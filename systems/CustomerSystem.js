@@ -1,0 +1,584 @@
+/*
+  CustomerSystem.js
+
+  담당:
+  - 3번 담당자 작업물 병합용 변환
+  - v2.2.1 팀장 병합 안정화
+
+  역할:
+  - 손님 NPC 생성
+  - 손님 타입 결정
+  - 손님별 구매 희망 상품 결정
+  - 손님 상태 / 구역 / 대기시간 관리
+  - 계산 완료 시 만족 손님 처리
+  - 대기시간 초과 시 화남 / 이탈 처리
+  - 랜덤 이벤트 후보 손님 조회 준비
+
+  규칙:
+  - 다른 시스템 직접 호출 금지
+  - EventBus로만 연결
+  - GameState.todayStats 직접 수정 금지
+  - 날짜는 실제 Date가 아니라 GameState.day 기준 사용
+  - Date.now() 사용 금지
+*/
+
+import { GameState } from "../core/GameState.js";
+import { EventBus } from "../core/EventBus.js";
+import { EVENTS } from "../core/Constants.js";
+
+import {
+  CUSTOMER_STATUS,
+  CUSTOMER_ZONES,
+  CUSTOMER_TYPES,
+  CUSTOMER_WANTED_PRODUCTS,
+  CUSTOMER_EVENTS
+} from "../data/CustomerData.js";
+
+export const CustomerSystem = {
+  customers: [],
+  customerIdCounter: 0,
+  routeTimerId: null,
+
+  init() {
+    EventBus.on(EVENTS.STORE_OPENED, () => {
+      this.startCustomerFlow();
+    });
+
+    EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data) => {
+      this.handleCheckoutCompleted(data);
+    });
+
+    EventBus.on(EVENTS.STORE_CLOSED, () => {
+      this.closeCustomerFlow();
+    });
+  },
+
+  startCustomerFlow() {
+    this.resetCustomersForDay();
+
+    const spawnCount = this.getSpawnCountByDay();
+    this.addCustomers(spawnCount);
+
+    this.startRouteTimer();
+
+    console.log(
+      `[CustomerSystem] Day ${GameState.day} 손님 ${spawnCount}명 생성 완료`
+    );
+  },
+
+  resetCustomersForDay() {
+    this.stopRouteTimer();
+
+    this.customers = [];
+    this.customerIdCounter = 0;
+  },
+
+  getSpawnCountByDay() {
+    const difficultyRate = GameState.difficulty?.customerSpawnRate ?? 1;
+    const baseCount = 3 + Math.floor(GameState.day * 1.2);
+
+    return Math.max(1, Math.floor(baseCount * difficultyRate));
+  },
+
+  addCustomers(count) {
+    const safeCount = Math.max(0, Math.floor(count));
+
+    for (let i = 0; i < safeCount; i += 1) {
+      const customer = this.createCustomer();
+
+      this.customers.push(customer);
+
+      EventBus.emit(EVENTS.CUSTOMER_ENTERED, this.createCustomerPayload(customer));
+    }
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  createCustomer() {
+    const customerType = this.pickCustomerType();
+    const wantedProduct = this.decideWantedProduct(customerType);
+    const routeState = this.getRouteStateByStatus(CUSTOMER_STATUS.ENTERING);
+
+    this.customerIdCounter += 1;
+
+    return {
+      id: `customer-${GameState.day}-${this.customerIdCounter}`,
+
+      typeId: customerType.id,
+      typeName: customerType.name,
+
+      patience: customerType.patience,
+      spendBias: customerType.spendBias,
+      eventChance: customerType.eventChance,
+
+      wantedProductId: wantedProduct.id,
+      wantedProductName: wantedProduct.name,
+
+      status: routeState.status,
+      currentZone: routeState.currentZone,
+      targetZone: routeState.targetZone,
+
+      waitTime: customerType.patience,
+      mood: "neutral",
+
+      isSatisfied: false,
+      hasReportedAngry: false,
+      hasReportedLeft: false
+    };
+  },
+
+  pickCustomerType() {
+    const totalWeight = CUSTOMER_TYPES.reduce((sum, type) => {
+      return sum + type.weight;
+    }, 0);
+
+    let target = Math.random() * totalWeight;
+
+    for (const type of CUSTOMER_TYPES) {
+      target -= type.weight;
+
+      if (target <= 0) {
+        return type;
+      }
+    }
+
+    return CUSTOMER_TYPES[CUSTOMER_TYPES.length - 1];
+  },
+
+  decideWantedProduct(customerType) {
+    const preferredProductIds = customerType.preferredProductIds ?? [];
+
+    const candidateProducts =
+      preferredProductIds.length > 0
+        ? CUSTOMER_WANTED_PRODUCTS.filter((product) => {
+            return preferredProductIds.includes(product.id);
+          })
+        : CUSTOMER_WANTED_PRODUCTS;
+
+    const safeCandidates =
+      candidateProducts.length > 0 ? candidateProducts : CUSTOMER_WANTED_PRODUCTS;
+
+    const randomIndex = Math.floor(Math.random() * safeCandidates.length);
+
+    return safeCandidates[randomIndex];
+  },
+
+  startRouteTimer() {
+    this.stopRouteTimer();
+
+    /*
+      실제 Date 객체는 사용하지 않음.
+      1초마다 게임 내 손님 상태만 갱신한다.
+    */
+    this.routeTimerId = setInterval(() => {
+      this.updateCustomersByTick(1);
+    }, 1000);
+  },
+
+  stopRouteTimer() {
+    if (!this.routeTimerId) return;
+
+    clearInterval(this.routeTimerId);
+    this.routeTimerId = null;
+  },
+
+  updateCustomersByTick(amount) {
+    let changed = false;
+
+    this.customers = this.customers.map((customer) => {
+      if (customer.status === CUSTOMER_STATUS.ENTERING) {
+        changed = true;
+        return this.transitionCustomerStatus(customer, CUSTOMER_STATUS.SHOPPING);
+      }
+
+      if (customer.status === CUSTOMER_STATUS.SHOPPING) {
+        changed = true;
+        return this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING);
+      }
+
+      if (customer.status === CUSTOMER_STATUS.WAITING) {
+        changed = true;
+        return this.decreaseWaitingCustomerTime(customer, amount);
+      }
+
+      if (customer.status === CUSTOMER_STATUS.ANGRY) {
+        changed = true;
+        return this.markCustomerAsLeaving(customer, "angry_leave");
+      }
+
+      return customer;
+    });
+
+    if (changed) {
+      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+    }
+  },
+
+  transitionCustomerStatus(customer, nextStatus) {
+    const routeState = this.getRouteStateByStatus(nextStatus);
+
+    return {
+      ...customer,
+      status: routeState.status,
+      currentZone: routeState.currentZone,
+      targetZone: routeState.targetZone
+    };
+  },
+
+  getRouteStateByStatus(status) {
+    const routeMap = {
+      [CUSTOMER_STATUS.ENTERING]: {
+        status: CUSTOMER_STATUS.ENTERING,
+        currentZone: CUSTOMER_ZONES.DOOR,
+        targetZone: CUSTOMER_ZONES.SHELF
+      },
+      [CUSTOMER_STATUS.SHOPPING]: {
+        status: CUSTOMER_STATUS.SHOPPING,
+        currentZone: CUSTOMER_ZONES.SHELF,
+        targetZone: CUSTOMER_ZONES.COUNTER
+      },
+      [CUSTOMER_STATUS.WAITING]: {
+        status: CUSTOMER_STATUS.WAITING,
+        currentZone: CUSTOMER_ZONES.COUNTER,
+        targetZone: CUSTOMER_ZONES.COUNTER
+      },
+      [CUSTOMER_STATUS.CHECKOUT]: {
+        status: CUSTOMER_STATUS.CHECKOUT,
+        currentZone: CUSTOMER_ZONES.COUNTER,
+        targetZone: CUSTOMER_ZONES.EXIT
+      },
+      [CUSTOMER_STATUS.LEAVING]: {
+        status: CUSTOMER_STATUS.LEAVING,
+        currentZone: CUSTOMER_ZONES.EXIT,
+        targetZone: CUSTOMER_ZONES.EXIT
+      },
+      [CUSTOMER_STATUS.ANGRY]: {
+        status: CUSTOMER_STATUS.ANGRY,
+        currentZone: CUSTOMER_ZONES.COUNTER,
+        targetZone: CUSTOMER_ZONES.EXIT
+      }
+    };
+
+    return routeMap[status] ?? routeMap[CUSTOMER_STATUS.ENTERING];
+  },
+
+  decreaseWaitingCustomerTime(customer, amount) {
+    const safeAmount = Math.max(0, Number(amount) || 0);
+    const nextWaitTime = Math.max(0, customer.waitTime - safeAmount);
+
+    const updatedCustomer = {
+      ...customer,
+      waitTime: nextWaitTime
+    };
+
+    if (nextWaitTime <= 0) {
+      return this.markCustomerAsAngry(updatedCustomer, "wait_timeout");
+    }
+
+    return updatedCustomer;
+  },
+
+  markCustomerAsAngry(customer, reason = "unknown") {
+    if (customer.hasReportedAngry) {
+      return customer;
+    }
+
+    const angryCustomer = {
+      ...customer,
+      status: CUSTOMER_STATUS.ANGRY,
+      mood: "angry",
+      currentZone: CUSTOMER_ZONES.COUNTER,
+      targetZone: CUSTOMER_ZONES.EXIT,
+      hasReportedAngry: true
+    };
+
+    EventBus.emit(EVENTS.CUSTOMER_ANGRY, {
+      ...this.createCustomerPayload(angryCustomer),
+      reason
+    });
+
+    return angryCustomer;
+  },
+
+  markCustomerAsLeaving(customer, reason = "unknown") {
+    if (customer.hasReportedLeft) {
+      return customer;
+    }
+
+    const leavingCustomer = {
+      ...customer,
+      status: CUSTOMER_STATUS.LEAVING,
+      currentZone: CUSTOMER_ZONES.EXIT,
+      targetZone: CUSTOMER_ZONES.EXIT,
+      hasReportedLeft: true
+    };
+
+    EventBus.emit(EVENTS.CUSTOMER_LEFT, {
+      ...this.createCustomerPayload(leavingCustomer),
+      reason
+    });
+
+    return leavingCustomer;
+  },
+
+  handleCheckoutCompleted(data = {}) {
+    const customer = this.getNextCheckoutCustomer();
+
+    if (!customer) {
+      console.warn("[CustomerSystem] 계산 가능한 손님이 없습니다.");
+      return;
+    }
+
+    const checkedOutCustomer = {
+      ...customer,
+      status: CUSTOMER_STATUS.LEAVING,
+      currentZone: CUSTOMER_ZONES.EXIT,
+      targetZone: CUSTOMER_ZONES.EXIT,
+      isSatisfied: true,
+      mood: "neutral",
+
+      /*
+        CUSTOMER_LEFT는 이탈/손실 손님 통계로 사용하기 때문에
+        만족한 손님은 CUSTOMER_LEFT를 emit하지 않는다.
+      */
+      hasReportedLeft: true
+    };
+
+    this.replaceCustomer(checkedOutCustomer);
+
+    EventBus.emit(EVENTS.CUSTOMER_SATISFIED, {
+      ...this.createCustomerPayload(checkedOutCustomer),
+      checkoutAmount: data.amount ?? 0
+    });
+
+    console.log(
+      `[CustomerSystem] ${checkedOutCustomer.typeName} 계산 완료: ${checkedOutCustomer.wantedProductName}`
+    );
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  closeCustomerFlow() {
+    this.stopRouteTimer();
+
+    this.customers = this.customers.map((customer) => {
+      const shouldLeave =
+        customer.status !== CUSTOMER_STATUS.LEAVING &&
+        !customer.isSatisfied &&
+        !customer.hasReportedLeft;
+
+      if (!shouldLeave) {
+        return customer;
+      }
+
+      return this.markCustomerAsLeaving(customer, "store_closed");
+    });
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  replaceCustomer(updatedCustomer) {
+    this.customers = this.customers.map((customer) => {
+      if (customer.id !== updatedCustomer.id) {
+        return customer;
+      }
+
+      return updatedCustomer;
+    });
+  },
+
+  createCustomerPayload(customer) {
+    return {
+      day: GameState.day,
+
+      customerId: customer.id,
+      customerTypeId: customer.typeId,
+      customerTypeName: customer.typeName,
+
+      wantedProductId: customer.wantedProductId,
+      wantedProductName: customer.wantedProductName,
+
+      status: customer.status,
+      currentZone: customer.currentZone,
+      targetZone: customer.targetZone,
+      waitTime: customer.waitTime,
+      mood: customer.mood
+    };
+  },
+
+  getCustomersByStatus(status) {
+    return this.customers.filter((customer) => {
+      return customer.status === status;
+    });
+  },
+
+  getCustomersByZone(zone) {
+    return this.customers.filter((customer) => {
+      return customer.currentZone === zone;
+    });
+  },
+
+  getCustomersNearDoor() {
+    return this.getCustomersByZone(CUSTOMER_ZONES.DOOR);
+  },
+
+  getCustomersNearShelf() {
+    return this.getCustomersByZone(CUSTOMER_ZONES.SHELF);
+  },
+
+  getWaitingCustomers() {
+    return this.customers.filter((customer) => {
+      return (
+        customer.status === CUSTOMER_STATUS.WAITING &&
+        customer.currentZone === CUSTOMER_ZONES.COUNTER &&
+        !customer.isSatisfied &&
+        !customer.hasReportedLeft
+      );
+    });
+  },
+
+  /*
+    v2.2.1 병합 안정화:
+    계산 대상 손님 조회 범위를 보완한다.
+
+    우선순위:
+    1. 계산대에서 waiting 상태인 손님
+    2. 계산대 근처에 있는 active 손님
+    3. shopping 상태 손님
+    4. entering 상태 손님
+
+    이유:
+    - 테스트 타이밍에 따라 손님이 아직 waiting 상태가 아닐 수 있음
+    - 팀원 시스템 연결 전까지 계산 이벤트가 먼저 발생해도 NPC 만족 처리가 가능해야 함
+  */
+  getCheckoutCandidates() {
+    return this.customers.filter((customer) => {
+      const isAlreadyDone =
+        customer.isSatisfied ||
+        customer.hasReportedLeft ||
+        customer.status === CUSTOMER_STATUS.LEAVING;
+
+      return !isAlreadyDone;
+    });
+  },
+
+  getNextCheckoutCustomer() {
+    const waitingCustomer = this.getWaitingCustomers()[0];
+
+    if (waitingCustomer) {
+      return waitingCustomer;
+    }
+
+    const candidates = this.getCheckoutCandidates();
+
+    const counterCustomer = candidates.find((customer) => {
+      return customer.currentZone === CUSTOMER_ZONES.COUNTER;
+    });
+
+    if (counterCustomer) {
+      return counterCustomer;
+    }
+
+    const shoppingCustomer = candidates.find((customer) => {
+      return customer.status === CUSTOMER_STATUS.SHOPPING;
+    });
+
+    if (shoppingCustomer) {
+      return shoppingCustomer;
+    }
+
+    const enteringCustomer = candidates.find((customer) => {
+      return customer.status === CUSTOMER_STATUS.ENTERING;
+    });
+
+    if (enteringCustomer) {
+      return enteringCustomer;
+    }
+
+    return null;
+  },
+
+  getAngryCustomers() {
+    return this.getCustomersByStatus(CUSTOMER_STATUS.ANGRY);
+  },
+
+  getActiveCustomers() {
+    return this.customers.filter((customer) => {
+      return (
+        customer.status !== CUSTOMER_STATUS.LEAVING &&
+        !customer.isSatisfied &&
+        !customer.hasReportedLeft
+      );
+    });
+  },
+
+  getCheckoutCustomerPayload() {
+    const customer = this.getNextCheckoutCustomer();
+
+    if (!customer) {
+      return null;
+    }
+
+    return this.createCustomerPayload(customer);
+  },
+
+  getAvailableEventsForCustomer(customer) {
+    if (!customer) {
+      return [];
+    }
+
+    return CUSTOMER_EVENTS.filter((event) => {
+      return event.allowedTypeIds.includes(customer.typeId);
+    });
+  },
+
+  canTriggerCustomerEvent(customer, randomValue = Math.random()) {
+    if (!customer) {
+      return false;
+    }
+
+    return randomValue < customer.eventChance;
+  },
+
+  pickCustomerEvent(customer, randomValue = Math.random()) {
+    const availableEvents = this.getAvailableEventsForCustomer(customer);
+
+    if (availableEvents.length === 0) {
+      return null;
+    }
+
+    const safeRandomValue = Math.min(Math.max(randomValue, 0), 0.999999);
+    const eventIndex = Math.floor(safeRandomValue * availableEvents.length);
+
+    return availableEvents[eventIndex];
+  },
+
+  getRandomEventTargetCustomer() {
+    const candidates = this.getWaitingCustomers().filter((customer) => {
+      return this.canTriggerCustomerEvent(customer);
+    });
+
+    return candidates[0] ?? null;
+  },
+
+  createRandomEventCandidatePayload() {
+    const customer = this.getRandomEventTargetCustomer();
+
+    if (!customer) {
+      return null;
+    }
+
+    const event = this.pickCustomerEvent(customer);
+
+    if (!event) {
+      return null;
+    }
+
+    return {
+      ...this.createCustomerPayload(customer),
+      eventId: event.id,
+      eventTitle: event.title,
+      eventDescription: event.description
+    };
+  }
+};

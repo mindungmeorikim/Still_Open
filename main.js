@@ -11,12 +11,14 @@ import { UIManager } from "./ui/UIManager.js";
 import { GameFlowSystem } from "./systems/GameFlowSystem.js";
 import { ResultSystem } from "./systems/ResultSystem.js";
 import { UpgradeSystem } from "./systems/UpgradeSystem.js";
+import { CustomerSystem } from "./systems/CustomerSystem.js";
 
 function initGame() {
   UIManager.init();
   GameFlowSystem.init();
   ResultSystem.init();
   UpgradeSystem.init();
+  CustomerSystem.init();
 
   EventBus.emit(EVENTS.GAME_INIT);
 

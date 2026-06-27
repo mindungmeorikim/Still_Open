@@ -132,3 +132,47 @@
 - 기존 EventBus 기반 흐름 유지
 
 ---
+
+## v2.2 / v2.2.1
+
+* 3번 담당 손님 NPC 작업물을 현재 프로젝트 구조에 맞게 병합용으로 변환
+* `data/CustomerData.js` 추가
+* `systems/CustomerSystem.js` 추가 및 EventBus 기반 구조로 변환
+* `main.js`에 `CustomerSystem.init()` 연결
+* 손님 타입 5종 추가
+
+  * 일반 손님
+  * 학생
+  * 회사원
+  * 급한 손님
+  * 진상 손님
+* 손님별 구매 희망 상품 데이터 추가
+
+  * `wantedProductId`
+  * `wantedProductName`
+* 손님 상태 관리값 추가
+
+  * `status`
+  * `currentZone`
+  * `targetZone`
+  * `waitTime`
+  * `mood`
+* 영업 시작 시 손님 자동 생성 기능 추가
+* 손님 생성 시 `CUSTOMER_ENTERED` 이벤트가 발생하도록 연결
+* 계산 완료 시 대기 손님을 만족 처리하고 `CUSTOMER_SATISFIED` 이벤트가 발생하도록 연결
+* 대기시간 초과 시 `CUSTOMER_ANGRY`, `CUSTOMER_LEFT` 이벤트가 발생할 수 있도록 구조 추가
+* 계산 대상 손님 조회 로직 보완
+
+  * `waiting` 상태 손님 우선 조회
+  * 대기 손님이 없을 경우 계산대 근처 손님, 쇼핑 중 손님, 입장 중 손님 순서로 조회
+* 테스트 타이밍에 따라 `CHECKOUT_COMPLETED` 이벤트가 먼저 발생해도 손님 만족 처리가 가능하도록 개선
+* 랜덤 이벤트 후보 손님 조회 함수 추가
+* 손님 타입별 이벤트 후보 판정 구조 추가
+* `Date.now()` 사용 제거
+* 손님 ID를 `GameState.day`와 내부 counter 기준으로 생성하도록 변경
+* `GameState.todayStats`를 직접 수정하지 않고 ResultSystem과 EventBus로 연결되도록 개선
+* 3번 담당 작업물의 기존 손님 NPC 로직은 유지하고, 현재 프로젝트 구조에 맞게 병합 안정화
+* 기존 EventBus 기반 연결 규칙 유지
+* 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
+
+---
