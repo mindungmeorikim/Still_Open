@@ -292,4 +292,27 @@ Live Server 실행
 
 **Still Open Team**
 
+# 📚 프로젝트 문서
+
+| 문서 | 용도 |
+|------|------|
+| README.md | 프로젝트 소개 및 협업 안내 |
+| EVENT_SPEC.md | EventBus 이벤트 및 시스템 인터페이스 명세 |
+| PROMPT_RULE.md | ChatGPT 공통 프롬프트 및 코드 작성 규칙 |
+| CHANGELOG.md | 버전별 개발 내역 및 변경 사항 기록 |
+
+---
+
+## 📢 개발 전 확인 사항
+
+개발을 시작하기 전에 아래 문서를 반드시 확인하세요.
+
+1. README.md
+2. EVENT_SPEC.md
+3. PROMPT_RULE.md
+
+모든 시스템은 EventBus를 통해 연결하며, 공통 파일 수정이 필요한 경우 팀원과 먼저 협의합니다.
+
+작업 전에는 반드시 최신 코드를 pull하고, 작업 완료 후 commit 및 push를 진행합니다.
+
 2026
