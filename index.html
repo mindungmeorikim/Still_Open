@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>오늘도 정상영업</title>
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <div id="game-root">
+    <header id="top-ui">
+      <h1>🏪 오늘도 정상영업</h1>
+
+      <div id="status-panel">
+        <p id="day-info">Day 1</p>
+        <p id="money-info">₩0</p>
+        <p id="satisfaction-info">만족도 100</p>
+        <p id="mental-info">멘탈 100</p>
+      </div>
+    </header>
+
+    <main id="game-screen">
+      <section id="store-area">
+        <div class="store-zone" id="entrance-zone">입구</div>
+        <div class="store-zone" id="shelf-zone">진열대</div>
+        <div class="store-zone" id="counter-zone">계산대</div>
+        <div class="store-zone" id="player-zone">플레이어</div>
+      </section>
+
+      <section id="message-panel">
+        <p id="system-message">게임 준비 중입니다.</p>
+      </section>
+    </main>
+
+    <footer id="bottom-ui">
+      <button id="start-day-button" type="button">Day 시작</button>
+      <button id="open-store-button" type="button">영업 시작</button>
+      <button id="end-day-button" type="button">하루 종료</button>
+    </footer>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

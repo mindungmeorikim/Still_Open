@@ -1,0 +1,153 @@
+/*
+  style.css
+  역할: v1.2 UI 기본 화면 스타일
+  규칙: 기존 id 이름 임의 변경 금지
+*/
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #eeeeee;
+  color: #222;
+}
+
+#game-root {
+  width: 100%;
+  max-width: 480px;
+  min-height: 100vh;
+  margin: 0 auto;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+#top-ui {
+  padding: 14px;
+  background: #222;
+  color: #fff;
+}
+
+#top-ui h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+}
+
+#status-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+#status-panel p {
+  margin: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #333;
+  font-size: 14px;
+  text-align: center;
+}
+
+#game-screen {
+  flex: 1;
+  padding: 12px;
+}
+
+#store-area {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  border: 2px solid #333;
+  border-radius: 12px;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.store-zone {
+  position: absolute;
+  min-width: 80px;
+  padding: 12px;
+  border: 2px solid #999;
+  border-radius: 12px;
+  background: #fff;
+  text-align: center;
+  font-weight: 700;
+}
+
+#entrance-zone {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+}
+
+#shelf-zone {
+  left: 20px;
+  top: 60px;
+}
+
+#counter-zone {
+  right: 20px;
+  bottom: 80px;
+}
+
+#player-zone {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #ffe082;
+}
+
+#message-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f1f1f1;
+}
+
+#system-message {
+  margin: 0;
+  font-size: 14px;
+}
+
+#bottom-ui {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  background: #fff;
+  border-top: 1px solid #ddd;
+}
+
+button {
+  flex: 1;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: #222;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 360px) {
+  #top-ui h1 {
+    font-size: 18px;
+  }
+
+  button {
+    font-size: 12px;
+  }
+
+  .store-zone {
+    min-width: 70px;
+    font-size: 13px;
+  }
+}
