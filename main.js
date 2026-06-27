@@ -8,13 +8,15 @@ import { EventBus } from "./core/EventBus.js";
 import { EVENTS } from "./core/Constants.js";
 
 import { UIManager } from "./ui/UIManager.js";
+import { GameFlowSystem } from "./systems/GameFlowSystem.js";
 
 function initGame() {
   UIManager.init();
+  GameFlowSystem.init();
 
   EventBus.emit(EVENTS.GAME_INIT);
 
-  console.log("오늘도 정상영업 v1.2 UI 초기화 완료");
+  console.log("오늘도 정상영업 v1.3 GameFlow 초기화 완료");
 }
 
 initGame();
