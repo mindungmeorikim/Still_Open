@@ -151,3 +151,94 @@ button:active {
     font-size: 13px;
   }
 }
+
+/* v2.1 정산 결과 모달 */
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+}
+
+.modal-content h2 {
+  margin: 0 0 14px;
+  font-size: 20px;
+  text-align: center;
+}
+
+.result-summary {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.result-summary.success {
+  background: #e8f5e9;
+}
+
+.result-summary.fail {
+  background: #ffebee;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eeeeee;
+  font-size: 15px;
+}
+
+.result-row span {
+  color: #555555;
+}
+
+.result-row strong {
+  text-align: right;
+}
+
+.modal-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: #777777;
+  text-align: center;
+}
+
+#result-confirm-button {
+  width: 100%;
+  margin-top: 18px;
+  min-height: 52px;
+  border: none;
+  border-radius: 14px;
+  background: #222222;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+#result-confirm-button:active {
+  transform: scale(0.98);
+}

@@ -9,6 +9,7 @@
   - 업그레이드 목록 관리
   - 업그레이드 선택 처리
   - 성공/실패 결과에 따른 업그레이드 메시지 처리
+  - 정산 결과 확인 후 다음 단계 진행
   - 다음 Day 준비 이벤트 전달
 
   규칙:
@@ -56,12 +57,13 @@ export const UpgradeSystem = {
       this.lastResultData = resultData;
 
       /*
-        정산 결과 메시지가 너무 빨리 업그레이드 메시지로 덮이지 않도록
-        짧은 지연 후 업그레이드 단계 진입
+        v2.1 변경:
+        정산 결과가 자동으로 사라지지 않도록
+        확인 버튼 클릭 후 업그레이드 단계로 이동
       */
-      this.upgradeTimerId = setTimeout(() => {
+      UIManager.showResultModal(resultData, () => {
         EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
-      }, 900);
+      });
     });
 
     EventBus.on(EVENTS.UPGRADE_PHASE_STARTED, (resultData) => {
@@ -77,7 +79,7 @@ export const UpgradeSystem = {
       : "목표 미달성. 다음 영업을 위해 기본 업그레이드를 적용합니다.";
 
     UIManager.showMessage(
-      `${successText} v2.0에서는 업그레이드가 자동 선택됩니다.`
+      `${successText} v2.1에서는 업그레이드가 자동 선택됩니다.`
     );
 
     UIManager.showUpgradeOptions(this.availableUpgrades);
@@ -127,9 +129,6 @@ export const UpgradeSystem = {
       resultData: this.lastResultData
     });
 
-    /*
-      업그레이드 적용 메시지가 보인 뒤 다음 Day로 넘어가도록 처리
-    */
     this.nextDayTimerId = setTimeout(() => {
       EventBus.emit(EVENTS.NEXT_DAY_READY, {
         currentDay: GameState.day,

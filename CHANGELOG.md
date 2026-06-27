@@ -120,3 +120,15 @@
 - 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 유지
 
 ---
+
+## v2.1
+
+- 정산 결과 확인 모달 구조 추가
+- 정산 결과가 자동으로 사라지지 않고 확인 버튼 클릭 후 다음 단계로 진행되도록 개선
+- `RESULT_CALCULATED` 이후 업그레이드 단계 자동 진입 흐름을 확인 버튼 기반으로 변경
+- 모바일 터치 환경에서도 확인 버튼을 누르기 쉽도록 모달 UI 추가
+- `UIManager.showResultModal()` 및 `UIManager.hideResultModal()` 추가
+- `UpgradeSystem`의 정산 이후 진행 흐름을 모달 확인 방식으로 변경
+- 기존 EventBus 기반 흐름 유지
+
+---
