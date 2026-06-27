@@ -10,15 +10,17 @@ import { EVENTS } from "./core/Constants.js";
 import { UIManager } from "./ui/UIManager.js";
 import { GameFlowSystem } from "./systems/GameFlowSystem.js";
 import { ResultSystem } from "./systems/ResultSystem.js";
+import { UpgradeSystem } from "./systems/UpgradeSystem.js";
 
 function initGame() {
   UIManager.init();
   GameFlowSystem.init();
   ResultSystem.init();
+  UpgradeSystem.init();
 
   EventBus.emit(EVENTS.GAME_INIT);
 
-  console.log("오늘도 정상영업 v1.4 ResultSystem 초기화 완료");
+  console.log("오늘도 정상영업 v1.5 UpgradeSystem 초기화 완료");
 }
 
 initGame();
