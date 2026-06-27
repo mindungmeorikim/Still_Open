@@ -8,11 +8,13 @@
   - 업그레이드 단계 진입
   - 업그레이드 목록 관리
   - 업그레이드 선택 처리
+  - 성공/실패 결과에 따른 업그레이드 메시지 처리
   - 다음 Day 준비 이벤트 전달
 
   규칙:
   - 다른 시스템 직접 호출 금지
   - EventBus로만 연결
+  - 날짜는 실제 Date가 아니라 GameState.day 기준 사용
 */
 
 import { GameState } from "../core/GameState.js";
@@ -45,25 +47,64 @@ export const UpgradeSystem = {
     }
   ],
 
+  lastResultData: null,
+  upgradeTimerId: null,
+  nextDayTimerId: null,
+
   init() {
     EventBus.on(EVENTS.RESULT_CALCULATED, (resultData) => {
-      EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
+      this.lastResultData = resultData;
+
+      /*
+        정산 결과 메시지가 너무 빨리 업그레이드 메시지로 덮이지 않도록
+        짧은 지연 후 업그레이드 단계 진입
+      */
+      this.upgradeTimerId = setTimeout(() => {
+        EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
+      }, 900);
     });
 
-    EventBus.on(EVENTS.UPGRADE_PHASE_STARTED, () => {
-      this.startUpgradePhase();
+    EventBus.on(EVENTS.UPGRADE_PHASE_STARTED, (resultData) => {
+      this.startUpgradePhase(resultData);
     });
   },
 
-  startUpgradePhase() {
+  startUpgradePhase(resultData = this.lastResultData) {
     GameState.phase = GAME_PHASE.UPGRADE;
 
-    UIManager.showMessage("업그레이드 단계입니다. v1.5에서는 첫 번째 업그레이드가 자동 선택됩니다.");
+    const successText = resultData && resultData.success
+      ? "목표 달성! 업그레이드를 적용합니다."
+      : "목표 미달성. 다음 영업을 위해 기본 업그레이드를 적용합니다.";
+
+    UIManager.showMessage(
+      `${successText} v2.0에서는 업그레이드가 자동 선택됩니다.`
+    );
+
     UIManager.showUpgradeOptions(this.availableUpgrades);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
-    this.selectUpgrade(this.availableUpgrades[0].id);
+    const autoUpgradeId = this.getAutoUpgradeId(resultData);
+
+    this.upgradeTimerId = setTimeout(() => {
+      this.selectUpgrade(autoUpgradeId);
+    }, 900);
+  },
+
+  getAutoUpgradeId(resultData) {
+    if (!resultData) {
+      return "fast_checkout";
+    }
+
+    if (!resultData.mentalSuccess || resultData.mental <= 40) {
+      return "mental_recovery";
+    }
+
+    if (!resultData.success) {
+      return "mental_recovery";
+    }
+
+    return "fast_checkout";
   },
 
   selectUpgrade(upgradeId) {
@@ -82,13 +123,20 @@ export const UpgradeSystem = {
 
     EventBus.emit(EVENTS.UPGRADE_SELECTED, {
       day: GameState.day,
-      upgrade: selectedUpgrade
+      upgrade: selectedUpgrade,
+      resultData: this.lastResultData
     });
 
-    EventBus.emit(EVENTS.NEXT_DAY_READY, {
-      currentDay: GameState.day,
-      selectedUpgrade
-    });
+    /*
+      업그레이드 적용 메시지가 보인 뒤 다음 Day로 넘어가도록 처리
+    */
+    this.nextDayTimerId = setTimeout(() => {
+      EventBus.emit(EVENTS.NEXT_DAY_READY, {
+        currentDay: GameState.day,
+        selectedUpgrade,
+        resultData: this.lastResultData
+      });
+    }, 700);
   },
 
   applyUpgrade(upgrade) {

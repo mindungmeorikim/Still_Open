@@ -7,6 +7,7 @@
   역할:
   - 하루 종료 후 매출, 비용, 순이익 정산
   - 만족도, 멘탈 점수 반영
+  - 목표 매출 / 목표 만족도 기준 성공 실패 판정
   - 팀원 시스템 이벤트를 받아 todayStats에 누적
   - 정산 결과 이벤트 전달
 
@@ -113,6 +114,10 @@ export const ResultSystem = {
   },
 
   calculateResult() {
+    if (this.shouldApplyMvpTestData()) {
+      this.applyMvpTestData();
+    }
+
     const stats = GameState.todayStats;
 
     stats.profit =
@@ -148,32 +153,122 @@ export const ResultSystem = {
 
     GameState.phase = GAME_PHASE.RESULT;
 
+    const revenueSuccess =
+      stats.revenue >= GameState.dailyGoal.targetRevenue;
+
+    const satisfactionSuccess =
+      GameState.satisfaction >= GameState.dailyGoal.targetSatisfaction;
+
+    const mentalSuccess =
+      GameState.mental > 0;
+
+    const success =
+      revenueSuccess &&
+      satisfactionSuccess &&
+      mentalSuccess;
+
     const resultData = {
       day: GameState.day,
+
       revenue: stats.revenue,
+      targetRevenue: GameState.dailyGoal.targetRevenue,
+
       cost: stats.cost,
       expiredLoss: stats.expiredLoss,
       eventPenalty: stats.eventPenalty,
       bmBonus: stats.bmBonus,
       profit: stats.profit,
       money: GameState.money,
+
       satisfaction: GameState.satisfaction,
+      targetSatisfaction: GameState.dailyGoal.targetSatisfaction,
       mental: GameState.mental,
+
       totalCustomers: stats.totalCustomers,
       satisfiedCustomers: stats.satisfiedCustomers,
       angryCustomers: stats.angryCustomers,
       lostCustomers: stats.lostCustomers,
+
       checkoutSuccessCount: stats.checkoutSuccessCount,
       restockCount: stats.restockCount,
       cleaningCount: stats.cleaningCount,
-      success: stats.revenue >= GameState.dailyGoal.targetRevenue
+
+      revenueSuccess,
+      satisfactionSuccess,
+      mentalSuccess,
+      success,
+
+      mvpTestDataApplied: stats.mvpTestDataApplied === true
     };
 
     UIManager.showResult(resultData);
+    UIManager.showMessage(this.createResultMessage(resultData));
     UIManager.render();
 
     EventBus.emit(EVENTS.RESULT_CALCULATED, resultData);
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  shouldApplyMvpTestData() {
+    const stats = GameState.todayStats;
+
+    return (
+      stats.revenue === 0 &&
+      stats.cost === 0 &&
+      stats.totalCustomers === 0 &&
+      stats.checkoutSuccessCount === 0 &&
+      stats.expiredLoss === 0 &&
+      stats.eventPenalty === 0 &&
+      stats.bmBonus === 0
+    );
+  },
+
+  applyMvpTestData() {
+    /*
+      임시 MVP 테스트 데이터
+      추후 CustomerSystem / InventorySystem / EconomySystem 연결 후 제거 가능
+
+      목적:
+      - NPC, 재고, 경제 시스템이 아직 완성되지 않아도
+        Day 종료 → 정산 → 업그레이드 → 다음 Day 흐름이 눈에 보이게 작동하도록 함
+    */
+
+    const targetRevenue = GameState.dailyGoal.targetRevenue;
+    const day = GameState.day;
+
+    GameState.todayStats.revenue = Math.floor(targetRevenue * 1.05);
+    GameState.todayStats.cost = Math.floor(targetRevenue * 0.35);
+
+    GameState.todayStats.totalCustomers = 6 + day * 2;
+    GameState.todayStats.satisfiedCustomers = 5 + day;
+    GameState.todayStats.angryCustomers = Math.max(1, Math.floor(day * 0.5));
+    GameState.todayStats.lostCustomers = 1;
+
+    GameState.todayStats.checkoutSuccessCount = 5 + day;
+    GameState.todayStats.restockCount = 2;
+    GameState.todayStats.cleaningCount = 1;
+
+    GameState.todayStats.expiredLoss = Math.floor(day * 500);
+    GameState.todayStats.eventPenalty = Math.floor(day * 300);
+    GameState.todayStats.bmBonus = 0;
+
+    GameState.todayStats.mvpTestDataApplied = true;
+  },
+
+  createResultMessage(resultData) {
+    const resultText = resultData.success ? "성공" : "실패";
+    const mvpText = resultData.mvpTestDataApplied
+      ? " / 임시 MVP 데이터 적용"
+      : "";
+
+    return (
+      `Day ${resultData.day} 정산 완료 | ` +
+      `결과: ${resultText} | ` +
+      `매출 ₩${resultData.revenue.toLocaleString()} / ` +
+      `목표 ₩${resultData.targetRevenue.toLocaleString()} | ` +
+      `만족도 ${resultData.satisfaction}/${resultData.targetSatisfaction} | ` +
+      `멘탈 ${resultData.mental}${mvpText}`
+    );
   },
 
   toNumber(value) {
