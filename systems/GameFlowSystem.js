@@ -12,6 +12,7 @@
   - 다음 Day 준비
   - Day 반복
   - Day별 목표/난이도 밸런스 관리
+  - 스토리 모드 클리어
   - 무한모드 진입
 
   규칙:
@@ -96,10 +97,22 @@ export const GameFlowSystem = {
   },
 
   startDay() {
+    if (
+      GameState.phase === GAME_PHASE.STORE_RUNNING ||
+      GameState.phase === GAME_PHASE.DAY_END ||
+      GameState.phase === GAME_PHASE.RESULT ||
+      GameState.phase === GAME_PHASE.UPGRADE
+    ) {
+      UIManager.showMessage("이미 Day가 진행 중입니다. 현재 단계를 먼저 완료해주세요.");
+      return;
+    }
+
     GameState.phase = GAME_PHASE.DAY_START;
 
+    const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
+
     UIManager.showMessage(
-      `Day ${GameState.day} 시작! 오늘 목표 매출은 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}입니다.`
+      `Day ${GameState.day} 시작! 현재 모드: ${modeText} / 오늘 목표 매출은 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}입니다.`
     );
 
     UIManager.render();
@@ -114,13 +127,19 @@ export const GameFlowSystem = {
     EventBus.emit(EVENTS.ORDER_PHASE_STARTED, {
       day: GameState.day,
       dailyGoal: GameState.dailyGoal,
-      difficulty: GameState.difficulty
+      difficulty: GameState.difficulty,
+      isEndlessMode: GameState.isEndlessMode
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
   openStore() {
+    if (GameState.phase !== GAME_PHASE.DAY_START && GameState.phase !== GAME_PHASE.ORDER) {
+      UIManager.showMessage("Day 시작 후에 영업을 시작할 수 있습니다.");
+      return;
+    }
+
     GameState.phase = GAME_PHASE.STORE_RUNNING;
 
     UIManager.showMessage("편의점 영업을 시작합니다. 손님을 받을 준비를 하세요!");
@@ -139,6 +158,11 @@ export const GameFlowSystem = {
   },
 
   closeStore() {
+    if (GameState.phase !== GAME_PHASE.STORE_RUNNING) {
+      UIManager.showMessage("영업 중일 때만 하루를 종료할 수 있습니다.");
+      return;
+    }
+
     GameState.phase = GAME_PHASE.DAY_END;
 
     UIManager.showMessage("하루 영업을 종료합니다. 정산을 준비합니다.");
@@ -159,6 +183,9 @@ export const GameFlowSystem = {
   },
 
   goToNextDay() {
+    const clearedStoryMode =
+      GameState.day === GAME_CONFIG.MAX_STORY_DAY && !GameState.isEndlessMode;
+
     GameState.day += 1;
 
     if (GameState.day > GAME_CONFIG.MAX_STORY_DAY) {
@@ -173,9 +200,15 @@ export const GameFlowSystem = {
 
     const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
 
-    UIManager.showMessage(
-      `Day ${GameState.day} 준비 완료! 현재 모드: ${modeText} / 목표 매출 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`
-    );
+    if (clearedStoryMode) {
+      UIManager.showMessage(
+        `스토리 모드 클리어! Day ${GameState.day}부터 무한모드에 진입합니다. 목표 매출 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`
+      );
+    } else {
+      UIManager.showMessage(
+        `Day ${GameState.day} 준비 완료! 현재 모드: ${modeText} / 목표 매출 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`
+      );
+    }
 
     UIManager.render();
 
