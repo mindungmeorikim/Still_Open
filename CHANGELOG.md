@@ -66,9 +66,18 @@
 - Day 6부터 무한모드 진입 구조 추가
 
 ---
-예정
 
-v1.7
+## v1.7
+
+- Day별 목표 매출 및 만족도 목표 구조 추가
+- Day 1~5 스토리 모드용 임시 밸런스 테이블 추가
+- Day 6 이후 무한모드용 자동 난이도 계산 구조 추가
+- `GameState.difficulty` 값이 Day에 따라 갱신되도록 개선
+- `DAY_STARTED`, `ORDER_PHASE_STARTED`, `STORE_OPENED` 이벤트 payload에 목표/난이도 데이터 전달 구조 유지
+- 실제 날짜(Date)가 아닌 `GameState.day` 기준으로 밸런스 계산
+
+---
+예정
 
 - NPC 연결
 
