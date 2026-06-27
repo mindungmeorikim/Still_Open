@@ -11,6 +11,7 @@
   - 하루 종료
   - 다음 Day 준비
   - Day 반복
+  - Day별 목표/난이도 밸런스 관리
   - 무한모드 진입
 
   규칙:
@@ -25,7 +26,69 @@ import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 
 export const GameFlowSystem = {
+  /*
+    임시 밸런스 데이터
+    추후 플레이 테스트 후 수정 가능
+
+    Day 1~5는 스토리 모드 기준 고정값
+    Day 6부터는 무한모드 공식 계산 사용
+  */
+  dayBalanceTable: {
+    1: {
+      targetRevenue: 30000,
+      targetSatisfaction: 70,
+      difficulty: {
+        customerSpawnRate: 1.0,
+        angryCustomerRate: 1.0,
+        stockDecreaseRate: 1.0,
+        eventRate: 1.0
+      }
+    },
+    2: {
+      targetRevenue: 45000,
+      targetSatisfaction: 70,
+      difficulty: {
+        customerSpawnRate: 1.15,
+        angryCustomerRate: 1.05,
+        stockDecreaseRate: 1.05,
+        eventRate: 1.05
+      }
+    },
+    3: {
+      targetRevenue: 60000,
+      targetSatisfaction: 72,
+      difficulty: {
+        customerSpawnRate: 1.3,
+        angryCustomerRate: 1.12,
+        stockDecreaseRate: 1.1,
+        eventRate: 1.1
+      }
+    },
+    4: {
+      targetRevenue: 80000,
+      targetSatisfaction: 75,
+      difficulty: {
+        customerSpawnRate: 1.5,
+        angryCustomerRate: 1.2,
+        stockDecreaseRate: 1.18,
+        eventRate: 1.18
+      }
+    },
+    5: {
+      targetRevenue: 100000,
+      targetSatisfaction: 78,
+      difficulty: {
+        customerSpawnRate: 1.75,
+        angryCustomerRate: 1.3,
+        stockDecreaseRate: 1.28,
+        eventRate: 1.3
+      }
+    }
+  },
+
   init() {
+    this.applyDayBalance();
+
     EventBus.on(EVENTS.DAY_START_REQUESTED, () => this.startDay());
     EventBus.on(EVENTS.STORE_OPEN_REQUESTED, () => this.openStore());
     EventBus.on(EVENTS.STORE_CLOSE_REQUESTED, () => this.closeStore());
@@ -50,7 +113,8 @@ export const GameFlowSystem = {
 
     EventBus.emit(EVENTS.ORDER_PHASE_STARTED, {
       day: GameState.day,
-      dailyGoal: GameState.dailyGoal
+      dailyGoal: GameState.dailyGoal,
+      difficulty: GameState.difficulty
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -66,7 +130,9 @@ export const GameFlowSystem = {
     EventBus.emit(EVENTS.STORE_OPENED, {
       day: GameState.day,
       phase: GameState.phase,
-      difficulty: GameState.difficulty
+      dailyGoal: GameState.dailyGoal,
+      difficulty: GameState.difficulty,
+      isEndlessMode: GameState.isEndlessMode
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -103,13 +169,12 @@ export const GameFlowSystem = {
     }
 
     this.resetTodayStats();
-    this.updateDailyGoal();
-    this.increaseDifficulty();
+    this.applyDayBalance();
 
     const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
 
     UIManager.showMessage(
-      `Day ${GameState.day} 준비 완료! 현재 모드: ${modeText}`
+      `Day ${GameState.day} 준비 완료! 현재 모드: ${modeText} / 목표 매출 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`
     );
 
     UIManager.render();
@@ -138,32 +203,42 @@ export const GameFlowSystem = {
     };
   },
 
-  updateDailyGoal() {
-    const baseRevenue = 30000;
-    const revenueIncreasePerDay = 15000;
+  applyDayBalance() {
+    const balance = this.getDayBalance(GameState.day);
 
     GameState.dailyGoal = {
-      targetRevenue:
-        baseRevenue + (GameState.day - 1) * revenueIncreasePerDay,
-      targetSatisfaction: 70
+      targetRevenue: balance.targetRevenue,
+      targetSatisfaction: balance.targetSatisfaction
+    };
+
+    GameState.difficulty = {
+      customerSpawnRate: balance.difficulty.customerSpawnRate,
+      angryCustomerRate: balance.difficulty.angryCustomerRate,
+      stockDecreaseRate: balance.difficulty.stockDecreaseRate,
+      eventRate: balance.difficulty.eventRate
     };
   },
 
-  increaseDifficulty() {
-    GameState.difficulty.customerSpawnRate = Number(
-      (1 + (GameState.day - 1) * 0.1).toFixed(2)
-    );
+  getDayBalance(day) {
+    if (this.dayBalanceTable[day]) {
+      return this.dayBalanceTable[day];
+    }
 
-    GameState.difficulty.angryCustomerRate = Number(
-      (1 + (GameState.day - 1) * 0.05).toFixed(2)
-    );
+    return this.getEndlessModeBalance(day);
+  },
 
-    GameState.difficulty.stockDecreaseRate = Number(
-      (1 + (GameState.day - 1) * 0.05).toFixed(2)
-    );
+  getEndlessModeBalance(day) {
+    const extraDay = day - GAME_CONFIG.MAX_STORY_DAY;
 
-    GameState.difficulty.eventRate = Number(
-      (1 + (GameState.day - 1) * 0.05).toFixed(2)
-    );
+    return {
+      targetRevenue: 100000 + extraDay * 25000,
+      targetSatisfaction: Math.min(90, 78 + extraDay),
+      difficulty: {
+        customerSpawnRate: Number((1.75 + extraDay * 0.12).toFixed(2)),
+        angryCustomerRate: Number((1.3 + extraDay * 0.07).toFixed(2)),
+        stockDecreaseRate: Number((1.28 + extraDay * 0.06).toFixed(2)),
+        eventRate: Number((1.3 + extraDay * 0.07).toFixed(2))
+      }
+    };
   }
 };
