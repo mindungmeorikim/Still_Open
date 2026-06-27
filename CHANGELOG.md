@@ -89,16 +89,19 @@
 - 기존 `GameState.day` 기준 Day 진행 규칙 유지
 
 ---
-예정
-- NPC 연결
 
-v1.8
+## v1.9
 
-- Inventory 연결
+- 팀원 시스템 연결을 위한 EventBus 수신 구조 추가
+- PlayerActionSystem 이벤트를 ResultSystem에서 정산 데이터로 반영
+- CustomerSystem 이벤트를 ResultSystem에서 손님 통계로 반영
+- Economy / Inventory / RandomEvent 이벤트를 ResultSystem에서 비용 및 손익 데이터로 반영
+- `CHECKOUT_COMPLETED`, `CUSTOMER_ENTERED`, `CUSTOMER_SATISFIED`, `CUSTOMER_ANGRY`, `CUSTOMER_LEFT` 이벤트 수신 처리 추가
+- `REVENUE_CHANGED`, `COST_CHANGED`, `EXPIRED_LOSS_RECORDED`, `EVENT_PENALTY_RECORDED`, `BM_BONUS_APPLIED` 이벤트 수신 처리 추가
+- 각 담당 시스템이 `GameState.todayStats`를 직접 수정하지 않고 EventBus로 정산 데이터에 반영될 수 있도록 구조 개선
+- 기존 EventBus 기반 연결 규칙 유지
 
-v1.9
-
-- Random Event 연결
+---
 
 v2.0
 
