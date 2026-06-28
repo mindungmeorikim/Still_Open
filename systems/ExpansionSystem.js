@@ -75,8 +75,10 @@ export const ExpansionSystem = {
       zoneName: zone.name,
       unlockCost: zone.unlockCost,
       remainingMoney: GameState.money,
+      unlockedZoneIds: [...this.unlockedZoneIds],
+      effects: this.getCurrentExpansionEffects(),
       expansionState: this.getExpansionState(),
-      message: `${zone.name} 확장 완료! 남은 돈은 ₩${GameState.money.toLocaleString()}입니다.`
+      message: `${zone.name} 확장 완료! ${this.getExpansionEffectMessage(zone)} 효과 적용. 남은 돈은 ₩${GameState.money.toLocaleString()}입니다.`
     };
 
     EventBus.emit(EVENTS.EXPANSION_COMPLETED, payload);
@@ -136,10 +138,72 @@ export const ExpansionSystem = {
       day: GameState.day,
       money: GameState.money,
       unlockedZoneIds,
+      effects: this.getCurrentExpansionEffects(),
       zones: EXPANSION_ZONES.map((zone) => {
         return this.createZoneState(zone);
       })
     };
+  },
+
+  getUnlockedZones() {
+    return EXPANSION_ZONES.filter((zone) => {
+      return this.unlockedZoneIds.has(zone.id);
+    });
+  },
+
+  getCurrentExpansionEffects() {
+    return this.getUnlockedZones().reduce((totalEffects, zone) => {
+      const effects = zone.effects ?? {};
+
+      return {
+        customerSpawnRateBonus:
+          totalEffects.customerSpawnRateBonus +
+          this.toNumber(effects.customerSpawnRateBonus),
+        targetRevenueBonus:
+          totalEffects.targetRevenueBonus +
+          this.toNumber(effects.targetRevenueBonus),
+        storeSizeBonus:
+          totalEffects.storeSizeBonus +
+          this.toNumber(effects.storeSizeBonus)
+      };
+    }, this.createEmptyExpansionEffects());
+  },
+
+  createExpansionEffectPayload() {
+    return {
+      day: GameState.day,
+      unlockedZoneIds: [...this.unlockedZoneIds],
+      effects: this.getCurrentExpansionEffects()
+    };
+  },
+
+  createEmptyExpansionEffects() {
+    return {
+      customerSpawnRateBonus: 0,
+      targetRevenueBonus: 0,
+      storeSizeBonus: 0
+    };
+  },
+
+  getExpansionEffectMessage(zone) {
+    const effectLabels = {
+      zone_basic: "기본 매장",
+      zone_extra_shelf: "추가 진열 구역",
+      zone_cold_food: "냉장·도시락 구역",
+      zone_premium_store: "프리미엄 매장 구역"
+    };
+
+    return effectLabels[zone.id] ?? "매장 확장";
+  },
+
+  toNumber(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+      return 0;
+    }
+
+    return numberValue;
   },
 
   createZoneState(zone) {

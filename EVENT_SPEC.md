@@ -158,9 +158,17 @@ payload 예시
   zoneName: "Lv.2 추가 진열 구역",
   unlockCost: 30000,
   remainingMoney: GameState.money,
+  unlockedZoneIds: ["zone_basic", "zone_extra_shelf"],
+  effects: {
+    customerSpawnRateBonus: 0.1,
+    targetRevenueBonus: 5000,
+    storeSizeBonus: 2
+  },
   expansionState: {}
 }
 ```
+
+`effects`는 해금된 확장 구역의 누적 효과입니다. `GameFlowSystem`은 이 payload를 저장해 Day별 기본 밸런스 위에 목표 매출 보너스와 손님 방문율 보너스를 더합니다.
 
 ### EXPANSION_FAILED
 
@@ -184,7 +192,7 @@ payload 예시
 - 실제 날짜 객체 사용 금지
 - 모든 확장 조건은 GameState.day 기준
 - ExpansionSystem은 GameState.money만 차감하고 GameState.todayStats를 직접 수정하지 않음
-- 재고 증가, 비용 정산, 입고 처리, 상품 슬롯 확장 효과는 v2.7에서 처리하지 않음
+- 재고 증가, 비용 정산, 입고 처리, 상품 슬롯 확장 효과는 확장 효과 반영 범위에 포함하지 않음
 
 ---
 

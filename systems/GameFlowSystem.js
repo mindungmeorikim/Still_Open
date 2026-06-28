@@ -27,6 +27,12 @@ import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 
 export const GameFlowSystem = {
+  expansionEffects: {
+    customerSpawnRateBonus: 0,
+    targetRevenueBonus: 0,
+    storeSizeBonus: 0
+  },
+
   /*
     임시 밸런스 데이터
     추후 플레이 테스트 후 수정 가능
@@ -94,6 +100,30 @@ export const GameFlowSystem = {
     EventBus.on(EVENTS.STORE_OPEN_REQUESTED, () => this.openStore());
     EventBus.on(EVENTS.STORE_CLOSE_REQUESTED, () => this.closeStore());
     EventBus.on(EVENTS.NEXT_DAY_READY, () => this.goToNextDay());
+    EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
+      this.applyExpansionEffects(data);
+    });
+  },
+
+  applyExpansionEffects(data = {}) {
+    this.expansionEffects = this.normalizeExpansionEffects(data.effects);
+    this.applyDayBalance();
+
+    UIManager.showMessage(
+      `확장 효과 적용: 목표 매출 +₩${this.expansionEffects.targetRevenueBonus.toLocaleString()} / 손님 방문 +${Math.round(this.expansionEffects.customerSpawnRateBonus * 100)}%`
+    );
+
+    UIManager.render();
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  normalizeExpansionEffects(effects = {}) {
+    return {
+      customerSpawnRateBonus: this.toNumber(effects.customerSpawnRateBonus),
+      targetRevenueBonus: this.toNumber(effects.targetRevenueBonus),
+      storeSizeBonus: this.toNumber(effects.storeSizeBonus)
+    };
   },
 
   startDay() {
@@ -238,14 +268,18 @@ export const GameFlowSystem = {
 
   applyDayBalance() {
     const balance = this.getDayBalance(GameState.day);
+    const expansionEffects = this.expansionEffects;
 
     GameState.dailyGoal = {
-      targetRevenue: balance.targetRevenue,
+      targetRevenue:
+        balance.targetRevenue + expansionEffects.targetRevenueBonus,
       targetSatisfaction: balance.targetSatisfaction
     };
 
     GameState.difficulty = {
-      customerSpawnRate: balance.difficulty.customerSpawnRate,
+      customerSpawnRate:
+        balance.difficulty.customerSpawnRate +
+        expansionEffects.customerSpawnRateBonus,
       angryCustomerRate: balance.difficulty.angryCustomerRate,
       stockDecreaseRate: balance.difficulty.stockDecreaseRate,
       eventRate: balance.difficulty.eventRate
@@ -273,5 +307,15 @@ export const GameFlowSystem = {
         eventRate: Number((1.3 + extraDay * 0.07).toFixed(2))
       }
     };
+  },
+
+  toNumber(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+      return 0;
+    }
+
+    return numberValue;
   }
 };

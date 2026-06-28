@@ -242,6 +242,7 @@ export const UIManager = {
         <h2 id="expansion-panel-title">매장 확장</h2>
         <span id="expansion-unlock-summary"></span>
       </div>
+      <div id="expansion-effect-summary" class="expansion-effect-summary"></div>
       <div id="expansion-zone-grid" class="expansion-zone-grid"></div>
       <p id="expansion-message">먼지 낀 옆 구역을 눌러 확장 조건을 확인하세요.</p>
     `;
@@ -273,6 +274,8 @@ export const UIManager = {
     if (unlockSummary) {
       unlockSummary.textContent = `${unlockedCount} / ${zoneStates.length}`;
     }
+
+    this.renderExpansionEffects(this.getExpansionEffectsViewModel(zoneStates));
 
     zoneGrid.innerHTML = zoneStates.map((zone) => {
       const statusLabel = this.getExpansionStatusLabel(zone.status);
@@ -377,6 +380,68 @@ export const UIManager = {
         }
       };
     });
+  },
+
+  getExpansionEffectsViewModel(zoneStates = []) {
+    const stateEffects = this.expansionState?.effects;
+
+    if (stateEffects) {
+      return {
+        customerSpawnRateBonus:
+          Number(stateEffects.customerSpawnRateBonus) || 0,
+        targetRevenueBonus:
+          Number(stateEffects.targetRevenueBonus) || 0,
+        storeSizeBonus:
+          Number(stateEffects.storeSizeBonus) || 0
+      };
+    }
+
+    return zoneStates
+      .filter((zone) => zone.isUnlocked)
+      .reduce((totalEffects, zone) => {
+        const effects = zone.effects ?? {};
+
+        return {
+          customerSpawnRateBonus:
+            totalEffects.customerSpawnRateBonus +
+            (Number(effects.customerSpawnRateBonus) || 0),
+          targetRevenueBonus:
+            totalEffects.targetRevenueBonus +
+            (Number(effects.targetRevenueBonus) || 0),
+          storeSizeBonus:
+            totalEffects.storeSizeBonus +
+            (Number(effects.storeSizeBonus) || 0)
+        };
+      }, {
+        customerSpawnRateBonus: 0,
+        targetRevenueBonus: 0,
+        storeSizeBonus: 0
+      });
+  },
+
+  renderExpansionEffects(effects) {
+    const effectSummary = document.getElementById("expansion-effect-summary");
+
+    if (!effectSummary) return;
+
+    const customerBonusPercent = Math.round(
+      effects.customerSpawnRateBonus * 100
+    );
+
+    effectSummary.innerHTML = `
+      <strong>현재 매장 효과</strong>
+      <div class="expansion-effect-list">
+        <span class="expansion-effect-item">
+          손님 방문 +${customerBonusPercent}%
+        </span>
+        <span class="expansion-effect-item">
+          목표 매출 +₩${effects.targetRevenueBonus.toLocaleString()}
+        </span>
+        <span class="expansion-effect-item">
+          매장 규모 Lv.${effects.storeSizeBonus}
+        </span>
+      </div>
+    `;
   },
 
   getExpansionMissingRequirements(zone, conditions) {

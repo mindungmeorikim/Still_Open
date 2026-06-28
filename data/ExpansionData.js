@@ -25,7 +25,12 @@ export const EXPANSION_ZONES = Object.freeze([
     requiredDay: 1,
     previousZoneId: null,
     defaultUnlocked: true,
-    description: "처음 인수한 작은 편의점입니다."
+    description: "처음 인수한 작은 편의점입니다.",
+    effects: {
+      customerSpawnRateBonus: 0,
+      targetRevenueBonus: 0,
+      storeSizeBonus: 1
+    }
   }),
   createExpansionZone({
     id: "zone_extra_shelf",
@@ -35,7 +40,12 @@ export const EXPANSION_ZONES = Object.freeze([
     requiredDay: 2,
     previousZoneId: "zone_basic",
     defaultUnlocked: false,
-    description: "낡은 박스를 치우고 추가 진열대를 둘 수 있는 공간입니다."
+    description: "낡은 박스를 치우고 추가 진열대를 둘 수 있는 공간입니다.",
+    effects: {
+      customerSpawnRateBonus: 0.1,
+      targetRevenueBonus: 5000,
+      storeSizeBonus: 1
+    }
   }),
   createExpansionZone({
     id: "zone_cold_food",
@@ -45,7 +55,12 @@ export const EXPANSION_ZONES = Object.freeze([
     requiredDay: 4,
     previousZoneId: "zone_extra_shelf",
     defaultUnlocked: false,
-    description: "냉장 상품과 도시락을 더 많이 운영할 수 있는 공간입니다."
+    description: "냉장 상품과 도시락을 더 많이 운영할 수 있는 공간입니다.",
+    effects: {
+      customerSpawnRateBonus: 0.15,
+      targetRevenueBonus: 10000,
+      storeSizeBonus: 1
+    }
   }),
   createExpansionZone({
     id: "zone_premium_store",
@@ -55,7 +70,12 @@ export const EXPANSION_ZONES = Object.freeze([
     requiredDay: 6,
     previousZoneId: "zone_cold_food",
     defaultUnlocked: false,
-    description: "세계 1등 편의점으로 가기 위한 프리미엄 공간입니다."
+    description: "세계 1등 편의점으로 가기 위한 프리미엄 공간입니다.",
+    effects: {
+      customerSpawnRateBonus: 0.25,
+      targetRevenueBonus: 20000,
+      storeSizeBonus: 1
+    }
   })
 ]);
 
