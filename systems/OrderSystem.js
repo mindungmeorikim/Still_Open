@@ -31,8 +31,38 @@ export const OrderSystem = {
       this.handleOrderConfirmed(data);
     });
 
+    EventBus.on(EVENTS.ORDER_REQUESTED, (data) => {
+      this.handleOrderRequested(data);
+    });
+
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
       this.handleStockOrganized(data);
+    });
+  },
+
+  handleOrderRequested(data = {}) {
+    const productId = data.productId;
+    const quantity = Number(data.quantity ?? 1);
+
+    if (!productId) {
+      console.warn("[OrderSystem] ORDER_REQUESTED에 productId가 없습니다.", data);
+      return;
+    }
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      console.warn("[OrderSystem] 잘못된 발주 수량입니다.", data);
+      return;
+    }
+
+    this.handleOrderConfirmed({
+      day: data.day ?? GameState.day,
+      source: "order_requested_compat",
+      items: [
+        {
+          productId,
+          quantity
+        }
+      ]
     });
   },
 
@@ -48,6 +78,17 @@ export const OrderSystem = {
     this.orderSequence += 1;
 
     const orderId = `order-${GameState.day}-${this.orderSequence}`;
+
+    if (totalCost > 0) {
+      EventBus.emit(EVENTS.COST_CHANGED, {
+        day: GameState.day,
+        orderId,
+        amount: totalCost,
+        reason: "order",
+        source: data.source ?? "order_confirmed",
+        items
+      });
+    }
 
     this.pendingDelivery = {
       orderId,
