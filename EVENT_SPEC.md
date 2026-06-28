@@ -70,6 +70,8 @@ EventBus.emit(EVENTS.DAY_STARTED, data);
 | DAY_START_REQUESTED | Day 시작 버튼 |
 | DAY_STARTED | Day 시작 |
 | ORDER_PHASE_STARTED | 발주 시작 |
+| ORDER_BUTTON_CLICKED | 상품 카드 발주 버튼 클릭 |
+| ORDER_REQUESTED | 상품 발주 요청 |
 | STORE_OPEN_REQUESTED | 영업 시작 버튼 |
 | STORE_OPENED | 영업 시작 |
 | STORE_CLOSE_REQUESTED | 영업 종료 버튼 |
@@ -80,6 +82,48 @@ EventBus.emit(EVENTS.DAY_STARTED, data);
 | UPGRADE_SELECTED | 업그레이드 선택 |
 | NEXT_DAY_READY | 다음 Day 준비 |
 | GAME_STATE_CHANGED | 상태 변경 |
+
+---
+
+## 발주 요청 이벤트
+
+### ORDER_BUTTON_CLICKED
+
+상품 카드의 발주 버튼을 눌렀을 때 발생하는 UI 입력 이벤트입니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  productId: "banana_milk",
+  productName: "달콤 바나나우유"
+}
+```
+
+### ORDER_REQUESTED
+
+특정 상품에 대한 발주 요청 이벤트입니다.
+
+추후 `OrderSystem`에서 이 이벤트를 받아 실제 발주 처리, 비용 차감, 재고 입고를 처리합니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  productId: "banana_milk",
+  productName: "달콤 바나나우유",
+  quantity: 1
+}
+```
+
+주의사항
+
+- 실제 날짜 객체 사용 금지
+- 모든 발주 일자는 GameState.day 기준
+- GameState.todayStats 직접 수정 금지
+- ORDER_REQUESTED는 요청 이벤트일 뿐 즉시 재고를 증가시키지 않음
 
 ---
 

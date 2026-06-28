@@ -245,6 +245,14 @@ export const UIManager = {
       unlockSummary.textContent = `${unlockedCount} / ${PRODUCTS.length}`;
     }
 
+    const orderItems = PRODUCTS.map((product) => {
+      return {
+        productId: product.id,
+        productName: product.name,
+        isUnlocked: product.unlockDay <= GameState.day
+      };
+    });
+
     productGrid.innerHTML = PRODUCTS.map((product) => {
       const inventoryItem = this.inventoryByProductId[product.id];
       const isLocked = product.unlockDay > GameState.day;
@@ -295,10 +303,56 @@ export const UIManager = {
                 <dd>${expireText}</dd>
               </div>
             </dl>
+
+            <button
+              class="product-order-button"
+              type="button"
+              data-product-id="${product.id}"
+              ${isLocked ? "disabled" : ""}
+            >
+              발주
+            </button>
           </div>
         </article>
       `;
     }).join("");
+
+    this.bindProductOrderButtons(orderItems);
+  },
+
+  bindProductOrderButtons(items = []) {
+    const productsById = items.reduce((productMap, product) => {
+      productMap[product.productId] = product;
+      return productMap;
+    }, {});
+
+    document.querySelectorAll(".product-order-button").forEach((button) => {
+      button.onclick = () => {
+        if (button.disabled) return;
+
+        const productId = button.dataset.productId;
+        const product = productsById[productId];
+
+        if (!product) return;
+
+        this.emitOrderRequest(product);
+      };
+    });
+  },
+
+  emitOrderRequest(product, quantity = 1) {
+    EventBus.emit(EVENTS.ORDER_BUTTON_CLICKED, {
+      day: GameState.day,
+      productId: product.productId,
+      productName: product.productName
+    });
+
+    EventBus.emit(EVENTS.ORDER_REQUESTED, {
+      day: GameState.day,
+      productId: product.productId,
+      productName: product.productName,
+      quantity
+    });
   },
 
   getProductCategoryLabel(category) {

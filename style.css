@@ -527,3 +527,26 @@ button:active {
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* v2.6 발주 버튼 */
+
+.product-order-button {
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border-radius: 8px;
+  background: #1f6f43;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.product-order-button:active {
+  transform: scale(0.98);
+}
+
+.product-order-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

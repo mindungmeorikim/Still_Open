@@ -259,3 +259,19 @@
 * 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
 
 ---
+
+## v2.6
+
+* 발주 버튼 입력 이벤트 구조 추가
+* `ORDER_BUTTON_CLICKED` 이벤트 추가
+* `ORDER_REQUESTED` 이벤트 추가
+* 상품 카드에 발주 버튼 추가
+* 발주 버튼 클릭 시 `ORDER_REQUESTED` 이벤트가 발생하도록 연결
+* 발주 요청 payload에 `day`, `productId`, `productName`, `quantity` 포함
+* 잠금 상품은 발주 버튼이 비활성화되도록 처리
+* 실제 발주 처리, 비용 차감, 재고 입고는 추후 `OrderSystem`에서 처리하도록 이벤트 입구만 구성
+* 기존 상품 카드 UI, 손님 NPC 표시 UI, 업그레이드 선택 UI 유지
+* 기존 EventBus 기반 연결 규칙 유지
+* 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
+
+---
