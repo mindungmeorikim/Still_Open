@@ -55,16 +55,16 @@ export const PlayerMovementSystem = {
 
   bindKeyboardEvents() {
     window.addEventListener("keydown", (event) => {
-      this.handleKeyChange(event.key, true);
+      this.handleKeyChange(event, true);
     });
 
     window.addEventListener("keyup", (event) => {
-      this.handleKeyChange(event.key, false);
+      this.handleKeyChange(event, false);
     });
   },
 
-  handleKeyChange(key, isPressed) {
-    const normalizedKey = key.toLowerCase();
+  handleKeyChange(event, isPressed) {
+    const normalizedKey = event.key.toLowerCase();
     let isMovementKey = true;
 
     if (normalizedKey === "arrowup" || normalizedKey === "w") {

@@ -30,8 +30,13 @@ function initGame() {
   ExpansionSystem.init();
   PlayerMovementSystem.init();
   EventBus.emit(EVENTS.GAME_INIT);
+  requestAnimationFrame(gameloop);
 
   console.log("오늘도 정상영업 v2.3 상품 재고 및 유통기한 시스템 초기화 완료");
 }
 
+function gameloop() {
+  PlayerMovementSystem.update();
+  requestAnimationFrame(gameloop);
+}
 initGame();
