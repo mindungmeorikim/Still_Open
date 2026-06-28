@@ -9,7 +9,7 @@
   - 업그레이드 목록 관리
   - 업그레이드 선택 처리
   - 성공/실패 결과에 따른 업그레이드 메시지 처리
-  - 정산 결과 확인 후 다음 단계 진행
+  - 정산 결과 확인 후 업그레이드 선택 UI 표시
   - 다음 Day 준비 이벤트 전달
 
   규칙:
@@ -49,7 +49,6 @@ export const UpgradeSystem = {
   ],
 
   lastResultData: null,
-  upgradeTimerId: null,
   nextDayTimerId: null,
 
   init() {
@@ -57,9 +56,8 @@ export const UpgradeSystem = {
       this.lastResultData = resultData;
 
       /*
-        v2.1 변경:
-        정산 결과가 자동으로 사라지지 않도록
-        확인 버튼 클릭 후 업그레이드 단계로 이동
+        정산 결과 확인 버튼을 누른 뒤
+        업그레이드 선택 단계로 이동한다.
       */
       UIManager.showResultModal(resultData, () => {
         EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
@@ -74,45 +72,24 @@ export const UpgradeSystem = {
   startUpgradePhase(resultData = this.lastResultData) {
     GameState.phase = GAME_PHASE.UPGRADE;
 
-    const successText = resultData && resultData.success
-      ? "목표 달성! 업그레이드를 적용합니다."
-      : "목표 미달성. 다음 영업을 위해 기본 업그레이드를 적용합니다.";
-
-    UIManager.showMessage(
-      `${successText} v2.1에서는 업그레이드가 자동 선택됩니다.`
-    );
-
+    UIManager.showMessage("업그레이드 1개를 선택해주세요.");
     UIManager.showUpgradeOptions(this.availableUpgrades);
 
+    UIManager.showUpgradeModal(
+      this.availableUpgrades,
+      (selectedUpgradeId) => {
+        this.selectUpgrade(selectedUpgradeId);
+      },
+      resultData
+    );
+
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
-
-    const autoUpgradeId = this.getAutoUpgradeId(resultData);
-
-    this.upgradeTimerId = setTimeout(() => {
-      this.selectUpgrade(autoUpgradeId);
-    }, 900);
-  },
-
-  getAutoUpgradeId(resultData) {
-    if (!resultData) {
-      return "fast_checkout";
-    }
-
-    if (!resultData.mentalSuccess || resultData.mental <= 40) {
-      return "mental_recovery";
-    }
-
-    if (!resultData.success) {
-      return "mental_recovery";
-    }
-
-    return "fast_checkout";
   },
 
   selectUpgrade(upgradeId) {
-    const selectedUpgrade = this.availableUpgrades.find(
-      (upgrade) => upgrade.id === upgradeId
-    );
+    const selectedUpgrade = this.availableUpgrades.find((upgrade) => {
+      return upgrade.id === upgradeId;
+    });
 
     if (!selectedUpgrade) {
       console.warn("존재하지 않는 업그레이드입니다:", upgradeId);

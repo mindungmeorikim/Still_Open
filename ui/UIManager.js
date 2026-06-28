@@ -10,10 +10,12 @@ import { GameState } from "../core/GameState.js";
 
 export const UIManager = {
   resultModal: null,
+  upgradeModal: null,
 
   init() {
     this.bindButtons();
     this.createResultModal();
+    this.createUpgradeModal();
     this.render();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
   },
@@ -158,5 +160,92 @@ export const UIManager = {
     if (!this.resultModal) return;
 
     this.resultModal.classList.add("hidden");
+  },
+
+  createUpgradeModal() {
+    if (document.getElementById("upgrade-modal")) {
+      this.upgradeModal = document.getElementById("upgrade-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "upgrade-modal";
+    modal.className = "modal hidden";
+
+    modal.innerHTML = `
+      <div class="modal-content upgrade-modal-content">
+        <h2 id="upgrade-modal-title">업그레이드 선택</h2>
+
+        <p id="upgrade-modal-description" class="upgrade-modal-description">
+          오늘의 보상으로 업그레이드 1개를 선택하세요.
+        </p>
+
+        <div id="upgrade-modal-list"></div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    this.upgradeModal = modal;
+  },
+
+  showUpgradeModal(upgrades, onSelect, resultData = null) {
+    if (!this.upgradeModal) {
+      this.createUpgradeModal();
+    }
+
+    const title = document.getElementById("upgrade-modal-title");
+    const description = document.getElementById("upgrade-modal-description");
+    const list = document.getElementById("upgrade-modal-list");
+
+    const resultText = resultData && resultData.success
+      ? "목표 달성 보상"
+      : "다음 영업 준비";
+
+    title.textContent = "업그레이드 선택";
+    description.textContent = `${resultText}으로 업그레이드 1개를 선택하세요.`;
+
+    list.innerHTML = "";
+
+    let alreadySelected = false;
+
+    upgrades.forEach((upgrade) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "upgrade-card";
+      button.dataset.upgradeId = upgrade.id;
+
+      button.innerHTML = `
+        <strong>${upgrade.name}</strong>
+        <span>${upgrade.description}</span>
+      `;
+
+      button.onclick = () => {
+        if (alreadySelected) return;
+
+        alreadySelected = true;
+
+        const upgradeButtons = list.querySelectorAll(".upgrade-card");
+        upgradeButtons.forEach((upgradeButton) => {
+          upgradeButton.disabled = true;
+        });
+
+        this.hideUpgradeModal();
+
+        if (typeof onSelect === "function") {
+          onSelect(upgrade.id);
+        }
+      };
+
+      list.appendChild(button);
+    });
+
+    this.upgradeModal.classList.remove("hidden");
+  },
+
+  hideUpgradeModal() {
+    if (!this.upgradeModal) return;
+
+    this.upgradeModal.classList.add("hidden");
   }
 };
