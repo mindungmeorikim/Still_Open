@@ -8,16 +8,21 @@ import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
+import { PRODUCTS } from "../data/ProductData.js";
 
 export const UIManager = {
   resultModal: null,
   upgradeModal: null,
+  productPanel: null,
+  inventoryByProductId: {},
 
   init() {
     this.bindButtons();
     this.bindGameEvents();
+    this.bindInventoryEvents();
     this.createResultModal();
     this.createUpgradeModal();
+    this.createProductPanel();
     this.render();
     this.renderCustomers();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
@@ -45,6 +50,19 @@ export const UIManager = {
     EventBus.on(EVENTS.GAME_STATE_CHANGED, () => {
       this.render();
       this.renderCustomers();
+    });
+  },
+
+  bindInventoryEvents() {
+    EventBus.on(EVENTS.INVENTORY_CHANGED, (data) => {
+      const items = Array.isArray(data.items) ? data.items : [];
+
+      this.inventoryByProductId = items.reduce((inventoryMap, item) => {
+        inventoryMap[item.productId] = item;
+        return inventoryMap;
+      }, {});
+
+      this.renderProductCards();
     });
   },
 
@@ -172,10 +190,127 @@ export const UIManager = {
   },
 
   render() {
+    this.renderProductCards();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  createProductPanel() {
+    const existingPanel = document.getElementById("product-panel");
+
+    if (existingPanel) {
+      this.productPanel = existingPanel;
+      return;
+    }
+
+    const gameScreen = document.getElementById("game-screen");
+    const messagePanel = document.getElementById("message-panel");
+
+    if (!gameScreen) return;
+
+    const productPanel = document.createElement("section");
+
+    productPanel.id = "product-panel";
+    productPanel.setAttribute("aria-labelledby", "product-panel-title");
+    productPanel.innerHTML = `
+      <div class="product-panel-header">
+        <h2 id="product-panel-title">상품 진열대</h2>
+        <span id="product-unlock-summary"></span>
+      </div>
+      <div id="product-card-grid" class="product-card-grid"></div>
+    `;
+
+    if (messagePanel) {
+      gameScreen.insertBefore(productPanel, messagePanel);
+    } else {
+      gameScreen.appendChild(productPanel);
+    }
+
+    this.productPanel = productPanel;
+  },
+
+  renderProductCards() {
+    const productGrid = document.getElementById("product-card-grid");
+    const unlockSummary = document.getElementById("product-unlock-summary");
+
+    if (!productGrid) return;
+
+    const unlockedCount = PRODUCTS.filter((product) => {
+      return product.unlockDay <= GameState.day;
+    }).length;
+
+    if (unlockSummary) {
+      unlockSummary.textContent = `${unlockedCount} / ${PRODUCTS.length}`;
+    }
+
+    productGrid.innerHTML = PRODUCTS.map((product) => {
+      const inventoryItem = this.inventoryByProductId[product.id];
+      const isLocked = product.unlockDay > GameState.day;
+      const quantity = inventoryItem?.quantity;
+      const stockText = Number.isFinite(quantity) ? `${quantity}개` : "-";
+      const nextExpireDay = inventoryItem?.nextExpireDay;
+      const expireText = Number.isFinite(nextExpireDay)
+        ? `Day ${nextExpireDay}`
+        : "-";
+
+      return `
+        <article
+          class="product-card${isLocked ? " is-locked" : ""}"
+          data-product-id="${product.id}"
+        >
+          <div class="product-image-wrap">
+            <img
+              class="product-image"
+              src="${product.imagePath}"
+              alt="${product.name}"
+              loading="lazy"
+              decoding="async"
+            />
+            ${
+              isLocked
+                ? `<span class="product-lock-badge">Day ${product.unlockDay} 해금</span>`
+                : ""
+            }
+          </div>
+
+          <div class="product-card-content">
+            <span class="product-category">
+              ${this.getProductCategoryLabel(product.category)}
+            </span>
+            <h3>${product.name}</h3>
+
+            <dl class="product-card-stats">
+              <div>
+                <dt>판매가</dt>
+                <dd>₩${product.salePrice.toLocaleString()}</dd>
+              </div>
+              <div>
+                <dt>재고</dt>
+                <dd>${stockText}</dd>
+              </div>
+              <div>
+                <dt>다음 폐기</dt>
+                <dd>${expireText}</dd>
+              </div>
+            </dl>
+          </div>
+        </article>
+      `;
+    }).join("");
+  },
+
+  getProductCategoryLabel(category) {
+    const categoryLabels = {
+      snack: "과자",
+      drink: "음료",
+      ready_meal: "즉석식품",
+      instant_food: "간편식",
+      fresh_food: "신선식품"
+    };
+
+    return categoryLabels[category] ?? "상품";
   },
 
   showMessage(message) {

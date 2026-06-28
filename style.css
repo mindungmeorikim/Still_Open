@@ -192,6 +192,134 @@ body {
   border-style: dashed;
 }
 
+/* 상품 카드 */
+
+#product-panel {
+  margin-top: 14px;
+}
+
+.product-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.product-panel-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+#product-unlock-summary {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #222222;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.product-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.product-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.product-image-wrap {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: #f8f4e9;
+}
+
+.product-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.product-card.is-locked .product-image {
+  filter: grayscale(0.8);
+  opacity: 0.48;
+}
+
+.product-lock-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  transform: translateX(-50%);
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(34, 34, 34, 0.9);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.product-card-content {
+  min-width: 0;
+  padding: 9px;
+}
+
+.product-category {
+  display: inline-block;
+  margin-bottom: 4px;
+  color: #727272;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.product-card h3 {
+  min-height: 38px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.product-card-stats {
+  margin: 0;
+}
+
+.product-card-stats > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid #eeeeee;
+}
+
+.product-card-stats dt,
+.product-card-stats dd {
+  margin: 0;
+  font-size: 11px;
+}
+
+.product-card-stats dt {
+  color: #777777;
+}
+
+.product-card-stats dd {
+  color: #222222;
+  font-weight: 800;
+  text-align: right;
+}
+
 #message-panel {
   margin-top: 12px;
   padding: 12px;
@@ -240,6 +368,15 @@ button:active {
 
   .store-zone {
     min-width: 70px;
+    font-size: 13px;
+  }
+
+  .product-card-content {
+    padding: 8px;
+  }
+
+  .product-card h3 {
+    min-height: 35px;
     font-size: 13px;
   }
 }
