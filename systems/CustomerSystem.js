@@ -268,7 +268,8 @@ export const CustomerSystem = {
 
     const updatedCustomer = {
       ...customer,
-      waitTime: nextWaitTime
+      waitTime: nextWaitTime,
+      mood: this.getMoodByWaitingPressure(customer, nextWaitTime)
     };
 
     if (nextWaitTime <= 0) {
@@ -276,6 +277,22 @@ export const CustomerSystem = {
     }
 
     return updatedCustomer;
+  },
+
+  getMoodByWaitingPressure(customer, waitTime) {
+    const patience = Math.max(1, Number(customer.patience) || 1);
+    const waitRatio = Math.max(0, waitTime) / patience;
+    const angryThreshold = customer.typeId === "difficult" ? 0.6 : 0.25;
+
+    if (waitRatio <= angryThreshold) {
+      return "angry";
+    }
+
+    if (waitRatio <= 0.5) {
+      return "impatient";
+    }
+
+    return customer.mood === "angry" ? "impatient" : "neutral";
   },
 
   markCustomerAsAngry(customer, reason = "unknown") {
@@ -322,11 +339,20 @@ export const CustomerSystem = {
   },
 
   handleCheckoutCompleted(data = {}) {
-    const customer = this.getNextCheckoutCustomer();
+    const customer = this.getCheckoutCustomerForCompletion(data);
 
     if (!customer) {
       console.warn("[CustomerSystem] 계산 가능한 손님이 없습니다.");
       return;
+    }
+
+    if (
+      data.wantedProductId &&
+      data.wantedProductId !== customer.wantedProductId
+    ) {
+      console.warn(
+        `[CustomerSystem] Checkout product mismatch: expected ${customer.wantedProductId}, received ${data.wantedProductId}`
+      );
     }
 
     const checkedOutCustomer = {
@@ -358,6 +384,22 @@ export const CustomerSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
+  getCheckoutCustomerForCompletion(data = {}) {
+    if (data.customerId) {
+      const customer = this.getCustomerById(data.customerId);
+
+      if (customer && this.isCheckoutCandidate(customer)) {
+        return customer;
+      }
+
+      console.warn(
+        `[CustomerSystem] Checkout customer not found or unavailable: ${data.customerId}`
+      );
+    }
+
+    return this.getNextCheckoutCustomer();
+  },
+
   closeCustomerFlow() {
     this.stopRouteTimer();
 
@@ -387,6 +429,16 @@ export const CustomerSystem = {
     });
   },
 
+  getCustomerById(customerId) {
+    if (!customerId) {
+      return null;
+    }
+
+    return this.customers.find((customer) => {
+      return customer.id === customerId;
+    }) ?? null;
+  },
+
   createCustomerPayload(customer) {
     return {
       day: GameState.day,
@@ -404,6 +456,28 @@ export const CustomerSystem = {
       waitTime: customer.waitTime,
       mood: customer.mood
     };
+  },
+
+  createRenderableCustomerPayload(customer) {
+    return {
+      customerId: customer.id,
+      typeId: customer.typeId,
+      typeName: customer.typeName,
+      wantedProductId: customer.wantedProductId,
+      wantedProductName: customer.wantedProductName,
+      status: customer.status,
+      currentZone: customer.currentZone,
+      targetZone: customer.targetZone,
+      waitTime: customer.waitTime,
+      mood: customer.mood,
+      isSatisfied: customer.isSatisfied
+    };
+  },
+
+  getRenderableCustomers() {
+    return this.customers.map((customer) => {
+      return this.createRenderableCustomerPayload(customer);
+    });
   },
 
   getCustomersByStatus(status) {
@@ -453,13 +527,20 @@ export const CustomerSystem = {
   */
   getCheckoutCandidates() {
     return this.customers.filter((customer) => {
-      const isAlreadyDone =
-        customer.isSatisfied ||
-        customer.hasReportedLeft ||
-        customer.status === CUSTOMER_STATUS.LEAVING;
-
-      return !isAlreadyDone;
+      return this.isCheckoutCandidate(customer);
     });
+  },
+
+  isCheckoutCandidate(customer) {
+    if (!customer) {
+      return false;
+    }
+
+    return (
+      !customer.isSatisfied &&
+      !customer.hasReportedLeft &&
+      customer.status !== CUSTOMER_STATUS.LEAVING
+    );
   },
 
   getNextCheckoutCustomer() {
@@ -496,6 +577,48 @@ export const CustomerSystem = {
     }
 
     return null;
+  },
+
+  markCustomerAsCheckout(customerId) {
+    const customer = this.getCustomerById(customerId);
+
+    if (!this.isCheckoutCandidate(customer)) {
+      return null;
+    }
+
+    const checkoutCustomer = this.transitionCustomerStatus(
+      customer,
+      CUSTOMER_STATUS.CHECKOUT
+    );
+
+    this.replaceCustomer(checkoutCustomer);
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    return this.createCustomerPayload(checkoutCustomer);
+  },
+
+  handleStockShortageForCustomer(customerId, reason = "stock_shortage") {
+    const customer = this.getCustomerById(customerId);
+
+    if (!this.isCheckoutCandidate(customer)) {
+      return null;
+    }
+
+    /*
+      Prepared for a future EventBus contract with checkout or inventory systems.
+      This is intentionally not wired to InventorySystem or PlayerActionSystem yet.
+    */
+    const updatedCustomer =
+      customer.typeId === "difficult"
+        ? this.markCustomerAsAngry(customer, reason)
+        : this.markCustomerAsLeaving(customer, reason);
+
+    this.replaceCustomer(updatedCustomer);
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    return this.createCustomerPayload(updatedCustomer);
   },
 
   getAngryCustomers() {
