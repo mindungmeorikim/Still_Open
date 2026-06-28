@@ -71,6 +71,9 @@ export const EXPANSION_ZONES = Object.freeze([
     previousZoneId: "zone_cold_food",
     defaultUnlocked: false,
     description: "세계 1등 편의점으로 가기 위한 프리미엄 공간입니다.",
+    isFinalGoal: true,
+    endingTitle: "세계 1등 편의점 달성!",
+    endingDescription: "먼지 나는 작은 편의점이 세계 최고의 K-편의점으로 성장했습니다.",
     effects: {
       customerSpawnRateBonus: 0.25,
       targetRevenueBonus: 20000,

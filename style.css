@@ -796,3 +796,100 @@ button:active {
     font-size: 13px;
   }
 }
+
+.ending-modal-content {
+  max-width: 420px;
+  border: 3px solid #ffcf5a;
+  background:
+    linear-gradient(180deg, #fff9dc 0%, #ffffff 54%, #f3ffef 100%);
+  box-shadow: 0 18px 42px rgba(49, 83, 59, 0.24);
+  text-align: center;
+}
+
+.ending-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  margin: 0 0 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #ffec99;
+  color: #6f4b00;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ending-title {
+  margin: 0;
+  color: #31533b;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.ending-description {
+  margin: 12px 0 16px;
+  color: #4f4f4f;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ending-reward-box {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid #dceacb;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ending-reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(49, 83, 59, 0.1);
+  color: #666666;
+  font-size: 13px;
+}
+
+.ending-reward-row:last-child {
+  border-bottom: 0;
+}
+
+.ending-reward-row strong {
+  color: #31533b;
+  font-weight: 900;
+  text-align: right;
+}
+
+.ending-continue-button {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 8px;
+  background: #31533b;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ending-continue-button:active {
+  transform: scale(0.98);
+}
+
+@media (max-width: 420px) {
+  .ending-modal-content {
+    width: calc(100% - 28px);
+    padding: 18px 14px;
+  }
+
+  .ending-title {
+    font-size: 21px;
+  }
+
+  .ending-reward-row {
+    font-size: 12px;
+  }
+}

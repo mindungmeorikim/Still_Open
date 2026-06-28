@@ -25,6 +25,7 @@ import {
 export const ExpansionSystem = {
   unlockedZoneIds: new Set(),
   isInitialized: false,
+  finalEndingMinDay: 6,
 
   init() {
     if (this.isInitialized) return;
@@ -82,6 +83,22 @@ export const ExpansionSystem = {
     };
 
     EventBus.emit(EVENTS.EXPANSION_COMPLETED, payload);
+
+    const canShowFinalEnding =
+      zone.isFinalGoal === true && GameState.day >= this.finalEndingMinDay;
+
+    if (canShowFinalEnding) {
+      EventBus.emit(EVENTS.ENDING_ACHIEVED, {
+        day: GameState.day,
+        zoneId: zone.id,
+        zoneName: zone.name,
+        endingTitle: zone.endingTitle,
+        endingDescription: zone.endingDescription,
+        unlockedZoneIds: [...this.unlockedZoneIds],
+        effects: this.getCurrentExpansionEffects()
+      });
+    }
+
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 

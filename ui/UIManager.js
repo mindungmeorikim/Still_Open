@@ -17,6 +17,7 @@ import {
 export const UIManager = {
   resultModal: null,
   upgradeModal: null,
+  endingModal: null,
   productPanel: null,
   expansionPanel: null,
   expansionState: null,
@@ -27,8 +28,10 @@ export const UIManager = {
     this.bindGameEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
+    this.bindEndingEvents();
     this.createResultModal();
     this.createUpgradeModal();
+    this.createEndingModal();
     this.createExpansionPanel();
     this.createProductPanel();
     this.render();
@@ -85,6 +88,12 @@ export const UIManager = {
       this.expansionState = data.expansionState ?? this.expansionState;
       this.showExpansionMessage(data.message ?? "확장 조건을 다시 확인해주세요.");
       this.renderExpansionZones(this.expansionState);
+    });
+  },
+
+  bindEndingEvents() {
+    EventBus.on(EVENTS.ENDING_ACHIEVED, (data) => {
+      this.showEndingModal(data);
     });
   },
 
@@ -830,6 +839,100 @@ export const UIManager = {
     if (!this.resultModal) return;
 
     this.resultModal.classList.add("hidden");
+  },
+
+  createEndingModal() {
+    if (document.getElementById("ending-modal")) {
+      this.endingModal = document.getElementById("ending-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "ending-modal";
+    modal.className = "modal hidden";
+
+    modal.innerHTML = `
+      <div class="modal-content ending-modal-content">
+        <p class="ending-kicker">최종 목표 달성</p>
+        <h2 id="ending-modal-title" class="ending-title">세계 1등 편의점 달성!</h2>
+
+        <p id="ending-modal-description" class="ending-description">
+          먼지 나는 작은 편의점이 세계 최고의 K-편의점으로 성장했습니다.
+        </p>
+
+        <div id="ending-modal-reward" class="ending-reward-box"></div>
+
+        <button id="ending-continue-button" class="ending-continue-button" type="button">
+          무한모드 계속하기
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    this.endingModal = modal;
+  },
+
+  showEndingModal(endingData = {}) {
+    if (!this.endingModal) {
+      this.createEndingModal();
+    }
+
+    const title = document.getElementById("ending-modal-title");
+    const description = document.getElementById("ending-modal-description");
+    const rewardBox = document.getElementById("ending-modal-reward");
+    const continueButton = document.getElementById("ending-continue-button");
+    const effects = endingData.effects ?? {};
+    const customerBonusPercent = Math.round(
+      (Number(effects.customerSpawnRateBonus) || 0) * 100
+    );
+    const targetRevenueBonus = Number(effects.targetRevenueBonus) || 0;
+    const storeSizeBonus = Number(effects.storeSizeBonus) || 0;
+
+    title.textContent = endingData.endingTitle ?? "세계 1등 편의점 달성!";
+    description.textContent = endingData.endingDescription ??
+      "작은 편의점에서 시작해 최고의 K-편의점으로 성장했습니다.";
+
+    rewardBox.innerHTML = `
+      <div class="ending-reward-row">
+        <span>달성 Day</span>
+        <strong>Day ${endingData.day ?? GameState.day}</strong>
+      </div>
+      <div class="ending-reward-row">
+        <span>최종 구역</span>
+        <strong>${endingData.zoneName ?? "프리미엄 매장 구역"}</strong>
+      </div>
+      <div class="ending-reward-row">
+        <span>손님 방문</span>
+        <strong>+${customerBonusPercent}%</strong>
+      </div>
+      <div class="ending-reward-row">
+        <span>목표 매출</span>
+        <strong>+₩${targetRevenueBonus.toLocaleString()}</strong>
+      </div>
+      <div class="ending-reward-row">
+        <span>매장 규모</span>
+        <strong>Lv.${storeSizeBonus}</strong>
+      </div>
+    `;
+
+    continueButton.onclick = () => {
+      this.hideEndingModal();
+
+      EventBus.emit(EVENTS.ENDING_MODAL_CLOSED, {
+        day: GameState.day,
+        zoneId: endingData.zoneId ?? null,
+        zoneName: endingData.zoneName ?? ""
+      });
+    };
+
+    this.endingModal.classList.remove("hidden");
+  },
+
+  hideEndingModal() {
+    if (!this.endingModal) return;
+
+    this.endingModal.classList.add("hidden");
   },
 
   createUpgradeModal() {
