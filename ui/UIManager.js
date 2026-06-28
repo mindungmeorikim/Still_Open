@@ -7,14 +7,17 @@
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
+import { CustomerSystem } from "../systems/CustomerSystem.js";
 
 export const UIManager = {
   resultModal: null,
 
   init() {
     this.bindButtons();
+    this.bindGameEvents();
     this.createResultModal();
     this.render();
+    this.renderCustomers();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
   },
 
@@ -34,6 +37,96 @@ export const UIManager = {
     endDayButton.addEventListener("click", () => {
       EventBus.emit(EVENTS.STORE_CLOSE_REQUESTED);
     });
+  },
+
+  bindGameEvents() {
+    EventBus.on(EVENTS.GAME_STATE_CHANGED, () => {
+      this.render();
+      this.renderCustomers();
+    });
+  },
+
+  getCustomerLayer() {
+    const storeArea = document.getElementById("store-area");
+
+    if (!storeArea) {
+      return null;
+    }
+
+    let customerLayer = document.getElementById("customer-layer");
+
+    if (!customerLayer) {
+      customerLayer = document.createElement("div");
+      customerLayer.id = "customer-layer";
+      storeArea.appendChild(customerLayer);
+    }
+
+    return customerLayer;
+  },
+
+  renderCustomers() {
+    const customerLayer = this.getCustomerLayer();
+
+    if (!customerLayer) {
+      return;
+    }
+
+    const customers = CustomerSystem.getRenderableCustomers().filter((customer) => {
+      return !(customer.status === "leaving" && customer.isSatisfied);
+    });
+
+    const visibleCustomerIds = new Set(
+      customers.map((customer) => customer.customerId)
+    );
+    const existingNodes = new Map(
+      [...customerLayer.querySelectorAll(".customer-npc")].map((node) => {
+        return [node.dataset.customerId, node];
+      })
+    );
+
+    existingNodes.forEach((node, customerId) => {
+      if (!visibleCustomerIds.has(customerId)) {
+        node.remove();
+      }
+    });
+
+    customers.forEach((customer, index) => {
+      let customerNode = existingNodes.get(customer.customerId);
+
+      if (!customerNode) {
+        customerNode = document.createElement("div");
+        customerNode.className = "customer-npc";
+        customerNode.dataset.customerId = customer.customerId;
+        customerLayer.appendChild(customerNode);
+      }
+
+      customerNode.className = this.getCustomerClassName(customer);
+      customerNode.style.setProperty("--customer-offset", `${(index % 4) * 16}px`);
+      customerNode.textContent = this.getCustomerDisplayText(customer);
+      customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
+    });
+  },
+
+  getCustomerClassName(customer) {
+    return [
+      "customer-npc",
+      `customer-type-${customer.typeId}`,
+      `customer-status-${customer.status}`,
+      `customer-mood-${customer.mood}`,
+      `customer-zone-${customer.currentZone}`
+    ].join(" ");
+  },
+
+  getCustomerDisplayText(customer) {
+    const typeLabels = {
+      normal: "일반",
+      student: "학생",
+      office_worker: "회사",
+      hurried: "급함",
+      difficult: "진상"
+    };
+
+    return typeLabels[customer.typeId] ?? "손님";
   },
 
   render() {

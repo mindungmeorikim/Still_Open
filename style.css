@@ -100,6 +100,95 @@ body {
   background: #ffe082;
 }
 
+#customer-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.customer-npc {
+  --customer-offset: 0px;
+  position: absolute;
+  min-width: 48px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 2px solid #222;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #222222;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
+  transition: left 180ms ease, top 180ms ease, right 180ms ease,
+    bottom 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.customer-zone-door {
+  left: calc(44% + var(--customer-offset));
+  bottom: 66px;
+}
+
+.customer-zone-shelf {
+  left: calc(24px + var(--customer-offset));
+  top: 122px;
+}
+
+.customer-zone-counter {
+  right: calc(26px + var(--customer-offset));
+  bottom: 142px;
+}
+
+.customer-zone-exit {
+  right: calc(18px + var(--customer-offset));
+  bottom: 18px;
+  opacity: 0.72;
+}
+
+.customer-type-normal {
+  background: #ffffff;
+}
+
+.customer-type-student {
+  background: #dff3ff;
+  border-color: #327da8;
+}
+
+.customer-type-office_worker {
+  background: #e8e3ff;
+  border-color: #6651b8;
+}
+
+.customer-type-hurried {
+  background: #fff1cc;
+  border-color: #b86f00;
+}
+
+.customer-type-difficult {
+  background: #ffe1e1;
+  border-color: #b83232;
+}
+
+.customer-status-waiting {
+  box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.28);
+}
+
+.customer-status-checkout {
+  transform: translateY(-8px);
+}
+
+.customer-status-angry,
+.customer-mood-angry {
+  background: #ffb3b3;
+  border-color: #8f1d1d;
+}
+
+.customer-mood-impatient {
+  border-style: dashed;
+}
+
 #message-panel {
   margin-top: 12px;
   padding: 12px;
