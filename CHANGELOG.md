@@ -176,3 +176,33 @@
 * 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
 
 ---
+
+## v2.3
+
+* 4번 담당 상품 / 재고 / 유통기한 작업물을 현재 프로젝트 구조에 맞게 병합
+* `data/ProductData.js` 추가
+* `systems/InventorySystem.js` 추가
+* `systems/ExpirationSystem.js` 추가
+* `main.js`에 `ExpirationSystem.init()`, `InventorySystem.init()` 연결
+* 상품 데이터 16종 추가
+* 바나나우유 상품 데이터 추가
+
+  * 매입가 1,000원
+  * 판매가 1,800원
+  * Day 2 해금
+* 상품별 매입가, 판매가, 유통기한, 해금 Day, 초기 재고 데이터 추가
+* 손님 요청 상품 ID와 실제 상품 ID 연결 구조 추가
+
+  * 예: `lunch_box` 요청을 도시락 상품군과 연결
+* 재고 입고 기능 추가
+* 상품 판매 시 재고 차감 구조 추가
+* 유통기한이 빠른 재고부터 차감하는 선입선출 구조 추가
+* Day 기준 유통기한 검사 구조 추가
+* 유통기한 만료 상품 폐기 및 폐기 손실 계산 구조 추가
+* 폐기 손실 발생 시 `EXPIRED_LOSS_RECORDED` 이벤트가 발생하도록 연결
+* 재고 변경 시 `INVENTORY_CHANGED` 이벤트가 발생하도록 연결
+* `CUSTOMER_SATISFIED` 이벤트를 받아 손님이 원하는 상품 기준으로 재고 차감이 가능하도록 연결
+* 실제 날짜(Date)가 아닌 `GameState.day` 기준으로 유통기한을 처리하도록 유지
+* 현재 구조상 계산 전 품절 여부 차단은 아직 미구현이며, 추후 `PlayerActionSystem`에서 계산 전 재고 검증 규칙 연결 필요
+
+---
