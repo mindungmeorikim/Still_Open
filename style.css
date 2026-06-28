@@ -122,28 +122,29 @@ body {
   line-height: 1.2;
   text-align: center;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.18);
-  transition: left 180ms ease, top 180ms ease, right 180ms ease,
-    bottom 180ms ease, transform 180ms ease, background 180ms ease;
+  transition: left 1400ms ease-in-out, top 1400ms ease-in-out,
+    transform 200ms ease, background 200ms ease, border-color 200ms ease;
+  will-change: left, top, transform;
 }
 
 .customer-zone-door {
-  left: calc(44% + var(--customer-offset));
-  bottom: 66px;
+  left: calc(46% + var(--customer-offset));
+  top: 78%;
 }
 
 .customer-zone-shelf {
-  left: calc(24px + var(--customer-offset));
-  top: 122px;
+  left: calc(9% + var(--customer-offset));
+  top: 30%;
 }
 
 .customer-zone-counter {
-  right: calc(26px + var(--customer-offset));
-  bottom: 142px;
+  left: calc(67% + var(--customer-offset));
+  top: 57%;
 }
 
 .customer-zone-exit {
-  right: calc(18px + var(--customer-offset));
-  bottom: 18px;
+  left: calc(78% + var(--customer-offset));
+  top: 82%;
   opacity: 0.72;
 }
 
