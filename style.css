@@ -334,3 +334,59 @@ button:active {
 #result-confirm-button:active {
   transform: scale(0.98);
 }
+
+/* v2.4 업그레이드 선택 모달 */
+
+.upgrade-modal-content {
+  max-width: 440px;
+}
+
+.upgrade-modal-description {
+  margin: 0 0 16px;
+  color: #555555;
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#upgrade-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.upgrade-card {
+  width: 100%;
+  min-height: 82px;
+  padding: 14px 16px;
+  border: 2px solid #eeeeee;
+  border-radius: 16px;
+  background: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.upgrade-card strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #222222;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.upgrade-card span {
+  display: block;
+  color: #666666;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.upgrade-card:active {
+  transform: scale(0.98);
+}
+
+.upgrade-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
