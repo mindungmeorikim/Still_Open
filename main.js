@@ -15,7 +15,8 @@ import { CustomerSystem } from "./systems/CustomerSystem.js";
 import { ExpirationSystem } from "./systems/ExpirationSystem.js";
 import { InventorySystem } from "./systems/InventorySystem.js";
 import { OrderSystem } from "./systems/OrderSystem.js";
-import { ExpansionSystem } from "./systems/ExpansionSystem.js";
+import { ExpansionSystem } from "./systems/ExpansionSystem.js"
+import { PlayerMovementSystem } from "./systems/PlayerMovementSystem.js";
 
 function initGame() {
   UIManager.init();
@@ -27,7 +28,7 @@ function initGame() {
   InventorySystem.init();
   OrderSystem.init();
   ExpansionSystem.init();
-
+  PlayerMovementSystem.init();
   EventBus.emit(EVENTS.GAME_INIT);
 
   console.log("오늘도 정상영업 v2.3 상품 재고 및 유통기한 시스템 초기화 완료");
