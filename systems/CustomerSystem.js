@@ -38,6 +38,10 @@ export const CustomerSystem = {
   customers: [],
   customerIdCounter: 0,
   routeTimerId: null,
+  spawnTimerId: null,
+  targetSpawnCount: 0,
+  spawnedCustomerCount: 0,
+  counterQueueOrderCounter: 0,
 
   init() {
     EventBus.on(EVENTS.STORE_OPENED, () => {
@@ -56,21 +60,28 @@ export const CustomerSystem = {
   startCustomerFlow() {
     this.resetCustomersForDay();
 
-    const spawnCount = this.getSpawnCountByDay();
-    this.addCustomers(spawnCount);
+    this.targetSpawnCount = this.getSpawnCountByDay();
+    this.spawnedCustomerCount = 0;
+
+    this.spawnNextCustomer();
+    this.startSpawnTimer();
 
     this.startRouteTimer();
 
     console.log(
-      `[CustomerSystem] Day ${GameState.day} 손님 ${spawnCount}명 생성 완료`
+      `[CustomerSystem] Day ${GameState.day} 손님 ${this.targetSpawnCount}명 순차 생성 시작`
     );
   },
 
   resetCustomersForDay() {
     this.stopRouteTimer();
+    this.stopSpawnTimer();
 
     this.customers = [];
     this.customerIdCounter = 0;
+    this.targetSpawnCount = 0;
+    this.spawnedCustomerCount = 0;
+    this.counterQueueOrderCounter = 0;
   },
 
   getSpawnCountByDay() {
@@ -92,6 +103,48 @@ export const CustomerSystem = {
     }
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  spawnNextCustomer() {
+    if (this.spawnedCustomerCount >= this.targetSpawnCount) {
+      this.stopSpawnTimer();
+      return false;
+    }
+
+    this.addCustomers(1);
+    this.spawnedCustomerCount += 1;
+
+    if (this.spawnedCustomerCount >= this.targetSpawnCount) {
+      this.stopSpawnTimer();
+    }
+
+    return true;
+  },
+
+  startSpawnTimer() {
+    this.stopSpawnTimer();
+
+    if (this.spawnedCustomerCount >= this.targetSpawnCount) {
+      return;
+    }
+
+    this.spawnTimerId = setInterval(() => {
+      this.spawnNextCustomer();
+    }, this.getSpawnIntervalMsByDay());
+  },
+
+  stopSpawnTimer() {
+    if (!this.spawnTimerId) return;
+
+    clearInterval(this.spawnTimerId);
+    this.spawnTimerId = null;
+  },
+
+  getSpawnIntervalMsByDay() {
+    const day = Math.max(1, Math.floor(Number(GameState.day) || 1));
+    const intervalSeconds = Math.max(2, 4.5 - day * 0.5);
+
+    return Math.floor(intervalSeconds * 1000);
   },
 
   createCustomer() {
@@ -118,8 +171,10 @@ export const CustomerSystem = {
       currentZone: routeState.currentZone,
       targetZone: routeState.targetZone,
 
+      enteringTime: this.getDefaultEnteringTime(),
       shoppingTime: this.getShoppingTimeByCustomerType(customerType),
       waitTime: customerType.patience,
+      queueOrder: null,
       mood: "neutral",
 
       isSatisfied: false,
@@ -189,7 +244,7 @@ export const CustomerSystem = {
     this.customers = this.customers.map((customer) => {
       if (customer.status === CUSTOMER_STATUS.ENTERING) {
         changed = true;
-        return this.transitionCustomerStatus(customer, CUSTOMER_STATUS.SHOPPING);
+        return this.decreaseEnteringCustomerTime(customer, amount);
       }
 
       if (customer.status === CUSTOMER_STATUS.SHOPPING) {
@@ -263,6 +318,31 @@ export const CustomerSystem = {
     return routeMap[status] ?? routeMap[CUSTOMER_STATUS.ENTERING];
   },
 
+  getDefaultEnteringTime() {
+    return 2;
+  },
+
+  decreaseEnteringCustomerTime(customer, amount) {
+    const safeAmount = Math.max(0, Number(amount) || 0);
+    const rawEnteringTime = Number(customer.enteringTime);
+    const currentEnteringTime = Number.isFinite(rawEnteringTime)
+      ? Math.max(0, rawEnteringTime)
+      : this.getDefaultEnteringTime();
+    const nextEnteringTime = Math.max(0, currentEnteringTime - safeAmount);
+
+    if (nextEnteringTime <= 0) {
+      return {
+        ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.SHOPPING),
+        enteringTime: 0
+      };
+    }
+
+    return {
+      ...customer,
+      enteringTime: nextEnteringTime
+    };
+  },
+
   getShoppingTimeByCustomerType(customerType) {
     const shoppingTimeMap = {
       hurried: 2,
@@ -281,15 +361,30 @@ export const CustomerSystem = {
     const nextShoppingTime = Math.max(0, currentShoppingTime - safeAmount);
 
     if (nextShoppingTime <= 0) {
-      return {
+      const waitingCustomer = {
         ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING),
         shoppingTime: 0
       };
+
+      return this.assignCounterQueueOrder(waitingCustomer);
     }
 
     return {
       ...customer,
       shoppingTime: nextShoppingTime
+    };
+  },
+
+  assignCounterQueueOrder(customer) {
+    if (Number.isFinite(Number(customer.queueOrder))) {
+      return customer;
+    }
+
+    this.counterQueueOrderCounter += 1;
+
+    return {
+      ...customer,
+      queueOrder: this.counterQueueOrderCounter
     };
   },
 
@@ -433,6 +528,7 @@ export const CustomerSystem = {
 
   closeCustomerFlow() {
     this.stopRouteTimer();
+    this.stopSpawnTimer();
 
     this.customers = this.customers.map((customer) => {
       const shouldLeave =
@@ -501,6 +597,7 @@ export const CustomerSystem = {
       targetZone: customer.targetZone,
       waitTime: customer.waitTime,
       mood: customer.mood,
+      queueOrder: customer.queueOrder,
       isSatisfied: customer.isSatisfied
     };
   },

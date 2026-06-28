@@ -90,6 +90,35 @@ export const UIManager = {
       }
     });
 
+    const counterQueueIndexes = new Map();
+
+    customers
+      .map((customer, index) => {
+        return { customer, index };
+      })
+      .filter(({ customer }) => {
+        return customer.currentZone === "counter";
+      })
+      .sort((first, second) => {
+        const firstQueueOrder = Number(first.customer.queueOrder);
+        const secondQueueOrder = Number(second.customer.queueOrder);
+        const firstSortOrder = Number.isFinite(firstQueueOrder)
+          ? firstQueueOrder
+          : Number.POSITIVE_INFINITY;
+        const secondSortOrder = Number.isFinite(secondQueueOrder)
+          ? secondQueueOrder
+          : Number.POSITIVE_INFINITY;
+
+        if (firstSortOrder !== secondSortOrder) {
+          return firstSortOrder - secondSortOrder;
+        }
+
+        return first.index - second.index;
+      })
+      .forEach(({ customer }, queueIndex) => {
+        counterQueueIndexes.set(customer.customerId, Math.min(queueIndex, 3));
+      });
+
     customers.forEach((customer, index) => {
       let customerNode = existingNodes.get(customer.customerId);
 
@@ -102,9 +131,20 @@ export const UIManager = {
 
       customerNode.className = this.getCustomerClassName(customer);
       customerNode.style.setProperty("--customer-offset", `${(index % 4) * 16}px`);
+      this.applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes);
       customerNode.textContent = this.getCustomerDisplayText(customer);
       customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
     });
+  },
+
+  applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes) {
+    const queueIndex = counterQueueIndexes.get(customer.customerId) ?? 0;
+    const isCounterCustomer = customer.currentZone === "counter";
+    const queueOffset = isCounterCustomer ? queueIndex * 18 : 0;
+
+    customerNode.dataset.queueIndex = isCounterCustomer ? String(queueIndex) : "";
+    customerNode.style.setProperty("--queue-x", `${queueOffset * -1}px`);
+    customerNode.style.setProperty("--queue-y", `${queueOffset}px`);
   },
 
   getCustomerClassName(customer) {

@@ -109,6 +109,8 @@ body {
 
 .customer-npc {
   --customer-offset: 0px;
+  --queue-x: 0px;
+  --queue-y: 0px;
   position: absolute;
   min-width: 48px;
   min-height: 32px;
@@ -138,8 +140,8 @@ body {
 }
 
 .customer-zone-counter {
-  left: calc(67% + var(--customer-offset));
-  top: 57%;
+  left: calc(67% + var(--queue-x));
+  top: calc(57% + var(--queue-y));
 }
 
 .customer-zone-exit {
