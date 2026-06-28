@@ -118,6 +118,7 @@ export const CustomerSystem = {
       currentZone: routeState.currentZone,
       targetZone: routeState.targetZone,
 
+      shoppingTime: this.getShoppingTimeByCustomerType(customerType),
       waitTime: customerType.patience,
       mood: "neutral",
 
@@ -193,7 +194,7 @@ export const CustomerSystem = {
 
       if (customer.status === CUSTOMER_STATUS.SHOPPING) {
         changed = true;
-        return this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING);
+        return this.decreaseShoppingCustomerTime(customer, amount);
       }
 
       if (customer.status === CUSTOMER_STATUS.WAITING) {
@@ -260,6 +261,36 @@ export const CustomerSystem = {
     };
 
     return routeMap[status] ?? routeMap[CUSTOMER_STATUS.ENTERING];
+  },
+
+  getShoppingTimeByCustomerType(customerType) {
+    const shoppingTimeMap = {
+      hurried: 2,
+      office_worker: 2,
+      normal: 3,
+      student: 3,
+      difficult: 4
+    };
+
+    return shoppingTimeMap[customerType.id] ?? 3;
+  },
+
+  decreaseShoppingCustomerTime(customer, amount) {
+    const safeAmount = Math.max(0, Number(amount) || 0);
+    const currentShoppingTime = Math.max(0, Number(customer.shoppingTime) || 0);
+    const nextShoppingTime = Math.max(0, currentShoppingTime - safeAmount);
+
+    if (nextShoppingTime <= 0) {
+      return {
+        ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING),
+        shoppingTime: 0
+      };
+    }
+
+    return {
+      ...customer,
+      shoppingTime: nextShoppingTime
+    };
   },
 
   decreaseWaitingCustomerTime(customer, amount) {
