@@ -275,3 +275,24 @@
 * 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
 
 ---
+
+## v2.7
+
+* 매장 구역 확장 시스템 1차 구현
+* `data/ExpansionData.js` 추가
+* `systems/ExpansionSystem.js` 추가
+* 확장 구역 데이터 추가
+
+  * Lv.1 먼지 나는 단칸 편의점
+  * Lv.2 추가 진열 구역
+  * Lv.3 냉장·도시락 구역
+  * Lv.4 프리미엄 매장 구역
+* `EXPANSION_REQUESTED`, `EXPANSION_COMPLETED`, `EXPANSION_FAILED` 이벤트 추가
+* 미확장 구역을 어두운 오버레이와 구름/먼지 느낌으로 표시
+* 확장 가능 조건을 만족하면 확장 버튼이 활성화되도록 처리
+* 확장 완료 시 돈을 차감하고 구역 상태를 unlocked로 변경
+* 확장 완료 구역은 밝게 표시되도록 개선
+* 기존 Day 진행, 정산, 업그레이드 선택, 손님 NPC, 상품 카드, 발주 버튼 흐름 유지
+* 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
+
+---

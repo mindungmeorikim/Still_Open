@@ -82,6 +82,9 @@ EventBus.emit(EVENTS.DAY_STARTED, data);
 | UPGRADE_SELECTED | 업그레이드 선택 |
 | NEXT_DAY_READY | 다음 Day 준비 |
 | GAME_STATE_CHANGED | 상태 변경 |
+| EXPANSION_REQUESTED | 매장 확장 요청 |
+| EXPANSION_COMPLETED | 매장 확장 완료 |
+| EXPANSION_FAILED | 매장 확장 실패 |
 
 ---
 
@@ -124,6 +127,64 @@ payload 예시
 - 모든 발주 일자는 GameState.day 기준
 - GameState.todayStats 직접 수정 금지
 - ORDER_REQUESTED는 요청 이벤트일 뿐 즉시 재고를 증가시키지 않음
+
+---
+
+## 매장 확장 이벤트
+
+### EXPANSION_REQUESTED
+
+매장 확장 버튼을 눌렀을 때 발생하는 확장 요청 이벤트입니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  zoneId: "zone_extra_shelf"
+}
+```
+
+### EXPANSION_COMPLETED
+
+확장 조건을 만족해 확장 비용이 차감되고 구역이 unlocked 상태가 되었을 때 발생합니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  zoneId: "zone_extra_shelf",
+  zoneName: "Lv.2 추가 진열 구역",
+  unlockCost: 30000,
+  remainingMoney: GameState.money,
+  expansionState: {}
+}
+```
+
+### EXPANSION_FAILED
+
+확장 조건이 부족하거나 잘못된 구역을 요청했을 때 발생합니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  zoneId: "zone_extra_shelf",
+  zoneName: "Lv.2 추가 진열 구역",
+  reason: "requirements_not_met",
+  expansionState: {},
+  message: "Lv.2 추가 진열 구역 확장 조건 부족: Day 2 필요 / ₩30,000 필요"
+}
+```
+
+주의사항
+
+- 실제 날짜 객체 사용 금지
+- 모든 확장 조건은 GameState.day 기준
+- ExpansionSystem은 GameState.money만 차감하고 GameState.todayStats를 직접 수정하지 않음
+- 재고 증가, 비용 정산, 입고 처리, 상품 슬롯 확장 효과는 v2.7에서 처리하지 않음
 
 ---
 

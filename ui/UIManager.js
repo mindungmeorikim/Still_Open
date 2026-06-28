@@ -9,19 +9,27 @@ import { EVENTS } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
 import { PRODUCTS } from "../data/ProductData.js";
+import {
+  EXPANSION_ZONES,
+  getPreviousExpansionZone
+} from "../data/ExpansionData.js";
 
 export const UIManager = {
   resultModal: null,
   upgradeModal: null,
   productPanel: null,
+  expansionPanel: null,
+  expansionState: null,
   inventoryByProductId: {},
 
   init() {
     this.bindButtons();
     this.bindGameEvents();
     this.bindInventoryEvents();
+    this.bindExpansionEvents();
     this.createResultModal();
     this.createUpgradeModal();
+    this.createExpansionPanel();
     this.createProductPanel();
     this.render();
     this.renderCustomers();
@@ -63,6 +71,20 @@ export const UIManager = {
       }, {});
 
       this.renderProductCards();
+    });
+  },
+
+  bindExpansionEvents() {
+    EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
+      this.expansionState = data.expansionState ?? this.expansionState;
+      this.showExpansionMessage(data.message ?? "매장 확장이 완료되었습니다.");
+      this.renderExpansionZones(this.expansionState);
+    });
+
+    EventBus.on(EVENTS.EXPANSION_FAILED, (data) => {
+      this.expansionState = data.expansionState ?? this.expansionState;
+      this.showExpansionMessage(data.message ?? "확장 조건을 다시 확인해주세요.");
+      this.renderExpansionZones(this.expansionState);
     });
   },
 
@@ -191,10 +213,271 @@ export const UIManager = {
 
   render() {
     this.renderProductCards();
+    this.renderExpansionZones();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  createExpansionPanel() {
+    const existingPanel = document.getElementById("expansion-panel");
+
+    if (existingPanel) {
+      this.expansionPanel = existingPanel;
+      return;
+    }
+
+    const gameScreen = document.getElementById("game-screen");
+    const storeArea = document.getElementById("store-area");
+
+    if (!gameScreen) return;
+
+    const expansionPanel = document.createElement("section");
+
+    expansionPanel.id = "expansion-panel";
+    expansionPanel.setAttribute("aria-labelledby", "expansion-panel-title");
+    expansionPanel.innerHTML = `
+      <div class="expansion-panel-header">
+        <h2 id="expansion-panel-title">매장 확장</h2>
+        <span id="expansion-unlock-summary"></span>
+      </div>
+      <div id="expansion-zone-grid" class="expansion-zone-grid"></div>
+      <p id="expansion-message">먼지 낀 옆 구역을 눌러 확장 조건을 확인하세요.</p>
+    `;
+
+    if (storeArea?.nextElementSibling) {
+      gameScreen.insertBefore(expansionPanel, storeArea.nextElementSibling);
+    } else {
+      gameScreen.appendChild(expansionPanel);
+    }
+
+    this.expansionPanel = expansionPanel;
+  },
+
+  renderExpansionZones(expansionState = this.expansionState) {
+    this.createExpansionPanel();
+
+    if (expansionState) {
+      this.expansionState = expansionState;
+    }
+
+    const zoneGrid = document.getElementById("expansion-zone-grid");
+    const unlockSummary = document.getElementById("expansion-unlock-summary");
+
+    if (!zoneGrid) return;
+
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const unlockedCount = zoneStates.filter((zone) => zone.isUnlocked).length;
+
+    if (unlockSummary) {
+      unlockSummary.textContent = `${unlockedCount} / ${zoneStates.length}`;
+    }
+
+    zoneGrid.innerHTML = zoneStates.map((zone) => {
+      const statusLabel = this.getExpansionStatusLabel(zone.status);
+      const costText = zone.unlockCost > 0
+        ? `₩${zone.unlockCost.toLocaleString()}`
+        : "기본 구역";
+      const actionText = zone.isUnlocked
+        ? "완료"
+        : zone.isAvailable
+          ? "확장"
+          : "조건 부족";
+
+      return `
+        <article
+          class="expansion-zone-tile expansion-zone-${zone.status}"
+          data-zone-id="${zone.id}"
+          tabindex="${zone.isUnlocked ? "-1" : "0"}"
+        >
+          <div class="expansion-zone-fog" aria-hidden="true"></div>
+
+          <div class="expansion-zone-content">
+            <div class="expansion-zone-topline">
+              <span class="expansion-zone-status">${statusLabel}</span>
+              <span class="expansion-zone-cost">${costText}</span>
+            </div>
+
+            <h3>${zone.name}</h3>
+            <p>${zone.description}</p>
+
+            <dl class="expansion-zone-conditions">
+              <div class="${zone.conditions.hasRequiredDay ? "is-met" : "is-missing"}">
+                <dt>필요 Day</dt>
+                <dd>${zone.requiredDay}</dd>
+              </div>
+              <div class="${zone.conditions.hasEnoughMoney ? "is-met" : "is-missing"}">
+                <dt>확장 비용</dt>
+                <dd>${costText}</dd>
+              </div>
+              <div class="${zone.conditions.previousUnlocked ? "is-met" : "is-missing"}">
+                <dt>이전 구역</dt>
+                <dd>${zone.previousZoneName}</dd>
+              </div>
+            </dl>
+
+            <button
+              class="expansion-action-button"
+              type="button"
+              data-zone-id="${zone.id}"
+              ${zone.isAvailable ? "" : "disabled"}
+            >
+              ${actionText}
+            </button>
+          </div>
+        </article>
+      `;
+    }).join("");
+
+    this.bindExpansionZoneEvents(zoneStates);
+  },
+
+  getExpansionZoneViewModels(expansionState = null) {
+    const stateUnlockedZoneIds = expansionState?.unlockedZoneIds;
+    const unlockedZoneIds = new Set(
+      Array.isArray(stateUnlockedZoneIds)
+        ? stateUnlockedZoneIds
+        : EXPANSION_ZONES
+            .filter((zone) => zone.defaultUnlocked)
+            .map((zone) => zone.id)
+    );
+
+    return EXPANSION_ZONES.map((zone) => {
+      const previousZone = getPreviousExpansionZone(zone);
+      const previousUnlocked =
+        !previousZone || unlockedZoneIds.has(previousZone.id);
+      const hasEnoughMoney = GameState.money >= zone.unlockCost;
+      const hasRequiredDay = GameState.day >= zone.requiredDay;
+      const isUnlocked = unlockedZoneIds.has(zone.id);
+      const isAvailable =
+        !isUnlocked && previousUnlocked && hasEnoughMoney && hasRequiredDay;
+      const status = isUnlocked
+        ? "unlocked"
+        : isAvailable
+          ? "available"
+          : "locked";
+
+      return {
+        ...zone,
+        status,
+        isUnlocked,
+        isAvailable,
+        previousZoneName: previousZone?.name ?? "없음",
+        missingRequirements: this.getExpansionMissingRequirements(zone, {
+          previousZone,
+          previousUnlocked,
+          hasEnoughMoney,
+          hasRequiredDay
+        }),
+        conditions: {
+          previousUnlocked,
+          hasEnoughMoney,
+          hasRequiredDay
+        }
+      };
+    });
+  },
+
+  getExpansionMissingRequirements(zone, conditions) {
+    const missingRequirements = [];
+
+    if (!conditions.previousUnlocked && conditions.previousZone) {
+      missingRequirements.push(`${conditions.previousZone.name} 확장 필요`);
+    }
+
+    if (!conditions.hasRequiredDay) {
+      missingRequirements.push(`Day ${zone.requiredDay} 필요`);
+    }
+
+    if (!conditions.hasEnoughMoney) {
+      missingRequirements.push(`₩${zone.unlockCost.toLocaleString()} 필요`);
+    }
+
+    return missingRequirements;
+  },
+
+  getExpansionStatusLabel(status) {
+    const statusLabels = {
+      unlocked: "확장 완료",
+      available: "확장 가능",
+      locked: "미확장"
+    };
+
+    return statusLabels[status] ?? "미확장";
+  },
+
+  bindExpansionZoneEvents(zoneStates = []) {
+    const zonesById = zoneStates.reduce((zoneMap, zone) => {
+      zoneMap[zone.id] = zone;
+      return zoneMap;
+    }, {});
+
+    document.querySelectorAll(".expansion-zone-tile").forEach((tile) => {
+      const showGuide = () => {
+        const zone = zonesById[tile.dataset.zoneId];
+
+        if (!zone) return;
+
+        if (zone.status === "locked") {
+          EventBus.emit(EVENTS.EXPANSION_REQUESTED, {
+            day: GameState.day,
+            zoneId: zone.id
+          });
+          return;
+        }
+
+        this.showExpansionMessage(this.getExpansionGuideMessage(zone));
+      };
+
+      tile.onclick = (event) => {
+        if (event.target.closest?.(".expansion-action-button")) return;
+
+        showGuide();
+      };
+
+      tile.onkeydown = (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+
+        event.preventDefault();
+        showGuide();
+      };
+    });
+
+    document.querySelectorAll(".expansion-action-button").forEach((button) => {
+      button.onclick = (event) => {
+        event.stopPropagation();
+
+        if (button.disabled) return;
+
+        EventBus.emit(EVENTS.EXPANSION_REQUESTED, {
+          day: GameState.day,
+          zoneId: button.dataset.zoneId
+        });
+      };
+    });
+  },
+
+  getExpansionGuideMessage(zone) {
+    if (zone.isUnlocked) {
+      return `${zone.name}은 이미 밝게 정리된 구역입니다.`;
+    }
+
+    if (zone.isAvailable) {
+      return `${zone.name} 확장 가능! 버튼을 누르면 ₩${zone.unlockCost.toLocaleString()}이 차감됩니다.`;
+    }
+
+    return `${zone.name} 확장 조건: ${zone.missingRequirements.join(" / ")}`;
+  },
+
+  showExpansionMessage(message) {
+    this.createExpansionPanel();
+
+    const messageNode = document.getElementById("expansion-message");
+
+    if (!messageNode) return;
+
+    messageNode.textContent = message;
   },
 
   createProductPanel() {
