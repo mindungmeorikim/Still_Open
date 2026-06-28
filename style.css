@@ -94,10 +94,21 @@ body {
 }
 
 #player-zone {
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: none;
   background: #ffe082;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  width: 72px;
+  height: 44px;
+  line-height: normal;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 #customer-layer {

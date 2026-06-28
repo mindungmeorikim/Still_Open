@@ -47,6 +47,39 @@ export const UIManager = {
     this.renderCustomers();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
   },
+    getPlayerNode() {
+    const storeArea = document.getElementById("store-area");
+
+    if (!storeArea) {
+      return null;
+    }
+
+    let playerNode = document.getElementById("player-zone")
+
+    if (!playerNode) {
+      playerNode = document.createElement("div");
+      playerNode.id = "player-zone";
+      playerNode.className = "store-zone";
+      playerNode.textContent = "플레이어";
+      storeArea.appendChild(playerNode);
+    }
+
+    return playerNode;
+  },
+
+  renderPlayer() {
+    const playerNode = this.getPlayerNode();
+
+    if (!playerNode || !GameState.player) {
+      return;
+    }
+
+    const x = Number(GameState.player.x) || 0;
+    const y = Number(GameState.player.y) || 0;
+
+    playerNode.style.left = `${x}px`;
+    playerNode.style.top = `${y}px`;
+  },
 
   bindButtons() {
     const startDayButton = document.getElementById("start-day-button");
@@ -254,6 +287,7 @@ export const UIManager = {
     this.renderProductCards();
     this.renderExpansionZones();
     this.renderControlButtons();
+    this.renderPlayer();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
