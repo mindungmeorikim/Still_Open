@@ -893,3 +893,257 @@ button:active {
     font-size: 12px;
   }
 }
+
+.day-scenario-modal-content {
+  max-width: 430px;
+  border: 2px solid #8cc27e;
+  background: #fbfff8;
+  text-align: left;
+}
+
+.day-scenario-kicker {
+  margin: 0 0 8px;
+  color: #4f7b47;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.day-scenario-title {
+  margin: 0;
+  color: #263f2e;
+  font-size: 23px;
+  line-height: 1.25;
+}
+
+.day-scenario-subtitle,
+.day-scenario-story {
+  margin: 8px 0 0;
+  color: #4f4f4f;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.day-scenario-features {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day-scenario-features li {
+  padding: 8px 10px;
+  border: 1px solid #dceacb;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #31533b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.day-scenario-tip {
+  margin: 0 0 14px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #fff6d8;
+  color: #6f4b00;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.day-scenario-confirm-button,
+.order-confirm-button,
+.stock-organized-button {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 8px;
+  background: #31533b;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.day-scenario-confirm-button:active,
+.order-confirm-button:active,
+.stock-organized-button:active {
+  transform: scale(0.98);
+}
+
+.order-confirm-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.order-modal-content {
+  width: min(720px, calc(100% - 28px));
+  max-width: 720px;
+  padding: 12px;
+  background: #2f3f37;
+}
+
+.order-computer-frame {
+  overflow: hidden;
+  border: 2px solid #17251e;
+  border-radius: 8px;
+  background: #eef5e8;
+  text-align: left;
+}
+
+.order-computer-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  background: #17251e;
+  color: #d7f5c8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+#order-modal-body {
+  padding: 14px;
+}
+
+.order-modal-header h2,
+.order-delivery-state h2 {
+  margin: 0;
+  color: #263f2e;
+  font-size: 21px;
+}
+
+.order-modal-header p,
+.order-delivery-state p {
+  margin: 6px 0 12px;
+  color: #4f4f4f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.order-product-list {
+  display: grid;
+  gap: 8px;
+  max-height: 42vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.order-product-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(130px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #cad9bd;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.order-product-row strong {
+  display: block;
+  color: #263f2e;
+  font-size: 13px;
+}
+
+.order-product-row span,
+.order-product-prices span {
+  display: block;
+  color: #666666;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.order-quantity-controls {
+  display: grid;
+  grid-template-columns: 36px 32px 36px;
+  align-items: center;
+  justify-content: end;
+  gap: 5px;
+}
+
+.order-qty-button {
+  width: 36px;
+  min-height: 36px;
+  border-radius: 8px;
+  background: #f0e6be;
+  color: #263f2e;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.order-quantity-controls strong {
+  text-align: center;
+}
+
+.order-total-box {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.order-total-box div,
+.order-delivered-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #555555;
+  font-size: 13px;
+}
+
+.order-total-box strong,
+.order-delivered-list strong {
+  color: #31533b;
+}
+
+.order-budget-message {
+  margin: 0 0 10px;
+  color: #31533b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.order-budget-message.is-warning {
+  color: #a13d2d;
+}
+
+.order-delivered-list {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+#bottom-ui button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@media (max-width: 520px) {
+  .day-scenario-modal-content {
+    width: calc(100% - 28px);
+    padding: 18px 14px;
+  }
+
+  .order-modal-content {
+    padding: 8px;
+  }
+
+  .order-product-row {
+    grid-template-columns: 1fr;
+  }
+
+  .order-quantity-controls {
+    justify-content: stretch;
+    grid-template-columns: 44px 1fr 44px;
+  }
+
+  .order-qty-button {
+    width: 44px;
+    min-height: 42px;
+  }
+}

@@ -5,7 +5,7 @@
 */
 
 import { EventBus } from "../core/EventBus.js";
-import { EVENTS } from "../core/Constants.js";
+import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
 import { PRODUCTS } from "../data/ProductData.js";
@@ -18,17 +18,26 @@ export const UIManager = {
   resultModal: null,
   upgradeModal: null,
   endingModal: null,
+  dayScenarioModal: null,
+  orderModal: null,
   productPanel: null,
   expansionPanel: null,
   expansionState: null,
+  pendingOrderPhaseData: null,
+  orderDraftQuantities: {},
+  orderDeliveredData: null,
   inventoryByProductId: {},
 
   init() {
     this.bindButtons();
     this.bindGameEvents();
+    this.bindDayStartEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
     this.bindEndingEvents();
+    this.bindOrderEvents();
+    this.createDayScenarioModal();
+    this.createOrderModal();
     this.createResultModal();
     this.createUpgradeModal();
     this.createEndingModal();
@@ -61,6 +70,27 @@ export const UIManager = {
     EventBus.on(EVENTS.GAME_STATE_CHANGED, () => {
       this.render();
       this.renderCustomers();
+    });
+  },
+
+  bindDayStartEvents() {
+    EventBus.on(EVENTS.DAY_STARTED, (data) => {
+      this.pendingOrderPhaseData = null;
+      this.showDayScenarioModal(data.dayScenario);
+    });
+
+    EventBus.on(EVENTS.ORDER_PHASE_STARTED, (data) => {
+      this.pendingOrderPhaseData = data;
+
+      if (!this.isDayScenarioModalVisible()) {
+        this.showOrderModal(data);
+      }
+    });
+  },
+
+  bindOrderEvents() {
+    EventBus.on(EVENTS.ORDER_DELIVERED, (data) => {
+      this.showOrderDelivered(data);
     });
   },
 
@@ -223,10 +253,36 @@ export const UIManager = {
   render() {
     this.renderProductCards();
     this.renderExpansionZones();
+    this.renderControlButtons();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  renderControlButtons() {
+    const startDayButton = document.getElementById("start-day-button");
+    const openStoreButton = document.getElementById("open-store-button");
+    const endDayButton = document.getElementById("end-day-button");
+
+    if (startDayButton) {
+      startDayButton.disabled = [
+        GAME_PHASE.ORDER,
+        GAME_PHASE.DAY_START,
+        GAME_PHASE.STORE_RUNNING,
+        GAME_PHASE.DAY_END,
+        GAME_PHASE.RESULT,
+        GAME_PHASE.UPGRADE
+      ].includes(GameState.phase);
+    }
+
+    if (openStoreButton) {
+      openStoreButton.disabled = GameState.phase !== GAME_PHASE.DAY_START;
+    }
+
+    if (endDayButton) {
+      endDayButton.disabled = GameState.phase !== GAME_PHASE.STORE_RUNNING;
+    }
   },
 
   createExpansionPanel() {
@@ -736,6 +792,333 @@ export const UIManager = {
 
   showUpgradeOptions(upgrades) {
     console.log("업그레이드 목록:", upgrades);
+  },
+
+  createDayScenarioModal() {
+    if (document.getElementById("day-scenario-modal")) {
+      this.dayScenarioModal = document.getElementById("day-scenario-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "day-scenario-modal";
+    modal.className = "modal hidden";
+
+    modal.innerHTML = `
+      <div class="modal-content day-scenario-modal-content">
+        <p class="day-scenario-kicker">오늘의 영업 브리핑</p>
+        <h2 id="day-scenario-title" class="day-scenario-title"></h2>
+        <p id="day-scenario-subtitle" class="day-scenario-subtitle"></p>
+        <p id="day-scenario-story" class="day-scenario-story"></p>
+        <ul id="day-scenario-features" class="day-scenario-features"></ul>
+        <p id="day-scenario-tip" class="day-scenario-tip"></p>
+        <button id="day-scenario-confirm-button" class="day-scenario-confirm-button" type="button">
+          영업 준비하기
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    this.dayScenarioModal = modal;
+  },
+
+  showDayScenarioModal(scenarioData = {}) {
+    if (!this.dayScenarioModal) {
+      this.createDayScenarioModal();
+    }
+
+    const title = document.getElementById("day-scenario-title");
+    const subtitle = document.getElementById("day-scenario-subtitle");
+    const story = document.getElementById("day-scenario-story");
+    const features = document.getElementById("day-scenario-features");
+    const tip = document.getElementById("day-scenario-tip");
+    const confirmButton = document.getElementById("day-scenario-confirm-button");
+    const featureItems = Array.isArray(scenarioData.features)
+      ? scenarioData.features
+      : [];
+
+    title.textContent = scenarioData.title ?? `Day ${GameState.day}. 영업 시작`;
+    subtitle.textContent = scenarioData.subtitle ?? "오늘의 편의점 운영을 준비합니다.";
+    story.textContent = scenarioData.story ?? "발주와 재고 정리를 마친 뒤 편의점을 오픈하세요.";
+    tip.textContent = scenarioData.tip ?? "보유금과 재고를 확인하고 발주 수량을 정하세요.";
+    confirmButton.textContent = scenarioData.ctaText ?? "발주 준비하기";
+
+    features.innerHTML = featureItems.map((feature) => {
+      return `<li>${feature}</li>`;
+    }).join("");
+
+    confirmButton.onclick = () => {
+      this.hideDayScenarioModal();
+
+      if (this.pendingOrderPhaseData) {
+        this.showOrderModal(this.pendingOrderPhaseData);
+      }
+    };
+
+    this.dayScenarioModal.classList.remove("hidden");
+  },
+
+  hideDayScenarioModal() {
+    if (!this.dayScenarioModal) return;
+
+    this.dayScenarioModal.classList.add("hidden");
+  },
+
+  isDayScenarioModalVisible() {
+    return (
+      this.dayScenarioModal &&
+      !this.dayScenarioModal.classList.contains("hidden")
+    );
+  },
+
+  createOrderModal() {
+    if (document.getElementById("order-modal")) {
+      this.orderModal = document.getElementById("order-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "order-modal";
+    modal.className = "modal hidden";
+
+    modal.innerHTML = `
+      <div class="modal-content order-modal-content">
+        <div class="order-computer-frame">
+          <div class="order-computer-topbar">
+            <span>STORE-ORDER</span>
+            <span id="order-modal-day-label">Day ${GameState.day}</span>
+          </div>
+          <div id="order-modal-body"></div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    this.orderModal = modal;
+  },
+
+  showOrderModal(orderData = {}) {
+    if (!this.orderModal) {
+      this.createOrderModal();
+    }
+
+    this.pendingOrderPhaseData = orderData;
+    this.orderDeliveredData = null;
+    this.orderDraftQuantities = this.getOrderableProducts().reduce(
+      (quantityMap, product) => {
+        quantityMap[product.id] = 0;
+        return quantityMap;
+      },
+      {}
+    );
+
+    const dayLabel = document.getElementById("order-modal-day-label");
+
+    if (dayLabel) {
+      dayLabel.textContent = `Day ${GameState.day}`;
+    }
+
+    this.renderOrderDraft();
+    this.orderModal.classList.remove("hidden");
+
+    EventBus.emit(EVENTS.ORDER_MODAL_OPENED, {
+      day: GameState.day,
+      productCount: this.getOrderableProducts().length
+    });
+  },
+
+  renderOrderDraft() {
+    const body = document.getElementById("order-modal-body");
+
+    if (!body) return;
+
+    const products = this.getOrderableProducts();
+    const totalCost = this.getOrderTotalCost(products);
+    const isOverBudget = totalCost > GameState.money;
+
+    body.innerHTML = `
+      <div class="order-modal-header">
+        <h2>컴퓨터 발주</h2>
+        <p>오늘 판매할 상품 수량을 정하고 발주를 확정하세요.</p>
+      </div>
+
+      <div class="order-product-list">
+        ${products.map((product) => {
+          const inventoryItem = this.inventoryByProductId[product.id];
+          const quantity = this.orderDraftQuantities[product.id] ?? 0;
+          const stockQuantity = Number.isFinite(inventoryItem?.quantity)
+            ? inventoryItem.quantity
+            : 0;
+
+          return `
+            <article class="order-product-row" data-product-id="${product.id}">
+              <div>
+                <strong>${product.name}</strong>
+                <span>현재 재고 ${stockQuantity}개</span>
+              </div>
+              <div class="order-product-prices">
+                <span>매입 ₩${product.purchasePrice.toLocaleString()}</span>
+                <span>판매 ₩${product.salePrice.toLocaleString()}</span>
+              </div>
+              <div class="order-quantity-controls">
+                <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}">-</button>
+                <strong>${quantity}</strong>
+                <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}">+</button>
+              </div>
+            </article>
+          `;
+        }).join("")}
+      </div>
+
+      <div class="order-total-box">
+        <div>
+          <span>예상 발주 비용</span>
+          <strong>₩${totalCost.toLocaleString()}</strong>
+        </div>
+        <div>
+          <span>보유금</span>
+          <strong>₩${GameState.money.toLocaleString()}</strong>
+        </div>
+      </div>
+
+      <p class="order-budget-message${isOverBudget ? " is-warning" : ""}">
+        ${isOverBudget ? "보유금보다 발주 비용이 큽니다." : "수량 0으로도 발주 확정이 가능합니다."}
+      </p>
+
+      <button id="order-confirm-button" class="order-confirm-button" type="button" ${isOverBudget ? "disabled" : ""}>
+        발주 확정
+      </button>
+    `;
+
+    this.bindOrderDraftControls(products);
+  },
+
+  bindOrderDraftControls(products = []) {
+    document.querySelectorAll(".order-qty-button").forEach((button) => {
+      button.onclick = () => {
+        const productId = button.dataset.productId;
+        const currentQuantity = this.orderDraftQuantities[productId] ?? 0;
+        const nextQuantity =
+          button.dataset.action === "increase"
+            ? currentQuantity + 1
+            : Math.max(0, currentQuantity - 1);
+
+        this.orderDraftQuantities[productId] = nextQuantity;
+        this.renderOrderDraft();
+      };
+    });
+
+    const confirmButton = document.getElementById("order-confirm-button");
+
+    if (!confirmButton) return;
+
+    confirmButton.onclick = () => {
+      if (confirmButton.disabled) return;
+
+      this.showOrderWaiting();
+
+      EventBus.emit(EVENTS.ORDER_CONFIRMED, {
+        day: GameState.day,
+        items: products.map((product) => {
+          return {
+            productId: product.id,
+            productName: product.name,
+            quantity: this.orderDraftQuantities[product.id] ?? 0,
+            purchasePrice: product.purchasePrice,
+            salePrice: product.salePrice
+          };
+        }),
+        totalCost: this.getOrderTotalCost(products)
+      });
+    };
+  },
+
+  showOrderWaiting() {
+    const body = document.getElementById("order-modal-body");
+
+    if (!body) return;
+
+    body.innerHTML = `
+      <div class="order-delivery-state">
+        <h2>발주 전송 완료</h2>
+        <p>거래처에서 상품을 보내는 중입니다.</p>
+      </div>
+    `;
+  },
+
+  showOrderDelivered(orderData = {}) {
+    if (!this.orderModal) {
+      this.createOrderModal();
+    }
+
+    const body = document.getElementById("order-modal-body");
+    const deliveredItems = Array.isArray(orderData.items)
+      ? orderData.items.filter((item) => item.quantity > 0)
+      : [];
+
+    if (!body) return;
+
+    this.orderDeliveredData = orderData;
+    this.orderModal.classList.remove("hidden");
+
+    const dayLabel = document.getElementById("order-modal-day-label");
+
+    if (dayLabel) {
+      dayLabel.textContent = `Day ${orderData.day ?? GameState.day}`;
+    }
+
+    body.innerHTML = `
+      <div class="order-delivery-state">
+        <h2>상품이 도착했습니다</h2>
+        <p>${orderData.message ?? "입고 상품을 정리해주세요."}</p>
+        <div class="order-delivered-list">
+          ${
+            deliveredItems.length > 0
+              ? deliveredItems.map((item) => {
+                  return `<div><span>${item.productName}</span><strong>${item.quantity}개</strong></div>`;
+                }).join("")
+              : "<div><span>입고 상품 없음</span><strong>0개</strong></div>"
+          }
+        </div>
+        <button id="stock-organized-button" class="stock-organized-button" type="button">
+          재고 정리 완료
+        </button>
+      </div>
+    `;
+
+    const organizedButton = document.getElementById("stock-organized-button");
+
+    organizedButton.onclick = () => {
+      EventBus.emit(EVENTS.STOCK_ORGANIZED, {
+        day: orderData.day ?? GameState.day,
+        orderId: orderData.orderId ?? null
+      });
+
+      this.hideOrderModal();
+      this.showMessage("재고 정리 완료. 편의점 오픈 버튼을 눌러주세요.");
+    };
+  },
+
+  hideOrderModal() {
+    if (!this.orderModal) return;
+
+    this.orderModal.classList.add("hidden");
+  },
+
+  getOrderableProducts() {
+    return PRODUCTS.filter((product) => {
+      return product.unlockDay <= GameState.day;
+    });
+  },
+
+  getOrderTotalCost(products = this.getOrderableProducts()) {
+    return products.reduce((totalCost, product) => {
+      const quantity = this.orderDraftQuantities[product.id] ?? 0;
+
+      return totalCost + product.purchasePrice * quantity;
+    }, 0);
   },
 
   createResultModal() {

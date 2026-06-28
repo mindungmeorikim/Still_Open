@@ -70,7 +70,7 @@ export const PRODUCTS = Object.freeze([
     purchasePrice: 800,
     salePrice: 1400,
     shelfLifeDays: 6,
-    unlockDay: 3,
+    unlockDay: 4,
     initialStock: 3
   }),
   createProduct({
@@ -160,7 +160,7 @@ export const PRODUCTS = Object.freeze([
     purchasePrice: 3200,
     salePrice: 5500,
     shelfLifeDays: 2,
-    unlockDay: 4,
+    unlockDay: 5,
     initialStock: 3,
     customerRequestIds: ["lunch_box"]
   }),

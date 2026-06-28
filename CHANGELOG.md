@@ -328,3 +328,27 @@
 * 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
 
 ---
+
+## v3.0
+
+* Day 1~5 프롤로그/스토리 모드 진행 기준 정리
+* Day 1부터 발주, 손님 입장, 계산, 정산까지 전체 운영 루프 진행 유지
+* Day별 안내 데이터 `DayScenarioData.js` 추가
+* Day 1 기본 영업 안내 추가
+* Day 2 상품 증가 및 손님 다양화 안내 추가
+* Day 3 재고/폐기 부담 증가 안내 추가
+* Day 4 진상 손님 및 랜덤 이벤트 증가 안내 추가
+* Day 5 프롤로그 마지막 날 및 무한모드 예고 추가
+* Day 6 무한모드 시작 안내 추가
+* Day 시작 후 안내 모달, 발주 팝업, 발주 확정, 상품 도착, 재고 정리 완료, 편의점 오픈 순서 추가
+* `OrderSystem.js` 추가
+* `ORDER_MODAL_OPENED`, `ORDER_CONFIRMED`, `ORDER_DELIVERED`, `STOCK_ORGANIZED` 이벤트 추가
+* 발주 확정 시 `GameState.money`만 차감하고 `GameState.todayStats`는 직접 수정하지 않도록 처리
+* 발주 입고 시 `RESTOCK_COMPLETED` payload에 `source: "order_delivery"` 포함
+* Day별 차이를 시스템 제한이 아닌 손님 비율, 상품 해금, 이벤트 빈도, 난이도 상승으로 표현
+* Day 6 이후 Day 1~5에 등장했던 손님/상품/이벤트가 랜덤 조합으로 등장하는 무한모드 기준 정리
+* Day 2~5까지 판매 가능 상품이 점진적으로 늘어나도록 상품 해금 Day 조정
+* 기존 정산, 업그레이드, 엔딩, 손님 NPC, 상품 카드, 발주 버튼, 확장 패널 흐름 유지
+* 실제 날짜(Date)가 아닌 `GameState.day` 기준 진행 규칙 유지
+
+---

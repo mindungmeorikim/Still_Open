@@ -35,12 +35,24 @@ export const CUSTOMER_ZONES = {
 
 export const CUSTOMER_WANTED_PRODUCTS = [
   {
+    id: "potato_chips",
+    name: "감자칩"
+  },
+  {
+    id: "chocolate_bar",
+    name: "초코바"
+  },
+  {
     id: "triangle_kimbap",
     name: "삼각김밥"
   },
   {
     id: "banana_milk",
     name: "바나나우유"
+  },
+  {
+    id: "orange_juice",
+    name: "오렌지주스"
   },
   {
     id: "coffee",
@@ -55,8 +67,32 @@ export const CUSTOMER_WANTED_PRODUCTS = [
     name: "컵라면"
   },
   {
+    id: "udon",
+    name: "우동"
+  },
+  {
+    id: "egg_sandwich",
+    name: "달걀샌드"
+  },
+  {
+    id: "sausage_hotbar",
+    name: "소시지 핫바"
+  },
+  {
+    id: "spicy_shrimp_snack",
+    name: "새우스낵"
+  },
+  {
+    id: "pork_cutlet_lunchbox",
+    name: "돈가스 도시락"
+  },
+  {
     id: "water",
     name: "생수"
+  },
+  {
+    id: "cola",
+    name: "콜라"
   }
 ];
 

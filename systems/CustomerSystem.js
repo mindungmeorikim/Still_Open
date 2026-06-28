@@ -33,6 +33,8 @@ import {
   CUSTOMER_WANTED_PRODUCTS,
   CUSTOMER_EVENTS
 } from "../data/CustomerData.js";
+import { getDayScenario } from "../data/DayScenarioData.js";
+import { getUnlockedProducts } from "../data/ProductData.js";
 
 export const CustomerSystem = {
   customers: [],
@@ -162,7 +164,7 @@ export const CustomerSystem = {
 
       patience: customerType.patience,
       spendBias: customerType.spendBias,
-      eventChance: customerType.eventChance,
+      eventChance: this.getCustomerEventChance(customerType),
 
       wantedProductId: wantedProduct.id,
       wantedProductName: wantedProduct.name,
@@ -184,39 +186,118 @@ export const CustomerSystem = {
   },
 
   pickCustomerType() {
-    const totalWeight = CUSTOMER_TYPES.reduce((sum, type) => {
-      return sum + type.weight;
+    const weightedTypes = CUSTOMER_TYPES.map((type) => {
+      return {
+        type,
+        weight: this.getCustomerTypeWeight(type)
+      };
+    }).filter((entry) => {
+      return entry.weight > 0;
+    });
+
+    const safeWeightedTypes =
+      weightedTypes.length > 0
+        ? weightedTypes
+        : CUSTOMER_TYPES.map((type) => {
+            return { type, weight: type.weight };
+          });
+
+    const totalWeight = safeWeightedTypes.reduce((sum, entry) => {
+      return sum + entry.weight;
     }, 0);
 
     let target = Math.random() * totalWeight;
 
-    for (const type of CUSTOMER_TYPES) {
-      target -= type.weight;
+    for (const entry of safeWeightedTypes) {
+      target -= entry.weight;
 
       if (target <= 0) {
-        return type;
+        return entry.type;
       }
     }
 
-    return CUSTOMER_TYPES[CUSTOMER_TYPES.length - 1];
+    return safeWeightedTypes[safeWeightedTypes.length - 1].type;
   },
 
   decideWantedProduct(customerType) {
     const preferredProductIds = customerType.preferredProductIds ?? [];
+    const availableWantedProducts = this.getAvailableWantedProducts();
 
     const candidateProducts =
       preferredProductIds.length > 0
-        ? CUSTOMER_WANTED_PRODUCTS.filter((product) => {
+        ? availableWantedProducts.filter((product) => {
             return preferredProductIds.includes(product.id);
           })
-        : CUSTOMER_WANTED_PRODUCTS;
+        : availableWantedProducts;
 
     const safeCandidates =
-      candidateProducts.length > 0 ? candidateProducts : CUSTOMER_WANTED_PRODUCTS;
+      candidateProducts.length > 0
+        ? candidateProducts
+        : availableWantedProducts.length > 0
+          ? availableWantedProducts
+          : CUSTOMER_WANTED_PRODUCTS;
 
     const randomIndex = Math.floor(Math.random() * safeCandidates.length);
 
     return safeCandidates[randomIndex];
+  },
+
+  getCurrentDayScenario() {
+    return getDayScenario(GameState.day);
+  },
+
+  getCustomerTypeWeight(customerType) {
+    const scenario = this.getCurrentDayScenario();
+    const scenarioWeight = Number(
+      scenario.customerTypeWeights?.[customerType.id]
+    );
+
+    if (Number.isFinite(scenarioWeight)) {
+      return Math.max(0, scenarioWeight);
+    }
+
+    return Math.max(0, Number(customerType.weight) || 0);
+  },
+
+  getCustomerEventChance(customerType) {
+    const baseChance = Number(customerType.eventChance) || 0;
+    const difficultyRate = Number(GameState.difficulty?.eventRate) || 1;
+    const scenarioRate =
+      Number(this.getCurrentDayScenario().eventRateMultiplier) || 1;
+
+    return Math.min(0.95, baseChance * difficultyRate * scenarioRate);
+  },
+
+  getAvailableWantedProducts() {
+    const scenario = this.getCurrentDayScenario();
+    const scenarioWantedProductIds = new Set(scenario.wantedProductIds ?? []);
+    const unlockedProducts = getUnlockedProducts(GameState.day);
+    const unlockedRequestIds = new Set();
+
+    unlockedProducts.forEach((product) => {
+      unlockedRequestIds.add(product.id);
+
+      (product.customerRequestIds ?? []).forEach((requestId) => {
+        unlockedRequestIds.add(requestId);
+      });
+    });
+
+    const candidates = CUSTOMER_WANTED_PRODUCTS.filter((product) => {
+      const isInScenario =
+        scenarioWantedProductIds.size === 0 ||
+        scenarioWantedProductIds.has(product.id);
+      const isUnlocked = unlockedRequestIds.has(product.id);
+
+      return isInScenario && isUnlocked;
+    });
+
+    if (candidates.length > 0) {
+      return candidates;
+    }
+
+    return CUSTOMER_WANTED_PRODUCTS.filter((product) => {
+      return unlockedRequestIds.has(product.id);
+    });
   },
 
   startRouteTimer() {

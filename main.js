@@ -14,6 +14,7 @@ import { UpgradeSystem } from "./systems/UpgradeSystem.js";
 import { CustomerSystem } from "./systems/CustomerSystem.js";
 import { ExpirationSystem } from "./systems/ExpirationSystem.js";
 import { InventorySystem } from "./systems/InventorySystem.js";
+import { OrderSystem } from "./systems/OrderSystem.js";
 import { ExpansionSystem } from "./systems/ExpansionSystem.js";
 
 function initGame() {
@@ -24,6 +25,7 @@ function initGame() {
   CustomerSystem.init();
   ExpirationSystem.init();
   InventorySystem.init();
+  OrderSystem.init();
   ExpansionSystem.init();
 
   EventBus.emit(EVENTS.GAME_INIT);

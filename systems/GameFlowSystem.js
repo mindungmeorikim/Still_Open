@@ -25,8 +25,11 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
+import { getDayScenario } from "../data/DayScenarioData.js";
 
 export const GameFlowSystem = {
+  orderReadyDay: null,
+
   expansionEffects: {
     customerSpawnRateBonus: 0,
     targetRevenueBonus: 0,
@@ -100,6 +103,9 @@ export const GameFlowSystem = {
     EventBus.on(EVENTS.STORE_OPEN_REQUESTED, () => this.openStore());
     EventBus.on(EVENTS.STORE_CLOSE_REQUESTED, () => this.closeStore());
     EventBus.on(EVENTS.NEXT_DAY_READY, () => this.goToNextDay());
+    EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
+      this.handleStockOrganized(data);
+    });
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
       this.applyExpansionEffects(data);
     });
@@ -137,12 +143,14 @@ export const GameFlowSystem = {
       return;
     }
 
-    GameState.phase = GAME_PHASE.DAY_START;
+    this.orderReadyDay = null;
+    GameState.phase = GAME_PHASE.ORDER;
 
     const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
+    const dayScenario = this.getCurrentDayScenario();
 
     UIManager.showMessage(
-      `Day ${GameState.day} 시작! 현재 모드: ${modeText} / 오늘 목표 매출은 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}입니다.`
+      `Day ${GameState.day} 시작! 현재 모드: ${modeText} / 발주와 재고 정리를 먼저 진행해주세요.`
     );
 
     UIManager.render();
@@ -151,22 +159,34 @@ export const GameFlowSystem = {
       day: GameState.day,
       dailyGoal: GameState.dailyGoal,
       difficulty: GameState.difficulty,
-      isEndlessMode: GameState.isEndlessMode
+      isEndlessMode: GameState.isEndlessMode,
+      dayScenario
     });
 
     EventBus.emit(EVENTS.ORDER_PHASE_STARTED, {
       day: GameState.day,
       dailyGoal: GameState.dailyGoal,
       difficulty: GameState.difficulty,
-      isEndlessMode: GameState.isEndlessMode
+      isEndlessMode: GameState.isEndlessMode,
+      dayScenario
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
   openStore() {
-    if (GameState.phase !== GAME_PHASE.DAY_START && GameState.phase !== GAME_PHASE.ORDER) {
+    if (GameState.phase === GAME_PHASE.ORDER) {
+      UIManager.showMessage("발주 확정과 재고 정리를 완료해야 편의점을 오픈할 수 있습니다.");
+      return;
+    }
+
+    if (GameState.phase !== GAME_PHASE.DAY_START) {
       UIManager.showMessage("Day 시작 후에 영업을 시작할 수 있습니다.");
+      return;
+    }
+
+    if (!this.isOrderReadyForCurrentDay()) {
+      UIManager.showMessage("발주 확정과 재고 정리를 완료해야 편의점을 오픈할 수 있습니다.");
       return;
     }
 
@@ -217,6 +237,7 @@ export const GameFlowSystem = {
       GameState.day === GAME_CONFIG.MAX_STORY_DAY && !GameState.isEndlessMode;
 
     GameState.day += 1;
+    this.orderReadyDay = null;
 
     if (GameState.day > GAME_CONFIG.MAX_STORY_DAY) {
       GameState.isEndlessMode = true;
@@ -243,6 +264,27 @@ export const GameFlowSystem = {
     UIManager.render();
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  handleStockOrganized(data = {}) {
+    if (data.day !== GameState.day) {
+      return;
+    }
+
+    this.orderReadyDay = GameState.day;
+
+    if (GameState.phase === GAME_PHASE.ORDER) {
+      GameState.phase = GAME_PHASE.DAY_START;
+    }
+
+    UIManager.showMessage("재고 정리 완료! 이제 편의점을 오픈할 수 있습니다.");
+    UIManager.render();
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  isOrderReadyForCurrentDay() {
+    return this.orderReadyDay === GameState.day;
   },
 
   resetTodayStats() {
@@ -307,6 +349,10 @@ export const GameFlowSystem = {
         eventRate: Number((1.3 + extraDay * 0.07).toFixed(2))
       }
     };
+  },
+
+  getCurrentDayScenario() {
+    return getDayScenario(GameState.day);
   },
 
   toNumber(value) {

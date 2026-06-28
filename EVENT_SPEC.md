@@ -70,8 +70,12 @@ EventBus.emit(EVENTS.DAY_STARTED, data);
 | DAY_START_REQUESTED | Day 시작 버튼 |
 | DAY_STARTED | Day 시작 |
 | ORDER_PHASE_STARTED | 발주 시작 |
+| ORDER_MODAL_OPENED | Day 시작 전 발주 팝업 표시 |
 | ORDER_BUTTON_CLICKED | 상품 카드 발주 버튼 클릭 |
 | ORDER_REQUESTED | 상품 발주 요청 |
+| ORDER_CONFIRMED | Day 시작 전 발주 확정 |
+| ORDER_DELIVERED | 발주 상품 도착 |
+| STOCK_ORGANIZED | 재고 정리 완료 |
 | STORE_OPEN_REQUESTED | 영업 시작 버튼 |
 | STORE_OPENED | 영업 시작 |
 | STORE_CLOSE_REQUESTED | 영업 종료 버튼 |
@@ -90,7 +94,64 @@ EventBus.emit(EVENTS.DAY_STARTED, data);
 
 ---
 
+## Day 시나리오 안내
+
+Day 1~5는 프롤로그/스토리 모드이고 Day 6부터 무한모드입니다.
+
+Day 1부터 발주, 손님 입장, 계산, 재고 감소, 하루 종료, 정산, 업그레이드 선택 흐름은 모두 진행됩니다.
+
+Day별 차이는 기능 잠금이 아니라 아래 기준으로 표현합니다.
+
+- 손님 타입 비율
+- 요청 상품 풀
+- 상품 해금 Day
+- 이벤트 빈도
+- Day 목표 매출 및 난이도
+
+`DAY_STARTED` payload에는 안내 모달과 손님/상품/이벤트 기준에 사용할 `dayScenario`가 포함될 수 있습니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  dailyGoal: GameState.dailyGoal,
+  difficulty: GameState.difficulty,
+  isEndlessMode: GameState.isEndlessMode,
+  dayScenario: {
+    title: "Day 1. 첫 영업 시작",
+    features: ["기본 상품 판매", "일반 손님 중심"]
+  }
+}
+```
+
+---
+
 ## 발주 요청 이벤트
+
+Day 시작 후 바로 영업을 오픈하지 않고 아래 순서로 진행합니다.
+
+1. Day 시작 안내 모달 표시
+2. 발주 팝업 표시
+3. 상품별 발주 수량 선택
+4. 발주 확정
+5. 발주 상품 도착
+6. 재고 정리 완료
+7. 편의점 오픈 가능
+8. 편의점 오픈 후 손님 입장
+
+### ORDER_MODAL_OPENED
+
+Day 시작 안내 모달을 닫은 뒤 발주 팝업이 표시될 때 발생합니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  productCount: 6
+}
+```
 
 ### ORDER_BUTTON_CLICKED
 
@@ -129,6 +190,66 @@ payload 예시
 - 모든 발주 일자는 GameState.day 기준
 - GameState.todayStats 직접 수정 금지
 - ORDER_REQUESTED는 요청 이벤트일 뿐 즉시 재고를 증가시키지 않음
+
+### ORDER_CONFIRMED
+
+Day 시작 전 발주 팝업에서 발주를 확정했을 때 발생합니다.
+
+수량 0 발주도 확정할 수 있습니다. 예상 발주 비용이 보유금보다 크면 UI에서 확정 버튼을 비활성화합니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  items: [
+    {
+      productId: "banana_milk",
+      productName: "달콤 바나나우유",
+      quantity: 2,
+      purchasePrice: 1000,
+      salePrice: 1800
+    }
+  ],
+  totalCost: 2000
+}
+```
+
+### ORDER_DELIVERED
+
+발주가 확정되고 상품이 도착했을 때 발생합니다.
+
+발주 비용은 `GameState.money`에서 차감되며 `GameState.todayStats`는 직접 수정하지 않습니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  orderId: "order-1-1",
+  totalCost: 2000,
+  remainingMoney: GameState.money,
+  items: [],
+  message: "발주 상품이 도착했습니다. 재고 정리를 완료해주세요."
+}
+```
+
+### STOCK_ORGANIZED
+
+도착한 발주 상품의 재고 정리를 완료했을 때 발생합니다.
+
+`OrderSystem`은 이 이벤트를 받은 뒤 입고 상품별로 `RESTOCK_COMPLETED`를 발생시킵니다.
+
+`RESTOCK_COMPLETED` payload에는 추후 정산용 재고 보충과 발주 입고를 구분할 수 있도록 `source: "order_delivery"`를 포함합니다.
+
+payload 예시
+
+```js
+{
+  day: GameState.day,
+  orderId: "order-1-1"
+}
+```
 
 ---
 
