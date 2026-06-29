@@ -1230,6 +1230,7 @@ button:active {
   overflow-y: auto;
   padding-right: 2px;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .delivered-product-button {

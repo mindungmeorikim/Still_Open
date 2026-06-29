@@ -1267,10 +1267,15 @@ export const UIManager = {
 
   bindDeliveredProductButtons(orderData = {}) {
     document.querySelectorAll(".delivered-product-button").forEach((button) => {
-      button.onclick = () => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
         if (button.disabled) return;
 
         const productId = button.dataset.productId;
+        const deliveredGrid = document.querySelector(".order-delivered-grid");
+        const previousScrollTop = deliveredGrid?.scrollTop ?? 0;
 
         EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
           day: orderData.day ?? GameState.day,
@@ -1278,6 +1283,14 @@ export const UIManager = {
           orderId: orderData.orderId ?? null,
           productId,
           source: "delivery_box_modal"
+        });
+
+        requestAnimationFrame(() => {
+          const updatedDeliveredGrid = document.querySelector(".order-delivered-grid");
+
+          if (updatedDeliveredGrid) {
+            updatedDeliveredGrid.scrollTop = previousScrollTop;
+          }
         });
       };
     });
