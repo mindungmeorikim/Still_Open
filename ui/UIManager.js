@@ -338,6 +338,8 @@ export const UIManager = {
   },
 
   createExpansionPanel() {
+    this.createExpansionEffectSummary();
+
     const existingPanel = document.getElementById("expansion-panel");
 
     if (existingPanel) {
@@ -359,7 +361,6 @@ export const UIManager = {
         <h2 id="expansion-panel-title">매장 확장</h2>
         <span id="expansion-unlock-summary"></span>
       </div>
-      <div id="expansion-effect-summary" class="expansion-effect-summary"></div>
       <div id="expansion-zone-grid" class="expansion-zone-grid"></div>
       <p id="expansion-message">먼지 낀 옆 구역을 눌러 확장 조건을 확인하세요.</p>
     `;
@@ -371,6 +372,24 @@ export const UIManager = {
     }
 
     this.expansionPanel = expansionPanel;
+  },
+
+  createExpansionEffectSummary() {
+    const statusPanel = document.getElementById("status-panel");
+
+    if (!statusPanel) return null;
+
+    let effectSummary = document.getElementById("expansion-effect-summary");
+
+    if (!effectSummary) {
+      effectSummary = document.createElement("div");
+      effectSummary.id = "expansion-effect-summary";
+    }
+
+    effectSummary.className = "expansion-effect-summary";
+    statusPanel.insertAdjacentElement("afterend", effectSummary);
+
+    return effectSummary;
   },
 
   renderExpansionZones(expansionState = this.expansionState) {
@@ -537,6 +556,8 @@ export const UIManager = {
   },
 
   renderExpansionEffects(effects) {
+    this.createExpansionEffectSummary();
+
     const effectSummary = document.getElementById("expansion-effect-summary");
 
     if (!effectSummary) return;
