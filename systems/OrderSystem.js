@@ -3,7 +3,7 @@
 
   역할:
   - Day 시작 전 발주 확정/배송/재고 정리 이벤트 연결
-  - 발주 비용 차감
+  - 발주 비용 계산 및 정산 이벤트 전달
   - 재고 입고는 RESTOCK_COMPLETED 이벤트로 InventorySystem에 위임
 
   규칙:
@@ -69,12 +69,12 @@ export const OrderSystem = {
   handleOrderConfirmed(data = {}) {
     const items = this.normalizeOrderItems(data.items);
     const totalCost = this.calculateTotalCost(items);
+    const availableMoney = this.getAvailableMoney();
 
-    if (totalCost > GameState.money) {
+    if (totalCost > availableMoney) {
       return;
     }
 
-    GameState.money -= totalCost;
     this.orderSequence += 1;
 
     const orderId = `order-${GameState.day}-${this.orderSequence}`;
@@ -102,7 +102,7 @@ export const OrderSystem = {
       orderId,
       items,
       totalCost,
-      remainingMoney: GameState.money,
+      remainingMoney: Math.max(0, availableMoney - totalCost),
       message: this.createDeliveryMessage(items)
     });
 
@@ -168,6 +168,15 @@ export const OrderSystem = {
     }, 0);
   },
 
+  getAvailableMoney() {
+    const money = this.toNonNegativeNumber(GameState.money);
+    const recordedCost = this.toNonNegativeNumber(
+      GameState.todayStats?.cost
+    );
+
+    return Math.max(0, money - recordedCost);
+  },
+
   createDeliveryMessage(items = []) {
     const orderedCount = items.reduce((totalCount, item) => {
       return totalCount + item.quantity;
@@ -184,5 +193,15 @@ export const OrderSystem = {
     const numberValue = Math.floor(Number(value) || 0);
 
     return Math.max(0, numberValue);
+  },
+
+  toNonNegativeNumber(value) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue) || numberValue <= 0) {
+      return 0;
+    }
+
+    return numberValue;
   }
 };
