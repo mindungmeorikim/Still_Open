@@ -33,6 +33,8 @@ export const UIManager = {
   orderModalMode: "closed",
   orderListScrollTop: 0,
   expansionCarouselIndex: 0,
+  selectedExpansionZoneId: null,
+  isStoreExpansionPopoverVisible: false,
   inventoryByProductId: {},
 
   init() {
@@ -49,6 +51,7 @@ export const UIManager = {
     this.createUpgradeModal();
     this.createEndingModal();
     this.createCustomerEventModal();
+    this.createStoreComposition();
     this.createExpansionPanel();
     this.createProductPanel();
     this.render();
@@ -165,14 +168,20 @@ export const UIManager = {
 
   bindExpansionEvents() {
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
+      const message = data.message ?? "매장 확장이 완료되었습니다.";
+
       this.expansionState = data.expansionState ?? this.expansionState;
-      this.showExpansionMessage(data.message ?? "매장 확장이 완료되었습니다.");
+      this.showExpansionMessage(message);
+      this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
     });
 
     EventBus.on(EVENTS.EXPANSION_FAILED, (data) => {
+      const message = data.message ?? "확장 조건을 다시 확인해주세요.";
+
       this.expansionState = data.expansionState ?? this.expansionState;
-      this.showExpansionMessage(data.message ?? "확장 조건을 다시 확인해주세요.");
+      this.showExpansionMessage(message);
+      this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
     });
   },
@@ -354,7 +363,7 @@ export const UIManager = {
     }
 
     const gameScreen = document.getElementById("game-screen");
-    const storeArea = document.getElementById("store-area");
+    const messagePanel = document.getElementById("message-panel");
 
     if (!gameScreen) return;
 
@@ -376,8 +385,8 @@ export const UIManager = {
       <p id="expansion-message">먼지 낀 옆 구역을 눌러 확장 조건을 확인하세요.</p>
     `;
 
-    if (storeArea?.nextElementSibling) {
-      gameScreen.insertBefore(expansionPanel, storeArea.nextElementSibling);
+    if (messagePanel?.parentElement === gameScreen) {
+      gameScreen.insertBefore(expansionPanel, messagePanel);
     } else {
       gameScreen.appendChild(expansionPanel);
     }
@@ -403,6 +412,61 @@ export const UIManager = {
     return effectSummary;
   },
 
+  createStoreComposition() {
+    const gameScreen = document.getElementById("game-screen");
+    const storeArea = document.getElementById("store-area");
+
+    if (!gameScreen || !storeArea) return null;
+
+    let composition = document.getElementById("store-composition");
+
+    if (!composition) {
+      composition = document.createElement("section");
+      composition.id = "store-composition";
+      composition.setAttribute("aria-labelledby", "store-composition-title");
+      composition.innerHTML = `
+        <div class="store-composition-header">
+          <h2 id="store-composition-title">매장 구성</h2>
+        </div>
+        <div class="store-composition-layout">
+          <div class="base-store-map"></div>
+          <div class="store-expansion-side">
+            <div
+              id="store-expansion-tiles"
+              class="store-expansion-tiles"
+              aria-label="확장 구역"
+            ></div>
+            <aside
+              id="store-expansion-popover"
+              class="store-expansion-popover expansion-condition-popover hidden"
+              aria-live="polite"
+            ></aside>
+          </div>
+        </div>
+      `;
+
+      if (storeArea.parentElement === gameScreen) {
+        gameScreen.insertBefore(composition, storeArea);
+      } else {
+        const messagePanel = document.getElementById("message-panel");
+
+        if (messagePanel?.parentElement === gameScreen) {
+          gameScreen.insertBefore(composition, messagePanel);
+        } else {
+          gameScreen.appendChild(composition);
+        }
+      }
+    }
+
+    const baseStoreMap = composition.querySelector(".base-store-map");
+
+    if (baseStoreMap && storeArea.parentElement !== baseStoreMap) {
+      baseStoreMap.appendChild(storeArea);
+    }
+
+    return composition;
+  },
+
   renderExpansionZones(expansionState = this.expansionState) {
     this.createExpansionPanel();
 
@@ -412,10 +476,12 @@ export const UIManager = {
 
     const zoneGrid = document.getElementById("expansion-zone-grid");
     const unlockSummary = document.getElementById("expansion-unlock-summary");
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+
+    this.renderStoreExpansionZones(zoneStates);
 
     if (!zoneGrid) return;
 
-    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
     const unlockedCount = zoneStates.filter((zone) => zone.isUnlocked).length;
     const carouselIndex = this.getSafeExpansionCarouselIndex(zoneStates);
     const visibleZone = zoneStates[carouselIndex];
@@ -485,6 +551,220 @@ export const UIManager = {
 
     this.bindExpansionZoneEvents(zoneStates);
     this.bindExpansionCarouselControls(zoneStates);
+  },
+
+  renderStoreExpansionZones(zoneStates = []) {
+    this.createStoreComposition();
+
+    const tilesNode = document.getElementById("store-expansion-tiles");
+
+    if (!tilesNode) return;
+
+    const displayNames = {
+      zone_extra_shelf: "Lv.2 추가 진열 구역",
+      zone_cold_food: "Lv.3 냉장·도시락 구역",
+      zone_premium_store: "Lv.4 프리미엄 매장 구역"
+    };
+    const objectLabels = {
+      zone_extra_shelf: "추가 진열대",
+      zone_cold_food: "냉장 상품 구역",
+      zone_premium_store: "프리미엄 매장 구역"
+    };
+    const visualZones = zoneStates.filter((zone) => zone.level > 1);
+    const selectedZoneExists = visualZones.some((zone) => {
+      return zone.id === this.selectedExpansionZoneId;
+    });
+
+    if (!selectedZoneExists) {
+      this.selectedExpansionZoneId = visualZones[0]?.id ?? null;
+    }
+
+    tilesNode.innerHTML = visualZones.map((zone) => {
+      const displayName = displayNames[zone.id] ?? zone.name;
+      const objectLabel = objectLabels[zone.id] ?? "추가 진열 구역";
+      const statusText = this.getStoreExpansionStatusText(zone);
+      const selectedClass =
+        zone.id === this.selectedExpansionZoneId ? " is-selected" : "";
+
+      return `
+        <button
+          class="store-expansion-tile store-expansion-${zone.status}${selectedClass}"
+          type="button"
+          data-zone-id="${zone.id}"
+          data-zone-level="${zone.level}"
+          aria-label="${displayName} ${statusText}"
+        >
+          <span class="store-expansion-tile-icon" aria-hidden="true">
+            ${zone.isUnlocked ? "✓" : "🔒"}
+          </span>
+          <strong>${displayName}</strong>
+          <span class="store-expansion-tile-status">${statusText}</span>
+          <span class="store-expansion-tile-object">
+            ${zone.isUnlocked ? objectLabel : "박스더미"}
+          </span>
+          <span class="store-expansion-tile-hint">
+            ${zone.isUnlocked ? "추가 공간 사용 중" : "확장 조건 보기"}
+          </span>
+        </button>
+      `;
+    }).join("");
+
+    const zonesById = visualZones.reduce((zoneMap, zone) => {
+      zoneMap[zone.id] = zone;
+      return zoneMap;
+    }, {});
+
+    tilesNode.querySelectorAll(".store-expansion-tile").forEach((zoneNode) => {
+      zoneNode.onclick = () => {
+        const zone = zonesById[zoneNode.dataset.zoneId];
+
+        if (!zone) return;
+
+        this.selectedExpansionZoneId = zone.id;
+        this.isStoreExpansionPopoverVisible = true;
+        this.showMessage(
+          zone.isUnlocked
+            ? "확장 완료된 구역입니다."
+            : "아직 확장되지 않은 구역입니다."
+        );
+        this.renderStoreExpansionZones(zoneStates);
+      };
+    });
+
+    this.renderStoreExpansionPopover(zonesById[this.selectedExpansionZoneId]);
+  },
+
+  renderStoreExpansionPopover(zone) {
+    const popover = document.getElementById("store-expansion-popover");
+
+    if (!popover) return;
+
+    if (!this.isStoreExpansionPopoverVisible || !zone) {
+      popover.classList.add("hidden");
+      popover.classList.remove("is-visible");
+      popover.removeAttribute("data-active-level");
+      popover.innerHTML = "";
+      return;
+    }
+
+    const costText = zone.unlockCost > 0
+      ? `₩${zone.unlockCost.toLocaleString()}`
+      : "기본 구역";
+    const statusText = this.getStoreExpansionStatusText(zone);
+    const actionText = zone.isUnlocked
+      ? "확장 완료"
+      : zone.isAvailable
+        ? "확장하기"
+        : "조건 부족";
+
+    popover.classList.remove("hidden");
+    popover.classList.add("is-visible");
+    popover.dataset.activeLevel = String(zone.level);
+    popover.innerHTML = `
+      <div class="store-expansion-popover-title">
+        <span>확장 조건</span>
+        <strong>${zone.name}</strong>
+      </div>
+      <p class="store-expansion-popover-message">
+        ${zone.isUnlocked ? "확장 완료된 구역입니다." : "아직 확장되지 않은 구역입니다."}
+      </p>
+      <dl class="store-expansion-condition-list">
+        <div class="${zone.conditions.hasRequiredDay ? "is-met" : "is-missing"}">
+          <dt>필요 Day</dt>
+          <dd>${zone.requiredDay}</dd>
+        </div>
+        <div class="${zone.conditions.hasEnoughMoney ? "is-met" : "is-missing"}">
+          <dt>확장 비용</dt>
+          <dd>${costText}</dd>
+        </div>
+        <div class="${zone.conditions.previousUnlocked ? "is-met" : "is-missing"}">
+          <dt>이전 구역</dt>
+          <dd>${zone.previousZoneName}</dd>
+        </div>
+        <div>
+          <dt>현재 상태</dt>
+          <dd>${statusText}</dd>
+        </div>
+      </dl>
+      <button
+        class="store-expansion-popover-action"
+        type="button"
+        data-zone-id="${zone.id}"
+        ${zone.isAvailable ? "" : "disabled"}
+      >
+        ${actionText}
+      </button>
+    `;
+
+    const actionButton = popover.querySelector(".store-expansion-popover-action");
+
+    if (!actionButton) return;
+
+    actionButton.onclick = () => {
+      if (actionButton.disabled) return;
+
+      EventBus.emit(EVENTS.EXPANSION_REQUESTED, {
+        day: GameState.day,
+        zoneId: actionButton.dataset.zoneId
+      });
+    };
+
+    this.positionStoreExpansionPopover(zone.id);
+  },
+
+  positionStoreExpansionPopover(zoneId) {
+    const popover = document.getElementById("store-expansion-popover");
+    const side = document.querySelector(".store-expansion-side");
+    const tile = document.querySelector(`.store-expansion-tile[data-zone-id="${zoneId}"]`);
+
+    if (!popover || !side || !tile) {
+      return;
+    }
+
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      popover.style.left = "";
+      popover.style.top = "";
+      popover.style.width = "";
+      popover.style.removeProperty("--popover-arrow-left");
+      return;
+    }
+
+    const popoverWidth = 220;
+    const sideWidth = side.clientWidth || popoverWidth;
+    const tileCenter = tile.offsetLeft + tile.clientWidth / 2;
+    const preferredLeft = Math.round(tileCenter - popoverWidth / 2);
+    const safeLeft = Math.min(
+      Math.max(preferredLeft, 0),
+      Math.max(sideWidth - popoverWidth, 0)
+    );
+
+    const hintNode = tile.querySelector(".store-expansion-tile-hint");
+    const hintBottom = hintNode
+      ? hintNode.offsetTop + hintNode.offsetHeight
+      : Math.round(tile.clientHeight * 0.48);
+
+    const popoverTop = Math.min(
+      hintBottom + 12,
+      Math.max(tile.clientHeight - 250, 120)
+    );
+    const arrowLeft = Math.round(tileCenter - safeLeft);
+
+    popover.style.left = `${safeLeft}px`;
+    popover.style.top = `${tile.offsetTop + popoverTop}px`;
+    popover.style.width = `${popoverWidth}px`;
+    popover.style.setProperty("--popover-arrow-left", `${arrowLeft}px`);
+  },
+
+  getStoreExpansionStatusText(zone) {
+    if (zone.isUnlocked) {
+      return "확장 완료";
+    }
+
+    if (zone.isAvailable) {
+      return "미확장";
+    }
+
+    return "조건 부족";
   },
 
   getSafeExpansionCarouselIndex(zoneStates = []) {
