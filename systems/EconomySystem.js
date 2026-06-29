@@ -55,7 +55,19 @@ export const EconomySystem = {
     const checkout = this.normalizeCheckout(data);
 
     if (!checkout.isValid) {
-      console.warn(`[EconomySystem] 매출 처리 실패: ${checkout.reason}`, data);
+      if (checkout.reason === "day_mismatch") {
+        console.warn(
+          "[EconomySystem] 매출 처리 스킵: 현재 Day와 계산 요청 Day가 일치하지 않습니다.",
+          {
+            amount: data.amount,
+            requestDay: checkout.requestDay,
+            currentDay: checkout.currentDay
+          }
+        );
+      } else {
+        console.warn(`[EconomySystem] 매출 처리 실패: ${checkout.reason}`, data);
+      }
+
       return {
         success: false,
         reason: checkout.reason
@@ -83,10 +95,10 @@ export const EconomySystem = {
       day: checkout.day,
       customerId: checkout.customerId,
       wantedProductId: checkout.wantedProductId,
-      productId: checkout.product.id,
-      productName: checkout.product.name,
+      productId: checkout.product?.id ?? null,
+      productName: checkout.product?.name ?? null,
       quantity: checkout.quantity,
-      unitPrice: checkout.product.salePrice,
+      unitPrice: checkout.unitPrice,
       amount: checkout.amount,
       reason: "product_sale"
     });
@@ -94,22 +106,50 @@ export const EconomySystem = {
     return {
       success: true,
       amount: checkout.amount,
-      productId: checkout.product.id,
+      productId: checkout.product?.id ?? null,
       quantity: checkout.quantity
     };
   },
 
   normalizeCheckout(data = {}) {
-    const day = this.toDayNumber(data.day, 0);
+    const requestDay = Number(data.day);
+    const currentDay = Number(GameState.day);
 
-    if (day !== GameState.day) {
+    if (!Number.isFinite(requestDay) || requestDay !== currentDay) {
       return {
         isValid: false,
-        reason: "현재 Day와 계산 요청 Day가 일치하지 않습니다."
+        reason: "day_mismatch",
+        requestDay,
+        currentDay
       };
     }
 
+    const day = currentDay;
     const productId = data.productId ?? data.wantedProductId;
+    const requestedAmount = this.toNonNegativeNumber(data.amount);
+
+    if (!productId) {
+      if (requestedAmount <= 0) {
+        return {
+          isValid: false,
+          reason: "판매 금액은 0원보다 커야 합니다."
+        };
+      }
+
+      return {
+        isValid: true,
+        checkoutKeys: this.createCheckoutKeys(data, day),
+        checkoutId: data.checkoutId ?? null,
+        day,
+        customerId: data.customerId ?? null,
+        wantedProductId: null,
+        product: null,
+        quantity: this.toPositiveInteger(data.quantity) || 1,
+        unitPrice: requestedAmount,
+        amount: requestedAmount
+      };
+    }
+
     const product = getProductById(productId);
 
     if (!product) {
@@ -145,7 +185,6 @@ export const EconomySystem = {
     }
 
     const amount = product.salePrice * quantity;
-    const requestedAmount = this.toNonNegativeNumber(data.amount);
 
     if (requestedAmount > 0 && requestedAmount !== amount) {
       console.warn(
@@ -162,6 +201,7 @@ export const EconomySystem = {
       wantedProductId: data.wantedProductId ?? product.id,
       product,
       quantity,
+      unitPrice: product.salePrice,
       amount
     };
   },

@@ -34,12 +34,8 @@ export const ResultSystem = {
   },
 
   bindPlayerEvents() {
-    EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data) => {
+    EventBus.on(EVENTS.CHECKOUT_COMPLETED, () => {
       GameState.todayStats.checkoutSuccessCount += 1;
-
-      if (data.amount) {
-        GameState.todayStats.revenue += this.toNumber(data.amount);
-      }
 
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
     });

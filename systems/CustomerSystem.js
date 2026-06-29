@@ -52,7 +52,9 @@ export const CustomerSystem = {
     });
 
     EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data) => {
-      this.handleCheckoutCompleted(data);
+      const checkoutData = this.normalizeCheckoutCompletedPayload(data);
+
+      this.handleCheckoutCompleted(checkoutData);
     });
 
     EventBus.on(EVENTS.STORE_CLOSED, () => {
@@ -606,6 +608,14 @@ export const CustomerSystem = {
     );
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  normalizeCheckoutCompletedPayload(data = {}) {
+    if (data.day === undefined || data.day === null) {
+      data.day = GameState.day;
+    }
+
+    return data;
   },
 
   getCheckoutCustomerForCompletion(data = {}) {
