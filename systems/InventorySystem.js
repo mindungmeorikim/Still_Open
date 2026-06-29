@@ -78,11 +78,9 @@ export const InventorySystem = {
       this.initializedProductIds.add(product.id);
       newlyUnlockedProductIds.push(product.id);
 
-      if (product.initialStock > 0) {
-        this.addStock(product.id, product.initialStock, {
-          emitChange: false
-        });
-      }
+      // v3.1: 발주하지 않은 상품에 기본 재고가 생기지 않도록
+      // 상품 해금과 재고 입고를 분리한다.
+      // 실제 재고 증가는 택배 박스 상품 정리 후 RESTOCK_COMPLETED 이벤트로만 처리한다.
     });
 
     return newlyUnlockedProductIds;

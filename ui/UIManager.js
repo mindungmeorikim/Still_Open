@@ -26,6 +26,8 @@ export const UIManager = {
   pendingOrderPhaseData: null,
   orderDraftQuantities: {},
   orderDeliveredData: null,
+  orderModalMode: "closed",
+  orderListScrollTop: 0,
   inventoryByProductId: {},
 
   init() {
@@ -123,7 +125,22 @@ export const UIManager = {
 
   bindOrderEvents() {
     EventBus.on(EVENTS.ORDER_DELIVERED, (data) => {
-      this.showOrderDelivered(data);
+      this.handleOrderDelivered(data);
+    });
+
+    EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
+      if (data.source !== "delivery_box_sorted" && data.source !== "empty_order") {
+        return;
+      }
+
+      this.clearDeliveryBox();
+      this.orderDeliveredData = null;
+      this.orderModalMode = "closed";
+      this.hideOrderModal();
+
+      this.showMessage(
+        data.message ?? "재고 정리 완료. 편의점 오픈 버튼을 눌러주세요."
+      );
     });
   },
 
@@ -288,6 +305,7 @@ export const UIManager = {
     this.renderExpansionZones();
     this.renderControlButtons();
     this.renderPlayer();
+    this.renderDeliveryBox(this.orderDeliveredData);
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
@@ -940,6 +958,8 @@ export const UIManager = {
 
     this.pendingOrderPhaseData = orderData;
     this.orderDeliveredData = null;
+    this.orderModalMode = "draft";
+    this.clearDeliveryBox();
     this.orderDraftQuantities = this.getOrderableProducts().reduce(
       (quantityMap, product) => {
         quantityMap[product.id] = 0;
@@ -963,8 +983,12 @@ export const UIManager = {
     });
   },
 
-  renderOrderDraft() {
+  renderOrderDraft(options = {}) {
     const body = document.getElementById("order-modal-body");
+    const previousList = document.querySelector(".order-product-list");
+    const previousScrollTop = options.preserveScroll
+      ? previousList?.scrollTop ?? this.orderListScrollTop
+      : 0;
 
     if (!body) return;
 
@@ -988,9 +1012,18 @@ export const UIManager = {
 
           return `
             <article class="order-product-row" data-product-id="${product.id}">
-              <div>
-                <strong>${product.name}</strong>
-                <span>현재 재고 ${stockQuantity}개</span>
+              <div class="order-product-main">
+                <img
+                  class="order-product-thumb"
+                  src="${product.imagePath}"
+                  alt="${product.name}"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <div>
+                  <strong>${product.name}</strong>
+                  <span>현재 재고 ${stockQuantity}개</span>
+                </div>
               </div>
               <div class="order-product-prices">
                 <span>매입 ₩${product.purchasePrice.toLocaleString()}</span>
@@ -1027,6 +1060,14 @@ export const UIManager = {
     `;
 
     this.bindOrderDraftControls(products);
+
+    if (options.preserveScroll) {
+      const nextList = document.querySelector(".order-product-list");
+
+      if (nextList) {
+        nextList.scrollTop = previousScrollTop;
+      }
+    }
   },
 
   bindOrderDraftControls(products = []) {
@@ -1039,8 +1080,10 @@ export const UIManager = {
             ? currentQuantity + 1
             : Math.max(0, currentQuantity - 1);
 
+        const orderList = document.querySelector(".order-product-list");
+        this.orderListScrollTop = orderList?.scrollTop ?? this.orderListScrollTop;
         this.orderDraftQuantities[productId] = nextQuantity;
-        this.renderOrderDraft();
+        this.renderOrderDraft({ preserveScroll: true });
       };
     });
 
@@ -1055,15 +1098,18 @@ export const UIManager = {
 
       EventBus.emit(EVENTS.ORDER_CONFIRMED, {
         day: GameState.day,
-        items: products.map((product) => {
-          return {
-            productId: product.id,
-            productName: product.name,
-            quantity: this.orderDraftQuantities[product.id] ?? 0,
-            purchasePrice: product.purchasePrice,
-            salePrice: product.salePrice
-          };
-        }),
+        items: products
+          .map((product) => {
+            return {
+              productId: product.id,
+              productName: product.name,
+              quantity: this.orderDraftQuantities[product.id] ?? 0,
+              purchasePrice: product.purchasePrice,
+              salePrice: product.salePrice,
+              imagePath: product.imagePath
+            };
+          })
+          .filter((item) => item.quantity > 0),
         totalCost: this.getOrderTotalCost(products)
       });
     };
@@ -1074,12 +1120,86 @@ export const UIManager = {
 
     if (!body) return;
 
+    this.orderModalMode = "waiting";
+
     body.innerHTML = `
       <div class="order-delivery-state">
         <h2>발주 전송 완료</h2>
-        <p>거래처에서 상품을 보내는 중입니다.</p>
+        <p>거래처에서 상품을 보내는 중입니다. 약 3초 뒤 가게 앞에 택배 박스가 도착합니다.</p>
       </div>
     `;
+  },
+
+  handleOrderDelivered(orderData = {}) {
+    const deliveredItems = this.getDeliveredItems(orderData);
+
+    this.orderDeliveredData = orderData;
+
+    if (orderData.isCompleted || deliveredItems.length === 0) {
+      this.clearDeliveryBox();
+      this.hideOrderModal();
+      return;
+    }
+
+    this.renderDeliveryBox(orderData);
+
+    if (this.orderModalMode === "delivery") {
+      this.showOrderDelivered(orderData);
+      return;
+    }
+
+    this.hideOrderModal();
+    this.showMessage("가게 앞에 택배 박스가 도착했습니다. 박스를 클릭해 열어주세요.");
+  },
+
+  renderDeliveryBox(orderData = this.orderDeliveredData) {
+    const storeArea = document.getElementById("store-area");
+
+    if (!storeArea) return;
+
+    const deliveredItems = this.getDeliveredItems(orderData);
+    const hasOpenDelivery = Boolean(orderData && deliveredItems.length > 0 && !orderData.isCompleted);
+    let deliveryBox = document.getElementById("delivery-box-zone");
+
+    if (!hasOpenDelivery) {
+      this.clearDeliveryBox();
+      return;
+    }
+
+    const remainingCount = deliveredItems.filter((item) => !item.isSorted).length;
+
+    if (!deliveryBox) {
+      deliveryBox = document.createElement("button");
+      deliveryBox.id = "delivery-box-zone";
+      deliveryBox.className = "delivery-box-zone";
+      deliveryBox.type = "button";
+      storeArea.appendChild(deliveryBox);
+    }
+
+    deliveryBox.innerHTML = `
+      <span class="delivery-box-icon">📦</span>
+      <span>택배 박스</span>
+      <strong>${remainingCount}종 정리 필요</strong>
+    `;
+
+    deliveryBox.onclick = () => {
+      EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
+        day: orderData.day ?? GameState.day,
+        actionType: "open_delivery_box",
+        orderId: orderData.orderId ?? null,
+        source: "delivery_box_zone"
+      });
+
+      this.showOrderDelivered(this.orderDeliveredData);
+    };
+  },
+
+  clearDeliveryBox() {
+    const deliveryBox = document.getElementById("delivery-box-zone");
+
+    if (deliveryBox) {
+      deliveryBox.remove();
+    }
   },
 
   showOrderDelivered(orderData = {}) {
@@ -1088,13 +1208,13 @@ export const UIManager = {
     }
 
     const body = document.getElementById("order-modal-body");
-    const deliveredItems = Array.isArray(orderData.items)
-      ? orderData.items.filter((item) => item.quantity > 0)
-      : [];
+    const deliveredItems = this.getDeliveredItems(orderData);
+    const remainingCount = deliveredItems.filter((item) => !item.isSorted).length;
 
     if (!body) return;
 
     this.orderDeliveredData = orderData;
+    this.orderModalMode = "delivery";
     this.orderModal.classList.remove("hidden");
 
     const dayLabel = document.getElementById("order-modal-day-label");
@@ -1105,40 +1225,78 @@ export const UIManager = {
 
     body.innerHTML = `
       <div class="order-delivery-state">
-        <h2>상품이 도착했습니다</h2>
-        <p>${orderData.message ?? "입고 상품을 정리해주세요."}</p>
-        <div class="order-delivered-list">
+        <h2>택배 박스 열기</h2>
+        <p>
+          상품 이미지를 누르면 해당 상품이 재고로 정리됩니다.
+          남은 상품 ${remainingCount}종을 모두 정리해야 편의점을 오픈할 수 있습니다.
+        </p>
+        <div class="order-delivered-grid">
           ${
             deliveredItems.length > 0
               ? deliveredItems.map((item) => {
-                  return `<div><span>${item.productName}</span><strong>${item.quantity}개</strong></div>`;
+                  const isSorted = Boolean(item.isSorted);
+
+                  return `
+                    <button
+                      class="delivered-product-button${isSorted ? " is-sorted" : ""}"
+                      type="button"
+                      data-product-id="${item.productId}"
+                      ${isSorted ? "disabled" : ""}
+                    >
+                      <img
+                        class="delivered-product-image"
+                        src="${item.imagePath ?? ""}"
+                        alt="${item.productName}"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                      <span>${item.productName}</span>
+                      <strong>${item.quantity}개</strong>
+                      <em>${isSorted ? "정리 완료" : "클릭해서 정리"}</em>
+                    </button>
+                  `;
                 }).join("")
-              : "<div><span>입고 상품 없음</span><strong>0개</strong></div>"
+              : "<div class=\"order-empty-delivery\">정리할 상품이 없습니다.</div>"
           }
         </div>
-        <button id="stock-organized-button" class="stock-organized-button" type="button">
-          재고 정리 완료
-        </button>
       </div>
     `;
 
-    const organizedButton = document.getElementById("stock-organized-button");
+    this.bindDeliveredProductButtons(orderData);
+  },
 
-    organizedButton.onclick = () => {
-      EventBus.emit(EVENTS.STOCK_ORGANIZED, {
-        day: orderData.day ?? GameState.day,
-        orderId: orderData.orderId ?? null
-      });
+  bindDeliveredProductButtons(orderData = {}) {
+    document.querySelectorAll(".delivered-product-button").forEach((button) => {
+      button.onclick = () => {
+        if (button.disabled) return;
 
-      this.hideOrderModal();
-      this.showMessage("재고 정리 완료. 편의점 오픈 버튼을 눌러주세요.");
-    };
+        const productId = button.dataset.productId;
+
+        EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
+          day: orderData.day ?? GameState.day,
+          actionType: "sort_delivery_item",
+          orderId: orderData.orderId ?? null,
+          productId,
+          source: "delivery_box_modal"
+        });
+      };
+    });
+  },
+
+  getDeliveredItems(orderData = {}) {
+    return Array.isArray(orderData?.items)
+      ? orderData.items.filter((item) => item.quantity > 0)
+      : [];
   },
 
   hideOrderModal() {
     if (!this.orderModal) return;
 
     this.orderModal.classList.add("hidden");
+
+    if (this.orderModalMode !== "delivery") {
+      this.orderModalMode = "closed";
+    }
   },
 
   getOrderableProducts() {

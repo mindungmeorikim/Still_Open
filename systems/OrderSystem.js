@@ -21,6 +21,8 @@ export const OrderSystem = {
   isInitialized: false,
   orderSequence: 0,
   pendingDelivery: null,
+  deliveryTimerId: null,
+  DELIVERY_WAIT_MS: 3000,
 
   init() {
     if (this.isInitialized) return;
@@ -37,6 +39,10 @@ export const OrderSystem = {
 
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
       this.handleStockOrganized(data);
+    });
+
+    EventBus.on(EVENTS.PLAYER_ACTION_RECORDED, (data) => {
+      this.handlePlayerActionRecorded(data);
     });
   },
 
@@ -72,6 +78,10 @@ export const OrderSystem = {
     const availableMoney = this.getAvailableMoney();
 
     if (totalCost > availableMoney) {
+      console.warn("[OrderSystem] 보유금보다 발주 비용이 큽니다.", {
+        totalCost,
+        availableMoney
+      });
       return;
     }
 
@@ -90,21 +100,125 @@ export const OrderSystem = {
       });
     }
 
+    this.clearDeliveryTimer();
+
+    if (items.length === 0) {
+      this.pendingDelivery = null;
+
+      EventBus.emit(EVENTS.STOCK_ORGANIZED, {
+        day: GameState.day,
+        orderId,
+        items: [],
+        totalCost: 0,
+        source: "empty_order",
+        message: "발주 상품 없이 영업 준비를 완료했습니다."
+      });
+
+      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+      return;
+    }
+
     this.pendingDelivery = {
       orderId,
       day: GameState.day,
-      items,
-      totalCost
+      items: items.map((item) => {
+        return {
+          ...item,
+          isSorted: false
+        };
+      }),
+      totalCost,
+      isArrived: false
     };
 
+    this.deliveryTimerId = setTimeout(() => {
+      this.deliverPendingOrder(orderId, availableMoney);
+    }, this.DELIVERY_WAIT_MS);
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  deliverPendingOrder(orderId, availableMoney = this.getAvailableMoney()) {
+    if (!this.pendingDelivery || this.pendingDelivery.orderId !== orderId) {
+      return;
+    }
+
+    this.pendingDelivery.isArrived = true;
+    this.deliveryTimerId = null;
+
     EventBus.emit(EVENTS.ORDER_DELIVERED, {
-      day: GameState.day,
-      orderId,
-      items,
-      totalCost,
-      remainingMoney: Math.max(0, availableMoney - totalCost),
-      message: this.createDeliveryMessage(items)
+      ...this.createDeliveryPayload("arrived"),
+      remainingMoney: Math.max(0, availableMoney - this.pendingDelivery.totalCost)
     });
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  handlePlayerActionRecorded(data = {}) {
+    if (data.actionType !== "sort_delivery_item") {
+      return;
+    }
+
+    this.handleDeliveryItemSorted(data);
+  },
+
+  handleDeliveryItemSorted(data = {}) {
+    if (!this.pendingDelivery || !this.pendingDelivery.isArrived) {
+      return;
+    }
+
+    const requestedOrderId = data.orderId ?? this.pendingDelivery.orderId;
+
+    if (requestedOrderId !== this.pendingDelivery.orderId) {
+      return;
+    }
+
+    const productId = data.productId;
+    const item = this.pendingDelivery.items.find((deliveryItem) => {
+      return deliveryItem.productId === productId;
+    });
+
+    if (!item || item.quantity <= 0 || item.isSorted) {
+      return;
+    }
+
+    item.isSorted = true;
+
+    EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
+      day: GameState.day,
+      productId: item.productId,
+      productName: item.productName,
+      quantity: item.quantity,
+      source: "delivery_box_item",
+      orderId: this.pendingDelivery.orderId
+    });
+
+    if (this.isDeliveryFullySorted()) {
+      const completedPayload = this.createDeliveryPayload("completed", {
+        productId: item.productId
+      });
+      const completedItems = completedPayload.items.map((deliveryItem) => ({
+        ...deliveryItem
+      }));
+
+      this.pendingDelivery = null;
+      this.clearDeliveryTimer();
+
+      EventBus.emit(EVENTS.ORDER_DELIVERED, completedPayload);
+
+      EventBus.emit(EVENTS.STOCK_ORGANIZED, {
+        day: GameState.day,
+        orderId: completedPayload.orderId,
+        items: completedItems,
+        totalCost: completedPayload.totalCost,
+        source: "delivery_box_sorted",
+        message: "모든 입고 상품 정리가 완료되었습니다."
+      });
+    } else {
+      EventBus.emit(EVENTS.ORDER_DELIVERED, this.createDeliveryPayload("item_sorted", {
+        productId: item.productId
+      }));
+    }
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
@@ -119,20 +233,26 @@ export const OrderSystem = {
     }
 
     this.pendingDelivery.items.forEach((item) => {
-      if (item.quantity <= 0) return;
+      if (item.quantity <= 0 || item.isSorted) return;
+
+      item.isSorted = true;
 
       EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
         day: GameState.day,
         productId: item.productId,
         productName: item.productName,
         quantity: item.quantity,
-        source: "order_delivery",
+        source: "order_delivery_compat",
         orderId: this.pendingDelivery.orderId
       });
     });
 
-    this.pendingDelivery = null;
+    const completedPayload = this.createDeliveryPayload("completed");
 
+    this.pendingDelivery = null;
+    this.clearDeliveryTimer();
+
+    EventBus.emit(EVENTS.ORDER_DELIVERED, completedPayload);
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
@@ -145,13 +265,14 @@ export const OrderSystem = {
       const product = getProductById(item.productId);
       const quantity = this.toPositiveInteger(item.quantity);
 
-      if (!product || product.unlockDay > GameState.day) {
+      if (!product || product.unlockDay > GameState.day || quantity <= 0) {
         return normalizedItems;
       }
 
       normalizedItems.push({
         productId: product.id,
         productName: product.name,
+        imagePath: product.imagePath,
         quantity,
         purchasePrice: product.purchasePrice,
         salePrice: product.salePrice,
@@ -186,7 +307,50 @@ export const OrderSystem = {
       return "발주 없이 오늘 영업 준비를 진행합니다.";
     }
 
-    return "발주 상품이 도착했습니다. 재고 정리를 완료해주세요.";
+    return "가게 앞 택배 박스가 도착했습니다. 박스를 눌러 입고 상품을 정리해주세요.";
+  },
+
+  createDeliveryPayload(reason = "arrived", details = {}) {
+    const delivery = this.pendingDelivery;
+
+    if (!delivery) {
+      return {
+        day: GameState.day,
+        orderId: null,
+        items: [],
+        totalCost: 0,
+        reason,
+        message: "정리할 입고 상품이 없습니다.",
+        ...details
+      };
+    }
+
+    return {
+      day: delivery.day,
+      orderId: delivery.orderId,
+      items: delivery.items.map((item) => ({ ...item })),
+      totalCost: delivery.totalCost,
+      isArrived: delivery.isArrived,
+      isCompleted: this.isDeliveryFullySorted(),
+      reason,
+      message: this.createDeliveryMessage(delivery.items),
+      ...details
+    };
+  },
+
+  isDeliveryFullySorted() {
+    if (!this.pendingDelivery) return true;
+
+    return this.pendingDelivery.items.every((item) => {
+      return item.quantity <= 0 || item.isSorted;
+    });
+  },
+
+  clearDeliveryTimer() {
+    if (!this.deliveryTimerId) return;
+
+    clearTimeout(this.deliveryTimerId);
+    this.deliveryTimerId = null;
   },
 
   toPositiveInteger(value) {
