@@ -14,7 +14,7 @@
 
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
-import { EVENTS } from "../core/Constants.js";
+import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
 
 export const OrderSystem = {
@@ -73,6 +73,13 @@ export const OrderSystem = {
   },
 
   handleOrderConfirmed(data = {}) {
+    const availability = this.validateOrderAvailability(data);
+
+    if (!availability.isAvailable) {
+      console.warn(`[OrderSystem] 발주 불가: ${availability.reason}`, data);
+      return;
+    }
+
     const items = this.normalizeOrderItems(data.items);
     const totalCost = this.calculateTotalCost(items);
     const availableMoney = this.getAvailableMoney();
@@ -298,6 +305,40 @@ export const OrderSystem = {
     return Math.max(0, money - recordedCost);
   },
 
+  validateOrderAvailability(data = {}) {
+    const requestDay = this.toDayNumber(data.day, GameState.day);
+
+    if (requestDay !== GameState.day) {
+      return {
+        isAvailable: false,
+        reason: "현재 Day와 발주 요청 Day가 일치하지 않습니다."
+      };
+    }
+
+    const isOrderPhase =
+      GameState.phase === GAME_PHASE.DAY_START ||
+      GameState.phase === GAME_PHASE.ORDER;
+
+    if (!isOrderPhase) {
+      return {
+        isAvailable: false,
+        reason: "발주는 Day 시작 후 영업 시작 전까지만 가능합니다."
+      };
+    }
+
+    if (this.pendingDelivery || this.deliveryTimerId) {
+      return {
+        isAvailable: false,
+        reason: "기존 발주 상품의 배송과 재고 정리를 먼저 완료해야 합니다."
+      };
+    }
+
+    return {
+      isAvailable: true,
+      reason: null
+    };
+  },
+
   createDeliveryMessage(items = []) {
     const orderedCount = items.reduce((totalCount, item) => {
       return totalCount + item.quantity;
@@ -367,5 +408,15 @@ export const OrderSystem = {
     }
 
     return numberValue;
+  },
+
+  toDayNumber(value, fallback) {
+    const day = Math.floor(Number(value));
+
+    if (!Number.isFinite(day) || day < 1) {
+      return fallback;
+    }
+
+    return day;
   }
 };
