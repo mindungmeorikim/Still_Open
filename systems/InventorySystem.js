@@ -87,23 +87,62 @@ export const InventorySystem = {
   },
 
   handleCustomerSatisfied(data = {}) {
-    const requestId = data.wantedProductId;
+    const requestId = data.wantedProductId ?? null;
+    const actualProductId = data.productId ?? null;
+    const quantity = this.toPositiveInteger(data.quantity ?? 1);
+    const saleDetails = {
+      checkoutId: data.checkoutId ?? null,
+      customerId: data.customerId ?? null,
+      requestedProductId: requestId,
+      actualProductId
+    };
 
-    if (!requestId) return;
+    if (quantity <= 0) {
+      this.emitInventoryChanged("invalid_sale_quantity", {
+        ...saleDetails,
+        requestedQuantity: data.quantity
+      });
+      return false;
+    }
 
-    const product = this.findAvailableProductForRequest(requestId);
+    let product = null;
+
+    if (actualProductId) {
+      product = getProductById(actualProductId);
+
+      if (!product || product.unlockDay > GameState.day) {
+        this.emitInventoryChanged("invalid_sale_product", {
+          ...saleDetails,
+          quantity
+        });
+        return false;
+      }
+
+      if (
+        requestId &&
+        !this.isProductMatchingRequest(product.id, requestId)
+      ) {
+        this.emitInventoryChanged("sale_product_mismatch", {
+          ...saleDetails,
+          productId: product.id,
+          productName: product.name,
+          quantity
+        });
+        return false;
+      }
+    } else if (requestId) {
+      product = this.findAvailableProductForRequest(requestId, quantity);
+    }
 
     if (!product) {
       this.emitInventoryChanged("stock_shortage", {
-        requestedProductId: requestId
+        ...saleDetails,
+        requestedQuantity: quantity
       });
-      return;
+      return false;
     }
 
-    this.consumeStock(product.id, 1, {
-      customerId: data.customerId ?? null,
-      requestedProductId: requestId
-    });
+    return this.consumeStock(product.id, quantity, saleDetails);
   },
 
   handleRestockCompleted(data = {}) {
@@ -234,12 +273,17 @@ export const InventorySystem = {
     return true;
   },
 
-  findAvailableProductForRequest(requestId) {
+  findAvailableProductForRequest(requestId, quantity = 1) {
+    const requiredQuantity = Math.max(
+      1,
+      this.toPositiveInteger(quantity)
+    );
+
     const candidates = getProductsByCustomerRequestId(requestId)
       .filter((product) => {
         return (
           product.unlockDay <= GameState.day &&
-          this.getStockQuantity(product.id) > 0
+          this.getStockQuantity(product.id) >= requiredQuantity
         );
       })
       .sort((first, second) => {
@@ -254,6 +298,16 @@ export const InventorySystem = {
       });
 
     return candidates[0] ?? null;
+  },
+
+  isProductMatchingRequest(productId, requestId) {
+    if (!productId || !requestId) {
+      return false;
+    }
+
+    return getProductsByCustomerRequestId(requestId).some((product) => {
+      return product.id === productId;
+    });
   },
 
   getStockQuantity(productId) {
