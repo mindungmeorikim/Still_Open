@@ -25,6 +25,21 @@ export const PlayerActionSystem = {
   isInitialized: false,
   checkoutSequence: 0,
   isCheckoutInputLocked: false,
+  isPlayerBusy: false,
+
+  shelf: {
+    x: 45,
+    y: 45,
+    currentStock: 0,
+    maxStock: 3
+  },
+
+  warehouse: {
+    stock: 25
+  },
+
+  interactionDistance: 120,
+  restockDuration: 5000,
 
   init() {
     if (this.isInitialized) return;
@@ -32,6 +47,7 @@ export const PlayerActionSystem = {
     this.isInitialized = true;
     this.bindCounterCheckoutAction();
     this.bindPointerActions();
+    this.bindKeyboardActions();
   },
 
   bindCounterCheckoutAction() {
@@ -60,6 +76,88 @@ export const PlayerActionSystem = {
     }, { passive: true });
   },
 
+  bindKeyboardActions() {
+    document.addEventListener("keydown", (event) => {
+      this.handleKeyboardAction(event);
+    });
+  },
+
+  handleKeyboardAction(event) {
+    if (event.code !== "Space") return;
+
+    event.preventDefault();
+    this.handleShelfRestockAction();
+  },
+
+  handleShelfRestockAction() {
+    if (this.isPlayerBusy) {
+      this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
+      return;
+    } 
+
+    if (!GameState.player) return;
+
+    if (!this.isNearShelf()) {
+      this.showActionMessage("진열대에 더 가까이 가야 합니다.");
+      return;
+    }
+
+    if (this.shelf.currentStock > 0) {
+      this.showActionMessage(
+        `아직 상품이 남아 있습니다. (${this.shelf.currentStock}/${this.shelf.maxStock})`
+      );
+      return;
+    }
+
+    if (this.warehouse.stock <= 0) {
+      this.showActionMessage("창고에 재고가 없습니다.");
+      return;
+    } 
+
+    this.startShelfRestock();
+  },
+
+  isNearShelf() {
+    const dx = GameState.player.x - this.shelf.x;
+    const dy = GameState.player.y - this.shelf.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    return distance <= this.interactionDistance;
+  },
+
+  startShelfRestock() {
+    this.isPlayerBusy = true;
+    this.showActionMessage("진열대 재고를 채우는 중...");
+
+    setTimeout(() => {
+      const needStock = this.shelf.maxStock - this.shelf.currentStock;
+      const restockAmount = Math.min(needStock, this.warehouse.stock);
+
+      this.shelf.currentStock += restockAmount;
+      this.warehouse.stock -= restockAmount;
+
+      this.isPlayerBusy = false;
+      this.showActionMessage(
+        `진열대에 상품 ${restockAmount}개를 채웠습니다. 진열대: (${this.shelf.currentStock}/${this.shelf.maxStock}), 창고: ${this.warehouse.stock}`
+    );
+    
+    console.log("[PlayerActionSystem] 진열대 보충 완료:", {
+      shelfStock: this.shelf.currentStock,
+      warehouseStock: this.warehouse.stock
+    });
+  }, this.restockDuration);
+  },
+
+  showActionMessage(message) {
+    const messageNode = document.getElementById("message-log");
+
+    if (messageNode) {
+      messageNode.textContent = message;
+      return;
+    }
+
+    console.log(message);
+  },
+
   handlePointerAction(event) {
     const actionNode = event.target.closest?.("[data-player-action]");
 
@@ -68,6 +166,11 @@ export const PlayerActionSystem = {
     const actionType = actionNode.dataset.playerAction;
 
     if (!actionType) return;
+
+    if (this.isPlayerBusy) {
+      this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
+      return;
+    } 
 
     if (this.isCheckoutAction(actionType) && !this.tryLockCheckoutInput()) {
       return;
