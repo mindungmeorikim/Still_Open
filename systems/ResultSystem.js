@@ -23,6 +23,8 @@ import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 
 export const ResultSystem = {
+  calculatedResultDay: null,
+
   init() {
     EventBus.on(EVENTS.DAY_ENDED, () => this.calculateResult());
 
@@ -114,6 +116,15 @@ export const ResultSystem = {
   },
 
   calculateResult() {
+    if (
+      this.calculatedResultDay === GameState.day &&
+      GameState.phase === GAME_PHASE.RESULT
+    ) {
+      return;
+    }
+
+    this.calculatedResultDay = GameState.day;
+
     if (this.shouldApplyMvpTestData()) {
       this.applyMvpTestData();
     }
@@ -126,6 +137,8 @@ export const ResultSystem = {
       stats.expiredLoss -
       stats.eventPenalty +
       stats.bmBonus;
+
+    const bmScore = stats.bmBonus;
 
     GameState.money += stats.profit;
 
@@ -177,6 +190,7 @@ export const ResultSystem = {
       expiredLoss: stats.expiredLoss,
       eventPenalty: stats.eventPenalty,
       bmBonus: stats.bmBonus,
+      bmScore,
       profit: stats.profit,
       money: GameState.money,
 
@@ -267,7 +281,8 @@ export const ResultSystem = {
       `매출 ₩${resultData.revenue.toLocaleString()} / ` +
       `목표 ₩${resultData.targetRevenue.toLocaleString()} | ` +
       `만족도 ${resultData.satisfaction}/${resultData.targetSatisfaction} | ` +
-      `멘탈 ${resultData.mental}${mvpText}`
+      `멘탈 ${resultData.mental} | ` +
+      `병맛 점수 ${resultData.bmScore.toLocaleString()}${mvpText}`
     );
   },
 

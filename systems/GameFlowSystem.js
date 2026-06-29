@@ -29,6 +29,10 @@ import { getDayScenario } from "../data/DayScenarioData.js";
 
 export const GameFlowSystem = {
   orderReadyDay: null,
+  dayTimerId: null,
+  remainingDaySeconds: GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS,
+  isStoreOpen: false,
+  isClosing: false,
 
   expansionEffects: {
     customerSpawnRateBonus: 0,
@@ -101,8 +105,8 @@ export const GameFlowSystem = {
 
     EventBus.on(EVENTS.DAY_START_REQUESTED, () => this.startDay());
     EventBus.on(EVENTS.STORE_OPEN_REQUESTED, () => this.openStore());
-    EventBus.on(EVENTS.STORE_CLOSE_REQUESTED, () => this.closeStore());
-    EventBus.on(EVENTS.NEXT_DAY_READY, () => this.goToNextDay());
+    EventBus.on(EVENTS.STORE_CLOSE_REQUESTED, (data) => this.closeStore(data));
+    EventBus.on(EVENTS.NEXT_DAY_READY, (data) => this.goToNextDay(data));
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
       this.handleStockOrganized(data);
     });
@@ -144,6 +148,11 @@ export const GameFlowSystem = {
     }
 
     this.orderReadyDay = null;
+    this.isStoreOpen = false;
+    this.isClosing = false;
+    this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
+    this.clearDayTimer();
+
     GameState.phase = GAME_PHASE.ORDER;
 
     const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
@@ -180,6 +189,11 @@ export const GameFlowSystem = {
       return;
     }
 
+    if (this.isStoreOpen || GameState.phase === GAME_PHASE.STORE_RUNNING) {
+      UIManager.showMessage("이미 편의점 영업이 진행 중입니다.");
+      return;
+    }
+
     if (GameState.phase !== GAME_PHASE.DAY_START) {
       UIManager.showMessage("Day 시작 후에 영업을 시작할 수 있습니다.");
       return;
@@ -191,14 +205,21 @@ export const GameFlowSystem = {
     }
 
     GameState.phase = GAME_PHASE.STORE_RUNNING;
+    this.isStoreOpen = true;
+    this.isClosing = false;
+    this.startDayTimer();
 
-    UIManager.showMessage("편의점 영업을 시작합니다. 손님을 받을 준비를 하세요!");
+    UIManager.showMessage(
+      `편의점 영업을 시작합니다. ${GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS}초 동안 손님을 받을 준비를 하세요!`
+    );
 
     UIManager.render();
 
     EventBus.emit(EVENTS.STORE_OPENED, {
       day: GameState.day,
       phase: GameState.phase,
+      dayTimeSeconds: GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS,
+      remainingDaySeconds: this.remainingDaySeconds,
       dailyGoal: GameState.dailyGoal,
       difficulty: GameState.difficulty,
       isEndlessMode: GameState.isEndlessMode
@@ -207,11 +228,19 @@ export const GameFlowSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
-  closeStore() {
+  closeStore(data = {}) {
+    if (this.isClosing) {
+      return;
+    }
+
     if (GameState.phase !== GAME_PHASE.STORE_RUNNING) {
       UIManager.showMessage("영업 중일 때만 하루를 종료할 수 있습니다.");
       return;
     }
+
+    this.isClosing = true;
+    this.isStoreOpen = false;
+    this.clearDayTimer();
 
     GameState.phase = GAME_PHASE.DAY_END;
 
@@ -221,23 +250,41 @@ export const GameFlowSystem = {
 
     EventBus.emit(EVENTS.STORE_CLOSED, {
       day: GameState.day,
-      phase: GameState.phase
+      phase: GameState.phase,
+      source: data.source ?? "store_close_requested"
     });
 
     EventBus.emit(EVENTS.DAY_ENDED, {
       day: GameState.day,
-      todayStats: GameState.todayStats
+      todayStats: GameState.todayStats,
+      source: data.source ?? "store_close_requested"
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
-  goToNextDay() {
+  goToNextDay(data = {}) {
+    if (data.currentDay && data.currentDay !== GameState.day) {
+      return;
+    }
+
+    if (
+      GameState.phase !== GAME_PHASE.RESULT &&
+      GameState.phase !== GAME_PHASE.UPGRADE
+    ) {
+      return;
+    }
+
     const clearedStoryMode =
       GameState.day === GAME_CONFIG.MAX_STORY_DAY && !GameState.isEndlessMode;
 
+    this.clearDayTimer();
+
     GameState.day += 1;
     this.orderReadyDay = null;
+    this.isStoreOpen = false;
+    this.isClosing = false;
+    this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
 
     if (GameState.day > GAME_CONFIG.MAX_STORY_DAY) {
       GameState.isEndlessMode = true;
@@ -285,6 +332,38 @@ export const GameFlowSystem = {
 
   isOrderReadyForCurrentDay() {
     return this.orderReadyDay === GameState.day;
+  },
+
+  startDayTimer() {
+    if (this.dayTimerId) {
+      return;
+    }
+
+    this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
+    console.log("[DAY TIMER START]", this.remainingDaySeconds);
+
+    this.dayTimerId = setInterval(() => {
+      if (GameState.phase !== GAME_PHASE.STORE_RUNNING || this.isClosing) {
+        this.clearDayTimer();
+        return;
+      }
+
+      this.remainingDaySeconds = Math.max(0, this.remainingDaySeconds - 1);
+      console.log("[DAY TIMER]", this.remainingDaySeconds);
+
+      if (this.remainingDaySeconds <= 0) {
+        console.log("[DAY TIMER END]");
+        this.closeStore({ source: "day_timer_finished" });
+      }
+    }, 1000);
+  },
+
+  clearDayTimer() {
+    if (!this.dayTimerId) return;
+
+    clearInterval(this.dayTimerId);
+    this.dayTimerId = null;
+    console.log("[DAY TIMER CLEAR]");
   },
 
   resetTodayStats() {

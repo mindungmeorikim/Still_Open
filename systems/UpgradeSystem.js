@@ -50,6 +50,7 @@ export const UpgradeSystem = {
 
   lastResultData: null,
   nextDayTimerId: null,
+  isUpgradeSelected: false,
 
   init() {
     EventBus.on(EVENTS.RESULT_CALCULATED, (resultData) => {
@@ -70,6 +71,13 @@ export const UpgradeSystem = {
   },
 
   startUpgradePhase(resultData = this.lastResultData) {
+    if (this.isUpgradeSelected && this.nextDayTimerId) {
+      return;
+    }
+
+    this.clearNextDayTimer();
+    this.isUpgradeSelected = false;
+
     GameState.phase = GAME_PHASE.UPGRADE;
 
     UIManager.showMessage("업그레이드 1개를 선택해주세요.");
@@ -87,6 +95,10 @@ export const UpgradeSystem = {
   },
 
   selectUpgrade(upgradeId) {
+    if (this.isUpgradeSelected) {
+      return;
+    }
+
     const selectedUpgrade = this.availableUpgrades.find((upgrade) => {
       return upgrade.id === upgradeId;
     });
@@ -96,31 +108,72 @@ export const UpgradeSystem = {
       return;
     }
 
-    GameState.upgrades.push(selectedUpgrade);
+    this.isUpgradeSelected = true;
 
-    this.applyUpgrade(selectedUpgrade);
+    const appliedUpgrade = {
+      ...selectedUpgrade,
+      selectedDay: GameState.day
+    };
+
+    GameState.upgrades.push(appliedUpgrade);
+
+    this.applyUpgrade(appliedUpgrade);
 
     EventBus.emit(EVENTS.UPGRADE_SELECTED, {
       day: GameState.day,
-      upgrade: selectedUpgrade,
+      upgrade: appliedUpgrade,
+      upgradeEffects: GameState.upgradeEffects,
       resultData: this.lastResultData
     });
 
+    this.clearNextDayTimer();
+
     this.nextDayTimerId = setTimeout(() => {
+      this.nextDayTimerId = null;
+
       EventBus.emit(EVENTS.NEXT_DAY_READY, {
         currentDay: GameState.day,
-        selectedUpgrade,
+        selectedUpgrade: appliedUpgrade,
+        upgradeEffects: GameState.upgradeEffects,
         resultData: this.lastResultData
       });
     }, 700);
   },
 
   applyUpgrade(upgrade) {
+    this.ensureUpgradeEffects();
+
+    if (upgrade.effectType === "CHECKOUT_SPEED") {
+      GameState.upgradeEffects.checkoutSpeedBonus += upgrade.value;
+    }
+
+    if (upgrade.effectType === "SHELF_CAPACITY") {
+      GameState.upgradeEffects.shelfCapacityBonus += upgrade.value;
+    }
+
     if (upgrade.effectType === "MENTAL_RECOVERY") {
       GameState.mental = Math.min(100, GameState.mental + upgrade.value);
     }
 
     UIManager.showMessage(`${upgrade.name} 업그레이드가 적용되었습니다.`);
     UIManager.render();
+  },
+
+  ensureUpgradeEffects() {
+    if (GameState.upgradeEffects) {
+      return;
+    }
+
+    GameState.upgradeEffects = {
+      checkoutSpeedBonus: 0,
+      shelfCapacityBonus: 0
+    };
+  },
+
+  clearNextDayTimer() {
+    if (!this.nextDayTimerId) return;
+
+    clearTimeout(this.nextDayTimerId);
+    this.nextDayTimerId = null;
   }
 };

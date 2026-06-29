@@ -1390,6 +1390,11 @@ export const UIManager = {
       </div>
 
       <div class="result-row">
+        <span>병맛 점수</span>
+        <strong>${(resultData.bmScore ?? resultData.bmBonus ?? 0).toLocaleString()}</strong>
+      </div>
+
+      <div class="result-row">
         <span>만족도</span>
         <strong>${resultData.satisfaction} / ${resultData.targetSatisfaction}</strong>
       </div>
