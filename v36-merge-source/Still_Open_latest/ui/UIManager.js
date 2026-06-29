@@ -30,9 +30,6 @@ export const UIManager = {
   pendingOrderPhaseData: null,
   orderDraftQuantities: {},
   orderDeliveredData: null,
-  orderModalMode: "closed",
-  orderListScrollTop: 0,
-  expansionCarouselIndex: 0,
   inventoryByProductId: {},
 
   init() {
@@ -131,22 +128,7 @@ export const UIManager = {
 
   bindOrderEvents() {
     EventBus.on(EVENTS.ORDER_DELIVERED, (data) => {
-      this.handleOrderDelivered(data);
-    });
-
-    EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
-      if (data.source !== "delivery_box_sorted" && data.source !== "empty_order") {
-        return;
-      }
-
-      this.clearDeliveryBox();
-      this.orderDeliveredData = null;
-      this.orderModalMode = "closed";
-      this.hideOrderModal();
-
-      this.showMessage(
-        data.message ?? "재고 정리 완료. 편의점 오픈 버튼을 눌러주세요."
-      );
+      this.showOrderDelivered(data);
     });
   },
 
@@ -208,9 +190,7 @@ export const UIManager = {
       return;
     }
 
-    const customers = CustomerSystem.getRenderableCustomers().filter((customer) => {
-      return !(customer.status === "leaving" && customer.isSatisfied);
-    });
+    const customers = CustomerSystem.getRenderableCustomers();
 
     const visibleCustomerIds = new Set(
       customers.map((customer) => customer.customerId)
@@ -269,7 +249,7 @@ export const UIManager = {
       customerNode.className = this.getCustomerClassName(customer);
       customerNode.style.setProperty("--customer-offset", `${(index % 4) * 16}px`);
       this.applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes);
-      customerNode.textContent = this.getCustomerDisplayText(customer);
+      this.renderCustomerInfo(customerNode, customer);
       customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
     });
   },
@@ -277,11 +257,12 @@ export const UIManager = {
   applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes) {
     const queueIndex = counterQueueIndexes.get(customer.customerId) ?? 0;
     const isCounterCustomer = customer.currentZone === "counter";
-    const queueOffset = isCounterCustomer ? queueIndex * 18 : 0;
+    const queueOffset = isCounterCustomer ? queueIndex * 28 : 0;
 
     customerNode.dataset.queueIndex = isCounterCustomer ? String(queueIndex) : "";
     customerNode.style.setProperty("--queue-x", `${queueOffset * -1}px`);
-    customerNode.style.setProperty("--queue-y", `${queueOffset}px`);
+    customerNode.style.setProperty("--queue-y", `${Math.round(queueOffset * -0.45)}px`);
+    customerNode.style.zIndex = isCounterCustomer ? String(40 - queueIndex) : "";
   },
 
   getCustomerClassName(customer) {
@@ -290,20 +271,136 @@ export const UIManager = {
       `customer-type-${customer.typeId}`,
       `customer-status-${customer.status}`,
       `customer-mood-${customer.mood}`,
-      `customer-zone-${customer.currentZone}`
+      `customer-zone-${customer.currentZone}`,
+      this.getCustomerWaitStateClass(customer)
     ].join(" ");
+  },
+
+  getCustomerWaitStateClass(customer) {
+    if (customer.status !== "waiting") {
+      return "";
+    }
+
+    const waitTime = Math.ceil(Number(customer.waitTime) || 0);
+
+    if (waitTime <= 5) {
+      return "customer-wait-danger";
+    }
+
+    if (waitTime <= 10) {
+      return "customer-wait-impatient";
+    }
+
+    return "";
+  },
+
+  renderCustomerInfo(customerNode, customer) {
+    const typeLabel = document.createElement("span");
+    const productLabel = document.createElement("span");
+    const productName = customer.wantedProductName ?? "";
+    const typeName = customer.typeName || this.getCustomerDisplayText(customer);
+
+    typeLabel.className = "customer-type-label";
+    typeLabel.textContent = this.getCustomerTypeLabelText(customer, typeName);
+
+    productLabel.className = "customer-product-label";
+    productLabel.textContent = productName;
+
+    const fragments = [typeLabel, productLabel];
+    const speechText = this.getCustomerSpeechText(customer);
+
+    if (speechText) {
+      const speechBubble = document.createElement("span");
+
+      speechBubble.className = "customer-speech-bubble";
+      speechBubble.textContent = speechText;
+      fragments.unshift(speechBubble);
+    }
+
+    if (customer.status === "waiting") {
+      const waitTime = Math.max(0, Math.ceil(Number(customer.waitTime) || 0));
+
+      productLabel.textContent = `${productName} \u00B7 ${waitTime}\uCD08`;
+    }
+
+    customerNode.replaceChildren(...fragments);
+  },
+
+  getCustomerSpeechText(customer) {
+    const waitTime = Math.ceil(Number(customer.waitTime) || 0);
+    const speechByType = {
+      normal: {
+        browsing: "\uC624\uB298\uC740 \uBB50 \uBA39\uC9C0?",
+        waiting: "\uACC4\uC0B0 \uBD80\uD0C1\uD574\uC694",
+        urgent: "\uC870\uAE08 \uAC78\uB9AC\uB124\uC694",
+        leaving: "\uB2E4\uC74C\uC5D0 \uC62C\uAC8C\uC694"
+      },
+      student: {
+        browsing: "\uC0BC\uAC01\uAE40\uBC25 \uC788\uB098?",
+        waiting: "\uC218\uC5C5 \uB2A6\uACA0\uB2E4",
+        urgent: "\uC9C0\uAC01\uD558\uACA0\uB2E4",
+        leaving: "\uB2E4\uB978 \uB370 \uAC08\uB798\uC694"
+      },
+      office_worker: {
+        browsing: "\uCEE4\uD53C\uBD80\uD130 \uC0AC\uC57C\uACA0\uB2E4",
+        waiting: "\uD68C\uC758 \uC804\uC5D0 \uAC00\uC57C \uD558\uB294\uB370",
+        urgent: "\uD68C\uC758 \uB2A6\uACA0\uB124",
+        leaving: "\uC2DC\uAC04 \uC5C6\uC5B4\uC11C \uAC11\uB2C8\uB2E4"
+      },
+      hurried: {
+        browsing: "\uBE68\uB9AC \uC0AC\uACE0 \uAC00\uC57C\uC9C0",
+        waiting: "\uBE68\uB9AC\uC694!",
+        urgent: "\uC9C4\uC9DC \uB2A6\uACA0\uC5B4\uC694!",
+        leaving: "\uADF8\uB0E5 \uAC08\uAC8C\uC694"
+      },
+      difficult: {
+        browsing: "\uD589\uC0AC \uC0C1\uD488 \uC5B4\uB514\uC788\uC5B4\uC694?",
+        waiting: "\uC810\uC7A5 \uBD88\uB7EC\uC8FC\uC138\uC694",
+        urgent: "\uB098 \uBA3C\uC800 \uD574\uC918\uC694",
+        leaving: "\uB2E4\uC2DC\uB294 \uC548 \uC640\uC694"
+      }
+    };
+    const speech = speechByType[customer.typeId] ?? speechByType.normal;
+
+    if (customer.status === "leaving") {
+      return speech.leaving;
+    }
+
+    if (customer.status === "waiting" && waitTime <= 10) {
+      return speech.urgent;
+    }
+
+    if (customer.status === "waiting") {
+      return speech.waiting;
+    }
+
+    if (customer.status === "shopping" || customer.status === "entering") {
+      return speech.browsing;
+    }
+
+    return "";
+  },
+
+  getCustomerTypeLabelText(customer, typeName) {
+    if (customer.typeId !== "difficult") {
+      return typeName;
+    }
+
+    const prefix = customer.mood === "angry" ? "\uD83D\uDE21" : "\uD83D\uDCA2";
+
+    return `${prefix} ${typeName}`;
   },
 
   getCustomerDisplayText(customer) {
     const typeLabels = {
-      normal: "일반",
-      student: "학생",
-      office_worker: "회사",
-      hurried: "급함",
-      difficult: "진상"
+      normal: "\uC77C\uBC18",
+      student: "\uD559\uC0DD",
+      office_worker: "\uD68C\uC0AC\uC6D0",
+      hurried: "\uAE09\uD55C \uC190\uB2D8",
+      difficult: "\uC9C4\uC0C1 \uC190\uB2D8"
     };
 
-    return typeLabels[customer.typeId] ?? "손님";
+    return typeLabels[customer.typeId] ?? "\uC190\uB2D8";
   },
 
   render() {
@@ -311,7 +408,6 @@ export const UIManager = {
     this.renderExpansionZones();
     this.renderControlButtons();
     this.renderPlayer();
-    this.renderDeliveryBox(this.orderDeliveredData);
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
@@ -344,8 +440,6 @@ export const UIManager = {
   },
 
   createExpansionPanel() {
-    this.createExpansionEffectSummary();
-
     const existingPanel = document.getElementById("expansion-panel");
 
     if (existingPanel) {
@@ -367,11 +461,7 @@ export const UIManager = {
         <h2 id="expansion-panel-title">매장 확장</h2>
         <span id="expansion-unlock-summary"></span>
       </div>
-      <div class="expansion-carousel-controls">
-        <button id="expansion-carousel-prev" class="expansion-carousel-button" type="button" aria-label="이전 확장 카드">←</button>
-        <span id="expansion-carousel-position">1 / 1</span>
-        <button id="expansion-carousel-next" class="expansion-carousel-button" type="button" aria-label="다음 확장 카드">→</button>
-      </div>
+      <div id="expansion-effect-summary" class="expansion-effect-summary"></div>
       <div id="expansion-zone-grid" class="expansion-zone-grid"></div>
       <p id="expansion-message">먼지 낀 옆 구역을 눌러 확장 조건을 확인하세요.</p>
     `;
@@ -383,24 +473,6 @@ export const UIManager = {
     }
 
     this.expansionPanel = expansionPanel;
-  },
-
-  createExpansionEffectSummary() {
-    const statusPanel = document.getElementById("status-panel");
-
-    if (!statusPanel) return null;
-
-    let effectSummary = document.getElementById("expansion-effect-summary");
-
-    if (!effectSummary) {
-      effectSummary = document.createElement("div");
-      effectSummary.id = "expansion-effect-summary";
-    }
-
-    effectSummary.className = "expansion-effect-summary";
-    statusPanel.insertAdjacentElement("afterend", effectSummary);
-
-    return effectSummary;
   },
 
   renderExpansionZones(expansionState = this.expansionState) {
@@ -417,17 +489,14 @@ export const UIManager = {
 
     const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
     const unlockedCount = zoneStates.filter((zone) => zone.isUnlocked).length;
-    const carouselIndex = this.getSafeExpansionCarouselIndex(zoneStates);
-    const visibleZone = zoneStates[carouselIndex];
 
     if (unlockSummary) {
       unlockSummary.textContent = `${unlockedCount} / ${zoneStates.length}`;
     }
 
     this.renderExpansionEffects(this.getExpansionEffectsViewModel(zoneStates));
-    this.renderExpansionCarouselControls(zoneStates, carouselIndex);
 
-    zoneGrid.innerHTML = (visibleZone ? [visibleZone] : []).map((zone) => {
+    zoneGrid.innerHTML = zoneStates.map((zone) => {
       const statusLabel = this.getExpansionStatusLabel(zone.status);
       const costText = zone.unlockCost > 0
         ? `₩${zone.unlockCost.toLocaleString()}`
@@ -484,61 +553,6 @@ export const UIManager = {
     }).join("");
 
     this.bindExpansionZoneEvents(zoneStates);
-    this.bindExpansionCarouselControls(zoneStates);
-  },
-
-  getSafeExpansionCarouselIndex(zoneStates = []) {
-    const lastIndex = Math.max(0, zoneStates.length - 1);
-
-    this.expansionCarouselIndex = Math.min(
-      Math.max(0, this.expansionCarouselIndex),
-      lastIndex
-    );
-
-    return this.expansionCarouselIndex;
-  },
-
-  renderExpansionCarouselControls(zoneStates = [], carouselIndex = 0) {
-    const prevButton = document.getElementById("expansion-carousel-prev");
-    const nextButton = document.getElementById("expansion-carousel-next");
-    const position = document.getElementById("expansion-carousel-position");
-    const totalCount = zoneStates.length;
-
-    if (position) {
-      position.textContent = `${totalCount > 0 ? carouselIndex + 1 : 0} / ${totalCount}`;
-    }
-
-    if (prevButton) {
-      prevButton.disabled = carouselIndex <= 0;
-    }
-
-    if (nextButton) {
-      nextButton.disabled = totalCount === 0 || carouselIndex >= totalCount - 1;
-    }
-  },
-
-  bindExpansionCarouselControls(zoneStates = []) {
-    const prevButton = document.getElementById("expansion-carousel-prev");
-    const nextButton = document.getElementById("expansion-carousel-next");
-    const lastIndex = Math.max(0, zoneStates.length - 1);
-
-    if (prevButton) {
-      prevButton.onclick = () => {
-        if (prevButton.disabled) return;
-
-        this.expansionCarouselIndex = Math.max(0, this.expansionCarouselIndex - 1);
-        this.renderExpansionZones(this.expansionState);
-      };
-    }
-
-    if (nextButton) {
-      nextButton.onclick = () => {
-        if (nextButton.disabled) return;
-
-        this.expansionCarouselIndex = Math.min(lastIndex, this.expansionCarouselIndex + 1);
-        this.renderExpansionZones(this.expansionState);
-      };
-    }
   },
 
   getExpansionZoneViewModels(expansionState = null) {
@@ -625,8 +639,6 @@ export const UIManager = {
   },
 
   renderExpansionEffects(effects) {
-    this.createExpansionEffectSummary();
-
     const effectSummary = document.getElementById("expansion-effect-summary");
 
     if (!effectSummary) return;
@@ -1048,8 +1060,6 @@ export const UIManager = {
 
     this.pendingOrderPhaseData = orderData;
     this.orderDeliveredData = null;
-    this.orderModalMode = "draft";
-    this.clearDeliveryBox();
     this.orderDraftQuantities = this.getOrderableProducts().reduce(
       (quantityMap, product) => {
         quantityMap[product.id] = 0;
@@ -1073,21 +1083,13 @@ export const UIManager = {
     });
   },
 
-  renderOrderDraft(options = {}) {
+  renderOrderDraft() {
     const body = document.getElementById("order-modal-body");
-    const previousList = document.querySelector(".order-product-list");
-    const previousScrollTop = options.preserveScroll
-      ? previousList?.scrollTop ?? this.orderListScrollTop
-      : 0;
 
     if (!body) return;
 
-    const products = PRODUCTS;
-    const orderableProducts = this.getOrderableProducts();
-    const orderableProductIds = new Set(
-      orderableProducts.map((product) => product.id)
-    );
-    const totalCost = this.getOrderTotalCost(orderableProducts);
+    const products = this.getOrderableProducts();
+    const totalCost = this.getOrderTotalCost(products);
     const isOverBudget = totalCost > GameState.money;
 
     body.innerHTML = `
@@ -1099,41 +1101,25 @@ export const UIManager = {
       <div class="order-product-list">
         ${products.map((product) => {
           const inventoryItem = this.inventoryByProductId[product.id];
-          const isOrderable = orderableProductIds.has(product.id);
-          const quantity = isOrderable
-            ? this.orderDraftQuantities[product.id] ?? 0
-            : 0;
+          const quantity = this.orderDraftQuantities[product.id] ?? 0;
           const stockQuantity = Number.isFinite(inventoryItem?.quantity)
             ? inventoryItem.quantity
             : 0;
-          const orderStatusText = isOrderable
-            ? "발주 가능"
-            : this.getOrderUnavailableReason(product);
 
           return `
-            <article class="order-product-row${isOrderable ? "" : " is-order-unavailable"}" data-product-id="${product.id}">
-              <div class="order-product-main">
-                <img
-                  class="order-product-thumb"
-                  src="${product.imagePath}"
-                  alt="${product.name}"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div>
-                  <strong>${product.name}</strong>
-                  <span>현재 재고 ${stockQuantity}개</span>
-                  <em class="order-product-status">${orderStatusText}</em>
-                </div>
+            <article class="order-product-row" data-product-id="${product.id}">
+              <div>
+                <strong>${product.name}</strong>
+                <span>현재 재고 ${stockQuantity}개</span>
               </div>
               <div class="order-product-prices">
                 <span>매입 ₩${product.purchasePrice.toLocaleString()}</span>
                 <span>판매 ₩${product.salePrice.toLocaleString()}</span>
               </div>
               <div class="order-quantity-controls">
-                <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
+                <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}">-</button>
                 <strong>${quantity}</strong>
-                <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>+</button>
+                <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}">+</button>
               </div>
             </article>
           `;
@@ -1160,36 +1146,21 @@ export const UIManager = {
       </button>
     `;
 
-    this.bindOrderDraftControls(orderableProducts);
-
-    if (options.preserveScroll) {
-      const nextList = document.querySelector(".order-product-list");
-
-      if (nextList) {
-        nextList.scrollTop = previousScrollTop;
-      }
-    }
+    this.bindOrderDraftControls(products);
   },
 
   bindOrderDraftControls(products = []) {
     document.querySelectorAll(".order-qty-button").forEach((button) => {
       button.onclick = () => {
-        if (button.disabled) return;
-
         const productId = button.dataset.productId;
-
-        if (!(productId in this.orderDraftQuantities)) return;
-
         const currentQuantity = this.orderDraftQuantities[productId] ?? 0;
         const nextQuantity =
           button.dataset.action === "increase"
             ? currentQuantity + 1
             : Math.max(0, currentQuantity - 1);
 
-        const orderList = document.querySelector(".order-product-list");
-        this.orderListScrollTop = orderList?.scrollTop ?? this.orderListScrollTop;
         this.orderDraftQuantities[productId] = nextQuantity;
-        this.renderOrderDraft({ preserveScroll: true });
+        this.renderOrderDraft();
       };
     });
 
@@ -1204,18 +1175,15 @@ export const UIManager = {
 
       EventBus.emit(EVENTS.ORDER_CONFIRMED, {
         day: GameState.day,
-        items: products
-          .map((product) => {
-            return {
-              productId: product.id,
-              productName: product.name,
-              quantity: this.orderDraftQuantities[product.id] ?? 0,
-              purchasePrice: product.purchasePrice,
-              salePrice: product.salePrice,
-              imagePath: product.imagePath
-            };
-          })
-          .filter((item) => item.quantity > 0),
+        items: products.map((product) => {
+          return {
+            productId: product.id,
+            productName: product.name,
+            quantity: this.orderDraftQuantities[product.id] ?? 0,
+            purchasePrice: product.purchasePrice,
+            salePrice: product.salePrice
+          };
+        }),
         totalCost: this.getOrderTotalCost(products)
       });
     };
@@ -1226,86 +1194,12 @@ export const UIManager = {
 
     if (!body) return;
 
-    this.orderModalMode = "waiting";
-
     body.innerHTML = `
       <div class="order-delivery-state">
         <h2>발주 전송 완료</h2>
-        <p>거래처에서 상품을 보내는 중입니다. 약 3초 뒤 가게 앞에 택배 박스가 도착합니다.</p>
+        <p>거래처에서 상품을 보내는 중입니다.</p>
       </div>
     `;
-  },
-
-  handleOrderDelivered(orderData = {}) {
-    const deliveredItems = this.getDeliveredItems(orderData);
-
-    this.orderDeliveredData = orderData;
-
-    if (orderData.isCompleted || deliveredItems.length === 0) {
-      this.clearDeliveryBox();
-      this.hideOrderModal();
-      return;
-    }
-
-    this.renderDeliveryBox(orderData);
-
-    if (this.orderModalMode === "delivery") {
-      this.showOrderDelivered(orderData);
-      return;
-    }
-
-    this.hideOrderModal();
-    this.showMessage("가게 앞에 택배 박스가 도착했습니다. 박스를 클릭해 열어주세요.");
-  },
-
-  renderDeliveryBox(orderData = this.orderDeliveredData) {
-    const storeArea = document.getElementById("store-area");
-
-    if (!storeArea) return;
-
-    const deliveredItems = this.getDeliveredItems(orderData);
-    const hasOpenDelivery = Boolean(orderData && deliveredItems.length > 0 && !orderData.isCompleted);
-    let deliveryBox = document.getElementById("delivery-box-zone");
-
-    if (!hasOpenDelivery) {
-      this.clearDeliveryBox();
-      return;
-    }
-
-    const remainingCount = deliveredItems.filter((item) => !item.isSorted).length;
-
-    if (!deliveryBox) {
-      deliveryBox = document.createElement("button");
-      deliveryBox.id = "delivery-box-zone";
-      deliveryBox.className = "delivery-box-zone";
-      deliveryBox.type = "button";
-      storeArea.appendChild(deliveryBox);
-    }
-
-    deliveryBox.innerHTML = `
-      <span class="delivery-box-icon">📦</span>
-      <span>택배 박스</span>
-      <strong>${remainingCount}종 정리 필요</strong>
-    `;
-
-    deliveryBox.onclick = () => {
-      EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
-        day: orderData.day ?? GameState.day,
-        actionType: "open_delivery_box",
-        orderId: orderData.orderId ?? null,
-        source: "delivery_box_zone"
-      });
-
-      this.showOrderDelivered(this.orderDeliveredData);
-    };
-  },
-
-  clearDeliveryBox() {
-    const deliveryBox = document.getElementById("delivery-box-zone");
-
-    if (deliveryBox) {
-      deliveryBox.remove();
-    }
   },
 
   showOrderDelivered(orderData = {}) {
@@ -1314,13 +1208,13 @@ export const UIManager = {
     }
 
     const body = document.getElementById("order-modal-body");
-    const deliveredItems = this.getDeliveredItems(orderData);
-    const remainingCount = deliveredItems.filter((item) => !item.isSorted).length;
+    const deliveredItems = Array.isArray(orderData.items)
+      ? orderData.items.filter((item) => item.quantity > 0)
+      : [];
 
     if (!body) return;
 
     this.orderDeliveredData = orderData;
-    this.orderModalMode = "delivery";
     this.orderModal.classList.remove("hidden");
 
     const dayLabel = document.getElementById("order-modal-day-label");
@@ -1331,105 +1225,46 @@ export const UIManager = {
 
     body.innerHTML = `
       <div class="order-delivery-state">
-        <h2>택배 박스 열기</h2>
-        <p>
-          상품 이미지를 누르면 해당 상품이 재고로 정리됩니다.
-          남은 상품 ${remainingCount}종을 모두 정리해야 편의점을 오픈할 수 있습니다.
-        </p>
-        <div class="order-delivered-grid">
+        <h2>상품이 도착했습니다</h2>
+        <p>${orderData.message ?? "입고 상품을 정리해주세요."}</p>
+        <div class="order-delivered-list">
           ${
             deliveredItems.length > 0
               ? deliveredItems.map((item) => {
-                  const isSorted = Boolean(item.isSorted);
-
-                  return `
-                    <button
-                      class="delivered-product-button${isSorted ? " is-sorted" : ""}"
-                      type="button"
-                      data-product-id="${item.productId}"
-                      ${isSorted ? "disabled" : ""}
-                    >
-                      <img
-                        class="delivered-product-image"
-                        src="${item.imagePath ?? ""}"
-                        alt="${item.productName}"
-                        loading="lazy"
-                        decoding="async"
-                      />
-                      <span>${item.productName}</span>
-                      <strong>${item.quantity}개</strong>
-                      <em>${isSorted ? "정리 완료" : "클릭해서 정리"}</em>
-                    </button>
-                  `;
+                  return `<div><span>${item.productName}</span><strong>${item.quantity}개</strong></div>`;
                 }).join("")
-              : "<div class=\"order-empty-delivery\">정리할 상품이 없습니다.</div>"
+              : "<div><span>입고 상품 없음</span><strong>0개</strong></div>"
           }
         </div>
+        <button id="stock-organized-button" class="stock-organized-button" type="button">
+          재고 정리 완료
+        </button>
       </div>
     `;
 
-    this.bindDeliveredProductButtons(orderData);
-  },
+    const organizedButton = document.getElementById("stock-organized-button");
 
-  bindDeliveredProductButtons(orderData = {}) {
-    document.querySelectorAll(".delivered-product-button").forEach((button) => {
-      button.onclick = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
+    organizedButton.onclick = () => {
+      EventBus.emit(EVENTS.STOCK_ORGANIZED, {
+        day: orderData.day ?? GameState.day,
+        orderId: orderData.orderId ?? null
+      });
 
-        if (button.disabled) return;
-
-        const productId = button.dataset.productId;
-        const deliveredGrid = document.querySelector(".order-delivered-grid");
-        const previousScrollTop = deliveredGrid?.scrollTop ?? 0;
-
-        EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
-          day: orderData.day ?? GameState.day,
-          actionType: "sort_delivery_item",
-          orderId: orderData.orderId ?? null,
-          productId,
-          source: "delivery_box_modal"
-        });
-
-        requestAnimationFrame(() => {
-          const updatedDeliveredGrid = document.querySelector(".order-delivered-grid");
-
-          if (updatedDeliveredGrid) {
-            updatedDeliveredGrid.scrollTop = previousScrollTop;
-          }
-        });
-      };
-    });
-  },
-
-  getDeliveredItems(orderData = {}) {
-    return Array.isArray(orderData?.items)
-      ? orderData.items.filter((item) => item.quantity > 0)
-      : [];
+      this.hideOrderModal();
+      this.showMessage("재고 정리 완료. 편의점 오픈 버튼을 눌러주세요.");
+    };
   },
 
   hideOrderModal() {
     if (!this.orderModal) return;
 
     this.orderModal.classList.add("hidden");
-
-    if (this.orderModalMode !== "delivery") {
-      this.orderModalMode = "closed";
-    }
   },
 
   getOrderableProducts() {
     return PRODUCTS.filter((product) => {
       return product.unlockDay <= GameState.day;
     });
-  },
-
-  getOrderUnavailableReason(product) {
-    if (product.unlockDay > GameState.day) {
-      return `Day ${product.unlockDay} 해금`;
-    }
-
-    return "발주 조건 확인 필요";
   },
 
   getOrderTotalCost(products = this.getOrderableProducts()) {
@@ -1501,11 +1336,6 @@ export const UIManager = {
       <div class="result-row">
         <span>순이익</span>
         <strong>₩${resultData.profit.toLocaleString()}</strong>
-      </div>
-
-      <div class="result-row">
-        <span>병맛 점수</span>
-        <strong>${(resultData.bmScore ?? resultData.bmBonus ?? 0).toLocaleString()}</strong>
       </div>
 
       <div class="result-row">
@@ -1732,19 +1562,16 @@ export const UIManager = {
     const modal = document.createElement("div");
     modal.id = "customer-event-modal";
     modal.className = "modal hidden";
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-labelledby", "customer-event-modal-title");
 
     modal.innerHTML = `
-      <div class="modal-content customer-event-modal-content">
-        <h2 id="customer-event-modal-title">고객 이벤트</h2>
-        <p id="customer-event-modal-meta" class="customer-event-modal-meta"></p>
-        <p id="customer-event-modal-dialogue" class="customer-event-modal-dialogue"></p>
-        <p id="customer-event-modal-summary" class="customer-event-modal-summary"></p>
-        <div id="customer-event-choice-list" class="customer-event-choice-list"></div>
-        <p id="customer-event-result-text" class="customer-event-result-text" hidden></p>
-        <button id="customer-event-close-button" class="customer-event-close-button" type="button" hidden>
+      <div class="modal-content" style="max-width: 440px;">
+        <h2 id="customer-event-modal-title">손님 이벤트</h2>
+        <p id="customer-event-modal-meta" style="margin: 0 0 12px; color: #666666; font-size: 13px; text-align: center;"></p>
+        <p id="customer-event-modal-dialogue" style="margin: 0 0 12px; padding: 12px; border-radius: 8px; background: #f7f7f7; font-weight: 700;"></p>
+        <p id="customer-event-modal-summary" style="margin: 0 0 14px; color: #555555; font-size: 14px;"></p>
+        <div id="customer-event-choice-list" style="display: grid; gap: 10px;"></div>
+        <p id="customer-event-result-text" hidden style="margin: 14px 0 0; padding: 12px; border-radius: 8px; background: #eef5ef; color: #31533b; font-weight: 700;"></p>
+        <button id="customer-event-close-button" type="button" style="width: 100%; margin-top: 14px;">
           확인
         </button>
       </div>
@@ -1776,24 +1603,25 @@ export const UIManager = {
       return;
     }
 
-    if (this.eventModalCloseTimerId) {
-      clearTimeout(this.eventModalCloseTimerId);
-      this.eventModalCloseTimerId = null;
-    }
-
     const choices = Array.isArray(payload.choices) ? payload.choices : [];
     const metaParts = [
       payload.customerTypeName,
       payload.wantedProductName,
       payload.day ? `Day ${payload.day}` : ""
     ].filter(Boolean);
+
+    if (this.eventModalCloseTimerId) {
+      clearTimeout(this.eventModalCloseTimerId);
+      this.eventModalCloseTimerId = null;
+    }
+
     const choiceSelectedCallback =
       typeof onChoiceSelected === "function" ? onChoiceSelected : null;
 
     this.eventModalOnClose = typeof onClose === "function" ? onClose : null;
     this.isEventModalClosing = false;
-    title.textContent = payload.eventTitle || "고객 이벤트";
-    meta.textContent = metaParts.join(" / ");
+    title.textContent = payload.eventTitle || "손님 이벤트";
+    meta.textContent = metaParts.join(" · ");
     dialogue.textContent = payload.dialogue || "손님이 말을 걸었습니다.";
     summary.textContent = payload.eventSummary || "";
     choiceList.innerHTML = "";
@@ -1809,9 +1637,17 @@ export const UIManager = {
       button.type = "button";
       button.className = "customer-event-choice-button";
       button.dataset.choiceId = choice.choiceId ?? "";
+      button.style.width = "100%";
+      button.style.minHeight = "56px";
+      button.style.padding = "12px";
+      button.style.display = "grid";
+      button.style.gap = "4px";
+      button.style.textAlign = "left";
 
       label.textContent = choice.label || "선택지";
       description.textContent = choice.description || "";
+      description.style.fontSize = "12px";
+      description.style.opacity = "0.82";
 
       button.appendChild(label);
       button.appendChild(description);
@@ -1822,7 +1658,9 @@ export const UIManager = {
         }
 
         this.isEventModalClosing = true;
-        choiceList.querySelectorAll("button").forEach((choiceButton) => {
+        const choiceButtons = choiceList.querySelectorAll("button");
+
+        choiceButtons.forEach((choiceButton) => {
           choiceButton.disabled = true;
         });
 
@@ -1844,10 +1682,10 @@ export const UIManager = {
 
     if (choices.length === 0) {
       const emptyMessage = document.createElement("p");
-      emptyMessage.className = "customer-event-empty";
       emptyMessage.textContent = "선택지가 없습니다.";
+      emptyMessage.style.margin = "0";
+      emptyMessage.style.color = "#666666";
       choiceList.appendChild(emptyMessage);
-      closeButton.hidden = false;
     }
 
     closeButton.onclick = () => {

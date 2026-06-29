@@ -30,7 +30,8 @@ import {
   CUSTOMER_STATUS,
   CUSTOMER_ZONES,
   CUSTOMER_TYPES,
-  CUSTOMER_WANTED_PRODUCTS
+  CUSTOMER_WANTED_PRODUCTS,
+  CUSTOMER_EVENTS
 } from "../data/CustomerData.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
 import { getUnlockedProducts } from "../data/ProductData.js";
@@ -356,7 +357,14 @@ export const CustomerSystem = {
         return this.markCustomerAsLeaving(customer, "angry_leave");
       }
 
+      if (customer.status === CUSTOMER_STATUS.LEAVING) {
+        changed = true;
+        return this.decreaseLeavingCustomerTime(customer, amount);
+      }
+
       return customer;
+    }).filter((customer) => {
+      return !this.shouldRemoveLeavingCustomer(customer);
     });
 
     if (changed) {
@@ -413,6 +421,10 @@ export const CustomerSystem = {
   },
 
   getDefaultEnteringTime() {
+    return 2;
+  },
+
+  getDefaultLeavingTime() {
     return 2;
   },
 
@@ -547,6 +559,7 @@ export const CustomerSystem = {
       status: CUSTOMER_STATUS.LEAVING,
       currentZone: CUSTOMER_ZONES.EXIT,
       targetZone: CUSTOMER_ZONES.EXIT,
+      leavingTime: this.getDefaultLeavingTime(),
       hasReportedLeft: true
     };
 
@@ -582,6 +595,7 @@ export const CustomerSystem = {
       targetZone: CUSTOMER_ZONES.EXIT,
       isSatisfied: true,
       mood: "neutral",
+      leavingTime: this.getDefaultLeavingTime(),
 
       /*
         CUSTOMER_LEFT는 이탈/손실 손님 통계로 사용하기 때문에
@@ -602,6 +616,28 @@ export const CustomerSystem = {
     );
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  decreaseLeavingCustomerTime(customer, amount) {
+    const safeAmount = Math.max(0, Number(amount) || 0);
+    const rawLeavingTime = Number(customer.leavingTime);
+    const currentLeavingTime = Number.isFinite(rawLeavingTime)
+      ? Math.max(0, rawLeavingTime)
+      : this.getDefaultLeavingTime();
+    const nextLeavingTime = Math.max(0, currentLeavingTime - safeAmount);
+
+    return {
+      ...customer,
+      leavingTime: nextLeavingTime
+    };
+  },
+
+  shouldRemoveLeavingCustomer(customer) {
+    if (customer.status !== CUSTOMER_STATUS.LEAVING) {
+      return false;
+    }
+
+    return Math.max(0, Number(customer.leavingTime) || 0) <= 0;
   },
 
   getCheckoutCustomerForCompletion(data = {}) {
