@@ -603,6 +603,39 @@ button:active {
   font-size: 18px;
 }
 
+.expansion-carousel-controls {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.expansion-carousel-button {
+  flex: 0 0 auto;
+  width: 44px;
+  min-height: 40px;
+  border-radius: 8px;
+  background: #31533b;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.expansion-carousel-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+#expansion-carousel-position {
+  min-width: 0;
+  color: #31533b;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+}
+
 #expansion-unlock-summary {
   flex: 0 0 auto;
   padding: 4px 8px;
@@ -656,7 +689,7 @@ button:active {
 .expansion-zone-tile {
   position: relative;
   min-width: 0;
-  min-height: 176px;
+  min-height: 286px;
   overflow: hidden;
   border: 2px solid #dedede;
   border-radius: 8px;
@@ -1071,6 +1104,11 @@ button:active {
   background: #ffffff;
 }
 
+.order-product-row.is-order-unavailable {
+  background: #f7f7f2;
+  opacity: 0.72;
+}
+
 .order-product-row strong {
   display: block;
   color: #263f2e;
@@ -1083,6 +1121,16 @@ button:active {
   color: #666666;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.order-product-status {
+  display: block;
+  margin-top: 3px;
+  color: #8a5a20;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  line-height: 1.3;
 }
 
 .order-quantity-controls {
@@ -1101,6 +1149,12 @@ button:active {
   color: #263f2e;
   font-size: 18px;
   font-weight: 900;
+}
+
+.order-qty-button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .order-quantity-controls strong {
