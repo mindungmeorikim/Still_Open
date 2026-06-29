@@ -594,6 +594,10 @@ export const CustomerSystem = {
 
     EventBus.emit(EVENTS.CUSTOMER_SATISFIED, {
       ...this.createCustomerPayload(checkedOutCustomer),
+      checkoutId: data.checkoutId ?? null,
+      productId: data.productId ?? null,
+      productName: data.productName ?? null,
+      quantity: data.quantity ?? 1,
       checkoutAmount: data.amount ?? 0
     });
 
