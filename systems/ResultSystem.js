@@ -180,11 +180,38 @@ export const ResultSystem = {
       satisfactionSuccess &&
       mentalSuccess;
 
+    const revenueGap = stats.revenue - GameState.dailyGoal.targetRevenue;
+    const satisfactionGap =
+      GameState.satisfaction - GameState.dailyGoal.targetSatisfaction;
+    const mentalGoal = 1;
+    const mentalGap = GameState.mental - mentalGoal;
+    const resultChecks = this.createResultChecks({
+      revenue: stats.revenue,
+      targetRevenue: GameState.dailyGoal.targetRevenue,
+      revenueGap,
+      satisfaction: GameState.satisfaction,
+      targetSatisfaction: GameState.dailyGoal.targetSatisfaction,
+      satisfactionGap,
+      mental: GameState.mental,
+      mentalGoal,
+      mentalGap,
+      revenueSuccess,
+      satisfactionSuccess,
+      mentalSuccess
+    });
+    const resultSummaryText = this.createResultSummaryText(success, {
+      revenueSuccess,
+      satisfactionSuccess,
+      mentalSuccess
+    });
+    const nextStepText = this.createNextStepText(success);
+
     const resultData = {
       day: GameState.day,
 
       revenue: stats.revenue,
       targetRevenue: GameState.dailyGoal.targetRevenue,
+      revenueGap,
 
       cost: stats.cost,
       expiredLoss: stats.expiredLoss,
@@ -196,7 +223,10 @@ export const ResultSystem = {
 
       satisfaction: GameState.satisfaction,
       targetSatisfaction: GameState.dailyGoal.targetSatisfaction,
+      satisfactionGap,
       mental: GameState.mental,
+      mentalGoal,
+      mentalGap,
 
       totalCustomers: stats.totalCustomers,
       satisfiedCustomers: stats.satisfiedCustomers,
@@ -211,6 +241,9 @@ export const ResultSystem = {
       satisfactionSuccess,
       mentalSuccess,
       success,
+      resultChecks,
+      resultSummaryText,
+      nextStepText,
 
       mvpTestDataApplied: stats.mvpTestDataApplied === true
     };
@@ -270,7 +303,7 @@ export const ResultSystem = {
   },
 
   createResultMessage(resultData) {
-    const resultText = resultData.success ? "성공" : "실패";
+    const resultText = resultData.success ? "영업 성공" : "영업 실패";
     const mvpText = resultData.mvpTestDataApplied
       ? " / 임시 MVP 데이터 적용"
       : "";
@@ -278,12 +311,65 @@ export const ResultSystem = {
     return (
       `Day ${resultData.day} 정산 완료 | ` +
       `결과: ${resultText} | ` +
+      `${resultData.resultSummaryText} | ` +
       `매출 ₩${resultData.revenue.toLocaleString()} / ` +
       `목표 ₩${resultData.targetRevenue.toLocaleString()} | ` +
       `만족도 ${resultData.satisfaction}/${resultData.targetSatisfaction} | ` +
       `멘탈 ${resultData.mental} | ` +
       `병맛 점수 ${resultData.bmScore.toLocaleString()}${mvpText}`
     );
+  },
+
+  createResultSummaryText(success, checks = {}) {
+    if (success) {
+      return "오늘 영업 목표를 모두 지켰습니다. 다음 날 장사 준비로 넘어갑니다.";
+    }
+
+    const failedLabels = [];
+
+    if (!checks.revenueSuccess) failedLabels.push("매출");
+    if (!checks.satisfactionSuccess) failedLabels.push("만족도");
+    if (!checks.mentalSuccess) failedLabels.push("멘탈");
+
+    return `${failedLabels.join(", ")} 조건을 놓쳤습니다. 업그레이드로 내일 다시 만회해봅시다.`;
+  },
+
+  createNextStepText(success) {
+    return success
+      ? "정산 확인 후 오늘의 보상 업그레이드를 선택하고 다음 Day로 진행합니다."
+      : "정산 확인 후 보완용 업그레이드를 선택하고 다음 Day에서 재도전합니다.";
+  },
+
+  createResultChecks(data = {}) {
+    return [
+      {
+        label: "목표 매출",
+        success: data.revenueSuccess,
+        statusText: data.revenueSuccess ? "달성" : "미달",
+        valueText: `₩${data.revenue.toLocaleString()} / ₩${data.targetRevenue.toLocaleString()}`,
+        detailText: data.revenueSuccess
+          ? `목표보다 ₩${Math.max(0, data.revenueGap).toLocaleString()} 더 벌었습니다.`
+          : `목표까지 ₩${Math.abs(data.revenueGap).toLocaleString()} 부족합니다.`
+      },
+      {
+        label: "만족도",
+        success: data.satisfactionSuccess,
+        statusText: data.satisfactionSuccess ? "유지" : "주의",
+        valueText: `${data.satisfaction} / ${data.targetSatisfaction}`,
+        detailText: data.satisfactionSuccess
+          ? "손님 반응이 목표 기준을 넘었습니다."
+          : `목표보다 ${Math.abs(data.satisfactionGap)} 낮습니다. 고객 응대가 필요합니다.`
+      },
+      {
+        label: "멘탈",
+        success: data.mentalSuccess,
+        statusText: data.mentalSuccess ? "버팀" : "방전",
+        valueText: `${data.mental} / 100`,
+        detailText: data.mentalSuccess
+          ? "오늘도 멘탈을 붙잡고 버텼습니다."
+          : "멘탈이 0이 되었습니다. 내일은 더 짧고 정확하게 움직여야 합니다."
+      }
+    ];
   },
 
   toNumber(value) {

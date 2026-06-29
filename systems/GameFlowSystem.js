@@ -159,7 +159,7 @@ export const GameFlowSystem = {
     const dayScenario = this.getCurrentDayScenario();
 
     UIManager.showMessage(
-      `Day ${GameState.day} 시작! 현재 모드: ${modeText} / 발주와 재고 정리를 먼저 진행해주세요.`
+      `Day ${GameState.day} 시작! ${modeText}입니다. 발주 → 택배 수령 → 재고 정리까지 마치면 영업을 시작할 수 있습니다.`
     );
 
     UIManager.render();
@@ -185,7 +185,7 @@ export const GameFlowSystem = {
 
   openStore() {
     if (GameState.phase === GAME_PHASE.ORDER) {
-      UIManager.showMessage("발주 확정과 재고 정리를 완료해야 편의점을 오픈할 수 있습니다.");
+      UIManager.showMessage("아직 오픈 준비 중입니다. 발주를 확정하고 도착한 택배를 열어 재고 정리까지 완료해주세요.");
       return;
     }
 
@@ -200,7 +200,7 @@ export const GameFlowSystem = {
     }
 
     if (!this.isOrderReadyForCurrentDay()) {
-      UIManager.showMessage("발주 확정과 재고 정리를 완료해야 편의점을 오픈할 수 있습니다.");
+      UIManager.showMessage("아직 오픈 준비 중입니다. 발주를 확정하고 도착한 택배를 열어 재고 정리까지 완료해주세요.");
       return;
     }
 
@@ -210,7 +210,7 @@ export const GameFlowSystem = {
     this.startDayTimer();
 
     UIManager.showMessage(
-      `편의점 영업을 시작합니다. ${GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS}초 동안 손님을 받을 준비를 하세요!`
+      `영업 시작! ${GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS}초 동안 손님 응대와 계산을 진행하고, 종료 후 오늘의 정산을 확인합니다.`
     );
 
     UIManager.render();
@@ -244,7 +244,7 @@ export const GameFlowSystem = {
 
     GameState.phase = GAME_PHASE.DAY_END;
 
-    UIManager.showMessage("하루 영업을 종료합니다. 정산을 준비합니다.");
+    UIManager.showMessage("영업 종료! 매출, 만족도, 멘탈을 기준으로 오늘의 정산을 준비합니다.");
 
     UIManager.render();
 
@@ -300,7 +300,7 @@ export const GameFlowSystem = {
 
     if (clearedStoryMode) {
       UIManager.showMessage(
-        `스토리 모드 클리어! Day ${GameState.day}부터 무한모드에 진입합니다. 목표 매출 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`
+        `스토리 모드 클리어! Day ${GameState.day}부터 무한모드가 시작됩니다. 목표 매출 ₩${GameState.dailyGoal.targetRevenue.toLocaleString()}에 도전하세요.`
       );
     } else {
       UIManager.showMessage(
@@ -324,7 +324,7 @@ export const GameFlowSystem = {
       GameState.phase = GAME_PHASE.DAY_START;
     }
 
-    UIManager.showMessage("재고 정리 완료! 이제 편의점을 오픈할 수 있습니다.");
+    UIManager.showMessage("재고 정리 완료! 오픈 준비가 끝났습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요.");
     UIManager.render();
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);

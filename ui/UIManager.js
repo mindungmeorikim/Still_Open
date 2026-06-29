@@ -928,7 +928,7 @@ export const UIManager = {
 
   showResult(resultData) {
     this.showMessage(
-      `정산 완료 | 매출 ₩${resultData.revenue.toLocaleString()} / 순이익 ₩${resultData.profit.toLocaleString()}`
+      `정산 완료 | ${resultData.resultSummaryText ?? "오늘 영업 결과를 확인하세요."}`
     );
   },
 
@@ -1451,7 +1451,7 @@ export const UIManager = {
     modal.className = "modal hidden";
 
     modal.innerHTML = `
-      <div class="modal-content">
+      <div class="modal-content result-modal-content">
         <h2 id="result-modal-title">정산 결과</h2>
 
         <div id="result-modal-body"></div>
@@ -1476,7 +1476,12 @@ export const UIManager = {
     const body = document.getElementById("result-modal-body");
     const confirmButton = document.getElementById("result-confirm-button");
 
-    const resultText = resultData.success ? "성공" : "실패";
+    const resultText = resultData.success ? "오늘 영업 성공" : "오늘 영업 실패";
+    const resultChecks = Array.isArray(resultData.resultChecks)
+      ? resultData.resultChecks
+      : [];
+    const nextStepText = resultData.nextStepText ??
+      "정산 확인 후 업그레이드를 선택하고 다음 Day로 진행합니다.";
     const mvpText = resultData.mvpTestDataApplied
       ? `<p class="modal-note">※ 임시 MVP 테스트 데이터가 적용되었습니다.</p>`
       : "";
@@ -1485,17 +1490,30 @@ export const UIManager = {
 
     body.innerHTML = `
       <div class="result-summary ${resultData.success ? "success" : "fail"}">
-        결과: ${resultText}
+        <strong>${resultText}</strong>
+        <span>${resultData.resultSummaryText ?? ""}</span>
       </div>
 
-      <div class="result-row">
-        <span>매출</span>
-        <strong>₩${resultData.revenue.toLocaleString()}</strong>
+      <div class="result-check-list">
+        ${resultChecks.map((check) => {
+          return `
+            <div class="result-check ${check.success ? "success" : "fail"}">
+              <div class="result-check-main">
+                <span>${check.label}</span>
+                <strong>${check.statusText}</strong>
+              </div>
+              <div class="result-check-value">${check.valueText}</div>
+              <p>${check.detailText}</p>
+            </div>
+          `;
+        }).join("")}
       </div>
 
+      <p class="result-section-title">영업 기록</p>
+
       <div class="result-row">
-        <span>목표 매출</span>
-        <strong>₩${resultData.targetRevenue.toLocaleString()}</strong>
+        <span>매출 / 목표</span>
+        <strong>₩${resultData.revenue.toLocaleString()} / ₩${resultData.targetRevenue.toLocaleString()}</strong>
       </div>
 
       <div class="result-row">
@@ -1515,7 +1533,7 @@ export const UIManager = {
 
       <div class="result-row">
         <span>멘탈</span>
-        <strong>${resultData.mental}</strong>
+        <strong>${resultData.mental} / 100</strong>
       </div>
 
       <div class="result-row">
@@ -1527,6 +1545,8 @@ export const UIManager = {
         <span>계산 성공</span>
         <strong>${resultData.checkoutSuccessCount}</strong>
       </div>
+
+      <p class="result-next-step">${nextStepText}</p>
 
       ${mvpText}
     `;
@@ -1564,13 +1584,13 @@ export const UIManager = {
         <h2 id="ending-modal-title" class="ending-title">세계 1등 편의점 달성!</h2>
 
         <p id="ending-modal-description" class="ending-description">
-          먼지 나는 작은 편의점이 세계 최고의 K-편의점으로 성장했습니다.
+          Day 5까지 버틴 편의점은 이제 Day 6부터 무한모드 영업에 도전합니다.
         </p>
 
         <div id="ending-modal-reward" class="ending-reward-box"></div>
 
         <button id="ending-continue-button" class="ending-continue-button" type="button">
-          무한모드 계속하기
+          Day 6 무한모드로 계속하기
         </button>
       </div>
     `;
@@ -1598,7 +1618,7 @@ export const UIManager = {
 
     title.textContent = endingData.endingTitle ?? "세계 1등 편의점 달성!";
     description.textContent = endingData.endingDescription ??
-      "작은 편의점에서 시작해 최고의 K-편의점으로 성장했습니다.";
+      "Day 5까지 버틴 편의점은 이제 Day 6부터 무한모드 영업에 도전합니다.";
 
     rewardBox.innerHTML = `
       <div class="ending-reward-row">
