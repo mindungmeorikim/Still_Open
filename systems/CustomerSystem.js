@@ -726,6 +726,8 @@ export const CustomerSystem = {
       );
     }
 
+    this.enrichCheckoutPayload(data, customer);
+
     const checkedOutCustomer = {
       ...customer,
       status: CUSTOMER_STATUS.LEAVING,
@@ -757,6 +759,46 @@ export const CustomerSystem = {
     );
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  enrichCheckoutPayload(data = {}, customer = null) {
+    if (!customer) {
+      return data;
+    }
+
+    const quantity = Math.max(1, Math.floor(Number(data.quantity) || 1));
+    const carriedProduct =
+      getProductById(customer.carriedProductId) ??
+      this.findStockedProductForRequest(
+        customer.wantedProductId,
+        quantity,
+        customer.id
+      );
+
+    data.day = Math.max(1, Math.floor(Number(data.day) || GameState.day || 1));
+    data.customerId = data.customerId ?? customer.id;
+    data.wantedProductId = data.wantedProductId ?? customer.wantedProductId;
+    data.checkoutId =
+      data.checkoutId ??
+      `checkout-${data.day}-${customer.id}`;
+    data.quantity = quantity;
+
+    if (carriedProduct) {
+      const shouldNormalizeAmount = !data.productId;
+
+      data.productId = data.productId ?? carriedProduct.id;
+      data.productName = data.productName ?? carriedProduct.name;
+
+      if (
+        shouldNormalizeAmount ||
+        !Number.isFinite(Number(data.amount)) ||
+        Number(data.amount) <= 0
+      ) {
+        data.amount = carriedProduct.salePrice * quantity;
+      }
+    }
+
+    return data;
   },
 
   normalizeCheckoutCompletedPayload(data = {}) {

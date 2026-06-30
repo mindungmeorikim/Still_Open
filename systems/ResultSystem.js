@@ -40,22 +40,10 @@ export const ResultSystem = {
     });
 
     EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data = {}) => {
-      const checkoutKey = this.createCheckoutKey(data);
-
-      if (!checkoutKey) {
-        console.warn("[ResultSystem] 계산 성공 수 처리 실패: checkoutId 또는 customerId가 필요합니다.", data);
-        return;
-      }
-
-      if (this.processedCheckoutKeys.has(checkoutKey)) {
-        console.warn("[ResultSystem] 이미 집계된 계산입니다.", data);
-        return;
-      }
-
-      this.processedCheckoutKeys.add(checkoutKey);
-      GameState.todayStats.checkoutSuccessCount += 1;
-
-      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+      this.recordCheckoutSuccess(data, {
+        warnOnMissingKey: false,
+        duplicateMessage: "[ResultSystem] 이미 집계된 계산입니다."
+      });
     });
 
     EventBus.on(EVENTS.RESTOCK_COMPLETED, () => {
@@ -93,6 +81,36 @@ export const ResultSystem = {
     return null;
   },
 
+  recordCheckoutSuccess(data = {}, options = {}) {
+    const checkoutKey = this.createCheckoutKey(data);
+
+    if (!checkoutKey) {
+      if (options.warnOnMissingKey === true) {
+        console.warn(
+          "[ResultSystem] 계산 성공 수 처리 실패: checkoutId 또는 customerId가 필요합니다.",
+          data
+        );
+      }
+
+      return false;
+    }
+
+    if (this.processedCheckoutKeys.has(checkoutKey)) {
+      if (options.duplicateMessage) {
+        console.warn(options.duplicateMessage, data);
+      }
+
+      return false;
+    }
+
+    this.processedCheckoutKeys.add(checkoutKey);
+    GameState.todayStats.checkoutSuccessCount += 1;
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    return true;
+  },
+
   bindCustomerEvents() {
     EventBus.on(EVENTS.CUSTOMER_ENTERED, () => {
       GameState.todayStats.totalCustomers += 1;
@@ -100,7 +118,12 @@ export const ResultSystem = {
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
     });
 
-    EventBus.on(EVENTS.CUSTOMER_SATISFIED, () => {
+    EventBus.on(EVENTS.CUSTOMER_SATISFIED, (data = {}) => {
+      this.recordCheckoutSuccess(data, {
+        warnOnMissingKey: false,
+        duplicateMessage: null
+      });
+
       GameState.todayStats.satisfiedCustomers += 1;
 
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
