@@ -3718,3 +3718,59 @@ button:active {
     grid-template-columns: 42px 1fr 42px;
   }
 }
+
+/* v4.3 발주 상품 카드 반응형 개선 */
+.order-product-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.order-product-row {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.order-product-row.is-recommended::before {
+  top: 8px;
+  right: 10px;
+  box-sizing: border-box;
+  max-width: calc(100% - 20px);
+  white-space: nowrap;
+}
+
+.order-product-row .order-product-title {
+  padding-right: 92px;
+}
+
+.order-quantity-controls {
+  grid-template-columns: minmax(44px, max-content) minmax(42px, 1fr) minmax(44px, max-content);
+}
+
+.order-qty-button {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.order-quantity-controls strong {
+  min-height: 44px;
+}
+
+@media (max-width: 1023px) {
+  .order-product-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 599px) {
+  .order-product-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .order-product-row .order-product-title {
+    padding-right: 86px;
+  }
+
+  .order-quantity-controls {
+    grid-template-columns: 44px minmax(44px, 1fr) 44px;
+  }
+}
