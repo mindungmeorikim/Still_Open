@@ -1130,6 +1130,12 @@ button:active {
   cursor: default;
 }
 
+.customer-event-choice-disabled-reason {
+  color: #9f3a2f;
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .customer-event-result-text {
   margin: 14px 0 0;
   padding: 12px;

@@ -118,6 +118,18 @@ export const UIManager = {
       this.render();
       this.renderCustomers();
     });
+
+    EventBus.on(EVENTS.CUSTOMER_LEFT, (data = {}) => {
+      if (data.reason !== "wanted_product_out_of_stock") {
+        return;
+      }
+
+      const message = data.wantedProductName
+        ? `${data.wantedProductName}을 찾던 손님이 재고가 없어 돌아갔습니다.`
+        : "원하던 상품이 없어 손님이 돌아갔습니다.";
+
+      this.showMessage(message);
+    });
   },
 
   bindDayStartEvents() {
@@ -296,6 +308,19 @@ export const UIManager = {
     label.textContent = this.getCustomerDisplayText(customer);
     customerNode.appendChild(label);
 
+    if (customer.bubbleText) {
+      const leavingBubble = document.createElement("span");
+      leavingBubble.className = "customer-wanted-bubble";
+
+      const leavingText = document.createElement("span");
+      leavingText.className = "customer-wanted-text";
+      leavingText.textContent = customer.bubbleText;
+      leavingBubble.appendChild(leavingText);
+
+      customerNode.appendChild(leavingBubble);
+      return;
+    }
+
     if (customer.currentZone !== "counter" || !customer.wantedProductName) {
       return;
     }
@@ -330,6 +355,7 @@ export const UIManager = {
     customerNode.dataset.queueIndex = isCounterCustomer ? String(queueIndex) : "";
     customerNode.style.setProperty("--queue-x", `${queueOffset * -1}px`);
     customerNode.style.setProperty("--queue-y", `${queueOffset}px`);
+    customerNode.style.zIndex = isCounterCustomer ? String(30 - queueIndex) : "";
   },
 
   getCustomerClassName(customer) {
@@ -2502,10 +2528,16 @@ export const UIManager = {
       const button = document.createElement("button");
       const label = document.createElement("strong");
       const description = document.createElement("span");
+      const disabledReason = document.createElement("span");
 
       button.type = "button";
       button.className = "customer-event-choice-button";
       button.dataset.choiceId = choice.choiceId ?? "";
+      button.disabled = choice.disabled === true;
+
+      if (choice.disabled) {
+        button.classList.add("is-disabled");
+      }
 
       label.textContent = choice.label || "선택지";
       description.textContent = choice.description || "";
@@ -2513,8 +2545,14 @@ export const UIManager = {
       button.appendChild(label);
       button.appendChild(description);
 
+      if (choice.disabled && choice.disabledReason) {
+        disabledReason.className = "customer-event-choice-disabled-reason";
+        disabledReason.textContent = choice.disabledReason;
+        button.appendChild(disabledReason);
+      }
+
       button.onclick = () => {
-        if (this.isEventModalClosing) {
+        if (this.isEventModalClosing || choice.disabled) {
           return;
         }
 

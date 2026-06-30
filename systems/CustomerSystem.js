@@ -438,6 +438,21 @@ export const CustomerSystem = {
         return this.markCustomerAsLeaving(customer, "angry_leave");
       }
 
+      if (
+        customer.status === CUSTOMER_STATUS.LEAVING &&
+        customer.leaveReason === "wanted_product_out_of_stock" &&
+        Number(customer.leavingRenderTime) > 0
+      ) {
+        changed = true;
+        return {
+          ...customer,
+          leavingRenderTime: Math.max(
+            0,
+            Number(customer.leavingRenderTime) - amount
+          )
+        };
+      }
+
       return customer;
     });
 
@@ -693,11 +708,23 @@ export const CustomerSystem = {
       return customer;
     }
 
+    const isWantedProductOutOfStock =
+      reason === "wanted_product_out_of_stock";
+
     const leavingCustomer = {
       ...customer,
       status: CUSTOMER_STATUS.LEAVING,
-      currentZone: CUSTOMER_ZONES.EXIT,
+      currentZone: isWantedProductOutOfStock
+        ? CUSTOMER_ZONES.DOOR
+        : CUSTOMER_ZONES.EXIT,
       targetZone: CUSTOMER_ZONES.EXIT,
+      leaveReason: reason,
+      ...(isWantedProductOutOfStock
+        ? {
+            leavingRenderTime: 2,
+            bubbleText: "앗, 찾던 상품이 없네… 다음에 올게요."
+          }
+        : {}),
       hasReportedLeft: true
     };
 
@@ -910,16 +937,27 @@ export const CustomerSystem = {
       waitTime: customer.waitTime,
       mood: customer.mood,
       queueOrder: customer.queueOrder,
-      isSatisfied: customer.isSatisfied
+      isSatisfied: customer.isSatisfied,
+      leaveReason: customer.leaveReason ?? null,
+      leavingRenderTime: customer.leavingRenderTime ?? 0,
+      bubbleText: customer.bubbleText ?? null
     };
   },
 
   getRenderableCustomers() {
     return this.customers
       .filter((customer) => {
+        const shouldRenderLeavingCustomer =
+          customer.status === CUSTOMER_STATUS.LEAVING &&
+          customer.leaveReason === "wanted_product_out_of_stock" &&
+          Number(customer.leavingRenderTime) > 0;
+
         return (
-          customer.status !== CUSTOMER_STATUS.LEAVING &&
-          !customer.hasReportedLeft
+          shouldRenderLeavingCustomer ||
+          (
+            customer.status !== CUSTOMER_STATUS.LEAVING &&
+            !customer.hasReportedLeft
+          )
         );
       })
       .map((customer) => {

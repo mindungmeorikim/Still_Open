@@ -101,6 +101,17 @@ function bindCustomerEventModalFlow() {
   });
 }
 
+function bindCustomerStockShortagePenalty() {
+  EventBus.on(EVENTS.CUSTOMER_LEFT, (data = {}) => {
+    if (data.reason !== "wanted_product_out_of_stock") {
+      return;
+    }
+
+    GameState.mental = clampPlayerStat(GameState.mental - 1);
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  });
+}
+
 function initGame() {
   UIManager.init();
   GameFlowSystem.init();
@@ -115,6 +126,7 @@ function initGame() {
   PlayerMovementSystem.init();
   PlayerActionSystem.init();
   bindCustomerEventModalFlow();
+  bindCustomerStockShortagePenalty();
   EventBus.emit(EVENTS.GAME_INIT);
   requestAnimationFrame(gameloop);
 

@@ -483,13 +483,19 @@ export const RandomEventSystem = {
     }
 
     const choices = Array.isArray(detail.choices)
-      ? detail.choices.filter((choice) => {
-          return !this.isChoiceBlockedByMissingProductStock(choice);
-        }).map((choice) => {
+      ? detail.choices.map((choice) => {
+          const missingRequirements =
+            this.getMissingProductInventoryRequirements(choice);
+          const disabled =
+            this.isChoiceBlockedByMissingProductStock(choice);
+
           return {
             choiceId: choice.id,
             label: choice.label,
             description: choice.description,
+            disabled,
+            disabledReason: disabled ? "필요 재고 부족" : null,
+            missingRequirements,
             resultTitle: choice.resultTitle,
             customerReaction: choice.customerReaction,
             playerThought: choice.playerThought,
@@ -503,7 +509,12 @@ export const RandomEventSystem = {
         })
       : [];
 
-    if (choices.length === 0) {
+    if (
+      choices.length === 0 ||
+      choices.every((choice) => {
+        return choice.disabled === true;
+      })
+    ) {
       return null;
     }
 
@@ -714,6 +725,16 @@ export const RandomEventSystem = {
     return requirements.every((requirement) => {
       return requirement.availableQuantity >= requirement.requiredQuantity;
     });
+  },
+
+  getMissingProductInventoryRequirements(choice = {}) {
+    return this.getChoiceProductInventoryRequirements(choice)
+      .filter((requirement) => {
+        return requirement.availableQuantity < requirement.requiredQuantity;
+      })
+      .map((requirement) => {
+        return { ...requirement };
+      });
   },
 
   isChoiceBlockedByMissingProductStock(choice = {}) {
