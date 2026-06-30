@@ -16,10 +16,15 @@
 
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
-import { EVENTS } from "../core/Constants.js";
+import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
 import { CustomerSystem } from "./CustomerSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
+
+const STAFF_EVENTS = {
+  AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
+  AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED"
+};
 
 export const PlayerActionSystem = {
   isInitialized: false,
@@ -48,6 +53,13 @@ export const PlayerActionSystem = {
     this.bindCounterCheckoutAction();
     this.bindPointerActions();
     this.bindKeyboardActions();
+    this.bindStaffAutoCheckoutEvents();
+  },
+
+  bindStaffAutoCheckoutEvents() {
+    EventBus.on(STAFF_EVENTS.AUTO_CHECKOUT_REQUESTED, (data = {}) => {
+      this.handleStaffAutoCheckoutRequest(data);
+    });
   },
 
   bindCounterCheckoutAction() {
@@ -309,23 +321,96 @@ export const PlayerActionSystem = {
     return true;
   },
 
-  handleCheckoutAction() {
-    const checkoutPayload = this.createCheckoutPayload();
-
-    if (!checkoutPayload) {
+  handleStaffAutoCheckoutRequest(data = {}) {
+    if (
+      GameState.phase !== GAME_PHASE.STORE_RUNNING ||
+      data.day !== GameState.day
+    ) {
+      this.emitStaffAutoCheckoutResult(false, data, "invalid_phase_or_day");
       return;
     }
 
-    EventBus.emit(EVENTS.CHECKOUT_COMPLETED, checkoutPayload);
-    this.showActionMessage(
-      `${checkoutPayload.productName} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`
-    );
+    const staff = data.staff ?? GameState.staff?.hired ?? null;
+
+    if (!staff) {
+      this.emitStaffAutoCheckoutResult(false, data, "no_staff");
+      return;
+    }
+
+    const checkoutPayload = this.performCheckout({
+      source: "staff_auto_checkout",
+      actorType: "staff",
+      actorId: staff.id,
+      actorName: staff.name,
+      checkoutIdPrefix: "staff-checkout",
+      onlyWaitingCustomer: true,
+      suppressNoCustomerMessage: true,
+      successMessage: (payload) => {
+        return `${staff.name} 알바가 ${payload.productName} 계산을 도왔습니다.`;
+      }
+    });
+
+    if (!checkoutPayload) {
+      this.emitStaffAutoCheckoutResult(false, data, "no_waiting_customer");
+    }
   },
 
-  createCheckoutPayload() {
-    const customer = CustomerSystem.getCheckoutCustomerPayload?.();
+  performCheckout(options = {}) {
+    const checkoutPayload = this.createCheckoutPayload(options);
+
+    if (!checkoutPayload) {
+      return null;
+    }
+
+    EventBus.emit(EVENTS.CHECKOUT_COMPLETED, checkoutPayload);
+
+    if (typeof options.successMessage === "function") {
+      this.showActionMessage(options.successMessage(checkoutPayload));
+    }
+
+    if (options.actorType === "staff") {
+      this.emitStaffAutoCheckoutResult(true, options, null, checkoutPayload);
+    }
+
+    return checkoutPayload;
+  },
+
+  emitStaffAutoCheckoutResult(success, request = {}, reason = null, checkoutPayload = null) {
+    EventBus.emit(STAFF_EVENTS.AUTO_CHECKOUT_COMPLETED, {
+      day: GameState.day,
+      success,
+      reason,
+      staffId: request.actorId ?? request.staff?.id ?? null,
+      staffName: request.actorName ?? request.staff?.name ?? null,
+      checkoutId: checkoutPayload?.checkoutId ?? null,
+      customerId: checkoutPayload?.customerId ?? null,
+      productId: checkoutPayload?.productId ?? null,
+      productName: checkoutPayload?.productName ?? null,
+      amount: checkoutPayload?.amount ?? 0
+    });
+  },
+
+  handleCheckoutAction() {
+    this.performCheckout({
+      source: "player_action_system",
+      actorType: "player",
+      checkoutIdPrefix: "checkout",
+      successMessage: (checkoutPayload) => {
+        return `${checkoutPayload.productName} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`;
+      }
+    });
+  },
+
+  createCheckoutPayload(options = {}) {
+    const customer = options.onlyWaitingCustomer
+      ? this.getWaitingCheckoutCustomerPayload()
+      : CustomerSystem.getCheckoutCustomerPayload?.();
 
     if (!customer) {
+      if (options.suppressNoCustomerMessage) {
+        return null;
+      }
+
       this.showActionMessage("계산 가능한 손님이 없습니다.");
       console.warn("[PlayerActionSystem] 계산 가능한 손님이 없습니다.");
       return null;
@@ -377,15 +462,40 @@ export const PlayerActionSystem = {
 
     this.checkoutSequence += 1;
 
+    const checkoutIdPrefix = options.checkoutIdPrefix ?? "checkout";
+    const actorType = options.actorType ?? "player";
+
     return {
-      checkoutId: `checkout-${GameState.day}-${customer.customerId}-${this.checkoutSequence}`,
+      checkoutId: `${checkoutIdPrefix}-${GameState.day}-${customer.customerId}-${this.checkoutSequence}`,
       day: GameState.day,
       customerId: customer.customerId,
       wantedProductId,
       productId: product.id,
       productName: product.name,
       quantity,
-      amount: product.salePrice * quantity
+      amount: product.salePrice * quantity,
+      source: options.source ?? "player_action_system",
+      actorType,
+      actorId: options.actorId ?? null,
+      actorName: options.actorName ?? null
+    };
+  },
+
+  getWaitingCheckoutCustomerPayload() {
+    const waitingCustomer = CustomerSystem.getWaitingCustomers?.()[0] ?? null;
+
+    if (!waitingCustomer) {
+      return null;
+    }
+
+    if (typeof CustomerSystem.createCustomerPayload === "function") {
+      return CustomerSystem.createCustomerPayload(waitingCustomer);
+    }
+
+    return {
+      customerId: waitingCustomer.id,
+      wantedProductId: waitingCustomer.wantedProductId,
+      carriedProductId: waitingCustomer.carriedProductId ?? null
     };
   }
 };

@@ -189,6 +189,14 @@ export const ResultSystem = {
     }
 
     const stats = GameState.todayStats;
+    const staffResult = this.createStaffResultSummary();
+
+    stats.staffWageCost = staffResult.wageCost;
+    stats.staffCheckoutCount = staffResult.checkoutCount;
+    stats.staffName = staffResult.name;
+    stats.staffType = staffResult.type;
+    stats.staffExpectedDailyWage = staffResult.wageCost;
+    stats.cost += staffResult.wageCost;
 
     stats.profit =
       stats.revenue -
@@ -295,6 +303,7 @@ export const ResultSystem = {
       checkoutSuccessCount: stats.checkoutSuccessCount,
       restockCount: stats.restockCount,
       cleaningCount: stats.cleaningCount,
+      staff: staffResult,
 
       revenueSuccess,
       satisfactionSuccess,
@@ -359,6 +368,41 @@ export const ResultSystem = {
     GameState.todayStats.bmBonus = 0;
 
     GameState.todayStats.mvpTestDataApplied = true;
+  },
+
+  createStaffResultSummary() {
+    const staffState = GameState.staff ?? {};
+    const hired = staffState.hired ?? null;
+
+    if (!hired) {
+      return {
+        hired: false,
+        name: "",
+        type: "",
+        checkoutCount: 0,
+        hourlyWage: 0,
+        shiftHours: 0,
+        wageCost: 0
+      };
+    }
+
+    const hourlyWage = Math.max(0, Number(hired.hourlyWage) || 0);
+    const shiftHours = Math.max(0, Number(hired.shiftHours) || 3);
+    const wageCost = Math.max(
+      0,
+      Number(hired.expectedDailyWage) || hourlyWage * shiftHours
+    );
+
+    return {
+      hired: true,
+      id: hired.id ?? null,
+      name: hired.name ?? "알바",
+      type: hired.type ?? "",
+      checkoutCount: Math.max(0, Number(staffState.todayCheckoutCount) || 0),
+      hourlyWage,
+      shiftHours,
+      wageCost
+    };
   },
 
   createResultMessage(resultData) {

@@ -4620,3 +4620,21 @@ button:active {
     min-height: 54px;
   }
 }
+
+/* v5.0 알바 자동 계산 보조 / 인건비 정산 연동 */
+.result-row-staff {
+  border-color: rgba(191, 234, 208, 0.95);
+  background:
+    linear-gradient(180deg, #f4fff5 0%, #fffdf7 100%);
+}
+
+.result-row-staff strong {
+  color: var(--tycoon-mint-dark);
+}
+
+.staff-summary-body span:nth-child(2),
+.staff-summary-body span:nth-child(3) {
+  border-color: rgba(191, 234, 208, 0.95);
+  background: #e8fff0;
+  color: var(--tycoon-mint-dark);
+}

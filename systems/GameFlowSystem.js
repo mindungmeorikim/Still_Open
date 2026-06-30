@@ -31,11 +31,18 @@ const STAFF_EVENTS = {
   HIRE_OFFERED: "STAFF_HIRE_OFFERED",
   HIRED: "STAFF_HIRED",
   HIRE_SKIPPED: "STAFF_HIRE_SKIPPED",
-  STATE_CHANGED: "STAFF_STATE_CHANGED"
+  STATE_CHANGED: "STAFF_STATE_CHANGED",
+  AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
+  AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED"
 };
 
 const STAFF_UNLOCK_DAY = 3;
 const STAFF_SHIFT_HOURS = 3;
+const STAFF_AUTO_CHECKOUT_INTERVALS = Object.freeze({
+  park_junho: 4,
+  kim_minji: 6,
+  lee_bora: 7
+});
 const STAFF_CANDIDATES = Object.freeze([
   Object.freeze({
     id: "kim_minji",
@@ -70,6 +77,7 @@ export const GameFlowSystem = {
   isStoreOpen: false,
   isClosing: false,
   isDayTimerPaused: false,
+  staffAutoCheckoutElapsedSeconds: 0,
 
   expansionEffects: {
     customerSpawnRateBonus: 0,
@@ -160,6 +168,9 @@ export const GameFlowSystem = {
     EventBus.on(STAFF_EVENTS.HIRE_SKIPPED, (data) => {
       this.handleStaffHireSkipped(data);
     });
+    EventBus.on(STAFF_EVENTS.AUTO_CHECKOUT_COMPLETED, (data) => {
+      this.handleStaffAutoCheckoutCompleted(data);
+    });
   },
 
   ensureStaffState() {
@@ -180,6 +191,15 @@ export const GameFlowSystem = {
 
     if (typeof GameState.staff.hired === "undefined") {
       GameState.staff.hired = null;
+    }
+
+    if (GameState.staff.checkoutCountDay !== GameState.day) {
+      GameState.staff.todayCheckoutCount = 0;
+      GameState.staff.checkoutCountDay = GameState.day;
+    }
+
+    if (!Number.isFinite(Number(GameState.staff.todayCheckoutCount))) {
+      GameState.staff.todayCheckoutCount = 0;
     }
 
     return GameState.staff;
@@ -276,6 +296,71 @@ export const GameFlowSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
+  getStaffAutoCheckoutInterval(staff = GameState.staff?.hired) {
+    if (!staff) {
+      return 0;
+    }
+
+    return STAFF_AUTO_CHECKOUT_INTERVALS[staff.id] ?? 6;
+  },
+
+  handleStaffAutoCheckoutTick(deltaSeconds = 1) {
+    const staffState = this.ensureStaffState();
+
+    if (
+      GameState.phase !== GAME_PHASE.STORE_RUNNING ||
+      this.isClosing ||
+      !this.isStoreOpen ||
+      !staffState.hired
+    ) {
+      this.staffAutoCheckoutElapsedSeconds = 0;
+      return;
+    }
+
+    const intervalSeconds = this.getStaffAutoCheckoutInterval(staffState.hired);
+
+    if (intervalSeconds <= 0) {
+      return;
+    }
+
+    this.staffAutoCheckoutElapsedSeconds += Math.max(0, Number(deltaSeconds) || 0);
+
+    if (this.staffAutoCheckoutElapsedSeconds < intervalSeconds) {
+      return;
+    }
+
+    this.staffAutoCheckoutElapsedSeconds = 0;
+
+    EventBus.emit(STAFF_EVENTS.AUTO_CHECKOUT_REQUESTED, {
+      day: GameState.day,
+      staff: staffState.hired,
+      intervalSeconds
+    });
+  },
+
+  handleStaffAutoCheckoutCompleted(data = {}) {
+    const staffState = this.ensureStaffState();
+
+    if (
+      data.day !== GameState.day ||
+      data.success !== true ||
+      !staffState.hired
+    ) {
+      return;
+    }
+
+    staffState.todayCheckoutCount =
+      (Number(staffState.todayCheckoutCount) || 0) + 1;
+    staffState.checkoutCountDay = GameState.day;
+
+    EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
+      day: GameState.day,
+      staff: staffState,
+      lastCheckout: data
+    });
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
   applyExpansionEffects(data = {}) {
     this.expansionEffects = this.normalizeExpansionEffects(data.effects);
     this.applyDayBalance();
@@ -314,6 +399,7 @@ export const GameFlowSystem = {
     this.isStoreOpen = false;
     this.isClosing = false;
     this.isDayTimerPaused = false;
+    this.staffAutoCheckoutElapsedSeconds = 0;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
     this.clearDayTimer();
 
@@ -374,6 +460,7 @@ export const GameFlowSystem = {
     this.isStoreOpen = true;
     this.isClosing = false;
     this.isDayTimerPaused = false;
+    this.staffAutoCheckoutElapsedSeconds = 0;
     this.startDayTimer();
 
     UIManager.showMessage(
@@ -458,6 +545,7 @@ export const GameFlowSystem = {
     this.isStoreOpen = false;
     this.isClosing = false;
     this.isDayTimerPaused = false;
+    this.staffAutoCheckoutElapsedSeconds = 0;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
 
     if (GameState.day > GAME_CONFIG.MAX_STORY_DAY) {
@@ -468,6 +556,7 @@ export const GameFlowSystem = {
     }
 
     this.resetTodayStats();
+    this.resetStaffDailyStats();
     this.applyDayBalance();
 
     const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
@@ -572,6 +661,7 @@ export const GameFlowSystem = {
       }
 
       this.remainingDaySeconds = Math.max(0, this.remainingDaySeconds - 1);
+      this.handleStaffAutoCheckoutTick(1);
       console.log("[DAY TIMER]", this.remainingDaySeconds);
 
       if (this.remainingDaySeconds <= 0) {
@@ -608,6 +698,14 @@ export const GameFlowSystem = {
       eventPenalty: 0,
       bmBonus: 0
     };
+  },
+
+  resetStaffDailyStats() {
+    const staffState = this.ensureStaffState();
+
+    staffState.todayCheckoutCount = 0;
+    staffState.checkoutCountDay = GameState.day;
+    this.staffAutoCheckoutElapsedSeconds = 0;
   },
 
   applyDayBalance() {

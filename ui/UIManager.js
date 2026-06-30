@@ -489,11 +489,17 @@ export const UIManager = {
 
     const expectedDailyWage = Number(hired.expectedDailyWage) ||
       (Number(hired.hourlyWage) || 0) * (Number(hired.shiftHours) || 3);
+    const todayCheckoutCount = Math.max(
+      0,
+      Number(staffState?.todayCheckoutCount) || 0
+    );
 
     summary.hidden = false;
     status.textContent = `${hired.name} 근무 중`;
     body.innerHTML = `
       <span>${hired.type}</span>
+      <span>자동 계산 보조 중</span>
+      <span>오늘 알바 계산 ${todayCheckoutCount}건</span>
       <span>시급 ₩${Number(hired.hourlyWage).toLocaleString("ko-KR")}</span>
       <span>예상 일급 ₩${expectedDailyWage.toLocaleString("ko-KR")}</span>
       <span>근태 ${hired.attendance}%</span>
@@ -2318,6 +2324,19 @@ export const UIManager = {
     const mvpText = resultData.mvpTestDataApplied
       ? `<p class="modal-note">※ 임시 MVP 테스트 데이터가 적용되었습니다.</p>`
       : "";
+    const staffResult = resultData.staff ?? {};
+    const staffResultRows = staffResult.hired
+      ? `
+        <div class="result-row result-row-staff">
+          <span>알바 계산</span>
+          <strong>${staffResult.name} ${Number(staffResult.checkoutCount) || 0}건</strong>
+        </div>
+        <div class="result-row result-row-staff">
+          <span>알바 인건비</span>
+          <strong>-₩${Number(staffResult.wageCost || 0).toLocaleString("ko-KR")}</strong>
+        </div>
+      `
+      : "";
 
     title.textContent = `Day ${resultData.day} 정산 결과`;
 
@@ -2378,6 +2397,8 @@ export const UIManager = {
         <span>계산 성공</span>
         <strong>${resultData.checkoutSuccessCount}</strong>
       </div>
+
+      ${staffResultRows}
 
       <p class="result-next-step">${nextStepText}</p>
 
