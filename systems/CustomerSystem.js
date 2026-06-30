@@ -904,7 +904,7 @@ export const CustomerSystem = {
       return this.getAvailableEventsForCustomer(customer).length > 0;
     });
 
-    return candidates[0] ?? null;
+    return RandomEventSystem.pickEventTargetCustomer(candidates, GameState.day);
   },
 
   createRandomEventCandidatePayload() {

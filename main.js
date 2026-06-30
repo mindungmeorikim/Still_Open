@@ -21,17 +21,11 @@ import { EconomySystem } from "./systems/EconomySystem.js";
 import { PlayerMovementSystem } from "./systems/PlayerMovementSystem.js";
 import { PlayerActionSystem } from "./systems/PlayerActionSystem.js";
 
-const shownCustomerEventKeys = new Set();
-
 function isCustomerEventModalOpen() {
   return (
     UIManager.eventModal &&
     !UIManager.eventModal.classList.contains("hidden")
   );
-}
-
-function createCustomerEventKey(payload) {
-  return `${payload.day}:${payload.customerId}:${payload.eventId}`;
 }
 
 function clampPlayerStat(value) {
@@ -70,13 +64,6 @@ function showCustomerEventCandidate() {
     return;
   }
 
-  const eventKey = createCustomerEventKey(payload);
-
-  if (shownCustomerEventKeys.has(eventKey)) {
-    return;
-  }
-
-  shownCustomerEventKeys.add(eventKey);
   CustomerSystem.pauseCustomerWaitTime();
 
   try {

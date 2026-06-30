@@ -2043,7 +2043,7 @@ export const UIManager = {
         <p id="customer-event-modal-dialogue" class="customer-event-modal-dialogue"></p>
         <p id="customer-event-modal-summary" class="customer-event-modal-summary"></p>
         <div id="customer-event-choice-list" class="customer-event-choice-list"></div>
-        <p id="customer-event-result-text" class="customer-event-result-text" hidden></p>
+        <div id="customer-event-result-text" class="customer-event-result-text" hidden></div>
         <button id="customer-event-close-button" class="customer-event-close-button" type="button" hidden>
           확인
         </button>
@@ -2053,6 +2053,122 @@ export const UIManager = {
     document.body.appendChild(modal);
 
     this.eventModal = modal;
+  },
+
+
+  formatCustomerEventSignedNumber(value) {
+    const safeValue = Number(value) || 0;
+    const sign = safeValue > 0 ? "+" : "";
+
+    return `${sign}${safeValue.toLocaleString("ko-KR")}`;
+  },
+
+  createCustomerEventResultLine(label, value) {
+    const item = document.createElement("li");
+    item.textContent = `${label} ${value}`;
+    return item;
+  },
+
+  formatCustomerEventInventoryChanges(inventoryChanges = []) {
+    const changes = Array.isArray(inventoryChanges) ? inventoryChanges : [];
+    const visibleChanges = changes.filter((change) => {
+      return Number(change.quantity) !== 0;
+    });
+
+    if (visibleChanges.length === 0) {
+      return "재고 변화 없음";
+    }
+
+    return visibleChanges.map((change) => {
+      const label = change.label ?? change.productId ?? change.itemKey ?? "재고";
+      const quantity = Number(change.quantity) || 0;
+      const sign = quantity > 0 ? "+" : "";
+
+      return `${label} ${sign}${quantity}`;
+    }).join(", ");
+  },
+
+  createCustomerEventResultNode(choice = {}) {
+    const wrapper = document.createElement("div");
+    const title = document.createElement("strong");
+    const customerReaction = document.createElement("p");
+    const playerThought = document.createElement("p");
+    const changesList = document.createElement("ul");
+    const specialEffect = document.createElement("p");
+    const effects = choice.effects ?? {};
+    const revenue = Number(effects.revenue) || 0;
+    const cost = Number(effects.cost) || 0;
+    const satisfaction = Number(effects.satisfaction) || 0;
+    const mental = Number(effects.mental) || 0;
+    const inventoryChanges =
+      Array.isArray(choice.inventoryChanges) && choice.inventoryChanges.length > 0
+        ? choice.inventoryChanges
+        : effects.inventoryChanges;
+
+    wrapper.className = "customer-event-result-card";
+    title.className = "customer-event-result-title";
+    title.textContent = choice.resultTitle || "선택 결과";
+
+    customerReaction.className = "customer-event-result-reaction";
+    customerReaction.textContent = choice.customerReaction
+      ? `손님 반응: “${choice.customerReaction}”`
+      : (choice.resultText || "선택했습니다.");
+
+    playerThought.className = "customer-event-result-thought";
+    playerThought.textContent = choice.playerThought
+      ? `종업원 속마음: “${choice.playerThought}”`
+      : "";
+
+    changesList.className = "customer-event-result-changes";
+    changesList.appendChild(
+      this.createCustomerEventResultLine(
+        "매출",
+        `${this.formatCustomerEventSignedNumber(revenue)}원`
+      )
+    );
+
+    if (cost !== 0) {
+      changesList.appendChild(
+        this.createCustomerEventResultLine(
+          "비용",
+          `-${Math.abs(cost).toLocaleString("ko-KR")}원`
+        )
+      );
+    }
+
+    changesList.appendChild(
+      this.createCustomerEventResultLine(
+        "만족도",
+        this.formatCustomerEventSignedNumber(satisfaction)
+      )
+    );
+    changesList.appendChild(
+      this.createCustomerEventResultLine(
+        "멘탈",
+        this.formatCustomerEventSignedNumber(mental)
+      )
+    );
+    changesList.appendChild(
+      this.createCustomerEventResultLine(
+        "재고",
+        this.formatCustomerEventInventoryChanges(inventoryChanges)
+      )
+    );
+
+    specialEffect.className = "customer-event-result-special";
+    specialEffect.textContent = `특수 효과: ${choice.specialEffect || "없음"}`;
+
+    wrapper.appendChild(title);
+    wrapper.appendChild(customerReaction);
+
+    if (choice.playerThought) {
+      wrapper.appendChild(playerThought);
+    }
+
+    wrapper.appendChild(changesList);
+    wrapper.appendChild(specialEffect);
+
+    return wrapper;
   },
 
   showCustomerEventModal(payload = {}, onClose = null, onChoiceSelected = null) {
@@ -2097,7 +2213,8 @@ export const UIManager = {
     dialogue.textContent = payload.dialogue || "손님이 말을 걸었습니다.";
     summary.textContent = payload.eventSummary || "";
     choiceList.innerHTML = "";
-    resultText.textContent = "";
+    choiceList.hidden = false;
+    resultText.innerHTML = "";
     resultText.hidden = true;
     closeButton.hidden = true;
 
@@ -2130,13 +2247,12 @@ export const UIManager = {
           choiceSelectedCallback(choice);
         }
 
-        resultText.textContent = choice.resultText || "선택했습니다.";
+        choiceList.hidden = true;
+        resultText.innerHTML = "";
+        resultText.appendChild(this.createCustomerEventResultNode(choice));
         resultText.hidden = false;
-
-        this.eventModalCloseTimerId = setTimeout(() => {
-          this.eventModalCloseTimerId = null;
-          this.hideCustomerEventModal();
-        }, 1200);
+        closeButton.hidden = false;
+        closeButton.focus?.();
       };
 
       choiceList.appendChild(button);

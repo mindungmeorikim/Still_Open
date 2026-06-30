@@ -9,7 +9,7 @@
   - 손님 상태값
   - 손님 이동 구역
   - 손님별 선호 상품
-  - 랜덤 이벤트 후보 데이터
+  - 고객 이벤트 후보는 EventData.js 기준으로 관리
 
   규칙:
   - 실제 Date 사용 금지
@@ -57,6 +57,10 @@ export const CUSTOMER_WANTED_PRODUCTS = [
   {
     id: "coffee",
     name: "커피"
+  },
+  {
+    id: "energy_drink",
+    name: "에너지드링크"
   },
   {
     id: "lunch_box",
@@ -121,7 +125,7 @@ export const CUSTOMER_TYPES = [
     weight: 18,
     patience: 22,
     spendBias: 1.2,
-    preferredProductIds: ["coffee", "lunch_box"],
+    preferredProductIds: ["coffee", "energy_drink", "lunch_box"],
     eventChance: 0.12
   },
   {
@@ -130,7 +134,7 @@ export const CUSTOMER_TYPES = [
     weight: 14,
     patience: 14,
     spendBias: 1,
-    preferredProductIds: ["coffee", "triangle_kimbap"],
+    preferredProductIds: ["coffee", "energy_drink", "triangle_kimbap"],
     eventChance: 0.16
   },
   {
@@ -144,35 +148,5 @@ export const CUSTOMER_TYPES = [
   }
 ];
 
-export const CUSTOMER_EVENTS = [
-  {
-    id: "one_plus_one_confusion",
-    title: "1+1 착각 손님",
-    description: "행사 상품 조건을 착각한 손님 이벤트입니다.",
-    allowedTypeIds: ["normal", "student", "difficult"]
-  },
-  {
-    id: "bag_request",
-    title: "봉투 요청 손님",
-    description: "결제 중 봉투가 필요한 손님 이벤트입니다.",
-    allowedTypeIds: ["normal", "student", "office_worker", "hurried", "difficult"]
-  },
-  {
-    id: "impatient_worker",
-    title: "급한 직장인",
-    description: "빠른 처리를 원하는 회사원 또는 급한 손님 이벤트입니다.",
-    allowedTypeIds: ["office_worker", "hurried"]
-  },
-  {
-    id: "transit_card_charge",
-    title: "교통카드 충전",
-    description: "교통카드 충전을 요청하는 손님 이벤트입니다.",
-    allowedTypeIds: ["student", "normal"]
-  },
-  {
-    id: "rude_complaint",
-    title: "진상 손님 불만",
-    description: "불만을 제기하는 진상 손님 이벤트입니다.",
-    allowedTypeIds: ["difficult"]
-  }
-];
+export const CUSTOMER_EVENTS = Object.freeze([]);
+

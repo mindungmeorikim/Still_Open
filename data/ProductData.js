@@ -118,6 +118,17 @@ export const PRODUCTS = Object.freeze([
     initialStock: 3
   }),
   createProduct({
+    id: "energy_drink",
+    name: "번쩍 에너지드링크",
+    imagePath: "./assets/images/products/coffee.webp",
+    category: PRODUCT_CATEGORIES.DRINK,
+    purchasePrice: 1000,
+    salePrice: 1800,
+    shelfLifeDays: 7,
+    unlockDay: 3,
+    initialStock: 3
+  }),
+  createProduct({
     id: "triangle_kimbap",
     name: "든든 참치삼각밥",
     imagePath: "./assets/images/products/triangle_kimbap.webp",
@@ -177,7 +188,7 @@ export const PRODUCTS = Object.freeze([
   }),
   createProduct({
     id: "udon",
-    name: "담백 우동컵",
+    name: "만번 조린 셰프의 우동",
     imagePath: "./assets/images/products/udon.webp",
     category: PRODUCT_CATEGORIES.INSTANT_FOOD,
     purchasePrice: 1100,
