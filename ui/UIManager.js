@@ -14,17 +14,26 @@ import {
   getPreviousExpansionZone
 } from "../data/ExpansionData.js";
 
+const STAFF_EVENTS = {
+  HIRE_OFFERED: "STAFF_HIRE_OFFERED",
+  HIRED: "STAFF_HIRED",
+  HIRE_SKIPPED: "STAFF_HIRE_SKIPPED",
+  STATE_CHANGED: "STAFF_STATE_CHANGED"
+};
+
 export const UIManager = {
   resultModal: null,
   upgradeModal: null,
   endingModal: null,
   dayScenarioModal: null,
   orderModal: null,
+  staffHireModal: null,
   eventModal: null,
   eventModalOnClose: null,
   eventModalCloseTimerId: null,
   isEventModalClosing: false,
   inventorySummary: null,
+  staffSummary: null,
   productPanel: null,
   expansionPanel: null,
   expansionState: null,
@@ -38,6 +47,7 @@ export const UIManager = {
   isStoreExpansionPopoverVisible: false,
   inventoryByProductId: {},
   inventorySnapshot: null,
+  pendingStaffHireData: null,
 
   init() {
     this.bindButtons();
@@ -47,13 +57,16 @@ export const UIManager = {
     this.bindExpansionEvents();
     this.bindEndingEvents();
     this.bindOrderEvents();
+    this.bindStaffEvents();
     this.createDayScenarioModal();
     this.createOrderModal();
+    this.createStaffHireModal();
     this.createResultModal();
     this.createUpgradeModal();
     this.createEndingModal();
     this.createCustomerEventModal();
     this.createInventorySummary();
+    this.createStaffSummary();
     this.createStoreComposition();
     this.createExpansionPanel();
     this.createProductPanel();
@@ -135,15 +148,36 @@ export const UIManager = {
   bindDayStartEvents() {
     EventBus.on(EVENTS.DAY_STARTED, (data) => {
       this.pendingOrderPhaseData = null;
+      this.pendingStaffHireData = null;
       this.showDayScenarioModal(data.dayScenario);
     });
 
     EventBus.on(EVENTS.ORDER_PHASE_STARTED, (data) => {
       this.pendingOrderPhaseData = data;
 
-      if (!this.isDayScenarioModalVisible()) {
-        this.showOrderModal(data);
+      if (
+        !this.isDayScenarioModalVisible() &&
+        !this.isStaffHireModalVisible()
+      ) {
+        this.continueDayStartFlow();
       }
+    });
+  },
+
+  bindStaffEvents() {
+    EventBus.on(STAFF_EVENTS.HIRE_OFFERED, (data = {}) => {
+      this.pendingStaffHireData = data;
+
+      if (
+        !this.isDayScenarioModalVisible() &&
+        !this.isStaffHireModalVisible()
+      ) {
+        this.continueDayStartFlow();
+      }
+    });
+
+    EventBus.on(STAFF_EVENTS.STATE_CHANGED, (data = {}) => {
+      this.renderStaffSummary(data.staff);
     });
   },
 
@@ -382,6 +416,7 @@ export const UIManager = {
 
   render() {
     this.renderInventorySummary();
+    this.renderStaffSummary();
     this.renderProductCards();
     this.renderExpansionZones();
     this.renderControlButtons();
@@ -391,6 +426,79 @@ export const UIManager = {
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  createStaffSummary() {
+    const existingSummary = document.getElementById("staff-summary");
+
+    if (existingSummary) {
+      this.staffSummary = existingSummary;
+      return existingSummary;
+    }
+
+    const topUi = document.getElementById("top-ui");
+    const inventorySummary = document.getElementById("inventory-summary");
+    const statusPanel = document.getElementById("status-panel");
+
+    if (!topUi || !statusPanel) {
+      return null;
+    }
+
+    const staffSummary = document.createElement("section");
+    staffSummary.id = "staff-summary";
+    staffSummary.className = "staff-summary";
+    staffSummary.hidden = true;
+    staffSummary.setAttribute("aria-live", "polite");
+    staffSummary.innerHTML = `
+      <div class="staff-summary-header">
+        <strong>알바 근무 현황</strong>
+        <span id="staff-summary-status">미고용</span>
+      </div>
+      <div id="staff-summary-body" class="staff-summary-body"></div>
+    `;
+
+    if (inventorySummary) {
+      inventorySummary.insertAdjacentElement("afterend", staffSummary);
+    } else {
+      statusPanel.insertAdjacentElement("afterend", staffSummary);
+    }
+
+    this.staffSummary = staffSummary;
+
+    return staffSummary;
+  },
+
+  renderStaffSummary(staffState = GameState.staff) {
+    this.createStaffSummary();
+
+    const summary = this.staffSummary;
+    const status = document.getElementById("staff-summary-status");
+    const body = document.getElementById("staff-summary-body");
+    const hired = staffState?.hired ?? null;
+
+    if (!summary || !status || !body) {
+      return;
+    }
+
+    if (!hired) {
+      summary.hidden = true;
+      status.textContent = "미고용";
+      body.innerHTML = "";
+      return;
+    }
+
+    const expectedDailyWage = Number(hired.expectedDailyWage) ||
+      (Number(hired.hourlyWage) || 0) * (Number(hired.shiftHours) || 3);
+
+    summary.hidden = false;
+    status.textContent = `${hired.name} 근무 중`;
+    body.innerHTML = `
+      <span>${hired.type}</span>
+      <span>시급 ₩${Number(hired.hourlyWage).toLocaleString("ko-KR")}</span>
+      <span>예상 일급 ₩${expectedDailyWage.toLocaleString("ko-KR")}</span>
+      <span>근태 ${hired.attendance}%</span>
+      <span>${hired.ability}</span>
+    `;
   },
 
   createInventorySummary() {
@@ -1543,10 +1651,7 @@ export const UIManager = {
 
     confirmButton.onclick = () => {
       this.hideDayScenarioModal();
-
-      if (this.pendingOrderPhaseData) {
-        this.showOrderModal(this.pendingOrderPhaseData);
-      }
+      this.continueDayStartFlow();
     };
 
     this.dayScenarioModal.classList.remove("hidden");
@@ -1562,6 +1667,34 @@ export const UIManager = {
     return (
       this.dayScenarioModal &&
       !this.dayScenarioModal.classList.contains("hidden")
+    );
+  },
+
+  continueDayStartFlow() {
+    if (this.shouldShowPendingStaffHireModal()) {
+      this.showStaffHireModal(this.pendingStaffHireData);
+      return;
+    }
+
+    if (this.pendingOrderPhaseData) {
+      this.showOrderModal(this.pendingOrderPhaseData);
+    }
+  },
+
+  shouldShowPendingStaffHireModal() {
+    const staffData = this.pendingStaffHireData;
+
+    return Boolean(
+      staffData &&
+      staffData.day === GameState.day &&
+      !staffData.staff?.hired
+    );
+  },
+
+  isStaffHireModalVisible() {
+    return (
+      this.staffHireModal &&
+      !this.staffHireModal.classList.contains("hidden")
     );
   },
 
@@ -1590,6 +1723,121 @@ export const UIManager = {
     const reasons = scenarioData.recommendedProductReasons ?? {};
 
     return reasons[productId] ?? "오늘 상권에서 수요 증가 예상";
+  },
+
+  createStaffHireModal() {
+    if (document.getElementById("staff-hire-modal")) {
+      this.staffHireModal = document.getElementById("staff-hire-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "staff-hire-modal";
+    modal.className = "modal hidden";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "staff-hire-title");
+
+    modal.innerHTML = `
+      <div class="modal-content staff-hire-modal-content">
+        <div class="staff-hire-header">
+          <span class="staff-hire-kicker">Day 3 오픈</span>
+          <h2 id="staff-hire-title">알바 고용 게시판</h2>
+          <p>오늘부터 3시간 단기 알바를 고용할 수 있습니다. 이번 버전에서는 급여 차감과 능력치 효과는 적용하지 않습니다.</p>
+        </div>
+        <div id="staff-hire-list" class="staff-hire-list"></div>
+        <button id="staff-hire-skip-button" class="staff-hire-skip-button" type="button">
+          오늘은 넘기기
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    this.staffHireModal = modal;
+  },
+
+  showStaffHireModal(staffData = {}) {
+    if (!this.staffHireModal) {
+      this.createStaffHireModal();
+    }
+
+    const list = document.getElementById("staff-hire-list");
+    const skipButton = document.getElementById("staff-hire-skip-button");
+    const candidates = Array.isArray(staffData.candidates)
+      ? staffData.candidates
+      : [];
+    const shiftHours = Number(staffData.shiftHours) || 3;
+
+    if (!list || !skipButton) {
+      return;
+    }
+
+    list.innerHTML = candidates.map((candidate) => {
+      const hourlyWage = Number(candidate.hourlyWage) || 0;
+      const expectedDailyWage = Number(candidate.expectedDailyWage) ||
+        hourlyWage * shiftHours;
+
+      return `
+        <article class="staff-candidate-card" data-staff-id="${candidate.id}">
+          <div class="staff-candidate-title">
+            <strong>${candidate.name}</strong>
+            <span>${candidate.type}</span>
+          </div>
+          <dl class="staff-candidate-stats">
+            <div>
+              <dt>시급</dt>
+              <dd>₩${hourlyWage.toLocaleString("ko-KR")}</dd>
+            </div>
+            <div>
+              <dt>예상 일급</dt>
+              <dd>₩${expectedDailyWage.toLocaleString("ko-KR")}</dd>
+            </div>
+            <div>
+              <dt>근태</dt>
+              <dd>${candidate.attendance}%</dd>
+            </div>
+          </dl>
+          <p class="staff-candidate-ability">${candidate.ability}</p>
+          <button class="staff-hire-button" type="button" data-staff-id="${candidate.id}">
+            고용하기
+          </button>
+        </article>
+      `;
+    }).join("");
+
+    list.querySelectorAll(".staff-hire-button").forEach((button) => {
+      button.onclick = () => {
+        const candidateId = button.dataset.staffId;
+
+        EventBus.emit(STAFF_EVENTS.HIRED, {
+          day: GameState.day,
+          candidateId
+        });
+
+        this.pendingStaffHireData = null;
+        this.hideStaffHireModal();
+        this.continueDayStartFlow();
+      };
+    });
+
+    skipButton.onclick = () => {
+      EventBus.emit(STAFF_EVENTS.HIRE_SKIPPED, {
+        day: GameState.day
+      });
+
+      this.pendingStaffHireData = null;
+      this.hideStaffHireModal();
+      this.continueDayStartFlow();
+    };
+
+    this.staffHireModal.classList.remove("hidden");
+  },
+
+  hideStaffHireModal() {
+    if (!this.staffHireModal) return;
+
+    this.staffHireModal.classList.add("hidden");
   },
 
   createOrderModal() {

@@ -27,6 +27,42 @@ import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
 
+const STAFF_EVENTS = {
+  HIRE_OFFERED: "STAFF_HIRE_OFFERED",
+  HIRED: "STAFF_HIRED",
+  HIRE_SKIPPED: "STAFF_HIRE_SKIPPED",
+  STATE_CHANGED: "STAFF_STATE_CHANGED"
+};
+
+const STAFF_UNLOCK_DAY = 3;
+const STAFF_SHIFT_HOURS = 3;
+const STAFF_CANDIDATES = Object.freeze([
+  Object.freeze({
+    id: "kim_minji",
+    name: "김민지",
+    type: "성실형",
+    hourlyWage: 1200,
+    attendance: 95,
+    ability: "재고 정리 +10%, 멘탈 소모 완화"
+  }),
+  Object.freeze({
+    id: "park_junho",
+    name: "박준호",
+    type: "스피드형",
+    hourlyWage: 1500,
+    attendance: 78,
+    ability: "계산 속도 +15%, 지각 가능성 있음"
+  }),
+  Object.freeze({
+    id: "lee_bora",
+    name: "이보라",
+    type: "친절형",
+    hourlyWage: 1350,
+    attendance: 88,
+    ability: "만족도 +8, 진상 응대 피해 완화"
+  })
+]);
+
 export const GameFlowSystem = {
   orderReadyDay: null,
   dayTimerId: null,
@@ -102,6 +138,7 @@ export const GameFlowSystem = {
   },
 
   init() {
+    this.ensureStaffState();
     this.applyDayBalance();
 
     EventBus.on(EVENTS.DAY_START_REQUESTED, () => this.startDay());
@@ -117,6 +154,126 @@ export const GameFlowSystem = {
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
       this.applyExpansionEffects(data);
     });
+    EventBus.on(STAFF_EVENTS.HIRED, (data) => {
+      this.handleStaffHired(data);
+    });
+    EventBus.on(STAFF_EVENTS.HIRE_SKIPPED, (data) => {
+      this.handleStaffHireSkipped(data);
+    });
+  },
+
+  ensureStaffState() {
+    if (!GameState.staff) {
+      GameState.staff = {
+        unlocked: false,
+        hired: null,
+        hirePopupShownDay: null
+      };
+    }
+
+    GameState.staff.unlocked =
+      GameState.staff.unlocked === true || GameState.day >= STAFF_UNLOCK_DAY;
+
+    if (typeof GameState.staff.hirePopupShownDay === "undefined") {
+      GameState.staff.hirePopupShownDay = null;
+    }
+
+    if (typeof GameState.staff.hired === "undefined") {
+      GameState.staff.hired = null;
+    }
+
+    return GameState.staff;
+  },
+
+  getStaffCandidates() {
+    return STAFF_CANDIDATES.map((candidate) => {
+      return {
+        ...candidate,
+        shiftHours: STAFF_SHIFT_HOURS,
+        expectedDailyWage: candidate.hourlyWage * STAFF_SHIFT_HOURS
+      };
+    });
+  },
+
+  shouldOfferStaffHiring() {
+    const staffState = this.ensureStaffState();
+
+    return (
+      GameState.day >= STAFF_UNLOCK_DAY &&
+      !staffState.hired &&
+      staffState.hirePopupShownDay !== GameState.day
+    );
+  },
+
+  offerStaffHiringIfNeeded() {
+    if (!this.shouldOfferStaffHiring()) {
+      return;
+    }
+
+    GameState.staff.unlocked = true;
+    GameState.staff.hirePopupShownDay = GameState.day;
+
+    EventBus.emit(STAFF_EVENTS.HIRE_OFFERED, {
+      day: GameState.day,
+      shiftHours: STAFF_SHIFT_HOURS,
+      candidates: this.getStaffCandidates(),
+      staff: GameState.staff
+    });
+  },
+
+  handleStaffHired(data = {}) {
+    const staffState = this.ensureStaffState();
+
+    if (data.day && data.day !== GameState.day) {
+      return;
+    }
+
+    const candidate = STAFF_CANDIDATES.find((staffCandidate) => {
+      return staffCandidate.id === data.candidateId;
+    });
+
+    if (!candidate) {
+      UIManager.showMessage("고용할 알바 후보를 다시 선택해주세요.");
+      return;
+    }
+
+    staffState.unlocked = true;
+    staffState.hirePopupShownDay = GameState.day;
+    staffState.hired = {
+      ...candidate,
+      shiftHours: STAFF_SHIFT_HOURS,
+      expectedDailyWage: candidate.hourlyWage * STAFF_SHIFT_HOURS,
+      hiredDay: GameState.day
+    };
+
+    UIManager.showMessage(
+      `${candidate.name} 알바를 고용했습니다. 급여 차감과 능력치 효과는 다음 버전에서 적용됩니다.`
+    );
+
+    EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
+      day: GameState.day,
+      staff: staffState
+    });
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  handleStaffHireSkipped(data = {}) {
+    const staffState = this.ensureStaffState();
+
+    if (data.day && data.day !== GameState.day) {
+      return;
+    }
+
+    staffState.unlocked = GameState.day >= STAFF_UNLOCK_DAY;
+    staffState.hirePopupShownDay = GameState.day;
+
+    UIManager.showMessage("오늘은 알바 고용을 넘겼습니다. 다음 Day 시작 때 다시 확인할 수 있습니다.");
+
+    EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
+      day: GameState.day,
+      staff: staffState
+    });
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
   applyExpansionEffects(data = {}) {
@@ -141,6 +298,8 @@ export const GameFlowSystem = {
   },
 
   startDay() {
+    this.ensureStaffState();
+
     if (
       GameState.phase === GAME_PHASE.STORE_RUNNING ||
       GameState.phase === GAME_PHASE.DAY_END ||
@@ -184,6 +343,8 @@ export const GameFlowSystem = {
       isEndlessMode: GameState.isEndlessMode,
       dayScenario
     });
+
+    this.offerStaffHiringIfNeeded();
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },

@@ -4357,3 +4357,266 @@ button:active {
     border-radius: 16px;
   }
 }
+
+/* v4.9 알바 고용 팝업 / 기본 고용 시스템 */
+.staff-summary {
+  margin-top: 10px;
+  padding: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.82);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 253, 247, 0.96) 0%, rgba(232, 255, 240, 0.94) 100%);
+  color: var(--tycoon-ink);
+  box-shadow: 0 4px 0 rgba(91, 66, 39, 0.12);
+}
+
+.staff-summary[hidden] {
+  display: none;
+}
+
+.staff-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.staff-summary-header strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+#staff-summary-status {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--tycoon-mint-deep);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.staff-summary-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.staff-summary-body span {
+  padding: 5px 8px;
+  border: 1px solid rgba(234, 217, 191, 0.95);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--tycoon-sub);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.staff-hire-modal-content {
+  width: min(860px, calc(100vw - 24px));
+  max-width: 860px;
+  max-height: min(92vh, 860px);
+  overflow-y: auto;
+  padding: clamp(16px, 3vw, 24px);
+  border: 3px solid #f0c66a;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 217, 109, 0.3) 0 8%, transparent 20%),
+    radial-gradient(circle at 88% 10%, rgba(191, 234, 208, 0.42) 0 9%, transparent 22%),
+    linear-gradient(180deg, #fffdf7 0%, #fff7e8 100%);
+  box-shadow: var(--tycoon-shadow);
+}
+
+.staff-hire-header {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.staff-hire-kicker {
+  justify-self: center;
+  padding: 5px 10px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #e8fff0;
+  color: var(--tycoon-mint-dark);
+  font-size: 12px;
+  font-weight: 950;
+  box-shadow: 0 3px 0 rgba(91, 66, 39, 0.1);
+}
+
+.staff-hire-header h2 {
+  margin: 0;
+  color: var(--tycoon-ink);
+}
+
+.staff-hire-header p {
+  max-width: 640px;
+  margin: 0 auto;
+  color: var(--tycoon-sub);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.staff-hire-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.staff-candidate-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 290px;
+  padding: 14px;
+  border: 2px solid #ead9bf;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, #fffdf7 0%, #fff8cf 100%);
+  box-shadow: 0 5px 0 rgba(91, 66, 39, 0.1), 0 14px 22px rgba(91, 66, 39, 0.08);
+}
+
+.staff-candidate-card:nth-child(2) {
+  background:
+    linear-gradient(180deg, #f4fff5 0%, #fffdf7 100%);
+}
+
+.staff-candidate-card:nth-child(3) {
+  background:
+    linear-gradient(180deg, #fff4f1 0%, #fffdf7 100%);
+}
+
+.staff-candidate-title {
+  display: grid;
+  gap: 5px;
+}
+
+.staff-candidate-title strong {
+  color: var(--tycoon-ink);
+  font-size: 18px;
+  font-weight: 950;
+  line-height: 1.25;
+}
+
+.staff-candidate-title span {
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #e8fff0;
+  color: var(--tycoon-mint-dark);
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.staff-candidate-stats {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.staff-candidate-stats div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(234, 217, 191, 0.95);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.staff-candidate-stats dt,
+.staff-candidate-stats dd {
+  margin: 0;
+}
+
+.staff-candidate-stats dt {
+  color: var(--tycoon-sub);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.staff-candidate-stats dd {
+  color: var(--tycoon-ink);
+  font-size: 13px;
+  font-weight: 950;
+  text-align: right;
+}
+
+.staff-candidate-ability {
+  min-height: 46px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(191, 234, 208, 0.95);
+  border-radius: 14px;
+  background: rgba(232, 255, 240, 0.72);
+  color: var(--tycoon-mint-dark);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.staff-hire-button,
+.staff-hire-skip-button {
+  min-height: 50px;
+  border: 0;
+  border-radius: 16px;
+  font-weight: 950;
+  touch-action: manipulation;
+}
+
+.staff-hire-button {
+  align-self: end;
+  background:
+    linear-gradient(180deg, #65c893 0%, #3e966f 100%);
+  color: #ffffff;
+  box-shadow: 0 5px 0 #2d7355, 0 12px 18px rgba(45, 115, 85, 0.16);
+}
+
+.staff-hire-skip-button {
+  width: 100%;
+  margin-top: 14px;
+  background:
+    linear-gradient(180deg, #fffdf7 0%, #f1eee8 100%);
+  color: var(--tycoon-sub);
+  box-shadow: 0 4px 0 #cfb99b;
+}
+
+@media (max-width: 760px) {
+  .staff-hire-list {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-candidate-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .staff-hire-modal-content {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 14px;
+    border-radius: 22px;
+  }
+
+  .staff-summary-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .staff-summary-body {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .staff-hire-button,
+  .staff-hire-skip-button {
+    min-height: 54px;
+  }
+}
