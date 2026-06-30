@@ -127,6 +127,14 @@ export const EconomySystem = {
     const day = currentDay;
     const productId = data.productId ?? data.wantedProductId;
     const requestedAmount = this.toNonNegativeNumber(data.amount);
+    const checkoutKeys = this.createCheckoutKeys(data, day);
+
+    if (checkoutKeys.length === 0) {
+      return {
+        isValid: false,
+        reason: "checkoutId 또는 customerId가 필요합니다."
+      };
+    }
 
     if (!productId) {
       if (requestedAmount <= 0) {
@@ -138,7 +146,7 @@ export const EconomySystem = {
 
       return {
         isValid: true,
-        checkoutKeys: this.createCheckoutKeys(data, day),
+        checkoutKeys,
         checkoutId: data.checkoutId ?? null,
         day,
         customerId: data.customerId ?? null,
@@ -172,15 +180,6 @@ export const EconomySystem = {
       return {
         isValid: false,
         reason: "판매 수량은 1개 이상이어야 합니다."
-      };
-    }
-
-    const checkoutKeys = this.createCheckoutKeys(data, day);
-
-    if (checkoutKeys.length === 0) {
-      return {
-        isValid: false,
-        reason: "checkoutId 또는 customerId가 필요합니다."
       };
     }
 

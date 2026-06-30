@@ -2088,6 +2088,46 @@ export const UIManager = {
     }).join(", ");
   },
 
+  formatCustomerEventApplicationResult(result = null) {
+    if (!result) {
+      return "실제 반영: 만족도/멘탈";
+    }
+
+    if (result.reason === "duplicate_choice_effect") {
+      return "실제 반영: 이미 처리된 선택";
+    }
+
+    const appliedParts = [];
+
+    if (Number(result.appliedRevenue) > 0) {
+      appliedParts.push(`매출 +${Number(result.appliedRevenue).toLocaleString("ko-KR")}원`);
+    }
+
+    if (Number(result.appliedPenalty) > 0) {
+      appliedParts.push(`손실/비용 -${Number(result.appliedPenalty).toLocaleString("ko-KR")}원`);
+    }
+
+    if (result.inventoryResult?.success === true) {
+      const appliedChanges = Array.isArray(result.inventoryResult.appliedChanges)
+        ? result.inventoryResult.appliedChanges
+        : [];
+
+      if (appliedChanges.length > 0) {
+        appliedParts.push(`재고 ${this.formatCustomerEventInventoryChanges(appliedChanges)}`);
+      }
+    }
+
+    if (result.inventoryResult?.success === false) {
+      appliedParts.push("재고 부족으로 매출/재고 반영 차단");
+    }
+
+    if (appliedParts.length === 0) {
+      appliedParts.push("만족도/멘탈");
+    }
+
+    return `실제 반영: ${appliedParts.join(" / ")}`;
+  },
+
   createCustomerEventResultNode(choice = {}) {
     const wrapper = document.createElement("div");
     const title = document.createElement("strong");
@@ -2095,6 +2135,7 @@ export const UIManager = {
     const playerThought = document.createElement("p");
     const changesList = document.createElement("ul");
     const specialEffect = document.createElement("p");
+    const applicationResult = document.createElement("p");
     const effects = choice.effects ?? {};
     const revenue = Number(effects.revenue) || 0;
     const cost = Number(effects.cost) || 0;
@@ -2158,6 +2199,11 @@ export const UIManager = {
     specialEffect.className = "customer-event-result-special";
     specialEffect.textContent = `특수 효과: ${choice.specialEffect || "없음"}`;
 
+    applicationResult.className = "customer-event-result-application";
+    applicationResult.textContent = this.formatCustomerEventApplicationResult(
+      choice.effectApplicationResult
+    );
+
     wrapper.appendChild(title);
     wrapper.appendChild(customerReaction);
 
@@ -2167,6 +2213,7 @@ export const UIManager = {
 
     wrapper.appendChild(changesList);
     wrapper.appendChild(specialEffect);
+    wrapper.appendChild(applicationResult);
 
     return wrapper;
   },
@@ -2243,13 +2290,17 @@ export const UIManager = {
           choiceButton.disabled = true;
         });
 
-        if (choiceSelectedCallback) {
-          choiceSelectedCallback(choice);
-        }
+        const effectApplicationResult = choiceSelectedCallback
+          ? choiceSelectedCallback(choice, payload)
+          : null;
+        const resultChoice = {
+          ...choice,
+          effectApplicationResult
+        };
 
         choiceList.hidden = true;
         resultText.innerHTML = "";
-        resultText.appendChild(this.createCustomerEventResultNode(choice));
+        resultText.appendChild(this.createCustomerEventResultNode(resultChoice));
         resultText.hidden = false;
         closeButton.hidden = false;
         closeButton.focus?.();

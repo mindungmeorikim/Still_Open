@@ -273,6 +273,132 @@ export const InventorySystem = {
     return true;
   },
 
+  applyEventInventoryChanges(changes = [], details = {}) {
+    const normalizedChanges = this.normalizeEventInventoryChanges(changes);
+    const appliedChanges = normalizedChanges.filter((change) => {
+      return change.apply === true && change.productId && change.quantity !== 0;
+    });
+    const skippedChanges = normalizedChanges.filter((change) => {
+      return !appliedChanges.includes(change);
+    });
+
+    if (appliedChanges.length === 0) {
+      return {
+        success: true,
+        appliedChanges: [],
+        skippedChanges,
+        reason: "no_applicable_inventory_changes"
+      };
+    }
+
+    const validation = this.validateEventInventoryChanges(appliedChanges);
+
+    if (!validation.isValid) {
+      this.emitInventoryChanged("event_inventory_change_failed", {
+        ...details,
+        failedChange: validation.failedChange,
+        reasonDetail: validation.reason
+      });
+
+      return {
+        success: false,
+        appliedChanges: [],
+        skippedChanges,
+        reason: validation.reason,
+        failedChange: validation.failedChange
+      };
+    }
+
+    appliedChanges.forEach((change) => {
+      if (change.quantity < 0) {
+        this.consumeStock(change.productId, Math.abs(change.quantity), {
+          ...details,
+          label: change.label,
+          reason: "customer_event_inventory_consumed"
+        });
+        return;
+      }
+
+      this.addStock(change.productId, change.quantity, {
+        emitChange: false
+      });
+    });
+
+    this.emitInventoryChanged("customer_event_inventory_applied", {
+      ...details,
+      appliedChanges,
+      skippedChanges
+    });
+
+    return {
+      success: true,
+      appliedChanges,
+      skippedChanges,
+      reason: "customer_event_inventory_applied"
+    };
+  },
+
+  normalizeEventInventoryChanges(changes = []) {
+    if (!Array.isArray(changes)) {
+      return [];
+    }
+
+    return changes.map((change) => {
+      return {
+        label: change.label ?? "재고",
+        productId: change.productId ?? null,
+        itemKey: change.itemKey ?? null,
+        quantity: Math.floor(Number(change.quantity) || 0),
+        apply: change.apply === true
+      };
+    });
+  },
+
+  validateEventInventoryChanges(changes = []) {
+    for (const change of changes) {
+      const product = getProductById(change.productId);
+
+      if (!product) {
+        return {
+          isValid: false,
+          reason: "invalid_product",
+          failedChange: change
+        };
+      }
+
+      if (product.unlockDay > GameState.day) {
+        return {
+          isValid: false,
+          reason: "locked_product",
+          failedChange: change
+        };
+      }
+
+      if (change.quantity < 0) {
+        const requiredQuantity = Math.abs(change.quantity);
+        const availableQuantity = this.getStockQuantity(change.productId);
+
+        if (availableQuantity < requiredQuantity) {
+          return {
+            isValid: false,
+            reason: "stock_shortage",
+            failedChange: {
+              ...change,
+              requiredQuantity,
+              availableQuantity
+            }
+          };
+        }
+      }
+    }
+
+    return {
+      isValid: true,
+      reason: null,
+      failedChange: null
+    };
+  },
+
   findAvailableProductForRequest(requestId, quantity = 1) {
     const requiredQuantity = Math.max(
       1,

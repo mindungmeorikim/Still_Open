@@ -24,6 +24,7 @@ import { UIManager } from "../ui/UIManager.js";
 
 export const ResultSystem = {
   calculatedResultDay: null,
+  processedCheckoutKeys: new Set(),
 
   init() {
     EventBus.on(EVENTS.DAY_ENDED, () => this.calculateResult());
@@ -34,7 +35,24 @@ export const ResultSystem = {
   },
 
   bindPlayerEvents() {
-    EventBus.on(EVENTS.CHECKOUT_COMPLETED, () => {
+    EventBus.on(EVENTS.DAY_STARTED, () => {
+      this.processedCheckoutKeys.clear();
+    });
+
+    EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data = {}) => {
+      const checkoutKey = this.createCheckoutKey(data);
+
+      if (!checkoutKey) {
+        console.warn("[ResultSystem] 계산 성공 수 처리 실패: checkoutId 또는 customerId가 필요합니다.", data);
+        return;
+      }
+
+      if (this.processedCheckoutKeys.has(checkoutKey)) {
+        console.warn("[ResultSystem] 이미 집계된 계산입니다.", data);
+        return;
+      }
+
+      this.processedCheckoutKeys.add(checkoutKey);
       GameState.todayStats.checkoutSuccessCount += 1;
 
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -51,6 +69,28 @@ export const ResultSystem = {
 
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
     });
+  },
+
+  createCheckoutKey(data = {}) {
+    const day = Math.max(1, Math.floor(Number(data.day) || GameState.day || 1));
+
+    if (data.checkoutId !== undefined && data.checkoutId !== null) {
+      const checkoutId = String(data.checkoutId).trim();
+
+      if (checkoutId) {
+        return `${day}:checkout:${checkoutId}`;
+      }
+    }
+
+    if (data.customerId !== undefined && data.customerId !== null) {
+      const customerId = String(data.customerId).trim();
+
+      if (customerId) {
+        return `${day}:customer:${customerId}`;
+      }
+    }
+
+    return null;
   },
 
   bindCustomerEvents() {

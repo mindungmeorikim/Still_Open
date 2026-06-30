@@ -18,6 +18,7 @@ import { InventorySystem } from "./systems/InventorySystem.js";
 import { OrderSystem } from "./systems/OrderSystem.js";
 import { ExpansionSystem } from "./systems/ExpansionSystem.js";
 import { EconomySystem } from "./systems/EconomySystem.js";
+import { RandomEventSystem } from "./systems/RandomEventSystem.js";
 import { PlayerMovementSystem } from "./systems/PlayerMovementSystem.js";
 import { PlayerActionSystem } from "./systems/PlayerActionSystem.js";
 
@@ -72,8 +73,17 @@ function showCustomerEventCandidate() {
       () => {
         CustomerSystem.resumeCustomerWaitTime();
       },
-      (choice) => {
-        applyCustomerEventChoiceStatEffects(choice);
+      (choice, eventPayload) => {
+        const effectResult = RandomEventSystem.applyCustomerEventChoiceEffects(
+          eventPayload,
+          choice
+        );
+
+        if (effectResult.success) {
+          applyCustomerEventChoiceStatEffects(choice);
+        }
+
+        return effectResult;
       }
     );
   } catch (error) {

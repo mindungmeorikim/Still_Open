@@ -4,8 +4,9 @@
   Role:
   - Final customer event data for customer response random events.
   - Data only. Event triggering and effect application are handled by systems.
-  - revenue and inventoryChanges are 1차 구현 기준 표시용 데이터이며,
-    실제 매출/재고 반영은 EconomySystem/InventorySystem 연동 후 처리한다.
+  - revenue/cost and product inventoryChanges are applied through
+    EconomySystem/InventorySystem event flows. itemKey-only inventoryChanges
+    remain display-only until a matching inventory store exists.
 */
 
 export const CUSTOMER_EVENT_TYPES = Object.freeze({
@@ -23,12 +24,15 @@ export const CUSTOMER_EVENT_TYPE_LABELS = Object.freeze({
 const freezeInventoryChanges = (inventoryChanges = []) => {
   return Object.freeze(
     inventoryChanges.map((change) => {
+      const quantity = Number(change.quantity) || 0;
+      const hasProductId = Boolean(change.productId);
+
       return Object.freeze({
         label: change.label ?? "재고",
         productId: change.productId ?? null,
         itemKey: change.itemKey ?? null,
-        quantity: Number(change.quantity) || 0,
-        apply: change.apply === true
+        quantity,
+        apply: change.apply ?? (hasProductId && quantity !== 0)
       });
     })
   );
@@ -36,14 +40,34 @@ const freezeInventoryChanges = (inventoryChanges = []) => {
 
 const createChoice = (choice) => {
   const inventoryChanges = freezeInventoryChanges(choice.inventoryChanges ?? []);
+  const revenue = Number(choice.effects?.revenue) || 0;
+  const cost = Number(choice.effects?.cost) || 0;
+  const hasAppliedInventoryChanges = inventoryChanges.some((change) => {
+    return change.apply === true;
+  });
   const effects = Object.freeze({
-    revenue: Number(choice.effects?.revenue) || 0,
-    cost: Number(choice.effects?.cost) || 0,
+    revenue,
+    cost,
     satisfaction: Number(choice.effects?.satisfaction) || 0,
     mental: Number(choice.effects?.mental) || 0,
     inventoryChanges,
-    applyRevenue: false,
-    applyInventory: false
+    applyRevenue: choice.effects?.applyRevenue ?? revenue !== 0,
+    applyCost: choice.effects?.applyCost ?? cost > 0,
+    applyInventory: choice.effects?.applyInventory ?? hasAppliedInventoryChanges,
+    requireInventoryForRevenue:
+      choice.effects?.requireInventoryForRevenue ??
+      (revenue > 0 && hasAppliedInventoryChanges),
+    economicMode:
+      choice.effects?.economicMode ??
+      (revenue > 0
+        ? "event_revenue"
+        : revenue < 0
+          ? "event_revenue_loss"
+          : cost > 0
+            ? "event_cost"
+            : hasAppliedInventoryChanges
+              ? "event_inventory"
+              : "stat_only")
   });
 
   return Object.freeze({

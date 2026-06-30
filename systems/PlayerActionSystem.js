@@ -148,7 +148,9 @@ export const PlayerActionSystem = {
   },
 
   showActionMessage(message) {
-    const messageNode = document.getElementById("message-log");
+    const messageNode =
+      document.getElementById("message-log") ??
+      document.getElementById("system-message");
 
     if (messageNode) {
       messageNode.textContent = message;

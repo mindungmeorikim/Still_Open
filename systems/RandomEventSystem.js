@@ -10,6 +10,8 @@
 */
 
 import { GameState } from "../core/GameState.js";
+import { EventBus } from "../core/EventBus.js";
+import { EVENTS } from "../core/Constants.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
 import {
   CUSTOMER_EVENT_DETAILS,
@@ -17,6 +19,7 @@ import {
   getAvailableEventDetails,
   getCustomerEventDetail
 } from "../data/EventData.js";
+import { InventorySystem } from "./InventorySystem.js";
 
 const EVENT_TYPE_RATE_BY_DAY = Object.freeze({
   1: Object.freeze({ positive: 45, neutral: 30, negative: 25 }),
@@ -42,6 +45,7 @@ export const RandomEventSystem = {
   rollTick: 0,
   evaluatedCustomerKeys: new Set(),
   customerTriggerCountByKey: new Map(),
+  appliedChoiceEffectKeys: new Set(),
   lastEventId: null,
   lastEventType: null,
   sameTypeStreak: 0,
@@ -61,6 +65,7 @@ export const RandomEventSystem = {
     this.rollTick = 0;
     this.evaluatedCustomerKeys.clear();
     this.customerTriggerCountByKey.clear();
+    this.appliedChoiceEffectKeys.clear();
     this.lastEventId = null;
     this.lastEventType = null;
     this.sameTypeStreak = 0;
@@ -131,12 +136,16 @@ export const RandomEventSystem = {
     statEffects.mental = Number.isFinite(mental) ? mental : 0;
     statEffects.revenue = Number.isFinite(revenue) ? revenue : 0;
     statEffects.cost = Number.isFinite(cost) ? cost : 0;
-    statEffects.applyRevenue = false;
-    statEffects.applyInventory = false;
+    statEffects.applyRevenue = sourceEffects.applyRevenue === true;
+    statEffects.applyCost = sourceEffects.applyCost === true;
+    statEffects.applyInventory = sourceEffects.applyInventory === true;
+    statEffects.requireInventoryForRevenue =
+      sourceEffects.requireInventoryForRevenue === true;
+    statEffects.economicMode = sourceEffects.economicMode ?? "stat_only";
     statEffects.inventoryChanges = Array.isArray(choice.inventoryChanges)
-      ? choice.inventoryChanges.map((change) => ({ ...change, apply: false }))
+      ? choice.inventoryChanges.map((change) => ({ ...change }))
       : Array.isArray(sourceEffects.inventoryChanges)
-        ? sourceEffects.inventoryChanges.map((change) => ({ ...change, apply: false }))
+        ? sourceEffects.inventoryChanges.map((change) => ({ ...change }))
         : [];
 
     return statEffects;
@@ -485,7 +494,7 @@ export const RandomEventSystem = {
             resultText: choice.resultText,
             specialEffect: choice.specialEffect,
             inventoryChanges: Array.isArray(choice.inventoryChanges)
-              ? choice.inventoryChanges.map((change) => ({ ...change, apply: false }))
+              ? choice.inventoryChanges.map((change) => ({ ...change }))
               : [],
             effects: this.createChoiceStatEffects(choice)
           };
@@ -513,6 +522,130 @@ export const RandomEventSystem = {
       choices,
       ui: detail.ui ?? {}
     };
+  },
+
+  applyCustomerEventChoiceEffects(eventPayload = {}, choice = {}) {
+    const day = Math.max(1, Math.floor(Number(eventPayload.day) || GameState.day || 1));
+
+    this.resetDailyStateIfNeeded(day);
+
+    const effectKey = this.createChoiceEffectKey(eventPayload, choice, day);
+
+    if (!effectKey) {
+      return {
+        success: false,
+        reason: "missing_effect_key",
+        appliedRevenue: 0,
+        appliedPenalty: 0,
+        inventoryResult: null
+      };
+    }
+
+    if (this.appliedChoiceEffectKeys.has(effectKey)) {
+      return {
+        success: false,
+        reason: "duplicate_choice_effect",
+        appliedRevenue: 0,
+        appliedPenalty: 0,
+        inventoryResult: null
+      };
+    }
+
+    this.appliedChoiceEffectKeys.add(effectKey);
+
+    const effects = choice.effects ?? {};
+    const revenue = Number(effects.revenue) || 0;
+    const cost = Number(effects.cost) || 0;
+    const inventoryChanges = this.getApplicableInventoryChanges(choice);
+    const details = {
+      day,
+      eventInstanceId: eventPayload.eventInstanceId ?? null,
+      eventId: eventPayload.eventId ?? null,
+      eventTitle: eventPayload.eventTitle ?? null,
+      customerId: eventPayload.customerId ?? null,
+      choiceId: choice.choiceId ?? choice.id ?? null,
+      reason: "customer_event_choice"
+    };
+    let inventoryResult = null;
+
+    if (effects.applyInventory === true) {
+      inventoryResult = InventorySystem.applyEventInventoryChanges(
+        inventoryChanges,
+        details
+      );
+    }
+
+    const shouldBlockRevenue =
+      effects.requireInventoryForRevenue === true &&
+      inventoryResult &&
+      inventoryResult.success === false;
+    let appliedRevenue = 0;
+    let appliedPenalty = 0;
+
+    if (effects.applyRevenue === true && revenue > 0 && !shouldBlockRevenue) {
+      appliedRevenue = revenue;
+
+      EventBus.emit(EVENTS.REVENUE_CHANGED, {
+        ...details,
+        amount: revenue,
+        source: "customer_event",
+        economicMode: effects.economicMode ?? "event_revenue"
+      });
+    }
+
+    if (effects.applyRevenue === true && revenue < 0) {
+      appliedPenalty += Math.abs(revenue);
+    }
+
+    if (effects.applyCost === true && cost > 0) {
+      appliedPenalty += cost;
+    }
+
+    if (appliedPenalty > 0) {
+      EventBus.emit(EVENTS.EVENT_PENALTY_RECORDED, {
+        ...details,
+        amount: appliedPenalty,
+        source: "customer_event",
+        economicMode: revenue < 0 ? "event_revenue_loss" : "event_cost"
+      });
+    }
+
+    return {
+      success: true,
+      reason: shouldBlockRevenue ? "inventory_failed_revenue_blocked" : "applied",
+      effectKey,
+      appliedRevenue,
+      appliedPenalty,
+      inventoryResult
+    };
+  },
+
+  createChoiceEffectKey(eventPayload = {}, choice = {}, day = this.getCurrentDay()) {
+    const eventId = eventPayload.eventId;
+    const choiceId = choice.choiceId ?? choice.id;
+
+    if (!eventId || !choiceId) {
+      return null;
+    }
+
+    const customerId = eventPayload.customerId ?? "unknown";
+    const eventInstanceId = eventPayload.eventInstanceId ?? "no-instance";
+
+    return `${day}:${customerId}:${eventId}:${choiceId}:${eventInstanceId}`;
+  },
+
+  getApplicableInventoryChanges(choice = {}) {
+    const effects = choice.effects ?? {};
+    const changes =
+      Array.isArray(choice.inventoryChanges) && choice.inventoryChanges.length > 0
+        ? choice.inventoryChanges
+        : Array.isArray(effects.inventoryChanges)
+          ? effects.inventoryChanges
+          : [];
+
+    return changes.filter((change) => {
+      return change.apply === true && change.productId && Number(change.quantity) !== 0;
+    });
   },
 
   createRandomEventCandidatePayload(customer, randomValue = Math.random()) {

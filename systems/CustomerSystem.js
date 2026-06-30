@@ -629,6 +629,8 @@ export const CustomerSystem = {
       console.warn(
         `[CustomerSystem] Checkout customer not found or unavailable: ${data.customerId}`
       );
+
+      return null;
     }
 
     return this.getNextCheckoutCustomer();
