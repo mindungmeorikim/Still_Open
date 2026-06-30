@@ -751,7 +751,9 @@ export const UIManager = {
       const objectLabel = objectLabels[zone.id] ?? "추가 진열 구역";
       const statusText = this.getStoreExpansionStatusText(zone);
       const selectedClass =
-        zone.id === this.selectedExpansionZoneId ? " is-selected" : "";
+        this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId
+          ? " is-selected"
+          : "";
 
       return `
         <button
@@ -760,6 +762,7 @@ export const UIManager = {
           data-zone-id="${zone.id}"
           data-zone-level="${zone.level}"
           aria-label="${displayName} ${statusText}"
+          aria-expanded="${this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId ? "true" : "false"}"
         >
           <span class="store-expansion-tile-icon" aria-hidden="true">
             ${zone.isUnlocked ? "✓" : "🔒"}
@@ -787,6 +790,15 @@ export const UIManager = {
 
         if (!zone) return;
 
+        const isSameVisibleZone =
+          this.isStoreExpansionPopoverVisible &&
+          this.selectedExpansionZoneId === zone.id;
+
+        if (isSameVisibleZone) {
+          this.closeStoreExpansionPopover();
+          return;
+        }
+
         this.selectedExpansionZoneId = zone.id;
         this.isStoreExpansionPopoverVisible = true;
         this.showMessage(
@@ -799,6 +811,23 @@ export const UIManager = {
     });
 
     this.renderStoreExpansionPopover(zonesById[this.selectedExpansionZoneId]);
+  },
+
+  closeStoreExpansionPopover() {
+    const popover = document.getElementById("store-expansion-popover");
+
+    this.isStoreExpansionPopoverVisible = false;
+
+    if (popover) {
+      popover.classList.add("hidden");
+      popover.classList.remove("is-visible");
+      popover.removeAttribute("data-active-level");
+      popover.innerHTML = "";
+    }
+
+    document.querySelectorAll(".store-expansion-tile.is-selected").forEach((tile) => {
+      tile.classList.remove("is-selected");
+    });
   },
 
   renderStoreExpansionPopover(zone) {
@@ -828,9 +857,16 @@ export const UIManager = {
     popover.classList.add("is-visible");
     popover.dataset.activeLevel = String(zone.level);
     popover.innerHTML = `
-      <div class="store-expansion-popover-title">
-        <span>확장 조건</span>
-        <strong>${zone.name}</strong>
+      <div class="store-expansion-popover-header">
+        <div class="store-expansion-popover-title">
+          <span>확장 조건</span>
+          <strong>${zone.name}</strong>
+        </div>
+        <button
+          class="store-expansion-popover-close"
+          type="button"
+          aria-label="확장 조건 닫기"
+        >×</button>
       </div>
       <p class="store-expansion-popover-message">
         ${zone.isUnlocked ? "확장 완료된 구역입니다." : "아직 확장되지 않은 구역입니다."}
@@ -863,11 +899,21 @@ export const UIManager = {
       </button>
     `;
 
+    const closeButton = popover.querySelector(".store-expansion-popover-close");
     const actionButton = popover.querySelector(".store-expansion-popover-action");
+
+    if (closeButton) {
+      closeButton.onclick = (event) => {
+        event.stopPropagation();
+        this.closeStoreExpansionPopover();
+      };
+    }
 
     if (!actionButton) return;
 
-    actionButton.onclick = () => {
+    actionButton.onclick = (event) => {
+      event.stopPropagation();
+
       if (actionButton.disabled) return;
 
       EventBus.emit(EVENTS.EXPANSION_REQUESTED, {
