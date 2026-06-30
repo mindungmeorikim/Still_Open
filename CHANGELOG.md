@@ -4,6 +4,42 @@
 
 ---
 
+## [v5.4] 확장 구역 이동 가능 연동
+### Added
+- 플레이어가 잠긴 구역에 진입할 수 없도록 이동 제한 추가
+- 손님이 잠긴 구역에 진입할 수 없도록 행동 영역 제한 추가
+- 확장 완료 후 새 구역이 이동 가능 영역으로 활성화되도록 추가
+
+### Notes
+- 수정 파일: systems/PlayerMovementSystem.js, systems/CustomerSystem.js, systems/ExpansionSystem.js, core/GameState.js
+- 날짜 처리는 GameState.day 기준 유지
+
+---
+
+## [v5.3] 확장 오픈 연출 추가
+### Added
+- 확장 성공 시 먼지/연기 팡 애니메이션 연출 추가
+- 확장 완료 시 어두운 구역이 밝아지는 전환 효과 추가
+
+### Notes
+- 수정 파일: systems/ExpansionSystem.js, ui/UIManager.js, style.css
+- 확장 로직 자체보다 시각 연출 강화 중심
+
+---
+
+## [v5.2] 2.5D 장면형 확장 맵 UI 1차 전환
+### Changed
+- 기존 세로 확장 카드 중심 UI를 2.5D 장면형 구역 맵 기반 UI로 전환
+- 열려 있는 구역은 밝게, 잠긴 구역은 어둡게 보이도록 시각 상태 개선
+- 잠긴 구역 클릭 시 기존 확장 조건 팝오버가 맵 상에서 표시되도록 개선
+
+### Notes
+- 수정 파일: data/ExpansionData.js, systems/ExpansionSystem.js, ui/UIManager.js, style.css
+- 공통 파일 수정 있음: core/GameState.js
+- 기존 확장 조건 데이터와 팝오버 내용은 유지
+
+---
+
 ## [v5.1] 알바 캐릭터 매장 표시 / 근무 상태 UI 개선
 ### Added
 - 고용한 알바가 매장 화면 안에 캐릭터로 표시되도록 추가

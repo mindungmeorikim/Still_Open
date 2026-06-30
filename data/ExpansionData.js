@@ -26,6 +26,26 @@ export const EXPANSION_ZONES = Object.freeze([
     previousZoneId: null,
     defaultUnlocked: true,
     description: "처음 인수한 작은 편의점입니다.",
+    scene: {
+      mapX: 6,
+      mapY: 44,
+      mapWidth: 42,
+      mapHeight: 30,
+      depth: 1,
+      icon: "🏪",
+      mapLabel: "기본 매장",
+      objectLabel: "운영 중인 매장"
+    },
+    movementBounds: [
+      {
+        id: "basic_floor",
+        x: 0.02,
+        y: 0.08,
+        width: 0.84,
+        height: 0.84
+      }
+    ],
+    customerZones: ["door", "shelf", "counter", "exit"],
     effects: {
       customerSpawnRateBonus: 0,
       targetRevenueBonus: 0,
@@ -41,6 +61,26 @@ export const EXPANSION_ZONES = Object.freeze([
     previousZoneId: "zone_basic",
     defaultUnlocked: false,
     description: "낡은 박스를 치우고 추가 진열대를 둘 수 있는 공간입니다.",
+    scene: {
+      mapX: 14,
+      mapY: 18,
+      mapWidth: 28,
+      mapHeight: 24,
+      depth: 2,
+      icon: "🧃",
+      mapLabel: "추가 진열",
+      objectLabel: "추가 진열대"
+    },
+    movementBounds: [
+      {
+        id: "extra_shelf_floor",
+        x: 0.04,
+        y: 0.14,
+        width: 0.36,
+        height: 0.36
+      }
+    ],
+    customerZones: ["shelf"],
     effects: {
       customerSpawnRateBonus: 0.1,
       targetRevenueBonus: 5000,
@@ -56,6 +96,26 @@ export const EXPANSION_ZONES = Object.freeze([
     previousZoneId: "zone_extra_shelf",
     defaultUnlocked: false,
     description: "냉장 상품과 도시락을 더 많이 운영할 수 있는 공간입니다.",
+    scene: {
+      mapX: 42,
+      mapY: 14,
+      mapWidth: 30,
+      mapHeight: 26,
+      depth: 3,
+      icon: "❄️",
+      mapLabel: "냉장·도시락",
+      objectLabel: "냉장 매대"
+    },
+    movementBounds: [
+      {
+        id: "cold_food_floor",
+        x: 0.36,
+        y: 0.12,
+        width: 0.34,
+        height: 0.34
+      }
+    ],
+    customerZones: ["shelf"],
     effects: {
       customerSpawnRateBonus: 0.15,
       targetRevenueBonus: 10000,
@@ -74,6 +134,26 @@ export const EXPANSION_ZONES = Object.freeze([
     isFinalGoal: true,
     endingTitle: "세계 1등 편의점 달성!",
     endingDescription: "먼지 나는 작은 편의점이 세계 최고의 K-편의점으로 성장했습니다.",
+    scene: {
+      mapX: 68,
+      mapY: 38,
+      mapWidth: 26,
+      mapHeight: 34,
+      depth: 4,
+      icon: "⭐",
+      mapLabel: "프리미엄",
+      objectLabel: "프리미엄 구역"
+    },
+    movementBounds: [
+      {
+        id: "premium_floor",
+        x: 0.78,
+        y: 0.20,
+        width: 0.20,
+        height: 0.62
+      }
+    ],
+    customerZones: ["counter", "exit"],
     effects: {
       customerSpawnRateBonus: 0.25,
       targetRevenueBonus: 20000,

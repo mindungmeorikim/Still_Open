@@ -30,6 +30,11 @@ export const PlayerMovementSystem = {
     speed: 4
   },
 
+  defaultPlayerSize: {
+    width: 78,
+    height: 48
+  },
+
   isInitialized: false,
 
   init() {
@@ -109,7 +114,136 @@ export const PlayerMovementSystem = {
 
     player.x += moveX * moveSpeed;
     player.y += moveY * moveSpeed;
+    this.clampPlayerToAllowedMovement(player);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  clampPlayerToAllowedMovement(player) {
+    const storeSize = this.getStoreAreaSize();
+    const playerSize = this.getPlayerSize();
+    const movementRects = this.getAllowedMovementRects(storeSize);
+    const playerCenter = {
+      x: player.x + playerSize.width / 2,
+      y: player.y + playerSize.height / 2
+    };
+
+    const isInsideAllowedRect = movementRects.some((rect) => {
+      return this.isPointInsideRect(playerCenter, rect);
+    });
+
+    if (isInsideAllowedRect) {
+      player.x = this.clamp(player.x, 0, storeSize.width - playerSize.width);
+      player.y = this.clamp(player.y, 0, storeSize.height - playerSize.height);
+      return;
+    }
+
+    const nearestPoint = this.getNearestPointInRects(playerCenter, movementRects);
+
+    player.x = this.clamp(
+      nearestPoint.x - playerSize.width / 2,
+      0,
+      storeSize.width - playerSize.width
+    );
+    player.y = this.clamp(
+      nearestPoint.y - playerSize.height / 2,
+      0,
+      storeSize.height - playerSize.height
+    );
+  },
+
+  getStoreAreaSize() {
+    const storeArea = document.getElementById("store-area");
+
+    return {
+      width: storeArea?.clientWidth || 420,
+      height: storeArea?.clientHeight || 420
+    };
+  },
+
+  getPlayerSize() {
+    const playerNode = document.getElementById("player-zone");
+
+    return {
+      width: playerNode?.offsetWidth || this.defaultPlayerSize.width,
+      height: playerNode?.offsetHeight || this.defaultPlayerSize.height
+    };
+  },
+
+  getAllowedMovementRects(storeSize) {
+    const movementBounds = Array.isArray(GameState.expansion?.movementBounds)
+      ? GameState.expansion.movementBounds
+      : [];
+
+    if (movementBounds.length === 0) {
+      return [
+        {
+          x: 0,
+          y: 0,
+          width: storeSize.width,
+          height: storeSize.height
+        }
+      ];
+    }
+
+    return movementBounds.map((bound) => {
+      const x = this.toRatio(bound.x);
+      const y = this.toRatio(bound.y);
+      const width = this.toRatio(bound.width, 1);
+      const height = this.toRatio(bound.height, 1);
+
+      return {
+        x: x * storeSize.width,
+        y: y * storeSize.height,
+        width: width * storeSize.width,
+        height: height * storeSize.height
+      };
+    });
+  },
+
+  getNearestPointInRects(point, rects) {
+    return rects.reduce((nearest, rect) => {
+      const candidate = {
+        x: this.clamp(point.x, rect.x, rect.x + rect.width),
+        y: this.clamp(point.y, rect.y, rect.y + rect.height)
+      };
+      const distance =
+        Math.abs(point.x - candidate.x) +
+        Math.abs(point.y - candidate.y);
+
+      if (!nearest || distance < nearest.distance) {
+        return {
+          ...candidate,
+          distance
+        };
+      }
+
+      return nearest;
+    }, null) ?? { x: point.x, y: point.y };
+  },
+
+  isPointInsideRect(point, rect) {
+    return (
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.width &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.height
+    );
+  },
+
+  toRatio(value, fallback = 0) {
+    const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue)) {
+      return fallback;
+    }
+
+    return this.clamp(numberValue, 0, 1);
+  },
+
+  clamp(value, min, max) {
+    const safeMax = Math.max(min, max);
+
+    return Math.min(safeMax, Math.max(min, value));
   }
 };

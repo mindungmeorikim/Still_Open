@@ -228,6 +228,7 @@ export const UIManager = {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.playStoreExpansionUnlockEffect(data.animation?.zoneId ?? data.zoneId);
     });
 
     EventBus.on(EVENTS.EXPANSION_FAILED, (data) => {
@@ -938,16 +939,6 @@ export const UIManager = {
 
     if (!tilesNode) return;
 
-    const displayNames = {
-      zone_extra_shelf: "Lv.2 추가 진열 구역",
-      zone_cold_food: "Lv.3 냉장·도시락 구역",
-      zone_premium_store: "Lv.4 프리미엄 매장 구역"
-    };
-    const objectLabels = {
-      zone_extra_shelf: "추가 진열대",
-      zone_cold_food: "냉장 상품 구역",
-      zone_premium_store: "프리미엄 매장 구역"
-    };
     const visualZones = zoneStates.filter((zone) => zone.level > 1);
     const selectedZoneExists = visualZones.some((zone) => {
       return zone.id === this.selectedExpansionZoneId;
@@ -958,9 +949,20 @@ export const UIManager = {
     }
 
     tilesNode.innerHTML = visualZones.map((zone) => {
-      const displayName = displayNames[zone.id] ?? zone.name;
-      const objectLabel = objectLabels[zone.id] ?? "추가 진열 구역";
+      const scene = zone.scene ?? {};
+      const displayName = scene.mapLabel ?? zone.name;
+      const objectLabel = scene.objectLabel ?? "추가 구역";
       const statusText = this.getStoreExpansionStatusText(zone);
+      const mapX = Number(scene.mapX) || 0;
+      const mapY = Number(scene.mapY) || 0;
+      const mapWidth = Number(scene.mapWidth) || 24;
+      const mapHeight = Number(scene.mapHeight) || 24;
+      const depth = Number(scene.depth) || zone.level;
+      const icon = zone.isUnlocked
+        ? (scene.icon ?? "✓")
+        : zone.isAvailable
+          ? "✨"
+          : "🔒";
       const selectedClass =
         this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId
           ? " is-selected"
@@ -968,15 +970,16 @@ export const UIManager = {
 
       return `
         <button
-          class="store-expansion-tile store-expansion-${zone.status}${selectedClass}"
+          class="store-expansion-tile store-expansion-scene-tile store-expansion-${zone.status}${selectedClass}"
           type="button"
           data-zone-id="${zone.id}"
           data-zone-level="${zone.level}"
+          style="--zone-x: ${mapX}%; --zone-y: ${mapY}%; --zone-width: ${mapWidth}%; --zone-height: ${mapHeight}%; --zone-depth: ${depth};"
           aria-label="${displayName} ${statusText}"
           aria-expanded="${this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId ? "true" : "false"}"
         >
           <span class="store-expansion-tile-icon" aria-hidden="true">
-            ${zone.isUnlocked ? "✓" : "🔒"}
+            ${icon}
           </span>
           <strong>${displayName}</strong>
           <span class="store-expansion-tile-status">${statusText}</span>
@@ -1033,6 +1036,7 @@ export const UIManager = {
       popover.classList.add("hidden");
       popover.classList.remove("is-visible");
       popover.removeAttribute("data-active-level");
+      popover.removeAttribute("data-active-zone");
       popover.innerHTML = "";
     }
 
@@ -1050,6 +1054,7 @@ export const UIManager = {
       popover.classList.add("hidden");
       popover.classList.remove("is-visible");
       popover.removeAttribute("data-active-level");
+      popover.removeAttribute("data-active-zone");
       popover.innerHTML = "";
       return;
     }
@@ -1067,6 +1072,7 @@ export const UIManager = {
     popover.classList.remove("hidden");
     popover.classList.add("is-visible");
     popover.dataset.activeLevel = String(zone.level);
+    popover.dataset.activeZone = zone.id;
     popover.innerHTML = `
       <div class="store-expansion-popover-header">
         <div class="store-expansion-popover-title">
@@ -1153,30 +1159,51 @@ export const UIManager = {
       return;
     }
 
-    const popoverWidth = 220;
+    const sideRect = side.getBoundingClientRect();
+    const tileRect = tile.getBoundingClientRect();
+    const popoverWidth = Math.min(260, Math.max((side.clientWidth || 260) - 24, 220));
     const sideWidth = side.clientWidth || popoverWidth;
-    const tileCenter = tile.offsetLeft + tile.clientWidth / 2;
+    const sideHeight = side.clientHeight || 420;
+    const tileCenter = tileRect.left - sideRect.left + tileRect.width / 2;
     const preferredLeft = Math.round(tileCenter - popoverWidth / 2);
     const safeLeft = Math.min(
-      Math.max(preferredLeft, 0),
-      Math.max(sideWidth - popoverWidth, 0)
+      Math.max(preferredLeft, 12),
+      Math.max(sideWidth - popoverWidth - 12, 12)
     );
-
-    const hintNode = tile.querySelector(".store-expansion-tile-hint");
-    const hintBottom = hintNode
-      ? hintNode.offsetTop + hintNode.offsetHeight
-      : Math.round(tile.clientHeight * 0.48);
-
-    const popoverTop = Math.min(
-      hintBottom + 12,
-      Math.max(tile.clientHeight - 250, 120)
+    const preferredTop = Math.round(tileRect.top - sideRect.top + tileRect.height + 16);
+    const popoverHeight = popover.offsetHeight || 240;
+    const safeTop = Math.min(
+      Math.max(preferredTop, 12),
+      Math.max(sideHeight - popoverHeight - 12, 12)
     );
     const arrowLeft = Math.round(tileCenter - safeLeft);
 
     popover.style.left = `${safeLeft}px`;
-    popover.style.top = `${tile.offsetTop + popoverTop}px`;
+    popover.style.top = `${safeTop}px`;
     popover.style.width = `${popoverWidth}px`;
     popover.style.setProperty("--popover-arrow-left", `${arrowLeft}px`);
+  },
+
+  playStoreExpansionUnlockEffect(zoneId) {
+    if (!zoneId) return;
+
+    const tile = document.querySelector(`.store-expansion-tile[data-zone-id="${zoneId}"]`);
+
+    if (!tile) return;
+
+    tile.classList.remove("is-unlocking");
+    void tile.offsetWidth;
+    tile.classList.add("is-unlocking");
+
+    const puff = document.createElement("span");
+    puff.className = "store-expansion-puff";
+    puff.setAttribute("aria-hidden", "true");
+    tile.appendChild(puff);
+
+    window.setTimeout(() => {
+      tile.classList.remove("is-unlocking");
+      puff.remove();
+    }, 1200);
   },
 
   getStoreExpansionStatusText(zone) {
