@@ -35,9 +35,9 @@ const EVENT_TYPE_LABELS = Object.freeze({
   [CUSTOMER_EVENT_TYPES.NEGATIVE]: "부정"
 });
 
-const SURPRISE_EVENT_CHANCE_MIN = 0.15;
-const SURPRISE_EVENT_CHANCE_BASE = 0.18;
-const SURPRISE_EVENT_CHANCE_MAX = 0.2;
+const SURPRISE_EVENT_CHANCE_MIN = 0.1;
+const SURPRISE_EVENT_CHANCE_BASE = 0.1;
+const SURPRISE_EVENT_CHANCE_MAX = 0.1;
 const MAX_EVENTS_PER_CUSTOMER_PER_DAY = 1;
 
 export const RandomEventSystem = {
@@ -483,7 +483,9 @@ export const RandomEventSystem = {
     }
 
     const choices = Array.isArray(detail.choices)
-      ? detail.choices.map((choice) => {
+      ? detail.choices.filter((choice) => {
+          return !this.isChoiceBlockedByMissingProductStock(choice);
+        }).map((choice) => {
           return {
             choiceId: choice.id,
             label: choice.label,
@@ -500,6 +502,10 @@ export const RandomEventSystem = {
           };
         })
       : [];
+
+    if (choices.length === 0) {
+      return null;
+    }
 
     this.recordTriggeredEvent(detail, customer);
 
@@ -557,6 +563,8 @@ export const RandomEventSystem = {
     const revenue = Number(effects.revenue) || 0;
     const cost = Number(effects.cost) || 0;
     const inventoryChanges = this.getApplicableInventoryChanges(choice);
+    const productInventoryRequirements =
+      this.getChoiceProductInventoryRequirements(choice);
     const details = {
       day,
       eventInstanceId: eventPayload.eventInstanceId ?? null,
@@ -567,6 +575,30 @@ export const RandomEventSystem = {
       reason: "customer_event_choice"
     };
     let inventoryResult = null;
+
+    if (
+      effects.applyRevenue === true &&
+      revenue > 0 &&
+      productInventoryRequirements.length > 0 &&
+      !this.hasStockForProductInventoryRequirements(productInventoryRequirements)
+    ) {
+      return {
+        success: false,
+        reason: "inventory_shortage_revenue_blocked",
+        effectKey,
+        appliedRevenue: 0,
+        appliedPenalty: 0,
+        inventoryResult: {
+          success: false,
+          reason: "stock_shortage",
+          failedChange: productInventoryRequirements.find((requirement) => {
+            return requirement.availableQuantity < requirement.requiredQuantity;
+          }) ?? productInventoryRequirements[0],
+          appliedChanges: [],
+          skippedChanges: []
+        }
+      };
+    }
 
     if (effects.applyInventory === true) {
       inventoryResult = InventorySystem.applyEventInventoryChanges(
@@ -646,6 +678,55 @@ export const RandomEventSystem = {
     return changes.filter((change) => {
       return change.apply === true && change.productId && Number(change.quantity) !== 0;
     });
+  },
+
+  getChoiceProductInventoryRequirements(choice = {}) {
+    const requiredQuantityByProductId = new Map();
+
+    this.getApplicableInventoryChanges(choice).forEach((change) => {
+      const quantity = Math.floor(Number(change.quantity) || 0);
+
+      if (quantity >= 0) {
+        return;
+      }
+
+      const currentQuantity =
+        requiredQuantityByProductId.get(change.productId) ?? 0;
+
+      requiredQuantityByProductId.set(
+        change.productId,
+        currentQuantity + Math.abs(quantity)
+      );
+    });
+
+    return [...requiredQuantityByProductId.entries()].map(
+      ([productId, requiredQuantity]) => {
+        return {
+          productId,
+          requiredQuantity,
+          availableQuantity: InventorySystem.getStockQuantity(productId)
+        };
+      }
+    );
+  },
+
+  hasStockForProductInventoryRequirements(requirements = []) {
+    return requirements.every((requirement) => {
+      return requirement.availableQuantity >= requirement.requiredQuantity;
+    });
+  },
+
+  isChoiceBlockedByMissingProductStock(choice = {}) {
+    const effects = choice.effects ?? {};
+    const revenue = Number(effects.revenue) || 0;
+    const requirements = this.getChoiceProductInventoryRequirements(choice);
+
+    return (
+      effects.applyRevenue === true &&
+      revenue > 0 &&
+      requirements.length > 0 &&
+      !this.hasStockForProductInventoryRequirements(requirements)
+    );
   },
 
   createRandomEventCandidatePayload(customer, randomValue = Math.random()) {

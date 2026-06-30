@@ -26,6 +26,7 @@ import {
   getProductsByCustomerRequestId,
   getUnlockedProducts
 } from "../data/ProductData.js";
+import { getDayScenario } from "../data/DayScenarioData.js";
 
 export const InventorySystem = {
   lots: [],
@@ -40,6 +41,10 @@ export const InventorySystem = {
 
     EventBus.on(EVENTS.DAY_STARTED, () => {
       this.handleDayStarted();
+    });
+
+    EventBus.on(EVENTS.STORE_OPENED, (data) => {
+      this.handleStoreOpened(data);
     });
 
     EventBus.on(EVENTS.CUSTOMER_SATISFIED, (data) => {
@@ -66,6 +71,14 @@ export const InventorySystem = {
         unlockedProductIds
       });
     }
+  },
+
+  handleStoreOpened(data = {}) {
+    if (data.day !== GameState.day) {
+      return;
+    }
+
+    this.emitInventoryChanged("store_open_stock_check");
   },
 
   unlockProductsForDay(day) {
@@ -458,7 +471,39 @@ export const InventorySystem = {
     return Math.min(...expireDays);
   },
 
+  getSellableProductIdsForCurrentDayRequests(day = GameState.day) {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const scenario = getDayScenario(safeDay);
+    const requestIds = Array.isArray(scenario?.wantedProductIds)
+      ? scenario.wantedProductIds
+      : [];
+    const sellableProductIds = new Set();
+
+    requestIds.forEach((requestId) => {
+      getProductsByCustomerRequestId(requestId).forEach((product) => {
+        if (product.unlockDay <= safeDay) {
+          sellableProductIds.add(product.id);
+        }
+      });
+    });
+
+    return [...sellableProductIds];
+  },
+
+  getSellableStockQuantityForCurrentDayRequests(day = GameState.day) {
+    return this.getSellableProductIdsForCurrentDayRequests(day).reduce(
+      (total, productId) => total + this.getStockQuantity(productId),
+      0
+    );
+  },
+
+  hasSellableStockForCurrentDayRequests(day = GameState.day) {
+    return this.getSellableStockQuantityForCurrentDayRequests(day) > 0;
+  },
+
   getInventorySnapshot() {
+    const sellableProductIdsForCurrentDay =
+      this.getSellableProductIdsForCurrentDayRequests(GameState.day);
     const items = PRODUCTS.map((product) => {
       const lots = this.lots
         .filter((lot) => lot.productId === product.id && lot.quantity > 0)
@@ -489,6 +534,11 @@ export const InventorySystem = {
       totalQuantity: items.reduce((total, item) => {
         return total + item.quantity;
       }, 0),
+      sellableProductIdsForCurrentDay,
+      sellableStockQuantityForCurrentDayRequests:
+        sellableProductIdsForCurrentDay.reduce((total, productId) => {
+          return total + this.getStockQuantity(productId);
+        }, 0),
       items
     };
   },

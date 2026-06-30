@@ -33,6 +33,7 @@ export const GameFlowSystem = {
   remainingDaySeconds: GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS,
   isStoreOpen: false,
   isClosing: false,
+  isDayTimerPaused: false,
 
   expansionEffects: {
     customerSpawnRateBonus: 0,
@@ -110,6 +111,9 @@ export const GameFlowSystem = {
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
       this.handleStockOrganized(data);
     });
+    EventBus.on(EVENTS.INVENTORY_CHANGED, (data) => {
+      this.handleInventoryChanged(data);
+    });
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
       this.applyExpansionEffects(data);
     });
@@ -150,6 +154,7 @@ export const GameFlowSystem = {
     this.orderReadyDay = null;
     this.isStoreOpen = false;
     this.isClosing = false;
+    this.isDayTimerPaused = false;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
     this.clearDayTimer();
 
@@ -207,6 +212,7 @@ export const GameFlowSystem = {
     GameState.phase = GAME_PHASE.STORE_RUNNING;
     this.isStoreOpen = true;
     this.isClosing = false;
+    this.isDayTimerPaused = false;
     this.startDayTimer();
 
     UIManager.showMessage(
@@ -240,24 +246,30 @@ export const GameFlowSystem = {
 
     this.isClosing = true;
     this.isStoreOpen = false;
+    this.isDayTimerPaused = false;
     this.clearDayTimer();
 
     GameState.phase = GAME_PHASE.DAY_END;
 
-    UIManager.showMessage("영업 종료! 매출, 만족도, 멘탈을 기준으로 오늘의 정산을 준비합니다.");
+    const closeSource = data.source ?? "store_close_requested";
+    const closeMessage = closeSource === "stock_out"
+      ? "판매 가능한 재고가 모두 소진되어 영업을 조기 종료합니다."
+      : "영업 종료! 매출, 만족도, 멘탈을 기준으로 오늘의 정산을 준비합니다.";
+
+    UIManager.showMessage(closeMessage);
 
     UIManager.render();
 
     EventBus.emit(EVENTS.STORE_CLOSED, {
       day: GameState.day,
       phase: GameState.phase,
-      source: data.source ?? "store_close_requested"
+      source: closeSource
     });
 
     EventBus.emit(EVENTS.DAY_ENDED, {
       day: GameState.day,
       todayStats: GameState.todayStats,
-      source: data.source ?? "store_close_requested"
+      source: closeSource
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -284,6 +296,7 @@ export const GameFlowSystem = {
     this.orderReadyDay = null;
     this.isStoreOpen = false;
     this.isClosing = false;
+    this.isDayTimerPaused = false;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
 
     if (GameState.day > GAME_CONFIG.MAX_STORY_DAY) {
@@ -330,8 +343,52 @@ export const GameFlowSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
+  handleInventoryChanged(data = {}) {
+    if (
+      GameState.phase !== GAME_PHASE.STORE_RUNNING ||
+      this.isClosing ||
+      !this.isStoreOpen
+    ) {
+      return;
+    }
+
+    if (data.day !== GameState.day) {
+      return;
+    }
+
+    const sellableQuantity = Number(
+      data.sellableStockQuantityForCurrentDayRequests
+    );
+
+    if (!Number.isFinite(sellableQuantity) || sellableQuantity > 0) {
+      return;
+    }
+
+    this.closeStore({ source: "stock_out" });
+  },
+
   isOrderReadyForCurrentDay() {
     return this.orderReadyDay === GameState.day;
+  },
+
+  pauseDayTimer() {
+    if (
+      GameState.phase !== GAME_PHASE.STORE_RUNNING ||
+      this.isClosing ||
+      !this.dayTimerId
+    ) {
+      return;
+    }
+
+    this.isDayTimerPaused = true;
+  },
+
+  resumeDayTimer() {
+    if (this.isClosing) {
+      return;
+    }
+
+    this.isDayTimerPaused = false;
   },
 
   startDayTimer() {
@@ -340,11 +397,16 @@ export const GameFlowSystem = {
     }
 
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
+    this.isDayTimerPaused = false;
     console.log("[DAY TIMER START]", this.remainingDaySeconds);
 
     this.dayTimerId = setInterval(() => {
       if (GameState.phase !== GAME_PHASE.STORE_RUNNING || this.isClosing) {
         this.clearDayTimer();
+        return;
+      }
+
+      if (this.isDayTimerPaused) {
         return;
       }
 

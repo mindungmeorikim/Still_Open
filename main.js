@@ -66,12 +66,14 @@ function showCustomerEventCandidate() {
   }
 
   CustomerSystem.pauseCustomerWaitTime();
+  GameFlowSystem.pauseDayTimer();
 
   try {
     UIManager.showCustomerEventModal(
       payload,
       () => {
         CustomerSystem.resumeCustomerWaitTime();
+        GameFlowSystem.resumeDayTimer();
       },
       (choice, eventPayload) => {
         const effectResult = RandomEventSystem.applyCustomerEventChoiceEffects(
@@ -88,6 +90,7 @@ function showCustomerEventCandidate() {
     );
   } catch (error) {
     CustomerSystem.resumeCustomerWaitTime();
+    GameFlowSystem.resumeDayTimer();
     throw error;
   }
 }

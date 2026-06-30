@@ -24,6 +24,7 @@ export const UIManager = {
   eventModalOnClose: null,
   eventModalCloseTimerId: null,
   isEventModalClosing: false,
+  inventorySummary: null,
   productPanel: null,
   expansionPanel: null,
   expansionState: null,
@@ -36,6 +37,7 @@ export const UIManager = {
   selectedExpansionZoneId: null,
   isStoreExpansionPopoverVisible: false,
   inventoryByProductId: {},
+  inventorySnapshot: null,
 
   init() {
     this.bindButtons();
@@ -51,6 +53,7 @@ export const UIManager = {
     this.createUpgradeModal();
     this.createEndingModal();
     this.createCustomerEventModal();
+    this.createInventorySummary();
     this.createStoreComposition();
     this.createExpansionPanel();
     this.createProductPanel();
@@ -161,7 +164,9 @@ export const UIManager = {
         inventoryMap[item.productId] = item;
         return inventoryMap;
       }, {});
+      this.inventorySnapshot = data;
 
+      this.renderInventorySummary();
       this.renderProductCards();
     });
   },
@@ -278,9 +283,43 @@ export const UIManager = {
       customerNode.className = this.getCustomerClassName(customer);
       customerNode.style.setProperty("--customer-offset", `${(index % 4) * 16}px`);
       this.applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes);
-      customerNode.textContent = this.getCustomerDisplayText(customer);
+      this.renderCustomerNodeContent(customerNode, customer);
       customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
     });
+  },
+
+  renderCustomerNodeContent(customerNode, customer) {
+    customerNode.innerHTML = "";
+
+    const label = document.createElement("span");
+    label.className = "customer-label";
+    label.textContent = this.getCustomerDisplayText(customer);
+    customerNode.appendChild(label);
+
+    if (customer.currentZone !== "counter" || !customer.wantedProductName) {
+      return;
+    }
+
+    const wantedBubble = document.createElement("span");
+    const productName =
+      customer.carriedProductName ?? customer.wantedProductName;
+
+    wantedBubble.className = "customer-wanted-bubble";
+
+    if (customer.carriedProductImagePath) {
+      const productImage = document.createElement("img");
+      productImage.className = "customer-wanted-image";
+      productImage.src = customer.carriedProductImagePath;
+      productImage.alt = productName;
+      wantedBubble.appendChild(productImage);
+    }
+
+    const wantedText = document.createElement("span");
+    wantedText.className = "customer-wanted-text";
+    wantedText.textContent = productName;
+    wantedBubble.appendChild(wantedText);
+
+    customerNode.appendChild(wantedBubble);
   },
 
   applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes) {
@@ -316,6 +355,7 @@ export const UIManager = {
   },
 
   render() {
+    this.renderInventorySummary();
     this.renderProductCards();
     this.renderExpansionZones();
     this.renderControlButtons();
@@ -325,6 +365,101 @@ export const UIManager = {
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  createInventorySummary() {
+    const existingSummary = document.getElementById("inventory-summary");
+
+    if (existingSummary) {
+      this.inventorySummary = existingSummary;
+      return existingSummary;
+    }
+
+    const topUi = document.getElementById("top-ui");
+    const statusPanel = document.getElementById("status-panel");
+
+    if (!topUi || !statusPanel) {
+      return null;
+    }
+
+    const inventorySummary = document.createElement("section");
+    inventorySummary.id = "inventory-summary";
+    inventorySummary.setAttribute("aria-labelledby", "inventory-summary-title");
+    inventorySummary.innerHTML = `
+      <div class="inventory-summary-header">
+        <strong id="inventory-summary-title">재고 현황</strong>
+        <span id="inventory-summary-total">판매 가능 0개 / 전체 0개</span>
+      </div>
+      <div id="inventory-summary-list" class="inventory-summary-list"></div>
+    `;
+
+    statusPanel.insertAdjacentElement("afterend", inventorySummary);
+    this.inventorySummary = inventorySummary;
+
+    return inventorySummary;
+  },
+
+  renderInventorySummary() {
+    this.createInventorySummary();
+
+    const totalNode = document.getElementById("inventory-summary-total");
+    const listNode = document.getElementById("inventory-summary-list");
+
+    if (!totalNode || !listNode) {
+      return;
+    }
+
+    const snapshot = this.inventorySnapshot ?? {};
+    const items = Array.isArray(snapshot.items)
+      ? snapshot.items
+      : PRODUCTS.map((product) => {
+          const inventoryItem = this.inventoryByProductId[product.id];
+
+          return {
+            productId: product.id,
+            productName: product.name,
+            unlockDay: product.unlockDay,
+            isUnlocked: product.unlockDay <= GameState.day,
+            quantity: Number(inventoryItem?.quantity) || 0
+          };
+        });
+    const unlockedItems = items.filter((item) => {
+      return item.isUnlocked || item.unlockDay <= GameState.day;
+    });
+    const totalQuantity = Number.isFinite(Number(snapshot.totalQuantity))
+      ? Number(snapshot.totalQuantity)
+      : unlockedItems.reduce((total, item) => {
+          return total + (Number(item.quantity) || 0);
+        }, 0);
+    const sellableQuantity = Number.isFinite(
+      Number(snapshot.sellableStockQuantityForCurrentDayRequests)
+    )
+      ? Number(snapshot.sellableStockQuantityForCurrentDayRequests)
+      : totalQuantity;
+
+    totalNode.textContent =
+      `판매 가능 ${sellableQuantity.toLocaleString("ko-KR")}개 / 전체 ${totalQuantity.toLocaleString("ko-KR")}개`;
+
+    if (unlockedItems.length === 0) {
+      listNode.innerHTML = `<span class="inventory-summary-empty">해금된 상품이 없습니다.</span>`;
+      return;
+    }
+
+    listNode.innerHTML = unlockedItems.map((item) => {
+      const quantity = Number(item.quantity) || 0;
+      const stockClass = quantity <= 0
+        ? " is-out"
+        : quantity <= 2
+          ? " is-low"
+          : "";
+
+      return `
+        <span class="inventory-stock-chip${stockClass}" title="${item.productName} 재고 ${quantity}개">
+          <span class="inventory-stock-name">${item.productName}</span>
+          <strong>${quantity}개</strong>
+        </span>
+      `;
+    }).join("");
   },
 
   renderControlButtons() {
@@ -407,7 +542,13 @@ export const UIManager = {
     }
 
     effectSummary.className = "expansion-effect-summary";
-    statusPanel.insertAdjacentElement("afterend", effectSummary);
+    const inventorySummary = document.getElementById("inventory-summary");
+
+    if (inventorySummary) {
+      inventorySummary.insertAdjacentElement("afterend", effectSummary);
+    } else {
+      statusPanel.insertAdjacentElement("afterend", effectSummary);
+    }
 
     return effectSummary;
   },
@@ -1092,15 +1233,21 @@ export const UIManager = {
       const inventoryItem = this.inventoryByProductId[product.id];
       const isLocked = product.unlockDay > GameState.day;
       const quantity = inventoryItem?.quantity;
+      const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
       const stockText = Number.isFinite(quantity) ? `${quantity}개` : "-";
       const nextExpireDay = inventoryItem?.nextExpireDay;
       const expireText = Number.isFinite(nextExpireDay)
         ? `Day ${nextExpireDay}`
         : "-";
+      const stockStatusClass = !isLocked && safeQuantity <= 0
+        ? " is-out-of-stock"
+        : !isLocked && safeQuantity <= 2
+          ? " is-low-stock"
+          : "";
 
       return `
         <article
-          class="product-card${isLocked ? " is-locked" : ""}"
+          class="product-card${isLocked ? " is-locked" : ""}${stockStatusClass}"
           data-product-id="${product.id}"
         >
           <div class="product-image-wrap">
@@ -1114,6 +1261,8 @@ export const UIManager = {
             ${
               isLocked
                 ? `<span class="product-lock-badge">Day ${product.unlockDay} 해금</span>`
+                : safeQuantity <= 0
+                  ? `<span class="product-lock-badge product-stock-badge">재고 없음</span>`
                 : ""
             }
           </div>

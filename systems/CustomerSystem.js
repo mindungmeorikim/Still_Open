@@ -24,7 +24,7 @@
 
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
-import { EVENTS } from "../core/Constants.js";
+import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 
 import {
   CUSTOMER_STATUS,
@@ -33,7 +33,11 @@ import {
   CUSTOMER_WANTED_PRODUCTS
 } from "../data/CustomerData.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
-import { getUnlockedProducts } from "../data/ProductData.js";
+import {
+  getProductById,
+  getProductsByCustomerRequestId,
+  getUnlockedProducts
+} from "../data/ProductData.js";
 import { RandomEventSystem } from "./RandomEventSystem.js";
 
 export const CustomerSystem = {
@@ -42,9 +46,11 @@ export const CustomerSystem = {
   routeTimerId: null,
   spawnTimerId: null,
   isWaitTimePaused: false,
+  isCustomerFlowPaused: false,
   targetSpawnCount: 0,
   spawnedCustomerCount: 0,
   counterQueueOrderCounter: 0,
+  inventoryByProductId: {},
 
   init() {
     EventBus.on(EVENTS.STORE_OPENED, () => {
@@ -57,6 +63,10 @@ export const CustomerSystem = {
       this.handleCheckoutCompleted(checkoutData);
     });
 
+    EventBus.on(EVENTS.INVENTORY_CHANGED, (data) => {
+      this.handleInventoryChanged(data);
+    });
+
     EventBus.on(EVENTS.STORE_CLOSED, () => {
       this.closeCustomerFlow();
     });
@@ -67,6 +77,8 @@ export const CustomerSystem = {
 
     this.targetSpawnCount = this.getSpawnCountByDay();
     this.spawnedCustomerCount = 0;
+    this.isCustomerFlowPaused = false;
+    this.isWaitTimePaused = false;
 
     this.spawnNextCustomer();
     this.startSpawnTimer();
@@ -87,13 +99,64 @@ export const CustomerSystem = {
     this.targetSpawnCount = 0;
     this.spawnedCustomerCount = 0;
     this.counterQueueOrderCounter = 0;
+    this.isCustomerFlowPaused = false;
+    this.isWaitTimePaused = false;
+  },
+
+  handleInventoryChanged(data = {}) {
+    const items = Array.isArray(data.items) ? data.items : [];
+
+    this.inventoryByProductId = items.reduce((inventoryMap, item) => {
+      inventoryMap[item.productId] = item;
+      return inventoryMap;
+    }, {});
   },
 
   getSpawnCountByDay() {
     const difficultyRate = GameState.difficulty?.customerSpawnRate ?? 1;
-    const baseCount = 3 + Math.floor(GameState.day * 1.2);
+    const targetRevenue = Math.max(
+      0,
+      Number(GameState.dailyGoal?.targetRevenue) || 0
+    );
+    const expectedAverageSalePrice = this.getExpectedAverageSalePrice();
+    const revenueBasedCount =
+      expectedAverageSalePrice > 0
+        ? Math.ceil((targetRevenue / expectedAverageSalePrice) * 1.1)
+        : 0;
+    const fallbackCount = 8 + Math.floor(GameState.day * 2);
+    const baseCount = Math.max(fallbackCount, revenueBasedCount);
 
-    return Math.max(1, Math.floor(baseCount * difficultyRate));
+    return Math.max(6, Math.min(60, Math.floor(baseCount * difficultyRate)));
+  },
+
+  getExpectedAverageSalePrice() {
+    const wantedProducts = this.getAvailableWantedProducts();
+    const wantedProductIds = new Set(
+      wantedProducts.map((product) => product.id)
+    );
+    const salePrices = getUnlockedProducts(GameState.day)
+      .filter((product) => {
+        return (
+          wantedProductIds.has(product.id) ||
+          (product.customerRequestIds ?? []).some((requestId) => {
+            return wantedProductIds.has(requestId);
+          })
+        );
+      })
+      .map((product) => Number(product.salePrice))
+      .filter((salePrice) => {
+        return Number.isFinite(salePrice) && salePrice > 0;
+      });
+
+    if (salePrices.length === 0) {
+      return 0;
+    }
+
+    const totalSalePrice = salePrices.reduce((total, salePrice) => {
+      return total + salePrice;
+    }, 0);
+
+    return totalSalePrice / salePrices.length;
   },
 
   addCustomers(count) {
@@ -111,6 +174,10 @@ export const CustomerSystem = {
   },
 
   spawnNextCustomer() {
+    if (this.isCustomerFlowPaused) {
+      return false;
+    }
+
     if (this.spawnedCustomerCount >= this.targetSpawnCount) {
       this.stopSpawnTimer();
       return false;
@@ -134,6 +201,10 @@ export const CustomerSystem = {
     }
 
     this.spawnTimerId = setInterval(() => {
+      if (this.isCustomerFlowPaused) {
+        return;
+      }
+
       this.spawnNextCustomer();
     }, this.getSpawnIntervalMsByDay());
   },
@@ -171,6 +242,9 @@ export const CustomerSystem = {
 
       wantedProductId: wantedProduct.id,
       wantedProductName: wantedProduct.name,
+      carriedProductId: null,
+      carriedProductName: null,
+      carriedProductImagePath: null,
 
       status: routeState.status,
       currentZone: routeState.currentZone,
@@ -324,13 +398,19 @@ export const CustomerSystem = {
 
   pauseCustomerWaitTime() {
     this.isWaitTimePaused = true;
+    this.isCustomerFlowPaused = true;
   },
 
   resumeCustomerWaitTime() {
     this.isWaitTimePaused = false;
+    this.isCustomerFlowPaused = GameState.phase !== GAME_PHASE.STORE_RUNNING;
   },
 
   updateCustomersByTick(amount) {
+    if (this.isCustomerFlowPaused) {
+      return;
+    }
+
     let changed = false;
 
     this.customers = this.customers.map((customer) => {
@@ -457,9 +537,25 @@ export const CustomerSystem = {
     const nextShoppingTime = Math.max(0, currentShoppingTime - safeAmount);
 
     if (nextShoppingTime <= 0) {
+      const carriedProduct = this.findStockedProductForRequest(
+        customer.wantedProductId,
+        1,
+        customer.id
+      );
+
+      if (!carriedProduct) {
+        return this.markCustomerAsLeaving({
+          ...customer,
+          shoppingTime: 0
+        }, "wanted_product_out_of_stock");
+      }
+
       const waitingCustomer = {
         ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING),
-        shoppingTime: 0
+        shoppingTime: 0,
+        carriedProductId: carriedProduct.id,
+        carriedProductName: carriedProduct.name,
+        carriedProductImagePath: carriedProduct.imagePath
       };
 
       return this.assignCounterQueueOrder(waitingCustomer);
@@ -499,6 +595,59 @@ export const CustomerSystem = {
     }
 
     return updatedCustomer;
+  },
+
+  findStockedProductForRequest(requestId, quantity = 1, customerId = null) {
+    const safeQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+    const candidates = getProductsByCustomerRequestId(requestId)
+      .filter((product) => {
+        return product.unlockDay <= GameState.day;
+      })
+      .map((product) => {
+        const stockQuantity = Number(
+          this.inventoryByProductId[product.id]?.quantity
+        ) || 0;
+        const reservedQuantity = this.getReservedCarriedQuantity(
+          product.id,
+          customerId
+        );
+
+        return {
+          ...product,
+          availableQuantity: Math.max(0, stockQuantity - reservedQuantity),
+          nextExpireDay:
+            this.inventoryByProductId[product.id]?.nextExpireDay ??
+            Number.POSITIVE_INFINITY
+        };
+      })
+      .filter((product) => {
+        return product.availableQuantity >= safeQuantity;
+      })
+      .sort((first, second) => {
+        if (first.nextExpireDay !== second.nextExpireDay) {
+          return first.nextExpireDay - second.nextExpireDay;
+        }
+
+        return first.name.localeCompare(second.name);
+      });
+
+    return candidates[0] ?? null;
+  },
+
+  getReservedCarriedQuantity(productId, exceptCustomerId = null) {
+    return this.customers.reduce((total, customer) => {
+      if (
+        customer.id === exceptCustomerId ||
+        customer.carriedProductId !== productId ||
+        customer.isSatisfied ||
+        customer.hasReportedLeft ||
+        customer.status === CUSTOMER_STATUS.LEAVING
+      ) {
+        return total;
+      }
+
+      return total + 1;
+    }, 0);
   },
 
   getMoodByWaitingPressure(customer, waitTime) {
@@ -639,6 +788,8 @@ export const CustomerSystem = {
   closeCustomerFlow() {
     this.stopRouteTimer();
     this.stopSpawnTimer();
+    this.isCustomerFlowPaused = false;
+    this.isWaitTimePaused = false;
 
     this.customers = this.customers.map((customer) => {
       const shouldLeave =
@@ -686,6 +837,9 @@ export const CustomerSystem = {
 
       wantedProductId: customer.wantedProductId,
       wantedProductName: customer.wantedProductName,
+      carriedProductId: customer.carriedProductId ?? null,
+      carriedProductName: customer.carriedProductName ?? null,
+      carriedProductImagePath: customer.carriedProductImagePath ?? null,
 
       status: customer.status,
       currentZone: customer.currentZone,
@@ -702,6 +856,12 @@ export const CustomerSystem = {
       typeName: customer.typeName,
       wantedProductId: customer.wantedProductId,
       wantedProductName: customer.wantedProductName,
+      carriedProductId: customer.carriedProductId ?? null,
+      carriedProductName: customer.carriedProductName ?? null,
+      carriedProductImagePath:
+        customer.carriedProductImagePath ??
+        getProductById(customer.carriedProductId)?.imagePath ??
+        null,
       status: customer.status,
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,
@@ -713,9 +873,16 @@ export const CustomerSystem = {
   },
 
   getRenderableCustomers() {
-    return this.customers.map((customer) => {
-      return this.createRenderableCustomerPayload(customer);
-    });
+    return this.customers
+      .filter((customer) => {
+        return (
+          customer.status !== CUSTOMER_STATUS.LEAVING &&
+          !customer.hasReportedLeft
+        );
+      })
+      .map((customer) => {
+        return this.createRenderableCustomerPayload(customer);
+      });
   },
 
   getCustomersByStatus(status) {

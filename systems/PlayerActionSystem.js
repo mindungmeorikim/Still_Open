@@ -77,15 +77,67 @@ export const PlayerActionSystem = {
   },
 
   bindKeyboardActions() {
-    document.addEventListener("keydown", (event) => {
+    window.addEventListener("keydown", (event) => {
       this.handleKeyboardAction(event);
-    });
+    }, true);
   },
 
   handleKeyboardAction(event) {
-    if (event.code !== "Space") return;
+    if (!this.isInteractionKey(event)) return;
 
     event.preventDefault();
+    event.stopPropagation();
+    this.handlePrimaryInteractionAction();
+  },
+
+  isInteractionKey(event) {
+    if (event.ctrlKey || event.altKey || event.metaKey) {
+      return false;
+    }
+
+    const target = event.target;
+    const targetTagName = target?.tagName?.toLowerCase?.() ?? "";
+    const isTypingTarget =
+      target?.isContentEditable ||
+      targetTagName === "input" ||
+      targetTagName === "textarea" ||
+      targetTagName === "select";
+
+    if (isTypingTarget) {
+      return false;
+    }
+
+    return (
+      event.code === "Space" ||
+      event.key === " " ||
+      event.key === "Spacebar" ||
+      event.keyCode === 32
+    );
+  },
+
+  handlePrimaryInteractionAction() {
+    if (this.isPlayerBusy) {
+      this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
+      return;
+    }
+
+    if (this.isNearCounter()) {
+      if (!this.tryLockCheckoutInput()) {
+        return;
+      }
+
+      EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
+        day: GameState.day,
+        actionType: "checkout",
+        orderId: null,
+        productId: null,
+        source: "player_action_system_keyboard"
+      });
+
+      this.handleCheckoutAction();
+      return;
+    }
+
     this.handleShelfRestockAction();
   },
 
@@ -118,10 +170,58 @@ export const PlayerActionSystem = {
   },
 
   isNearShelf() {
-    const dx = GameState.player.x - this.shelf.x;
-    const dy = GameState.player.y - this.shelf.y;
+    const playerCenter = this.getPlayerCenter();
+    const shelfCenter = this.getZoneCenter("shelf-zone", this.shelf);
+
+    const dx = playerCenter.x - shelfCenter.x;
+    const dy = playerCenter.y - shelfCenter.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     return distance <= this.interactionDistance;
+  },
+
+  isNearCounter() {
+    if (!GameState.player) {
+      return false;
+    }
+
+    const playerCenter = this.getPlayerCenter();
+    const counterCenter = this.getZoneCenter("counter-zone", null);
+
+    if (!counterCenter) {
+      return false;
+    }
+
+    const dx = playerCenter.x - counterCenter.x;
+    const dy = playerCenter.y - counterCenter.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    return distance <= this.interactionDistance;
+  },
+
+  getPlayerCenter() {
+    const player = GameState.player ?? { x: 0, y: 0 };
+
+    return {
+      x: (Number(player.x) || 0) + 36,
+      y: (Number(player.y) || 0) + 22
+    };
+  },
+
+  getZoneCenter(zoneId, fallback = null) {
+    const zoneNode = document.getElementById(zoneId);
+    const storeNode = document.getElementById("store-area");
+
+    if (zoneNode && storeNode) {
+      const zoneRect = zoneNode.getBoundingClientRect();
+      const storeRect = storeNode.getBoundingClientRect();
+
+      return {
+        x: zoneRect.left - storeRect.left + zoneRect.width / 2,
+        y: zoneRect.top - storeRect.top + zoneRect.height / 2
+      };
+    }
+
+    return fallback;
   },
 
   startShelfRestock() {
@@ -212,29 +312,42 @@ export const PlayerActionSystem = {
   handleCheckoutAction() {
     const checkoutPayload = this.createCheckoutPayload();
 
-    if (!checkoutPayload) return;
+    if (!checkoutPayload) {
+      return;
+    }
 
     EventBus.emit(EVENTS.CHECKOUT_COMPLETED, checkoutPayload);
+    this.showActionMessage(
+      `${checkoutPayload.productName} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`
+    );
   },
 
   createCheckoutPayload() {
     const customer = CustomerSystem.getCheckoutCustomerPayload?.();
 
     if (!customer) {
+      this.showActionMessage("계산 가능한 손님이 없습니다.");
       console.warn("[PlayerActionSystem] 계산 가능한 손님이 없습니다.");
       return null;
     }
 
     const wantedProductId = customer.wantedProductId;
+    const carriedProductId = customer.carriedProductId ?? null;
     const quantity = 1;
 
     if (!wantedProductId) {
+      this.showActionMessage("손님의 요청 상품 정보가 없습니다.");
       console.warn("[PlayerActionSystem] 손님의 요청 상품 정보가 없습니다.", customer);
       return null;
     }
 
-    const availableProduct =
-      InventorySystem.findAvailableProductForRequest?.(wantedProductId, quantity);
+    const availableProduct = carriedProductId
+      ? (
+          InventorySystem.getStockQuantity?.(carriedProductId) >= quantity
+            ? { id: carriedProductId }
+            : null
+        )
+      : InventorySystem.findAvailableProductForRequest?.(wantedProductId, quantity);
 
     if (!availableProduct) {
       CustomerSystem.handleStockShortageForCustomer?.(
@@ -242,6 +355,7 @@ export const PlayerActionSystem = {
         "stock_shortage"
       );
 
+      this.showActionMessage("판매 가능한 재고가 없습니다.");
       console.warn("[PlayerActionSystem] 판매 가능한 재고가 없습니다.", {
         customerId: customer.customerId,
         wantedProductId
@@ -253,6 +367,7 @@ export const PlayerActionSystem = {
     const product = getProductById(availableProduct.id);
 
     if (!product) {
+      this.showActionMessage("실제 판매 상품을 찾을 수 없습니다.");
       console.warn("[PlayerActionSystem] 실제 판매 상품을 찾을 수 없습니다.", {
         productId: availableProduct.id
       });
