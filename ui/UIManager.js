@@ -1231,11 +1231,35 @@ export const UIManager = {
         <p class="day-scenario-kicker">오늘의 영업 브리핑</p>
         <h2 id="day-scenario-title" class="day-scenario-title"></h2>
         <p id="day-scenario-subtitle" class="day-scenario-subtitle"></p>
+
+        <div class="day-scenario-goal-box" aria-label="오늘의 목표">
+          <div>
+            <span>목표 매출</span>
+            <strong id="day-scenario-target-revenue"></strong>
+          </div>
+          <div>
+            <span>목표 만족도</span>
+            <strong id="day-scenario-target-satisfaction"></strong>
+          </div>
+        </div>
+
+        <section class="day-scenario-market-box" aria-label="오늘의 상권 정보">
+          <div class="day-scenario-market-header">
+            <span id="day-scenario-weather" class="day-scenario-weather"></span>
+            <strong id="day-scenario-market-headline"></strong>
+          </div>
+          <p id="day-scenario-market-message"></p>
+          <div class="day-scenario-recommend-box">
+            <span>추천 발주 상품</span>
+            <ul id="day-scenario-recommend-list"></ul>
+          </div>
+        </section>
+
         <p id="day-scenario-story" class="day-scenario-story"></p>
         <ul id="day-scenario-features" class="day-scenario-features"></ul>
         <p id="day-scenario-tip" class="day-scenario-tip"></p>
         <button id="day-scenario-confirm-button" class="day-scenario-confirm-button" type="button">
-          영업 준비하기
+          발주하러 가기
         </button>
       </div>
     `;
@@ -1252,6 +1276,12 @@ export const UIManager = {
 
     const title = document.getElementById("day-scenario-title");
     const subtitle = document.getElementById("day-scenario-subtitle");
+    const targetRevenue = document.getElementById("day-scenario-target-revenue");
+    const targetSatisfaction = document.getElementById("day-scenario-target-satisfaction");
+    const weather = document.getElementById("day-scenario-weather");
+    const marketHeadline = document.getElementById("day-scenario-market-headline");
+    const marketMessage = document.getElementById("day-scenario-market-message");
+    const recommendList = document.getElementById("day-scenario-recommend-list");
     const story = document.getElementById("day-scenario-story");
     const features = document.getElementById("day-scenario-features");
     const tip = document.getElementById("day-scenario-tip");
@@ -1259,12 +1289,32 @@ export const UIManager = {
     const featureItems = Array.isArray(scenarioData.features)
       ? scenarioData.features
       : [];
+    const marketInfo = scenarioData.marketInfo ?? {};
+    const recommendedProducts = this.getRecommendedProducts(scenarioData);
 
     title.textContent = scenarioData.title ?? `Day ${GameState.day}. 영업 시작`;
     subtitle.textContent = scenarioData.subtitle ?? "오늘의 편의점 운영을 준비합니다.";
+    targetRevenue.textContent = `₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`;
+    targetSatisfaction.textContent = `${GameState.dailyGoal.targetSatisfaction}%`;
+    weather.textContent = marketInfo.weatherLabel ?? "상권 정보";
+    marketHeadline.textContent = marketInfo.headline ?? "오늘의 수요 정보를 확인하세요.";
+    marketMessage.textContent = marketInfo.message ?? "추천 상품을 참고해서 발주 수량을 정해보세요.";
     story.textContent = scenarioData.story ?? "발주와 재고 정리를 마친 뒤 편의점을 오픈하세요.";
     tip.textContent = scenarioData.tip ?? "보유금과 재고를 확인하고 발주 수량을 정하세요.";
-    confirmButton.textContent = scenarioData.ctaText ?? "발주 준비하기";
+    confirmButton.textContent = scenarioData.ctaText ?? "발주하러 가기";
+
+    recommendList.innerHTML = recommendedProducts.length > 0
+      ? recommendedProducts.map((product) => {
+          const reason = this.getRecommendedProductReason(scenarioData, product.id);
+
+          return `
+            <li>
+              <strong>${product.name}</strong>
+              <span>${reason}</span>
+            </li>
+          `;
+        }).join("")
+      : `<li><strong>추천 상품 미정</strong><span>내일 회의 후 상품 데이터가 확정되면 자동으로 표시됩니다.</span></li>`;
 
     features.innerHTML = featureItems.map((feature) => {
       return `<li>${feature}</li>`;
@@ -1292,6 +1342,33 @@ export const UIManager = {
       this.dayScenarioModal &&
       !this.dayScenarioModal.classList.contains("hidden")
     );
+  },
+
+  getRecommendedProducts(scenarioData = this.pendingOrderPhaseData?.dayScenario ?? {}) {
+    const recommendedIds = this.getRecommendedProductIdSet(scenarioData);
+
+    return PRODUCTS.filter((product) => recommendedIds.has(product.id));
+  },
+
+  getRecommendedProductIdSet(scenarioData = this.pendingOrderPhaseData?.dayScenario ?? {}) {
+    const recommendedProductIds = Array.isArray(scenarioData.recommendedProductIds)
+      ? scenarioData.recommendedProductIds
+      : [];
+    const existingProductIds = new Set(PRODUCTS.map((product) => product.id));
+
+    return new Set(
+      recommendedProductIds.filter((productId) => {
+        const product = PRODUCTS.find((item) => item.id === productId);
+
+        return existingProductIds.has(productId) && product?.unlockDay <= GameState.day;
+      })
+    );
+  },
+
+  getRecommendedProductReason(scenarioData = {}, productId) {
+    const reasons = scenarioData.recommendedProductReasons ?? {};
+
+    return reasons[productId] ?? "오늘 상권에서 수요 증가 예상";
   },
 
   createOrderModal() {
@@ -1369,11 +1446,14 @@ export const UIManager = {
     );
     const totalCost = this.getOrderTotalCost(orderableProducts);
     const isOverBudget = totalCost > GameState.money;
+    const dayScenario = this.pendingOrderPhaseData?.dayScenario ?? {};
+    const recommendedProductIds = this.getRecommendedProductIdSet(dayScenario);
 
     body.innerHTML = `
       <div class="order-modal-header">
         <h2>컴퓨터 발주</h2>
         <p>오늘 판매할 상품 수량을 정하고 발주를 확정하세요.</p>
+        <p class="order-market-note">[오늘 추천] 배지가 붙은 상품은 오늘 상권 정보 기준으로 수요가 높을 수 있습니다.</p>
       </div>
 
       <div class="order-product-list">
@@ -1389,9 +1469,10 @@ export const UIManager = {
           const orderStatusText = isOrderable
             ? "발주 가능"
             : this.getOrderUnavailableReason(product);
+          const isRecommended = recommendedProductIds.has(product.id);
 
           return `
-            <article class="order-product-row${isOrderable ? "" : " is-order-unavailable"}" data-product-id="${product.id}">
+            <article class="order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}" data-product-id="${product.id}">
               <div class="order-product-main">
                 <img
                   class="order-product-thumb"
@@ -1401,7 +1482,10 @@ export const UIManager = {
                   decoding="async"
                 />
                 <div>
-                  <strong>${product.name}</strong>
+                  <strong class="order-product-title">
+                    ${product.name}
+                    ${isRecommended ? `<span class="order-recommend-badge">오늘 추천</span>` : ""}
+                  </strong>
                   <span>현재 재고 ${stockQuantity}개</span>
                   <em class="order-product-status">${orderStatusText}</em>
                 </div>

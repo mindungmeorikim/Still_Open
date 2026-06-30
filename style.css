@@ -1489,6 +1489,118 @@ button:active {
   line-height: 1.5;
 }
 
+.day-scenario-goal-box {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 14px 0 10px;
+}
+
+.day-scenario-goal-box div {
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #dceacb;
+}
+
+.day-scenario-goal-box span {
+  display: block;
+  color: #6f7f6c;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.day-scenario-goal-box strong {
+  display: block;
+  margin-top: 4px;
+  color: #263f2e;
+  font-size: 16px;
+}
+
+.day-scenario-market-box {
+  margin: 10px 0 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #eef8ff;
+  border: 1px solid #b7d5e8;
+}
+
+.day-scenario-market-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.day-scenario-weather {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #31533b;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.day-scenario-market-header strong {
+  color: #263f2e;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+#day-scenario-market-message {
+  margin: 8px 0 0;
+  color: #4f4f4f;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.day-scenario-recommend-box {
+  margin-top: 10px;
+}
+
+.day-scenario-recommend-box > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #31533b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+#day-scenario-recommend-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#day-scenario-recommend-list li {
+  padding: 8px 9px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid rgba(49, 83, 59, 0.12);
+}
+
+#day-scenario-recommend-list strong,
+#day-scenario-recommend-list span {
+  display: block;
+}
+
+#day-scenario-recommend-list strong {
+  color: #263f2e;
+  font-size: 13px;
+}
+
+#day-scenario-recommend-list span {
+  margin-top: 2px;
+  color: #6f6f6f;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .day-scenario-features {
   display: grid;
   gap: 7px;
@@ -1585,6 +1697,16 @@ button:active {
   line-height: 1.45;
 }
 
+.order-modal-header .order-market-note {
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff6d8;
+  color: #6f4b00;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .order-product-list {
   display: grid;
   gap: 8px;
@@ -1604,6 +1726,13 @@ button:active {
   background: #ffffff;
 }
 
+.order-product-row.is-recommended {
+  border-color: #f0c95a;
+  background: #fffdf3;
+}
+
+/* 추천 배지 기본 스타일은 아래의 더 구체적인 선택자에서 지정합니다. */
+
 .order-product-row.is-order-unavailable {
   background: #f7f7f2;
   opacity: 0.72;
@@ -1621,6 +1750,26 @@ button:active {
   color: #666666;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.order-product-row .order-product-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.order-product-row .order-recommend-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #ffcf5a;
+  color: #263f2e;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .order-product-status {
@@ -1889,5 +2038,16 @@ button:active {
   .delivery-box-zone {
     bottom: 72px;
     width: 104px;
+  }
+}
+
+@media (max-width: 520px) {
+  .day-scenario-goal-box {
+    grid-template-columns: 1fr;
+  }
+
+  .day-scenario-market-header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

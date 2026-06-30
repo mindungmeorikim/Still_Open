@@ -16,6 +16,13 @@ const createScenario = (scenario) => {
     features: Object.freeze([...(scenario.features ?? [])]),
     responseUnlocks: Object.freeze([...(scenario.responseUnlocks ?? [])]),
     wantedProductIds: Object.freeze([...(scenario.wantedProductIds ?? [])]),
+    recommendedProductIds: Object.freeze([...(scenario.recommendedProductIds ?? [])]),
+    recommendedProductReasons: Object.freeze({
+      ...(scenario.recommendedProductReasons ?? {})
+    }),
+    marketInfo: Object.freeze({
+      ...(scenario.marketInfo ?? {})
+    }),
     customerTypeWeights: Object.freeze({
       ...(scenario.customerTypeWeights ?? {})
     })
@@ -35,7 +42,18 @@ export const DAY_SCENARIOS = Object.freeze({
       "기본 발주/계산/정산 루프 진행"
     ],
     tip: "처음부터 모든 걸 잘할 필요는 없습니다. 손님을 계산하고 하루를 마치는 것부터 시작하세요.",
-    ctaText: "첫 영업 준비하기",
+    ctaText: "발주하러 가기",
+    marketInfo: {
+      weatherLabel: "맑음",
+      headline: "첫 영업은 기본 상품 수요가 안정적입니다.",
+      message: "오늘은 특별한 상권 이슈가 없습니다. 삼각밥, 생수, 컵면처럼 손님이 자주 찾는 기본 상품을 먼저 준비해보세요."
+    },
+    recommendedProductIds: ["triangle_kimbap", "water", "ramen"],
+    recommendedProductReasons: {
+      triangle_kimbap: "출근길 기본 식사 수요",
+      water: "모든 Day에 안정적인 기본 음료",
+      ramen: "초반 매출을 만들기 쉬운 간편식"
+    },
     responseUnlocks: ["기본 계산 대응"],
     wantedProductIds: [
       "triangle_kimbap",
@@ -66,7 +84,18 @@ export const DAY_SCENARIOS = Object.freeze({
       "상품별 발주 수량 선택 중요"
     ],
     tip: "매입가와 판매가를 비교하면서 오늘 팔릴 상품을 조금씩 준비해보세요.",
-    ctaText: "Day 2 발주 준비",
+    ctaText: "발주하러 가기",
+    marketInfo: {
+      weatherLabel: "비",
+      headline: "비 오는 날에는 따뜻한 간편식 수요가 늘어납니다.",
+      message: "오늘은 비가 올 예정입니다. 우산 상품은 아직 회의 후 확정 예정이므로, 지금은 따뜻한 컵면과 우동류를 넉넉히 준비해보세요."
+    },
+    recommendedProductIds: ["ramen", "udon", "banana_milk"],
+    recommendedProductReasons: {
+      ramen: "비 오는 날 따뜻한 상품 수요",
+      udon: "쌀쌀한 날씨에 어울리는 간편식",
+      banana_milk: "학생 손님 선호 음료"
+    },
     responseUnlocks: ["빠른 계산"],
     wantedProductIds: [
       "triangle_kimbap",
@@ -98,7 +127,18 @@ export const DAY_SCENARIOS = Object.freeze({
       "짧은 유통기한 상품 관리 필요"
     ],
     tip: "유통기한이 짧은 상품은 조금씩 자주 발주하는 편이 안전합니다.",
-    ctaText: "Day 3 발주 준비",
+    ctaText: "발주하러 가기",
+    marketInfo: {
+      weatherLabel: "한파",
+      headline: "김이 서릴 정도로 추운 날씨입니다.",
+      message: "오늘은 추운 날씨 탓에 따뜻한 식사류와 각성 음료 수요가 늘어날 수 있습니다. 컵면, 우동, 캔커피를 확인해보세요."
+    },
+    recommendedProductIds: ["ramen", "udon", "coffee"],
+    recommendedProductReasons: {
+      ramen: "한파 대응 따뜻한 식사",
+      udon: "추운 날씨 추천 간편식",
+      coffee: "출근길 직장인 수요"
+    },
     responseUnlocks: ["재촉 손님 대응"],
     wantedProductIds: [
       "triangle_kimbap",
@@ -132,7 +172,18 @@ export const DAY_SCENARIOS = Object.freeze({
       "손님 대기 관리 중요"
     ],
     tip: "계산대 앞 손님을 오래 기다리게 두면 멘탈과 만족도가 흔들릴 수 있습니다.",
-    ctaText: "Day 4 발주 준비",
+    ctaText: "발주하러 가기",
+    marketInfo: {
+      weatherLabel: "야근 상권",
+      headline: "근처 회사에 야근 인원이 늘었습니다.",
+      message: "늦은 시간까지 버티는 손님이 많아질 것 같습니다. 에너지드링크, 캔커피, 간단히 먹을 수 있는 샌드위치를 추천합니다."
+    },
+    recommendedProductIds: ["energy_drink", "coffee", "egg_sandwich"],
+    recommendedProductReasons: {
+      energy_drink: "야근 손님 각성 음료 수요",
+      coffee: "직장인 반복 구매 수요",
+      egg_sandwich: "간단한 식사 대체 상품"
+    },
     responseUnlocks: ["진상 손님 응대 선택지"],
     wantedProductIds: [
       "triangle_kimbap",
@@ -168,7 +219,18 @@ export const DAY_SCENARIOS = Object.freeze({
       "무한모드 진입 예고"
     ],
     tip: "오늘은 재고를 넉넉히 준비하되, 유통기한이 짧은 상품은 과하게 쌓지 마세요.",
-    ctaText: "마지막 프롤로그 준비",
+    ctaText: "발주하러 가기",
+    marketInfo: {
+      weatherLabel: "혼잡",
+      headline: "프롤로그 마지막 영업으로 다양한 손님이 몰릴 예정입니다.",
+      message: "오늘은 식사류, 음료, 간식 수요가 한꺼번에 섞입니다. 객단가가 높은 도시락과 빠르게 팔릴 수 있는 음료를 함께 준비하세요."
+    },
+    recommendedProductIds: ["pork_cutlet_lunchbox", "energy_drink", "sausage_hotbar"],
+    recommendedProductReasons: {
+      pork_cutlet_lunchbox: "높은 객단가 식사류",
+      energy_drink: "급한 손님과 직장인 수요",
+      sausage_hotbar: "간식/식사 사이 수요"
+    },
     responseUnlocks: ["종합 대응"],
     wantedProductIds: [
       "triangle_kimbap",
@@ -205,7 +267,18 @@ export const DAY_SCENARIOS = Object.freeze({
       "매일 발주 판단 중요"
     ],
     tip: "매일 같은 정답은 없습니다. 전날 재고와 보유금을 보고 오늘의 발주를 정하세요.",
-    ctaText: "무한 영업 준비",
+    ctaText: "발주하러 가기",
+    marketInfo: {
+      weatherLabel: "변동 상권",
+      headline: "무한모드에서는 매일 수요가 달라집니다.",
+      message: "오늘은 전날 재고와 보유금을 보고 안정 상품과 고마진 상품을 섞어 발주하는 것이 좋습니다."
+    },
+    recommendedProductIds: ["triangle_kimbap", "coffee", "ramen"],
+    recommendedProductReasons: {
+      triangle_kimbap: "안정적인 기본 식사 수요",
+      coffee: "반복 구매가 쉬운 음료",
+      ramen: "재고 운영이 쉬운 간편식"
+    },
     responseUnlocks: ["랜덤 대응 상황"],
     wantedProductIds: [
       "triangle_kimbap",
