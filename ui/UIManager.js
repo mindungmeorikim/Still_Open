@@ -34,6 +34,7 @@ export const UIManager = {
   isEventModalClosing: false,
   inventorySummary: null,
   staffSummary: null,
+  staffCharacter: null,
   productPanel: null,
   expansionPanel: null,
   expansionState: null,
@@ -68,6 +69,7 @@ export const UIManager = {
     this.createInventorySummary();
     this.createStaffSummary();
     this.createStoreComposition();
+    this.createStaffCharacter();
     this.createExpansionPanel();
     this.createProductPanel();
     this.render();
@@ -178,6 +180,7 @@ export const UIManager = {
 
     EventBus.on(STAFF_EVENTS.STATE_CHANGED, (data = {}) => {
       this.renderStaffSummary(data.staff);
+      this.renderStaffCharacter(data.staff);
     });
   },
 
@@ -417,6 +420,7 @@ export const UIManager = {
   render() {
     this.renderInventorySummary();
     this.renderStaffSummary();
+    this.renderStaffCharacter();
     this.renderProductCards();
     this.renderExpansionZones();
     this.renderControlButtons();
@@ -505,6 +509,99 @@ export const UIManager = {
       <span>근태 ${hired.attendance}%</span>
       <span>${hired.ability}</span>
     `;
+  },
+
+  createStaffCharacter() {
+    const storeArea = document.getElementById("store-area");
+
+    if (!storeArea) {
+      return null;
+    }
+
+    let staffCharacter = document.getElementById("staff-character");
+
+    if (!staffCharacter) {
+      staffCharacter = document.createElement("div");
+      staffCharacter.id = "staff-character";
+      staffCharacter.className = "staff-character";
+      staffCharacter.hidden = true;
+      staffCharacter.setAttribute("aria-live", "polite");
+      storeArea.appendChild(staffCharacter);
+    }
+
+    this.staffCharacter = staffCharacter;
+
+    return staffCharacter;
+  },
+
+  renderStaffCharacter(staffState = GameState.staff) {
+    const staffCharacter = this.createStaffCharacter();
+    const hired = staffState?.hired ?? null;
+
+    if (!staffCharacter) {
+      return;
+    }
+
+    if (!hired) {
+      staffCharacter.hidden = true;
+      staffCharacter.innerHTML = "";
+      staffCharacter.removeAttribute("data-staff-type");
+      staffCharacter.removeAttribute("aria-label");
+      return;
+    }
+
+    const staffName = String(hired.name ?? "알바").trim() || "알바";
+    const staffType = String(hired.type ?? "근무").trim() || "근무";
+    const todayCheckoutCount = Math.max(
+      0,
+      Number(staffState?.todayCheckoutCount) || 0
+    );
+
+    staffCharacter.hidden = false;
+    staffCharacter.dataset.staffType = String(hired.id ?? "staff");
+    staffCharacter.setAttribute(
+      "aria-label",
+      `${staffName} ${staffType}, 자동 계산 중, 오늘 계산 ${todayCheckoutCount}건`
+    );
+    staffCharacter.innerHTML = "";
+
+    const avatar = document.createElement("div");
+    avatar.className = "staff-character-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+
+    const face = document.createElement("span");
+    face.className = "staff-character-face";
+    face.textContent = this.getStaffCharacterMark(hired);
+    avatar.appendChild(face);
+
+    const label = document.createElement("div");
+    label.className = "staff-character-label";
+
+    const nameNode = document.createElement("strong");
+    nameNode.textContent = staffName;
+
+    const statusNode = document.createElement("span");
+    statusNode.textContent = "자동 계산 중";
+
+    const countNode = document.createElement("em");
+    countNode.textContent = `오늘 계산 ${todayCheckoutCount}건`;
+
+    label.appendChild(nameNode);
+    label.appendChild(statusNode);
+    label.appendChild(countNode);
+
+    staffCharacter.appendChild(avatar);
+    staffCharacter.appendChild(label);
+  },
+
+  getStaffCharacterMark(staff = {}) {
+    const marks = {
+      kim_minji: "정",
+      park_junho: "속",
+      lee_bora: "친"
+    };
+
+    return marks[staff.id] ?? "알";
   },
 
   createInventorySummary() {
