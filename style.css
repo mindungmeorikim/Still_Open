@@ -3774,3 +3774,48 @@ button:active {
     grid-template-columns: 44px minmax(44px, 1fr) 44px;
   }
 }
+
+/* v4.5 발주 상품 카드 텍스트 정렬 개선 */
+.order-product-main {
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.order-product-main > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.order-product-row .order-product-title {
+  box-sizing: border-box;
+  min-height: 2.7em;
+  max-height: 2.75em;
+  padding-right: 0;
+  white-space: normal;
+  overflow: hidden;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  line-height: 1.35;
+}
+
+.order-product-row.is-recommended .order-product-title {
+  padding-right: 92px;
+}
+
+.order-product-main > div > span,
+.order-product-status {
+  max-width: 100%;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.order-product-status {
+  box-sizing: border-box;
+}
+
+@media (max-width: 599px) {
+  .order-product-row.is-recommended .order-product-title {
+    padding-right: 86px;
+  }
+}
