@@ -42,12 +42,6 @@ export const GameState = {
 
   upgrades: [],
 
-  expansion: {
-    unlockedZoneIds: ["zone_basic"],
-    movementBounds: [],
-    customerAccessibleZones: ["door", "shelf", "counter", "exit"]
-  },
-
   difficulty: {
     customerSpawnRate: 1,
     angryCustomerRate: 1,

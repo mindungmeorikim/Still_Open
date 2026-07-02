@@ -227,8 +227,6 @@ export const CustomerSystem = {
     const customerType = this.pickCustomerType();
     const wantedProduct = this.decideWantedProduct(customerType);
     const routeState = this.getRouteStateByStatus(CUSTOMER_STATUS.ENTERING);
-    const currentZone = this.getAccessibleCustomerZone(routeState.currentZone);
-    const targetZone = this.getAccessibleCustomerZone(routeState.targetZone, currentZone);
 
     this.customerIdCounter += 1;
 
@@ -249,8 +247,8 @@ export const CustomerSystem = {
       carriedProductImagePath: null,
 
       status: routeState.status,
-      currentZone,
-      targetZone,
+      currentZone: routeState.currentZone,
+      targetZone: routeState.targetZone,
 
       enteringTime: this.getDefaultEnteringTime(),
       shoppingTime: this.getShoppingTimeByCustomerType(customerType),
@@ -465,31 +463,13 @@ export const CustomerSystem = {
 
   transitionCustomerStatus(customer, nextStatus) {
     const routeState = this.getRouteStateByStatus(nextStatus);
-    const currentZone = this.getAccessibleCustomerZone(routeState.currentZone);
-    const targetZone = this.getAccessibleCustomerZone(routeState.targetZone, currentZone);
 
     return {
       ...customer,
       status: routeState.status,
-      currentZone,
-      targetZone
+      currentZone: routeState.currentZone,
+      targetZone: routeState.targetZone
     };
-  },
-
-  getAccessibleCustomerZone(zone, fallbackZone = CUSTOMER_ZONES.DOOR) {
-    const accessibleZones = Array.isArray(GameState.expansion?.customerAccessibleZones)
-      ? GameState.expansion.customerAccessibleZones
-      : [];
-
-    if (accessibleZones.length === 0 || accessibleZones.includes(zone)) {
-      return zone;
-    }
-
-    if (accessibleZones.includes(fallbackZone)) {
-      return fallbackZone;
-    }
-
-    return accessibleZones[0] ?? CUSTOMER_ZONES.DOOR;
   },
 
   getRouteStateByStatus(status) {
