@@ -14,6 +14,8 @@ import {
   getPreviousExpansionZone
 } from "../data/ExpansionData.js";
 
+const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
+
 const STAFF_EVENTS = {
   HIRE_OFFERED: "STAFF_HIRE_OFFERED",
   HIRED: "STAFF_HIRED",
@@ -45,10 +47,31 @@ export const UIManager = {
   orderListScrollTop: 0,
   expansionCarouselIndex: 0,
   selectedExpansionZoneId: null,
+  currentFocusedZoneId: "zone_basic",
   isStoreExpansionPopoverVisible: false,
   inventoryByProductId: {},
   inventorySnapshot: null,
   pendingStaffHireData: null,
+  notificationTimerId: null,
+  isWorldCameraBound: false,
+  worldCamera: {
+    x: 0,
+    y: 0,
+    zoom: 1.15,
+    minZoom: 0.45,
+    fullZoom: 0.55,
+    focusZoom: 1.55,
+    maxZoom: 2.2,
+    isDragging: false,
+    wasDragging: false,
+    dragStartX: 0,
+    dragStartY: 0,
+    startX: 0,
+    startY: 0,
+    pinchStartDistance: 0,
+    pinchStartZoom: 1.55,
+    resizeTimerId: null
+  },
 
   init() {
     this.bindButtons();
@@ -68,6 +91,9 @@ export const UIManager = {
     this.createCustomerEventModal();
     this.createInventorySummary();
     this.createStaffSummary();
+    this.createDailyGoalPanel();
+    this.createFocusedZonePanel();
+    this.moveTopIconMenuToRoot();
     this.createStoreComposition();
     this.createStaffCharacter();
     this.createExpansionPanel();
@@ -75,22 +101,29 @@ export const UIManager = {
     this.render();
     this.renderCustomers();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
+    this.queueInitialCameraFocus();
   },
-    getPlayerNode() {
+  getPlayerNode() {
+    const interactionLayer = this.getStoreInteractionLayer();
     const storeArea = document.getElementById("store-area");
 
-    if (!storeArea) {
+    if (!interactionLayer && !storeArea) {
       return null;
     }
 
-    let playerNode = document.getElementById("player-zone")
+    let playerNode = document.getElementById("player-zone");
 
     if (!playerNode) {
       playerNode = document.createElement("div");
       playerNode.id = "player-zone";
       playerNode.className = "store-zone";
       playerNode.textContent = "플레이어";
-      storeArea.appendChild(playerNode);
+    }
+
+    const targetParent = interactionLayer ?? storeArea;
+
+    if (playerNode.parentElement !== targetParent) {
+      targetParent.appendChild(playerNode);
     }
 
     return playerNode;
@@ -106,8 +139,10 @@ export const UIManager = {
     const x = Number(GameState.player.x) || 0;
     const y = Number(GameState.player.y) || 0;
 
-    playerNode.style.left = `${x}px`;
-    playerNode.style.top = `${y}px`;
+    playerNode.style.setProperty("left", `${x}px`, "important");
+    playerNode.style.setProperty("top", `${y}px`, "important");
+    playerNode.style.setProperty("--player-x", `${x}px`);
+    playerNode.style.setProperty("--player-y", `${y}px`);
   },
 
   bindButtons() {
@@ -221,6 +256,15 @@ export const UIManager = {
   },
 
   bindExpansionEvents() {
+    EventBus.on(EXPANSION_CONSTRUCTION_STARTED, (data) => {
+      const message = data.message ?? "매장 공사를 시작합니다.";
+
+      this.expansionState = data.expansionState ?? this.expansionState;
+      this.showExpansionMessage(message);
+      this.showMessage(message);
+      this.renderExpansionZones(this.expansionState);
+    });
+
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
       const message = data.message ?? "매장 확장이 완료되었습니다.";
 
@@ -228,6 +272,7 @@ export const UIManager = {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.playStoreExpansionUnlockEffect(data.animation?.zoneId ?? data.zoneId);
     });
 
     EventBus.on(EVENTS.EXPANSION_FAILED, (data) => {
@@ -247,9 +292,10 @@ export const UIManager = {
   },
 
   getCustomerLayer() {
+    const interactionLayer = this.getStoreInteractionLayer();
     const storeArea = document.getElementById("store-area");
 
-    if (!storeArea) {
+    if (!interactionLayer && !storeArea) {
       return null;
     }
 
@@ -258,7 +304,12 @@ export const UIManager = {
     if (!customerLayer) {
       customerLayer = document.createElement("div");
       customerLayer.id = "customer-layer";
-      storeArea.appendChild(customerLayer);
+    }
+
+    const targetParent = interactionLayer ?? storeArea;
+
+    if (customerLayer.parentElement !== targetParent) {
+      targetParent.appendChild(customerLayer);
     }
 
     return customerLayer;
@@ -424,12 +475,211 @@ export const UIManager = {
     this.renderProductCards();
     this.renderExpansionZones();
     this.renderControlButtons();
+    this.renderPhaseChip();
+    this.renderDailyGoalPanel();
+    this.renderFocusedZonePanel();
+    this.moveTopIconMenuToRoot();
     this.renderPlayer();
     this.renderDeliveryBox(this.orderDeliveredData);
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  renderPhaseChip() {
+    const phaseChip = document.getElementById("phase-chip");
+
+    if (!phaseChip) return;
+
+    const phaseLabels = {
+      [GAME_PHASE.READY]: "영업 준비",
+      [GAME_PHASE.DAY_START]: "오픈 대기",
+      [GAME_PHASE.ORDER]: "발주 중",
+      [GAME_PHASE.STORE_OPEN]: "오픈",
+      [GAME_PHASE.STORE_RUNNING]: "영업 중",
+      [GAME_PHASE.DAY_END]: "마감 중",
+      [GAME_PHASE.RESULT]: "정산",
+      [GAME_PHASE.UPGRADE]: "업그레이드",
+      [GAME_PHASE.NEXT_DAY]: "다음 Day",
+      [GAME_PHASE.ENDLESS]: "무한모드"
+    };
+
+    phaseChip.textContent = phaseLabels[GameState.phase] ?? "영업 준비";
+  },
+
+  moveTopIconMenuToRoot() {
+    const gameRoot = document.getElementById("game-root");
+    const topIconMenu = document.getElementById("top-icon-menu");
+
+    if (!gameRoot || !topIconMenu) return;
+
+    if (topIconMenu.parentElement !== gameRoot) {
+      gameRoot.appendChild(topIconMenu);
+    }
+  },
+
+  queueInitialCameraFocus() {
+    const focusBasic = () => {
+      this.focusStoreSpace("zone_basic");
+    };
+
+    window.requestAnimationFrame(() => {
+      focusBasic();
+      window.setTimeout(focusBasic, 80);
+      window.setTimeout(focusBasic, 260);
+    });
+  },
+
+  createDailyGoalPanel() {
+    const existingPanel = document.getElementById("daily-goal-panel");
+
+    if (existingPanel) {
+      return existingPanel;
+    }
+
+    const dayCard = document.getElementById("day-card");
+    const topUi = document.getElementById("top-ui");
+
+    if (!dayCard && !topUi) return null;
+
+    const goalPanel = document.createElement("section");
+
+    goalPanel.id = "daily-goal-panel";
+    goalPanel.className = "daily-goal-panel";
+    goalPanel.setAttribute("aria-label", "오늘의 목표");
+    goalPanel.innerHTML = `
+      <div class="daily-goal-panel-header">
+        <strong>목표</strong>
+        <span id="daily-goal-day-label">Day ${GameState.day}</span>
+      </div>
+      <div class="daily-goal-panel-body">
+        <div class="daily-goal-main">
+          <span>매출</span>
+          <strong id="daily-goal-revenue-text">₩0 / ₩0</strong>
+        </div>
+        <div class="daily-goal-progress" aria-hidden="true">
+          <span id="daily-goal-progress-bar"></span>
+        </div>
+        <div class="daily-goal-sub">
+          <span id="daily-goal-satisfaction-text">만족도 0 / 0</span>
+        </div>
+      </div>
+    `;
+
+    (dayCard ?? topUi).appendChild(goalPanel);
+
+    return goalPanel;
+  },
+
+  createFocusedZonePanel() {
+    const existingPanel = document.getElementById("focused-zone-panel");
+
+    if (existingPanel) {
+      return existingPanel;
+    }
+
+    const dayCard = document.getElementById("day-card");
+    const topUi = document.getElementById("top-ui");
+
+    if (!dayCard && !topUi) return null;
+
+    const panel = document.createElement("section");
+
+    panel.id = "focused-zone-panel";
+    panel.className = "focused-zone-panel hidden";
+    panel.setAttribute("aria-label", "현재 구역");
+    panel.innerHTML = `
+      <div class="focused-zone-panel-header">
+        <strong>구역</strong>
+        <span id="focused-zone-status-label">확대 보기</span>
+      </div>
+      <div class="focused-zone-panel-body">
+        <strong id="focused-zone-name">기본 매장</strong>
+        <span id="focused-zone-hint">기본 플레이 구역</span>
+      </div>
+    `;
+
+    const goalPanel = this.createDailyGoalPanel();
+    const parent = dayCard ?? topUi;
+
+    if (goalPanel?.parentElement === parent) {
+      goalPanel.insertAdjacentElement("afterend", panel);
+    } else {
+      parent.appendChild(panel);
+    }
+
+    return panel;
+  },
+
+  renderFocusedZonePanel(zoneId = this.currentFocusedZoneId) {
+    const panel = this.createFocusedZonePanel();
+    const storeArea = document.getElementById("store-area");
+
+    if (!panel) return;
+
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const zone = zoneStates.find((candidate) => candidate.id === zoneId) ?? zoneStates[0];
+    const nameNode = document.getElementById("focused-zone-name");
+    const hintNode = document.getElementById("focused-zone-hint");
+    const statusNode = document.getElementById("focused-zone-status-label");
+    const isOverview = storeArea?.classList.contains("is-world-overview") ?? false;
+
+    panel.classList.toggle("hidden", isOverview || !zone);
+
+    if (!zone) return;
+
+    if (nameNode) {
+      nameNode.textContent = zone.level === 1 ? "기본 매장" : zone.name;
+    }
+
+    if (hintNode) {
+      hintNode.textContent = zone.level === 1
+        ? "기본 플레이 구역"
+        : zone.isUnlocked
+          ? "확장 완료"
+          : zone.isConstructing
+            ? "공사 중"
+            : "눌러서 조건 확인";
+    }
+
+    if (statusNode) {
+      statusNode.textContent = isOverview ? "전체 보기" : "확대 보기";
+    }
+  },
+
+  renderDailyGoalPanel() {
+    const goalPanel = this.createDailyGoalPanel();
+
+    if (!goalPanel) return;
+
+    const dayLabel = document.getElementById("daily-goal-day-label");
+    const revenueText = document.getElementById("daily-goal-revenue-text");
+    const progressBar = document.getElementById("daily-goal-progress-bar");
+    const satisfactionText = document.getElementById("daily-goal-satisfaction-text");
+    const targetRevenue = Number(GameState.dailyGoal?.targetRevenue) || 0;
+    const currentRevenue = Number(GameState.todayStats?.revenue) || 0;
+    const targetSatisfaction = Number(GameState.dailyGoal?.targetSatisfaction) || 0;
+    const currentSatisfaction = Number(GameState.satisfaction) || 0;
+    const revenueProgress = targetRevenue > 0
+      ? Math.min(100, Math.max(0, (currentRevenue / targetRevenue) * 100))
+      : 0;
+
+    if (dayLabel) {
+      dayLabel.textContent = `Day ${GameState.day}`;
+    }
+
+    if (revenueText) {
+      revenueText.textContent = `₩${currentRevenue.toLocaleString()} / ₩${targetRevenue.toLocaleString()}`;
+    }
+
+    if (progressBar) {
+      progressBar.style.width = `${revenueProgress}%`;
+    }
+
+    if (satisfactionText) {
+      satisfactionText.textContent = `만족도 ${currentSatisfaction} / ${targetSatisfaction}`;
+    }
   },
 
   createStaffSummary() {
@@ -512,9 +762,10 @@ export const UIManager = {
   },
 
   createStaffCharacter() {
+    const interactionLayer = this.getStoreInteractionLayer();
     const storeArea = document.getElementById("store-area");
 
-    if (!storeArea) {
+    if (!interactionLayer && !storeArea) {
       return null;
     }
 
@@ -526,7 +777,12 @@ export const UIManager = {
       staffCharacter.className = "staff-character";
       staffCharacter.hidden = true;
       staffCharacter.setAttribute("aria-live", "polite");
-      storeArea.appendChild(staffCharacter);
+    }
+
+    const targetParent = interactionLayer ?? storeArea;
+
+    if (staffCharacter.parentElement !== targetParent) {
+      targetParent.appendChild(staffCharacter);
     }
 
     this.staffCharacter = staffCharacter;
@@ -677,6 +933,8 @@ export const UIManager = {
     totalNode.textContent =
       `판매 가능 ${sellableQuantity.toLocaleString("ko-KR")}개 / 전체 ${totalQuantity.toLocaleString("ko-KR")}개`;
 
+    this.renderStockInfo(totalQuantity);
+
     if (unlockedItems.length === 0) {
       listNode.innerHTML = `<span class="inventory-summary-empty">해금된 상품이 없습니다.</span>`;
       return;
@@ -697,6 +955,27 @@ export const UIManager = {
         </span>
       `;
     }).join("");
+  },
+
+  renderStockInfo(totalQuantity = null) {
+    const stockInfo = document.getElementById("stock-info");
+
+    if (!stockInfo) {
+      return;
+    }
+
+    const resolvedTotalQuantity = Number.isFinite(Number(totalQuantity))
+      ? Number(totalQuantity)
+      : Object.values(this.inventoryByProductId).reduce((sum, item) => {
+          return sum + (Number(item?.quantity) || 0);
+        }, 0);
+    const unlockedZoneCount = Array.isArray(GameState.expansion?.unlockedZoneIds)
+      ? GameState.expansion.unlockedZoneIds.length
+      : 1;
+    const stockCapacity = 40 + Math.max(0, unlockedZoneCount - 1) * 20;
+
+    stockInfo.textContent =
+      `재고 ${resolvedTotalQuantity.toLocaleString("ko-KR")}/${stockCapacity.toLocaleString("ko-KR")}`;
   },
 
   renderControlButtons() {
@@ -801,25 +1080,24 @@ export const UIManager = {
     if (!composition) {
       composition = document.createElement("section");
       composition.id = "store-composition";
+      composition.classList.add("quarter-view-store-composition", "world-store-composition");
       composition.setAttribute("aria-labelledby", "store-composition-title");
       composition.innerHTML = `
         <div class="store-composition-header">
-          <h2 id="store-composition-title">매장 구성</h2>
+          <div>
+            <h2 id="store-composition-title">오늘의 매장</h2>
+            <p class="store-camera-help">드래그로 이동 · 휠/두 손가락으로 줌 · 공간 클릭으로 포커스</p>
+          </div>
+          <div id="store-camera-controls" class="store-camera-controls" aria-label="카메라 이동">
+            <button class="store-camera-button" type="button" data-camera-focus="zone_basic">1번</button>
+            <button class="store-camera-button" type="button" data-camera-focus="zone_extra_shelf">2번</button>
+            <button class="store-camera-button" type="button" data-camera-focus="zone_cold_food">3번</button>
+            <button class="store-camera-button" type="button" data-camera-focus="zone_premium_store">4번</button>
+            <button id="store-camera-fit-button" class="store-camera-button store-camera-button-wide" type="button">전체보기</button>
+          </div>
         </div>
         <div class="store-composition-layout">
           <div class="base-store-map"></div>
-          <div class="store-expansion-side">
-            <div
-              id="store-expansion-tiles"
-              class="store-expansion-tiles"
-              aria-label="확장 구역"
-            ></div>
-            <aside
-              id="store-expansion-popover"
-              class="store-expansion-popover expansion-condition-popover hidden"
-              aria-live="polite"
-            ></aside>
-          </div>
         </div>
       `;
 
@@ -836,13 +1114,688 @@ export const UIManager = {
       }
     }
 
+    composition.classList.add("quarter-view-store-composition", "world-store-composition");
+
     const baseStoreMap = composition.querySelector(".base-store-map");
 
     if (baseStoreMap && storeArea.parentElement !== baseStoreMap) {
       baseStoreMap.appendChild(storeArea);
     }
 
+    storeArea.classList.add("quarter-view-map", "world-camera-viewport");
+    storeArea.setAttribute("aria-label", "매장 월드맵");
+
+    this.ensureStoreWorldMap(storeArea);
+    this.moveGameplayNodesToInteractionLayer();
+    this.bindWorldCameraEvents();
+
+    if (!storeArea.dataset.cameraInitialized) {
+      storeArea.dataset.cameraInitialized = "true";
+      this.queueInitialCameraFocus();
+    } else {
+      this.updateWorldCameraTransform();
+    }
+
     return composition;
+  },
+
+  ensureStoreMapArtLayer(storeArea) {
+    return this.ensureStoreWorldMap(storeArea);
+  },
+
+  ensureQuarterViewScene(storeArea) {
+    return this.ensureStoreWorldMap(storeArea);
+  },
+
+  ensureStoreExpansionLayer(storeArea) {
+    return this.ensureStoreWorldMap(storeArea);
+  },
+
+  ensureStoreWorldMap(storeArea = document.getElementById("store-area")) {
+    if (!storeArea) return null;
+
+    let worldMap = document.getElementById("store-world-map");
+
+    if (!worldMap) {
+      worldMap = document.createElement("div");
+      worldMap.id = "store-world-map";
+      worldMap.className = "store-world-map is-unified-store-layout";
+    }
+
+    worldMap.classList.add("is-unified-store-layout");
+
+    if (worldMap.parentElement !== storeArea) {
+      storeArea.insertBefore(worldMap, storeArea.firstChild);
+    }
+
+    let background = document.getElementById("store-world-background");
+
+    if (!background) {
+      background = document.createElement("div");
+      background.id = "store-world-background";
+      background.className = "store-world-background";
+      background.setAttribute("aria-hidden", "true");
+      background.innerHTML = `
+        <img
+          src="./assets/images/world/map/background.png"
+          alt=""
+          draggable="false"
+        />
+      `;
+      worldMap.appendChild(background);
+    }
+
+    let sharedFloor = document.getElementById("store-world-shared-floor");
+
+    if (!sharedFloor) {
+      sharedFloor = document.createElement("div");
+      sharedFloor.id = "store-world-shared-floor";
+      sharedFloor.className = "store-world-shared-floor";
+      sharedFloor.setAttribute("aria-hidden", "true");
+      sharedFloor.innerHTML = `
+        <img
+          src="./assets/images/world/map/map2_floor_clean.png"
+          alt=""
+          draggable="false"
+        />
+      `;
+      worldMap.appendChild(sharedFloor);
+    } else if (sharedFloor.parentElement !== worldMap) {
+      worldMap.appendChild(sharedFloor);
+    }
+
+    let unifiedBase = document.getElementById("store-unified-base");
+
+    if (!unifiedBase) {
+      unifiedBase = document.createElement("div");
+      unifiedBase.id = "store-unified-base";
+      unifiedBase.className = "store-unified-base";
+      unifiedBase.setAttribute("aria-hidden", "true");
+      unifiedBase.innerHTML = `
+        <img
+          src="./assets/images/world/unified/unified_store_stage1.png"
+          alt=""
+          draggable="false"
+        />
+      `;
+      worldMap.appendChild(unifiedBase);
+    } else if (unifiedBase.parentElement !== worldMap) {
+      worldMap.appendChild(unifiedBase);
+    }
+
+    let zoneArtLayer = document.getElementById("store-zone-art-layer");
+
+    if (!zoneArtLayer) {
+      zoneArtLayer = document.createElement("div");
+      zoneArtLayer.id = "store-zone-art-layer";
+      zoneArtLayer.className = "store-zone-art-layer";
+      zoneArtLayer.setAttribute("aria-hidden", "true");
+      zoneArtLayer.innerHTML = `
+        <img class="store-zone-art-image zone-1" src="./assets/images/world/bright_empty_space/first_empty_space.png" alt="" draggable="false" />
+        <img class="store-zone-art-image zone-2" src="./assets/images/world/bright_empty_space/second_empty_space.png" alt="" draggable="false" />
+        <img class="store-zone-art-image zone-3" src="./assets/images/world/bright_empty_space/third_empty_space.png" alt="" draggable="false" />
+        <img class="store-zone-art-image zone-4" src="./assets/images/world/bright_empty_space/fourth_empty_space.png" alt="" draggable="false" />
+      `;
+      worldMap.appendChild(zoneArtLayer);
+    } else if (zoneArtLayer.parentElement !== worldMap) {
+      worldMap.appendChild(zoneArtLayer);
+    }
+
+    let stageOverlay = document.getElementById("store-stage-overlay");
+
+    if (!stageOverlay) {
+      stageOverlay = document.createElement("div");
+      stageOverlay.id = "store-stage-overlay";
+      stageOverlay.className = "store-stage-overlay hidden";
+      stageOverlay.setAttribute("aria-hidden", "true");
+      stageOverlay.innerHTML = `
+        <img src="" alt="" draggable="false" />
+      `;
+      worldMap.appendChild(stageOverlay);
+    } else if (stageOverlay.parentElement !== worldMap) {
+      worldMap.appendChild(stageOverlay);
+    }
+
+    let tilesNode = document.getElementById("store-expansion-tiles");
+
+    if (!tilesNode) {
+      tilesNode = document.createElement("div");
+      tilesNode.id = "store-expansion-tiles";
+      tilesNode.className = "store-expansion-tiles store-space-layer";
+      tilesNode.setAttribute("aria-label", "매장 공간 배치");
+      worldMap.appendChild(tilesNode);
+    } else if (tilesNode.parentElement !== worldMap) {
+      worldMap.appendChild(tilesNode);
+    }
+
+    let interactionLayer = document.getElementById("store-interaction-layer");
+
+    if (!interactionLayer) {
+      interactionLayer = document.createElement("div");
+      interactionLayer.id = "store-interaction-layer";
+      interactionLayer.className = "store-interaction-layer";
+      worldMap.appendChild(interactionLayer);
+    } else if (interactionLayer.parentElement !== worldMap) {
+      worldMap.appendChild(interactionLayer);
+    }
+
+    let popover = document.getElementById("store-expansion-popover");
+
+    if (!popover) {
+      popover = document.createElement("aside");
+      popover.id = "store-expansion-popover";
+      popover.className = "store-expansion-popover expansion-condition-popover hidden";
+      popover.setAttribute("aria-live", "polite");
+    }
+
+    if (popover.parentElement !== storeArea) {
+      storeArea.appendChild(popover);
+    }
+
+    return worldMap;
+  },
+
+  getStoreInteractionLayer() {
+    this.ensureStoreWorldMap();
+
+    return document.getElementById("store-interaction-layer");
+  },
+
+  moveGameplayNodesToInteractionLayer() {
+    const interactionLayer = document.getElementById("store-interaction-layer");
+
+    if (!interactionLayer) return;
+
+    [
+      "entrance-zone",
+      "shelf-zone",
+      "counter-zone",
+      "player-zone",
+      "customer-layer",
+      "staff-character",
+      "delivery-box-zone"
+    ].forEach((nodeId) => {
+      const node = document.getElementById(nodeId);
+
+      if (node && node.parentElement !== interactionLayer) {
+        interactionLayer.appendChild(node);
+      }
+    });
+  },
+
+  bindWorldCameraEvents() {
+    if (this.isWorldCameraBound) return;
+
+    const viewport = document.getElementById("store-area");
+
+    if (!viewport) return;
+
+    this.isWorldCameraBound = true;
+
+    viewport.addEventListener("wheel", (event) => {
+      this.handleStoreCameraWheel(event);
+    }, { passive: false });
+
+    viewport.addEventListener("pointerdown", (event) => {
+      this.handleStoreCameraPointerDown(event);
+    });
+
+    window.addEventListener("pointermove", (event) => {
+      this.handleStoreCameraPointerMove(event);
+    });
+
+    window.addEventListener("pointerup", () => {
+      this.handleStoreCameraPointerUp();
+    });
+
+    window.addEventListener("pointercancel", () => {
+      this.handleStoreCameraPointerUp();
+    });
+
+    viewport.addEventListener("click", (event) => {
+      this.handleStoreCameraViewportClick(event);
+    });
+
+    viewport.addEventListener("touchstart", (event) => {
+      this.handleStoreCameraTouchStart(event);
+    }, { passive: false });
+
+    viewport.addEventListener("touchmove", (event) => {
+      this.handleStoreCameraTouchMove(event);
+    }, { passive: false });
+
+    viewport.addEventListener("touchend", () => {
+      this.handleStoreCameraTouchEnd();
+    });
+
+    viewport.addEventListener("touchcancel", () => {
+      this.handleStoreCameraTouchEnd();
+    });
+
+    window.addEventListener("resize", () => {
+      window.clearTimeout(this.worldCamera.resizeTimerId);
+      this.worldCamera.resizeTimerId = window.setTimeout(() => {
+        const activeZoneId = this.selectedExpansionZoneId || "zone_basic";
+
+        if (this.worldCamera.zoom <= this.getStoreCameraMinZoom() + 0.08) {
+          this.fitStoreWorld();
+          return;
+        }
+
+        this.focusStoreSpace(activeZoneId, { zoom: this.worldCamera.zoom });
+      }, 120);
+    });
+  },
+
+  handleStoreCameraWheel(event) {
+    event.preventDefault();
+
+    const zoomDelta = event.deltaY > 0 ? -0.08 : 0.08;
+    const nextZoom = this.worldCamera.zoom + zoomDelta;
+
+    this.zoomStoreCameraAt(event.clientX, event.clientY, nextZoom);
+  },
+
+  handleStoreCameraPointerDown(event) {
+    if (event.button !== undefined && event.button !== 0) return;
+
+    const isBlockedTarget = event.target.closest?.(
+      ".store-expansion-popover, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, button[data-player-action]"
+    );
+
+    if (isBlockedTarget) return;
+
+    this.worldCamera.isDragging = true;
+    this.worldCamera.wasDragging = false;
+    this.worldCamera.dragStartX = event.clientX;
+    this.worldCamera.dragStartY = event.clientY;
+    this.worldCamera.startX = this.worldCamera.x;
+    this.worldCamera.startY = this.worldCamera.y;
+
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
+  },
+
+  handleStoreCameraPointerMove(event) {
+    if (!this.worldCamera.isDragging) return;
+
+    const dx = event.clientX - this.worldCamera.dragStartX;
+    const dy = event.clientY - this.worldCamera.dragStartY;
+
+    if (Math.abs(dx) + Math.abs(dy) > 4) {
+      this.worldCamera.wasDragging = true;
+    }
+
+    this.worldCamera.x = this.worldCamera.startX + dx;
+    this.worldCamera.y = this.worldCamera.startY + dy;
+    this.updateWorldCameraTransform();
+  },
+
+  handleStoreCameraPointerUp() {
+    if (!this.worldCamera.isDragging) return;
+
+    this.worldCamera.isDragging = false;
+
+    window.setTimeout(() => {
+      this.worldCamera.wasDragging = false;
+    }, 80);
+  },
+
+  handleStoreCameraViewportClick(event) {
+    const isBlockedTarget = event.target.closest?.(
+      ".store-expansion-popover, .store-space-popover-trigger, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, #message-panel, #top-ui, #bottom-ui, button[data-player-action]"
+    );
+
+    if (isBlockedTarget || this.worldCamera.wasDragging) {
+      return;
+    }
+
+    const hitZone = this.getStoreZoneAtViewportPoint(event.clientX, event.clientY);
+
+    if (!hitZone) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.closeStoreExpansionPopover();
+    this.focusStoreSpace(hitZone.id, { zoom: "auto" });
+
+    if (hitZone.level === 1) {
+      this.showMessage("기본 매장으로 이동했습니다. 진열대/계산대 오브젝트는 에셋 연결 후 이 위치에 교체됩니다.");
+      return;
+    }
+
+    this.showMessage(
+      hitZone.isUnlocked
+        ? "확장 완료된 구역으로 이동했습니다."
+        : "아직 확장되지 않은 구역입니다. 구역명 라벨을 누르면 조건을 확인할 수 있습니다."
+    );
+  },
+
+  getStoreZoneAtViewportPoint(clientX, clientY) {
+    const viewport = document.getElementById("store-area");
+
+    if (!viewport) return null;
+
+    const rect = viewport.getBoundingClientRect();
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+
+    if (
+      localX < 0 ||
+      localY < 0 ||
+      localX > rect.width ||
+      localY > rect.height
+    ) {
+      return null;
+    }
+
+    const worldX = (localX - this.worldCamera.x) / this.worldCamera.zoom;
+    const worldY = (localY - this.worldCamera.y) / this.worldCamera.zoom;
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+
+    return zoneStates
+      .map((zone) => {
+        return {
+          zone,
+          scene: this.getSpaceSceneViewModel(zone)
+        };
+      })
+      .filter(({ scene }) => {
+        return (
+          worldX >= scene.x &&
+          worldX <= scene.x + scene.width &&
+          worldY >= scene.y &&
+          worldY <= scene.y + scene.height
+        );
+      })
+      .sort((first, second) => {
+        return Number(second.scene.depth) - Number(first.scene.depth);
+      })[0]?.zone ?? null;
+  },
+
+  handleStoreCameraTouchStart(event) {
+    if (event.touches.length !== 2) return;
+
+    event.preventDefault();
+    this.worldCamera.isDragging = false;
+    this.worldCamera.pinchStartDistance = this.getPinchDistance(event.touches);
+    this.worldCamera.pinchStartZoom = this.worldCamera.zoom;
+  },
+
+  handleStoreCameraTouchMove(event) {
+    if (event.touches.length !== 2 || this.worldCamera.pinchStartDistance <= 0) return;
+
+    event.preventDefault();
+
+    const distance = this.getPinchDistance(event.touches);
+    const midpointX = (event.touches[0].clientX + event.touches[1].clientX) / 2;
+    const midpointY = (event.touches[0].clientY + event.touches[1].clientY) / 2;
+    const ratio = distance / this.worldCamera.pinchStartDistance;
+    const nextZoom = this.worldCamera.pinchStartZoom * ratio;
+
+    this.zoomStoreCameraAt(midpointX, midpointY, nextZoom);
+  },
+
+  handleStoreCameraTouchEnd() {
+    this.worldCamera.pinchStartDistance = 0;
+  },
+
+  getPinchDistance(touches) {
+    if (!touches || touches.length < 2) return 0;
+
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+
+    return Math.sqrt(dx * dx + dy * dy);
+  },
+
+  zoomStoreCameraAt(clientX, clientY, nextZoom) {
+    const viewport = document.getElementById("store-area");
+
+    if (!viewport) return;
+
+    const rect = viewport.getBoundingClientRect();
+    const oldZoom = this.worldCamera.zoom;
+    const safeZoom = this.setStoreCameraZoom(nextZoom, false);
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+    const worldX = (localX - this.worldCamera.x) / oldZoom;
+    const worldY = (localY - this.worldCamera.y) / oldZoom;
+
+    this.worldCamera.x = localX - worldX * safeZoom;
+    this.worldCamera.y = localY - worldY * safeZoom;
+    this.updateWorldCameraTransform();
+  },
+
+  getWorldCoverZoom() {
+    const viewport = document.getElementById("store-area");
+    const worldMap = document.getElementById("store-world-map");
+
+    if (!viewport || !worldMap) {
+      return this.worldCamera.minZoom;
+    }
+
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 540;
+    const worldWidth = worldMap.offsetWidth || 1672;
+    const worldHeight = worldMap.offsetHeight || 941;
+
+    return Math.max(
+      viewportWidth / worldWidth,
+      viewportHeight / worldHeight,
+      this.worldCamera.minZoom
+    );
+  },
+
+  getStoreCameraMinZoom() {
+    return this.getWorldCoverZoom();
+  },
+
+  getStoreCameraSafeArea(viewportWidth = 960, viewportHeight = 540) {
+    const left = Math.max(72, Math.min(170, viewportWidth * 0.16));
+    const right = Math.max(56, Math.min(96, viewportWidth * 0.09));
+    const top = Math.max(58, Math.min(96, viewportHeight * 0.12));
+    const bottom = Math.max(84, Math.min(116, viewportHeight * 0.15));
+
+    return {
+      left,
+      right,
+      top,
+      bottom,
+      width: Math.max(240, viewportWidth - left - right),
+      height: Math.max(180, viewportHeight - top - bottom)
+    };
+  },
+
+  setStoreCameraZoom(nextZoom, shouldUpdate = true) {
+    const minZoom = this.getStoreCameraMinZoom();
+    const maxZoom = Math.max(this.worldCamera.maxZoom, minZoom);
+    const requestedZoom = Number(nextZoom) || this.worldCamera.focusZoom;
+    const zoom = Math.min(maxZoom, Math.max(minZoom, requestedZoom));
+
+    this.worldCamera.zoom = zoom;
+
+    if (shouldUpdate) {
+      this.updateWorldCameraTransform();
+    }
+
+    return zoom;
+  },
+
+  focusStoreSpace(zoneId = "zone_basic", options = {}) {
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const zone = zoneStates.find((candidate) => candidate.id === zoneId) ?? zoneStates[0];
+    const scene = this.getSpaceSceneViewModel(zone);
+    const viewport = document.getElementById("store-area");
+
+    if (!scene || !viewport) return;
+
+    this.currentFocusedZoneId = zone.id;
+
+    const requestedZoom = options.zoom;
+    const autoZoom = this.getStoreSpaceFocusZoom(scene);
+    const zoom = this.setStoreCameraZoom(
+      typeof requestedZoom === "number" ? requestedZoom : autoZoom,
+      false
+    );
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 560;
+    const safeArea = this.getStoreCameraSafeArea(viewportWidth, viewportHeight);
+    const viewportCenterX = safeArea.left + safeArea.width / 2;
+    const viewportCenterY = safeArea.top + safeArea.height / 2;
+    const centerX = (Number(scene.focusX) || scene.x + scene.width / 2) + (Number(scene.focusOffsetX) || 0);
+    const centerY = (Number(scene.focusY) || scene.y + scene.height / 2) + (Number(scene.focusOffsetY) || 0);
+
+    this.worldCamera.x = Math.round(viewportCenterX - centerX * zoom);
+    this.worldCamera.y = Math.round(viewportCenterY - centerY * zoom);
+    this.setStoreViewMode("focus");
+    this.updateWorldCameraTransform();
+  },
+
+  getStoreSpaceFocusZoom(scene = {}) {
+    const viewport = document.getElementById("store-area");
+    const viewportWidth = viewport?.clientWidth || 960;
+    const viewportHeight = viewport?.clientHeight || 540;
+    const safeArea = this.getStoreCameraSafeArea(viewportWidth, viewportHeight);
+    const sceneWidth = Math.max(1, Number(scene.focusWidth) || Number(scene.width) || 560);
+    const sceneHeight = Math.max(1, Number(scene.focusHeight) || Number(scene.height) || 360);
+    const widthZoom = safeArea.width / (sceneWidth * 1.08);
+    const heightZoom = safeArea.height / (sceneHeight * 1.18);
+    const coverZoom = this.getWorldCoverZoom();
+    const targetZoom = Math.min(widthZoom, heightZoom, this.worldCamera.maxZoom);
+
+    return Math.max(
+      coverZoom + 0.16,
+      Math.min(this.worldCamera.maxZoom, targetZoom)
+    );
+  },
+
+  setStoreViewMode(mode = "focus") {
+    const storeArea = document.getElementById("store-area");
+
+    if (!storeArea) return;
+
+    const isOverview = mode === "overview";
+
+    storeArea.classList.toggle("is-world-overview", isOverview);
+    storeArea.classList.toggle("is-zone-focused", !isOverview);
+    this.renderFocusedZonePanel(this.currentFocusedZoneId);
+  },
+
+  fitStoreWorld() {
+    const viewport = document.getElementById("store-area");
+    const worldMap = document.getElementById("store-world-map");
+
+    if (!viewport || !worldMap) return;
+
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 560;
+    const coverZoom = this.getWorldCoverZoom();
+    const unifiedStoreZoom = Math.max(
+      coverZoom,
+      Math.min(this.worldCamera.maxZoom, viewportWidth / 1260, viewportHeight / 760)
+    );
+    const zoom = this.setStoreCameraZoom(unifiedStoreZoom, false);
+    const storeCenterX = 845;
+    const storeCenterY = 505;
+
+    this.worldCamera.x = Math.round(viewportWidth / 2 - storeCenterX * zoom);
+    this.worldCamera.y = Math.round(viewportHeight / 2 - storeCenterY * zoom);
+    this.setStoreViewMode("overview");
+    this.updateWorldCameraTransform();
+  },
+
+  updateWorldCameraTransform() {
+    const worldMap = document.getElementById("store-world-map");
+
+    if (!worldMap) return;
+
+    this.clampWorldCamera();
+
+    const storeArea = document.getElementById("store-area");
+    const overviewThreshold = this.getStoreCameraMinZoom() + 0.18;
+    const shouldUseOverviewLabels = this.worldCamera.zoom <= overviewThreshold;
+
+    if (storeArea) {
+      storeArea.classList.toggle("is-world-overview", shouldUseOverviewLabels);
+      storeArea.classList.toggle("is-zone-focused", !shouldUseOverviewLabels);
+    }
+
+    worldMap.style.transform = `translate(${this.worldCamera.x}px, ${this.worldCamera.y}px) scale(${this.worldCamera.zoom})`;
+    this.positionStoreExpansionPopover(this.selectedExpansionZoneId);
+    this.renderFocusedZonePanel(this.currentFocusedZoneId);
+  },
+
+  clampWorldCamera() {
+    const viewport = document.getElementById("store-area");
+    const worldMap = document.getElementById("store-world-map");
+
+    if (!viewport || !worldMap) return;
+
+    const minZoom = this.getStoreCameraMinZoom();
+
+    if (this.worldCamera.zoom < minZoom) {
+      this.worldCamera.zoom = minZoom;
+    }
+
+    const scaledWidth = worldMap.offsetWidth * this.worldCamera.zoom;
+    const scaledHeight = worldMap.offsetHeight * this.worldCamera.zoom;
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 560;
+    const minX = Math.min(0, viewportWidth - scaledWidth);
+    const minY = Math.min(0, viewportHeight - scaledHeight);
+
+    if (scaledWidth <= viewportWidth) {
+      this.worldCamera.x = Math.round((viewportWidth - scaledWidth) / 2);
+    } else {
+      this.worldCamera.x = Math.min(0, Math.max(minX, this.worldCamera.x));
+    }
+
+    if (scaledHeight <= viewportHeight) {
+      this.worldCamera.y = Math.round((viewportHeight - scaledHeight) / 2);
+    } else {
+      this.worldCamera.y = Math.min(0, Math.max(minY, this.worldCamera.y));
+    }
+  },
+
+  renderStoreCameraControls(zoneStates = []) {
+    const controls = document.getElementById("store-camera-controls");
+
+    if (!controls) return;
+
+    const zonesById = zoneStates.reduce((zoneMap, zone) => {
+      zoneMap[zone.id] = zone;
+      return zoneMap;
+    }, {});
+
+    controls.querySelectorAll("[data-camera-focus]").forEach((button) => {
+      const zone = zonesById[button.dataset.cameraFocus];
+      const isUnlocked = zone?.isUnlocked || zone?.level === 1;
+
+      button.classList.toggle("is-locked", Boolean(zone && !isUnlocked));
+      button.onclick = () => {
+        if (!zone) return;
+
+        this.focusStoreSpace(zone.id, { zoom: "auto" });
+
+        if (zone.level > 1 && !zone.isUnlocked) {
+          this.selectedExpansionZoneId = zone.id;
+          this.isStoreExpansionPopoverVisible = true;
+          this.renderStoreExpansionPopover(zone);
+        }
+      };
+    });
+
+    const fitButton = document.getElementById("store-camera-fit-button");
+
+    if (fitButton) {
+      fitButton.onclick = () => {
+        this.closeStoreExpansionPopover();
+        this.fitStoreWorld();
+      };
+    }
   },
 
   renderExpansionZones(expansionState = this.expansionState) {
@@ -878,9 +1831,11 @@ export const UIManager = {
         : "기본 구역";
       const actionText = zone.isUnlocked
         ? "완료"
-        : zone.isAvailable
-          ? "확장"
-          : "조건 부족";
+        : zone.isConstructing
+          ? "공사 중"
+          : zone.isAvailable
+            ? "확장"
+            : "조건 부족";
 
       return `
         <article
@@ -938,68 +1893,135 @@ export const UIManager = {
 
     if (!tilesNode) return;
 
-    const displayNames = {
-      zone_extra_shelf: "Lv.2 추가 진열 구역",
-      zone_cold_food: "Lv.3 냉장·도시락 구역",
-      zone_premium_store: "Lv.4 프리미엄 매장 구역"
-    };
-    const objectLabels = {
-      zone_extra_shelf: "추가 진열대",
-      zone_cold_food: "냉장 상품 구역",
-      zone_premium_store: "프리미엄 매장 구역"
-    };
-    const visualZones = zoneStates.filter((zone) => zone.level > 1);
+    const visualZones = zoneStates.length > 0
+      ? zoneStates
+      : this.getExpansionZoneViewModels(this.expansionState);
+    const zonesById = visualZones.reduce((zoneMap, zone) => {
+      zoneMap[zone.id] = zone;
+      return zoneMap;
+    }, {});
     const selectedZoneExists = visualZones.some((zone) => {
       return zone.id === this.selectedExpansionZoneId;
     });
 
     if (!selectedZoneExists) {
-      this.selectedExpansionZoneId = visualZones[0]?.id ?? null;
+      this.selectedExpansionZoneId = null;
     }
 
+    this.updateStoreWorldArtLayers(visualZones);
+    this.renderStoreCameraControls(visualZones);
+
     tilesNode.innerHTML = visualZones.map((zone) => {
-      const displayName = displayNames[zone.id] ?? zone.name;
-      const objectLabel = objectLabels[zone.id] ?? "추가 진열 구역";
+      const scene = this.getSpaceSceneViewModel(zone);
+      const imageSrc = this.getStoreSpaceImageSrc(zone);
       const statusText = this.getStoreExpansionStatusText(zone);
+      const isCovered = zone.level > 1 && !zone.isUnlocked;
       const selectedClass =
         this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId
           ? " is-selected"
           : "";
+      const coveredClass = isCovered ? " is-covered" : "";
+      const availableClass = zone.isAvailable ? " is-expandable" : "";
+      const cloudHtml = isCovered && scene.cloudAsset
+        ? `<img class="store-space-cloud" src="${scene.cloudAsset}" alt="" draggable="false" aria-hidden="true" />`
+        : "";
+      const lockHtml = isCovered && scene.lockAsset
+        ? `<img class="store-space-lock" src="${scene.lockAsset}" alt="" draggable="false" aria-hidden="true" />`
+        : "";
+      const hintText = zone.level === 1
+        ? "기본 플레이 구역"
+        : zone.isUnlocked
+          ? "확장 완료"
+          : zone.isConstructing
+            ? "공사 중"
+            : zone.isAvailable
+              ? "확장 가능"
+              : "눌러서 조건 확인";
 
       return `
-        <button
-          class="store-expansion-tile store-expansion-${zone.status}${selectedClass}"
-          type="button"
+        <article
+          class="store-space-tile store-expansion-${zone.status}${selectedClass}${coveredClass}${availableClass}"
+          role="button"
+          tabindex="0"
           data-zone-id="${zone.id}"
           data-zone-level="${zone.level}"
-          aria-label="${displayName} ${statusText}"
+          style="--space-x: ${scene.x}px; --space-y: ${scene.y}px; --space-width: ${scene.width}px; --space-height: ${scene.height}px; --space-depth: ${scene.depth}; --space-label-left: ${scene.labelX}%; --space-label-top: ${scene.labelY}%;"
+          aria-label="${scene.label} ${statusText}"
           aria-expanded="${this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId ? "true" : "false"}"
         >
-          <span class="store-expansion-tile-icon" aria-hidden="true">
-            ${zone.isUnlocked ? "✓" : "🔒"}
+          <img class="store-space-image" src="${imageSrc}" alt="" draggable="false" />
+          ${cloudHtml}
+          ${lockHtml}
+          <span class="store-space-focus-ring" aria-hidden="true"></span>
+          <span
+            class="store-space-label store-space-popover-trigger"
+            role="button"
+            tabindex="0"
+            aria-label="${scene.label} 확장 조건 확인"
+          >
+            <strong>${scene.label}</strong>
+            <em>${hintText}</em>
           </span>
-          <strong>${displayName}</strong>
-          <span class="store-expansion-tile-status">${statusText}</span>
-          <span class="store-expansion-tile-object">
-            ${zone.isUnlocked ? objectLabel : "박스더미"}
-          </span>
-          <span class="store-expansion-tile-hint">
-            ${zone.isUnlocked ? "추가 공간 사용 중" : "확장 조건 보기"}
-          </span>
-        </button>
+        </article>
       `;
     }).join("");
 
-    const zonesById = visualZones.reduce((zoneMap, zone) => {
-      zoneMap[zone.id] = zone;
-      return zoneMap;
-    }, {});
+    this.renderStoreInteractionHotspots(visualZones);
 
-    tilesNode.querySelectorAll(".store-expansion-tile").forEach((zoneNode) => {
-      zoneNode.onclick = () => {
+    tilesNode.querySelectorAll(".store-space-tile").forEach((zoneNode) => {
+      const focusZone = (event = null) => {
+        if (this.worldCamera.wasDragging) {
+          return;
+        }
+
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
         const zone = zonesById[zoneNode.dataset.zoneId];
 
         if (!zone) return;
+
+        this.closeStoreExpansionPopover();
+        this.focusStoreSpace(zone.id, { zoom: "auto" });
+
+        if (zone.level === 1) {
+          this.showMessage("기본 매장으로 이동했습니다. 진열대/계산대 오브젝트는 에셋 연결 후 이 위치에 교체됩니다.");
+          return;
+        }
+
+        this.showMessage(
+          zone.isUnlocked
+            ? "확장 완료된 구역으로 이동했습니다."
+            : zone.isConstructing
+              ? "현재 공사 중인 구역입니다."
+              : "아직 확장되지 않은 구역입니다. 구역명 라벨을 누르면 조건을 확인할 수 있습니다."
+        );
+      };
+
+      zoneNode.onclick = focusZone;
+      zoneNode.onkeydown = (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+
+        focusZone(event);
+      };
+    });
+
+    tilesNode.querySelectorAll(".store-space-popover-trigger").forEach((triggerNode) => {
+      const zoneNode = triggerNode.closest(".store-space-tile");
+      const openZonePopover = (event = null) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const zone = zonesById[zoneNode?.dataset.zoneId];
+
+        if (!zone) return;
+
+        if (zone.level === 1) {
+          this.closeStoreExpansionPopover();
+          this.focusStoreSpace(zone.id, { zoom: "auto" });
+          this.showMessage("기본 매장으로 이동했습니다. 진열대/계산대 오브젝트는 에셋 연결 후 이 위치에 교체됩니다.");
+          return;
+        }
 
         const isSameVisibleZone =
           this.isStoreExpansionPopoverVisible &&
@@ -1012,16 +2034,214 @@ export const UIManager = {
 
         this.selectedExpansionZoneId = zone.id;
         this.isStoreExpansionPopoverVisible = true;
+        this.focusStoreSpace(zone.id, { zoom: "auto" });
         this.showMessage(
           zone.isUnlocked
             ? "확장 완료된 구역입니다."
-            : "아직 확장되지 않은 구역입니다."
+            : zone.isConstructing
+              ? "현재 공사 중인 구역입니다."
+              : "아직 확장되지 않은 구역입니다."
         );
-        this.renderStoreExpansionZones(zoneStates);
+        window.setTimeout(() => {
+          this.renderStoreExpansionZones(this.getExpansionZoneViewModels(this.expansionState));
+        }, 0);
+      };
+
+      triggerNode.onpointerdown = (event) => {
+        event.stopPropagation();
+        this.worldCamera.isDragging = false;
+        this.worldCamera.wasDragging = false;
+      };
+
+      triggerNode.onclick = openZonePopover;
+      triggerNode.onkeydown = (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+
+        openZonePopover(event);
       };
     });
 
     this.renderStoreExpansionPopover(zonesById[this.selectedExpansionZoneId]);
+  },
+
+  updateStoreWorldArtLayers(zoneStates = []) {
+    const stageOverlay = document.getElementById("store-stage-overlay");
+    const stageOverlayImage = stageOverlay?.querySelector("img");
+
+    if (!stageOverlay || !stageOverlayImage) return;
+
+    const overlaySrc = this.getStoreStageOverlaySrc(zoneStates);
+
+    if (!overlaySrc) {
+      stageOverlay.classList.add("hidden");
+      stageOverlayImage.setAttribute("src", "");
+      return;
+    }
+
+    stageOverlayImage.setAttribute("src", overlaySrc);
+    stageOverlay.classList.remove("hidden");
+  },
+
+  getStoreStageOverlaySrc(zoneStates = []) {
+    const constructingZone = zoneStates.find((zone) => zone.isConstructing);
+
+    if (constructingZone) {
+      if (constructingZone.id === "zone_extra_shelf") {
+        return "./assets/images/world/fixing/fixing_second_space.png";
+      }
+
+      if (constructingZone.id === "zone_cold_food") {
+        return "./assets/images/world/fixing/fixing_third_space.png";
+      }
+
+      if (constructingZone.id === "zone_premium_store") {
+        return "./assets/images/world/fixing/fixing_fourth_space.png";
+      }
+    }
+
+    const unlockedLevels = zoneStates
+      .filter((zone) => zone.isUnlocked)
+      .map((zone) => Number(zone.level))
+      .sort((a, b) => a - b);
+    const highestUnlockedLevel = unlockedLevels[unlockedLevels.length - 1] ?? 1;
+
+    if (highestUnlockedLevel <= 1) {
+      return "./assets/images/world/state/all_dark_empty_space.png";
+    }
+
+    if (highestUnlockedLevel === 2) {
+      return "./assets/images/world/state/two_dark_empty_space.png";
+    }
+
+    if (highestUnlockedLevel === 3) {
+      return "./assets/images/world/state/one_dark_empty_space.png";
+    }
+
+    return "";
+  },
+
+  getSpaceSceneViewModel(zone = {}) {
+    const scene = zone.scene ?? {};
+    const fallbackByLevel = {
+      1: { x: 335, y: 515, width: 560, height: 370 },
+      2: { x: 330, y: 135, width: 565, height: 360 },
+      3: { x: 890, y: 535, width: 585, height: 329 },
+      4: { x: 895, y: 145, width: 575, height: 320 }
+    };
+    const fallback = fallbackByLevel[zone.level] ?? fallbackByLevel[1];
+
+    const x = Number(scene.worldX) || fallback.x;
+    const y = Number(scene.worldY) || fallback.y;
+    const width = Number(scene.worldWidth) || fallback.width;
+    const height = Number(scene.worldHeight) || fallback.height;
+
+    return {
+      x,
+      y,
+      width,
+      height,
+      focusX: Number(scene.focusWorldX) || x + width / 2,
+      focusY: Number(scene.focusWorldY) || y + height / 2,
+      focusWidth: Number(scene.focusWorldWidth) || width,
+      focusHeight: Number(scene.focusWorldHeight) || height,
+      focusOffsetX: Number(scene.focusOffsetX) || 0,
+      focusOffsetY: Number(scene.focusOffsetY) || 0,
+      labelX: Number(scene.labelX) || 50,
+      labelY: Number(scene.labelY) || (Number(zone.level) === 1 ? 10 : 13),
+      popoverAnchorX: Number(scene.popoverAnchorX) || null,
+      popoverAnchorY: Number(scene.popoverAnchorY) || null,
+      popoverOffsetX: Number(scene.popoverOffsetX) || 0,
+      popoverOffsetY: Number(scene.popoverOffsetY) || 0,
+      depth: Number(scene.depth) || Number(zone.level) || 1,
+      label: scene.mapLabel ?? zone.name ?? "매장 구역",
+      focusZoom: Number(scene.focusZoom) || this.worldCamera.focusZoom,
+      brightAsset: scene.brightAsset ?? "./assets/images/world/bright_empty_space/first_empty_space.png",
+      darkAsset: scene.darkAsset ?? scene.brightAsset ?? "./assets/images/world/bright_empty_space/first_empty_space.png",
+      cloudAsset: scene.cloudAsset ?? "./assets/images/world/icon/cloud_icon2.png",
+      lockAsset: scene.lockAsset ?? "./assets/images/world/icon/lock_icon.png"
+    };
+  },
+
+  getStoreSpaceImageSrc(zone = {}) {
+    const scene = this.getSpaceSceneViewModel(zone);
+
+    if (zone.level === 1 || zone.isUnlocked) {
+      return scene.brightAsset;
+    }
+
+    return scene.darkAsset;
+  },
+
+  renderStoreInteractionHotspots(zoneStates = []) {
+    const interactionLayer = this.getStoreInteractionLayer();
+
+    if (!interactionLayer) return;
+
+    this.moveGameplayNodesToInteractionLayer();
+
+    const counterZone = document.getElementById("counter-zone");
+
+    if (counterZone) {
+      counterZone.dataset.playerAction = "checkout";
+      counterZone.setAttribute("role", "button");
+      counterZone.setAttribute("tabindex", "0");
+    }
+
+    const expansionHotspots = {
+      zone_extra_shelf: {
+        id: "extra-shelf-placeholder-zone",
+        className: "extra-shelf-placeholder-zone",
+        label: "추가 진열대",
+        description: "오브젝트 에셋 연결 예정"
+      },
+      zone_cold_food: {
+        id: "cold-food-placeholder-zone",
+        className: "cold-food-placeholder-zone",
+        label: "냉장·도시락",
+        description: "오브젝트 에셋 연결 예정"
+      },
+      zone_premium_store: {
+        id: "premium-placeholder-zone",
+        className: "premium-placeholder-zone",
+        label: "프리미엄 구역",
+        description: "오브젝트 에셋 연결 예정"
+      }
+    };
+
+    zoneStates
+      .filter((zone) => zone.level > 1)
+      .forEach((zone) => {
+        const config = expansionHotspots[zone.id];
+
+        if (!config) return;
+
+        let hotspot = document.getElementById(config.id);
+
+        if (!hotspot) {
+          hotspot = document.createElement("button");
+          hotspot.id = config.id;
+          hotspot.className = `expansion-space-hotspot ${config.className}`;
+          hotspot.type = "button";
+          interactionLayer.appendChild(hotspot);
+        } else if (hotspot.parentElement !== interactionLayer) {
+          interactionLayer.appendChild(hotspot);
+        }
+
+        hotspot.dataset.zoneId = zone.id;
+        hotspot.disabled = !zone.isUnlocked;
+        hotspot.hidden = !zone.isUnlocked;
+        hotspot.innerHTML = `
+          <strong>${config.label}</strong>
+          <span>${config.description}</span>
+        `;
+        hotspot.onclick = (event) => {
+          event.stopPropagation();
+
+          if (!zone.isUnlocked) return;
+
+          this.showMessage(`${zone.name} 오브젝트 기능은 에셋 연결 후 활성화됩니다.`);
+        };
+      });
   },
 
   closeStoreExpansionPopover() {
@@ -1033,10 +2253,11 @@ export const UIManager = {
       popover.classList.add("hidden");
       popover.classList.remove("is-visible");
       popover.removeAttribute("data-active-level");
+      popover.removeAttribute("data-active-zone");
       popover.innerHTML = "";
     }
 
-    document.querySelectorAll(".store-expansion-tile.is-selected").forEach((tile) => {
+    document.querySelectorAll(".store-expansion-tile.is-selected, .store-space-tile.is-selected").forEach((tile) => {
       tile.classList.remove("is-selected");
     });
   },
@@ -1050,6 +2271,7 @@ export const UIManager = {
       popover.classList.add("hidden");
       popover.classList.remove("is-visible");
       popover.removeAttribute("data-active-level");
+      popover.removeAttribute("data-active-zone");
       popover.innerHTML = "";
       return;
     }
@@ -1067,10 +2289,11 @@ export const UIManager = {
     popover.classList.remove("hidden");
     popover.classList.add("is-visible");
     popover.dataset.activeLevel = String(zone.level);
+    popover.dataset.activeZone = zone.id;
     popover.innerHTML = `
       <div class="store-expansion-popover-header">
         <div class="store-expansion-popover-title">
-          <span>확장 조건</span>
+          <span>구역 정보</span>
           <strong>${zone.name}</strong>
         </div>
         <button
@@ -1138,50 +2361,98 @@ export const UIManager = {
 
   positionStoreExpansionPopover(zoneId) {
     const popover = document.getElementById("store-expansion-popover");
-    const side = document.querySelector(".store-expansion-side");
-    const tile = document.querySelector(`.store-expansion-tile[data-zone-id="${zoneId}"]`);
+    const viewport = document.getElementById("store-area");
+    const tile = document.querySelector(`.store-space-tile[data-zone-id="${zoneId}"]`);
 
-    if (!popover || !side || !tile) {
+    if (!popover || !viewport || !tile || popover.classList.contains("hidden")) {
       return;
     }
 
-    if (window.matchMedia("(max-width: 760px)").matches) {
-      popover.style.left = "";
-      popover.style.top = "";
-      popover.style.width = "";
-      popover.style.removeProperty("--popover-arrow-left");
-      return;
-    }
-
-    const popoverWidth = 220;
-    const sideWidth = side.clientWidth || popoverWidth;
-    const tileCenter = tile.offsetLeft + tile.clientWidth / 2;
-    const preferredLeft = Math.round(tileCenter - popoverWidth / 2);
-    const safeLeft = Math.min(
-      Math.max(preferredLeft, 0),
-      Math.max(sideWidth - popoverWidth, 0)
+    const viewportRect = viewport.getBoundingClientRect();
+    const tileRect = tile.getBoundingClientRect();
+    const trigger = tile.querySelector('.store-space-popover-trigger');
+    const triggerRect = trigger?.getBoundingClientRect();
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 540;
+    const isCompactLandscape = window.matchMedia("(max-height: 620px), (max-width: 980px) and (orientation: landscape)").matches;
+    const topSafe = isCompactLandscape ? 86 : 108;
+    const bottomSafe = isCompactLandscape ? 82 : 112;
+    const sideSafe = isCompactLandscape ? 10 : 16;
+    const popoverWidth = Math.min(isCompactLandscape ? 236 : 268, Math.max(220, viewportWidth - sideSafe * 2));
+    const popoverHeight = popover.offsetHeight || 250;
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const zone = zoneStates.find((candidate) => candidate.id === zoneId);
+    const scene = this.getSpaceSceneViewModel(zone);
+    const customAnchorX = scene?.popoverAnchorX;
+    const customAnchorY = scene?.popoverAnchorY;
+    const tileCenterX = typeof customAnchorX === 'number'
+      ? tileRect.left - viewportRect.left + (tileRect.width * customAnchorX / 100)
+      : (triggerRect
+          ? triggerRect.left - viewportRect.left + triggerRect.width / 2
+          : tileRect.left - viewportRect.left + tileRect.width / 2);
+    const tileCenterY = typeof customAnchorY === 'number'
+      ? tileRect.top - viewportRect.top + (tileRect.height * customAnchorY / 100)
+      : (triggerRect
+          ? triggerRect.top - viewportRect.top + triggerRect.height / 2
+          : tileRect.top - viewportRect.top + tileRect.height / 2);
+    const isUpperExpansionZone = zoneId === "zone_extra_shelf" || zoneId === "zone_premium_store";
+    const popoverOffsetX = Number(scene?.popoverOffsetX) || 0;
+    const popoverOffsetY = Number(scene?.popoverOffsetY) || 0;
+    const preferredLeft = Math.round(tileCenterX - popoverWidth / 2 + popoverOffsetX);
+    const preferredTop = Math.round(
+      (isUpperExpansionZone
+        ? tileCenterY + 22
+        : tileCenterY - popoverHeight / 2) + popoverOffsetY
     );
-
-    const hintNode = tile.querySelector(".store-expansion-tile-hint");
-    const hintBottom = hintNode
-      ? hintNode.offsetTop + hintNode.offsetHeight
-      : Math.round(tile.clientHeight * 0.48);
-
-    const popoverTop = Math.min(
-      hintBottom + 12,
-      Math.max(tile.clientHeight - 250, 120)
+    const minLeft = sideSafe;
+    const maxLeft = Math.max(viewportWidth - popoverWidth - sideSafe, sideSafe);
+    const minTop = topSafe;
+    const maxTop = Math.max(viewportHeight - popoverHeight - bottomSafe, topSafe);
+    const safeLeft = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
+    const safeTop = Math.min(Math.max(preferredTop, minTop), maxTop);
+    const arrowLeft = Math.min(
+      Math.max(Math.round(tileCenterX - safeLeft), 20),
+      popoverWidth - 20
     );
-    const arrowLeft = Math.round(tileCenter - safeLeft);
 
     popover.style.left = `${safeLeft}px`;
-    popover.style.top = `${tile.offsetTop + popoverTop}px`;
+    popover.style.right = "auto";
+    popover.style.top = `${safeTop}px`;
     popover.style.width = `${popoverWidth}px`;
     popover.style.setProperty("--popover-arrow-left", `${arrowLeft}px`);
+  },
+
+  playStoreExpansionUnlockEffect(zoneId) {
+    if (!zoneId) return;
+
+    const tile = document.querySelector(`.store-space-tile[data-zone-id="${zoneId}"]`);
+
+    if (!tile) return;
+
+    tile.classList.remove("is-unlocking");
+    void tile.offsetWidth;
+    tile.classList.add("is-unlocking");
+
+    const puff = document.createElement("span");
+    puff.className = "store-expansion-puff";
+    puff.setAttribute("aria-hidden", "true");
+    tile.appendChild(puff);
+
+    this.focusStoreSpace(zoneId, { zoom: "auto" });
+
+    window.setTimeout(() => {
+      tile.classList.remove("is-unlocking");
+      puff.remove();
+    }, 1200);
   },
 
   getStoreExpansionStatusText(zone) {
     if (zone.isUnlocked) {
       return "확장 완료";
+    }
+
+    if (zone.isConstructing) {
+      return "공사 중";
     }
 
     if (zone.isAvailable) {
@@ -1247,6 +2518,8 @@ export const UIManager = {
 
   getExpansionZoneViewModels(expansionState = null) {
     const stateUnlockedZoneIds = expansionState?.unlockedZoneIds;
+    const constructionZoneId = expansionState?.constructionZoneId ?? null;
+    const isAnyConstructionActive = Boolean(constructionZoneId);
     const unlockedZoneIds = new Set(
       Array.isArray(stateUnlockedZoneIds)
         ? stateUnlockedZoneIds
@@ -1262,18 +2535,27 @@ export const UIManager = {
       const hasEnoughMoney = GameState.money >= zone.unlockCost;
       const hasRequiredDay = GameState.day >= zone.requiredDay;
       const isUnlocked = unlockedZoneIds.has(zone.id);
+      const isConstructing = constructionZoneId === zone.id;
       const isAvailable =
-        !isUnlocked && previousUnlocked && hasEnoughMoney && hasRequiredDay;
+        !isAnyConstructionActive &&
+        !isUnlocked &&
+        !isConstructing &&
+        previousUnlocked &&
+        hasEnoughMoney &&
+        hasRequiredDay;
       const status = isUnlocked
         ? "unlocked"
-        : isAvailable
-          ? "available"
-          : "locked";
+        : isConstructing
+          ? "constructing"
+          : isAvailable
+            ? "available"
+            : "locked";
 
       return {
         ...zone,
         status,
         isUnlocked,
+        isConstructing,
         isAvailable,
         previousZoneName: previousZone?.name ?? "없음",
         missingRequirements: this.getExpansionMissingRequirements(zone, {
@@ -1377,7 +2659,8 @@ export const UIManager = {
     const statusLabels = {
       unlocked: "확장 완료",
       available: "확장 가능",
-      locked: "미확장"
+      locked: "미확장",
+      constructing: "공사 중"
     };
 
     return statusLabels[status] ?? "미확장";
@@ -1437,6 +2720,10 @@ export const UIManager = {
   getExpansionGuideMessage(zone) {
     if (zone.isUnlocked) {
       return `${zone.name}은 이미 밝게 정리된 구역입니다.`;
+    }
+
+    if (zone.isConstructing) {
+      return `${zone.name} 공사 진행 중입니다. 잠시만 기다려주세요.`;
     }
 
     if (zone.isAvailable) {
@@ -1634,8 +2921,36 @@ export const UIManager = {
     return categoryLabels[category] ?? "상품";
   },
 
-  showMessage(message) {
-    document.getElementById("system-message").textContent = message;
+  showMessage(message, options = {}) {
+    const messagePanel = document.getElementById("message-panel");
+    const messageNode = document.getElementById("system-message");
+
+    if (!messagePanel || !messageNode) return;
+
+    const normalizedMessage = String(message ?? "")
+      .replace(/[\s\u00A0]*오늘의[\s\u00A0]*목표[\s\u00A0]*[·:|\-]?[\s\u00A0]*/gu, "")
+      .replace(/^[\s\u00A0]*목표[\s\u00A0]*[·:|\-]?[\s\u00A0]*/u, "")
+      .trim();
+
+    window.clearTimeout(this.notificationTimerId);
+
+    if (!normalizedMessage) {
+      messagePanel.classList.remove("is-visible");
+      messagePanel.classList.add("is-hidden");
+      messageNode.textContent = "";
+      return;
+    }
+
+    messageNode.textContent = normalizedMessage;
+    messagePanel.classList.remove("is-hidden");
+    messagePanel.classList.add("is-visible");
+
+    const duration = Number(options.duration) || 2400;
+
+    this.notificationTimerId = window.setTimeout(() => {
+      messagePanel.classList.remove("is-visible");
+      messagePanel.classList.add("is-hidden");
+    }, duration);
   },
 
   showResult(resultData) {
@@ -2002,6 +3317,33 @@ export const UIManager = {
     });
   },
 
+  getProductFallbackIcon(product = {}) {
+    const id = product.id ?? "";
+    const category = product.category ?? "";
+
+    if (id.includes("milk") || id.includes("water") || id.includes("cola") || id.includes("juice") || id.includes("coffee") || id.includes("drink")) {
+      return "🥤";
+    }
+
+    if (id.includes("ramen") || id.includes("udon")) {
+      return "🍜";
+    }
+
+    if (id.includes("kimbap") || id.includes("rice") || id.includes("lunchbox")) {
+      return "🍱";
+    }
+
+    if (id.includes("sandwich")) {
+      return "🥪";
+    }
+
+    if (id.includes("bar") || id.includes("snack") || id.includes("chips") || category === "snack") {
+      return "🍪";
+    }
+
+    return "📦";
+  },
+
   renderOrderDraft(options = {}) {
     const body = document.getElementById("order-modal-body");
     const previousList = document.querySelector(".order-product-list");
@@ -2017,83 +3359,105 @@ export const UIManager = {
       orderableProducts.map((product) => product.id)
     );
     const totalCost = this.getOrderTotalCost(orderableProducts);
+    const totalQuantity = orderableProducts.reduce((quantityTotal, product) => {
+      return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
+    }, 0);
     const isOverBudget = totalCost > GameState.money;
+    const isZeroOrderBlocked = GameState.day === 1 && totalQuantity <= 0;
     const dayScenario = this.pendingOrderPhaseData?.dayScenario ?? {};
     const recommendedProductIds = this.getRecommendedProductIdSet(dayScenario);
 
     body.innerHTML = `
-      <div class="order-modal-header">
-        <h2>컴퓨터 발주</h2>
-        <p>오늘 판매할 상품 수량을 정하고 발주를 확정하세요.</p>
-        <p class="order-market-note">[오늘 추천] 배지가 붙은 상품은 오늘 상권 정보 기준으로 수요가 높을 수 있습니다.</p>
+      <div class="order-draft-layout">
+        <section class="order-draft-sidebar" aria-label="발주 요약">
+          <div class="order-modal-header">
+            <h2>컴퓨터 발주</h2>
+            <p>오늘 판매할 상품 수량을 정하고 발주를 확정하세요.</p>
+            <p class="order-market-note">[오늘 추천] 상품은 오늘 상권 정보 기준으로 수요가 높을 수 있습니다.</p>
+          </div>
+
+          <div class="order-total-box">
+            <div>
+              <span>예상 발주 비용</span>
+              <strong>₩${totalCost.toLocaleString()}</strong>
+            </div>
+            <div>
+              <span>보유금</span>
+              <strong>₩${GameState.money.toLocaleString()}</strong>
+            </div>
+          </div>
+
+          <p class="order-budget-message${isOverBudget || isZeroOrderBlocked ? " is-warning" : ""}">
+            ${
+              isOverBudget
+                ? "보유금보다 발주 비용이 큽니다."
+                : isZeroOrderBlocked
+                  ? "Day 1에는 기본 상품을 1개 이상 발주해야 영업을 시작할 수 있습니다."
+                  : "Day 2부터는 수량 0으로도 발주 확정이 가능합니다."
+            }
+          </p>
+
+          <button id="order-confirm-button" class="order-confirm-button" type="button" ${isOverBudget || isZeroOrderBlocked ? "disabled" : ""}>
+            발주 확정
+          </button>
+        </section>
+
+        <section class="order-draft-list-panel" aria-label="발주 상품 목록">
+          <div class="order-product-list">
+            ${products.map((product) => {
+              const inventoryItem = this.inventoryByProductId[product.id];
+              const isOrderable = orderableProductIds.has(product.id);
+              const quantity = isOrderable
+                ? this.orderDraftQuantities[product.id] ?? 0
+                : 0;
+              const stockQuantity = Number.isFinite(inventoryItem?.quantity)
+                ? inventoryItem.quantity
+                : 0;
+              const orderStatusText = isOrderable
+                ? "발주 가능"
+                : this.getOrderUnavailableReason(product);
+              const isRecommended = recommendedProductIds.has(product.id);
+
+              return `
+                <article class="order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}" data-product-id="${product.id}">
+                  <div class="order-product-main">
+                    <span class="order-product-image-box">
+                      <img
+                        class="order-product-thumb"
+                        src="${product.imagePath}"
+                        alt="${product.name}"
+                        loading="lazy"
+                        decoding="async"
+                        onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+                      />
+                      <span class="order-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
+                    </span>
+                    <div class="order-product-copy">
+                      <strong class="order-product-title">
+                        ${product.name}
+                      </strong>
+                      <span>현재 재고 ${stockQuantity}개</span>
+                      <em class="order-product-status">${orderStatusText}</em>
+                    </div>
+                  </div>
+                  <div class="order-product-prices">
+                    <span>매입 ₩${product.purchasePrice.toLocaleString()}</span>
+                    <span>판매 ₩${product.salePrice.toLocaleString()}</span>
+                  </div>
+                  <div class="order-quantity-panel">
+                    ${isRecommended ? `<span class="order-recommend-badge">오늘 추천</span>` : `<span class="order-recommend-placeholder" aria-hidden="true"></span>`}
+                    <div class="order-quantity-controls">
+                      <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
+                      <strong>${quantity}</strong>
+                      <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>+</button>
+                    </div>
+                  </div>
+                </article>
+              `;
+            }).join("")}
+          </div>
+        </section>
       </div>
-
-      <div class="order-product-list">
-        ${products.map((product) => {
-          const inventoryItem = this.inventoryByProductId[product.id];
-          const isOrderable = orderableProductIds.has(product.id);
-          const quantity = isOrderable
-            ? this.orderDraftQuantities[product.id] ?? 0
-            : 0;
-          const stockQuantity = Number.isFinite(inventoryItem?.quantity)
-            ? inventoryItem.quantity
-            : 0;
-          const orderStatusText = isOrderable
-            ? "발주 가능"
-            : this.getOrderUnavailableReason(product);
-          const isRecommended = recommendedProductIds.has(product.id);
-
-          return `
-            <article class="order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}" data-product-id="${product.id}">
-              <div class="order-product-main">
-                <img
-                  class="order-product-thumb"
-                  src="${product.imagePath}"
-                  alt="${product.name}"
-                  loading="lazy"
-                  decoding="async"
-                />
-                <div>
-                  <strong class="order-product-title">
-                    ${product.name}
-                    ${isRecommended ? `<span class="order-recommend-badge">오늘 추천</span>` : ""}
-                  </strong>
-                  <span>현재 재고 ${stockQuantity}개</span>
-                  <em class="order-product-status">${orderStatusText}</em>
-                </div>
-              </div>
-              <div class="order-product-prices">
-                <span>매입 ₩${product.purchasePrice.toLocaleString()}</span>
-                <span>판매 ₩${product.salePrice.toLocaleString()}</span>
-              </div>
-              <div class="order-quantity-controls">
-                <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
-                <strong>${quantity}</strong>
-                <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>+</button>
-              </div>
-            </article>
-          `;
-        }).join("")}
-      </div>
-
-      <div class="order-total-box">
-        <div>
-          <span>예상 발주 비용</span>
-          <strong>₩${totalCost.toLocaleString()}</strong>
-        </div>
-        <div>
-          <span>보유금</span>
-          <strong>₩${GameState.money.toLocaleString()}</strong>
-        </div>
-      </div>
-
-      <p class="order-budget-message${isOverBudget ? " is-warning" : ""}">
-        ${isOverBudget ? "보유금보다 발주 비용이 큽니다." : "수량 0으로도 발주 확정이 가능합니다."}
-      </p>
-
-      <button id="order-confirm-button" class="order-confirm-button" type="button" ${isOverBudget ? "disabled" : ""}>
-        발주 확정
-      </button>
     `;
 
     this.bindOrderDraftControls(orderableProducts);
@@ -2165,9 +3529,12 @@ export const UIManager = {
     this.orderModalMode = "waiting";
 
     body.innerHTML = `
-      <div class="order-delivery-state">
-        <h2>발주 전송 완료</h2>
-        <p>거래처에서 상품을 보내는 중입니다. 약 3초 뒤 가게 앞에 택배 박스가 도착합니다.</p>
+      <div class="order-waiting-state">
+        <div class="order-waiting-card">
+          <span class="order-waiting-icon">📦</span>
+          <h2>발주 접수 중</h2>
+          <p>발주가 접수되었습니다. 잠시 후 택배 박스가 매장 앞에 도착합니다.</p>
+        </div>
       </div>
     `;
   },
@@ -2195,7 +3562,7 @@ export const UIManager = {
   },
 
   renderDeliveryBox(orderData = this.orderDeliveredData) {
-    const storeArea = document.getElementById("store-area");
+    const storeArea = this.getStoreInteractionLayer() ?? document.getElementById("store-area");
 
     if (!storeArea) return;
 
@@ -2215,6 +3582,7 @@ export const UIManager = {
       deliveryBox.id = "delivery-box-zone";
       deliveryBox.className = "delivery-box-zone";
       deliveryBox.type = "button";
+      deliveryBox.setAttribute("aria-label", "택배 박스 열기");
       storeArea.appendChild(deliveryBox);
     }
 
@@ -2224,7 +3592,15 @@ export const UIManager = {
       <strong>${remainingCount}종 정리 필요</strong>
     `;
 
-    deliveryBox.onclick = () => {
+    deliveryBox.onpointerdown = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    deliveryBox.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
       EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
         day: orderData.day ?? GameState.day,
         actionType: "open_delivery_box",
@@ -2232,7 +3608,7 @@ export const UIManager = {
         source: "delivery_box_zone"
       });
 
-      this.showOrderDelivered(this.orderDeliveredData);
+      this.showOrderDelivered(this.orderDeliveredData ?? orderData);
     };
   },
 
@@ -2277,6 +3653,12 @@ export const UIManager = {
             deliveredItems.length > 0
               ? deliveredItems.map((item) => {
                   const isSorted = Boolean(item.isSorted);
+                  const product = PRODUCTS.find((candidate) => candidate.id === item.productId) ?? {
+                    id: item.productId,
+                    name: item.productName,
+                    imagePath: item.imagePath
+                  };
+                  const imagePath = item.imagePath ?? product.imagePath ?? "";
 
                   return `
                     <button
@@ -2285,13 +3667,17 @@ export const UIManager = {
                       data-product-id="${item.productId}"
                       ${isSorted ? "disabled" : ""}
                     >
-                      <img
-                        class="delivered-product-image"
-                        src="${item.imagePath ?? ""}"
-                        alt="${item.productName}"
-                        loading="lazy"
-                        decoding="async"
-                      />
+                      <span class="delivered-product-image-box">
+                        <img
+                          class="delivered-product-image"
+                          src="${imagePath}"
+                          alt="${item.productName}"
+                          loading="lazy"
+                          decoding="async"
+                          onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+                        />
+                        <span class="delivered-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
+                      </span>
                       <span>${item.productName}</span>
                       <strong>${item.quantity}개</strong>
                       <em>${isSorted ? "정리 완료" : "클릭해서 정리"}</em>
@@ -2438,68 +3824,74 @@ export const UIManager = {
     title.textContent = `Day ${resultData.day} 정산 결과`;
 
     body.innerHTML = `
-      <div class="result-summary ${resultData.success ? "success" : "fail"}">
-        <strong>${resultText}</strong>
-        <span>${resultData.resultSummaryText ?? ""}</span>
+      <div class="result-landscape-layout">
+        <section class="result-left-panel" aria-label="영업 기록">
+          <div class="result-summary ${resultData.success ? "success" : "fail"}">
+            <strong>${resultText}</strong>
+            <span>${resultData.resultSummaryText ?? ""}</span>
+          </div>
+
+          <p class="result-section-title">영업 기록</p>
+
+          <div class="result-row">
+            <span>매출 / 목표</span>
+            <strong>₩${resultData.revenue.toLocaleString()} / ₩${resultData.targetRevenue.toLocaleString()}</strong>
+          </div>
+
+          <div class="result-row">
+            <span>순이익</span>
+            <strong>₩${resultData.profit.toLocaleString()}</strong>
+          </div>
+
+          <div class="result-row">
+            <span>병맛 점수</span>
+            <strong>${(resultData.bmScore ?? resultData.bmBonus ?? 0).toLocaleString()}</strong>
+          </div>
+
+          <div class="result-row">
+            <span>만족도</span>
+            <strong>${resultData.satisfaction} / ${resultData.targetSatisfaction}</strong>
+          </div>
+
+          <div class="result-row">
+            <span>멘탈</span>
+            <strong>${resultData.mental} / 100</strong>
+          </div>
+
+          <div class="result-row">
+            <span>손님 수</span>
+            <strong>${resultData.totalCustomers}</strong>
+          </div>
+
+          <div class="result-row">
+            <span>계산 성공</span>
+            <strong>${resultData.checkoutSuccessCount}</strong>
+          </div>
+
+          ${staffResultRows}
+        </section>
+
+        <section class="result-right-panel" aria-label="목표 체크">
+          <div class="result-check-list">
+            ${resultChecks.map((check) => {
+              return `
+                <div class="result-check ${check.success ? "success" : "fail"}">
+                  <div class="result-check-main">
+                    <span>${check.label}</span>
+                    <strong>${check.statusText}</strong>
+                  </div>
+                  <div class="result-check-value">${check.valueText}</div>
+                  <p>${check.detailText}</p>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </section>
+
+        <p class="result-next-step">${nextStepText}</p>
+
+        ${mvpText}
       </div>
-
-      <div class="result-check-list">
-        ${resultChecks.map((check) => {
-          return `
-            <div class="result-check ${check.success ? "success" : "fail"}">
-              <div class="result-check-main">
-                <span>${check.label}</span>
-                <strong>${check.statusText}</strong>
-              </div>
-              <div class="result-check-value">${check.valueText}</div>
-              <p>${check.detailText}</p>
-            </div>
-          `;
-        }).join("")}
-      </div>
-
-      <p class="result-section-title">영업 기록</p>
-
-      <div class="result-row">
-        <span>매출 / 목표</span>
-        <strong>₩${resultData.revenue.toLocaleString()} / ₩${resultData.targetRevenue.toLocaleString()}</strong>
-      </div>
-
-      <div class="result-row">
-        <span>순이익</span>
-        <strong>₩${resultData.profit.toLocaleString()}</strong>
-      </div>
-
-      <div class="result-row">
-        <span>병맛 점수</span>
-        <strong>${(resultData.bmScore ?? resultData.bmBonus ?? 0).toLocaleString()}</strong>
-      </div>
-
-      <div class="result-row">
-        <span>만족도</span>
-        <strong>${resultData.satisfaction} / ${resultData.targetSatisfaction}</strong>
-      </div>
-
-      <div class="result-row">
-        <span>멘탈</span>
-        <strong>${resultData.mental} / 100</strong>
-      </div>
-
-      <div class="result-row">
-        <span>손님 수</span>
-        <strong>${resultData.totalCustomers}</strong>
-      </div>
-
-      <div class="result-row">
-        <span>계산 성공</span>
-        <strong>${resultData.checkoutSuccessCount}</strong>
-      </div>
-
-      ${staffResultRows}
-
-      <p class="result-next-step">${nextStepText}</p>
-
-      ${mvpText}
     `;
 
     confirmButton.onclick = () => {

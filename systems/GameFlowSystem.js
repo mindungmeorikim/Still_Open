@@ -614,7 +614,13 @@ export const GameFlowSystem = {
       return;
     }
 
-    this.closeStore({ source: "stock_out" });
+    // v6.2.9: 재고가 없거나 오늘 상권 수요와 맞는 재고가 없어도 영업을 즉시 종료하지 않는다.
+    // 0개 발주/소량 발주도 플레이는 계속 가능해야 하며, 실패 여부는 하루 종료 정산에서 판정한다.
+    if (data.reason === "store_open_stock_check") {
+      UIManager.showMessage("판매 가능한 재고가 부족합니다. 그래도 영업은 진행됩니다.");
+    }
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
   isOrderReadyForCurrentDay() {

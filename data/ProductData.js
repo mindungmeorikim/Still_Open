@@ -32,7 +32,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "potato_chips",
     name: "바삭 감자칩",
-    imagePath: "./assets/images/products/potato_chips.webp",
+    imagePath: "./assets/images/products/potato_chips.png",
     category: PRODUCT_CATEGORIES.SNACK,
     purchasePrice: 900,
     salePrice: 1500,
@@ -43,7 +43,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "chocolate_bar",
     name: "달콤 초코바",
-    imagePath: "./assets/images/products/chocolate_bar.webp",
+    imagePath: "./assets/images/products/chocolate_bar.png",
     category: PRODUCT_CATEGORIES.SNACK,
     purchasePrice: 700,
     salePrice: 1200,
@@ -54,7 +54,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "banana_milk",
     name: "달콤 바나나우유",
-    imagePath: "./assets/images/products/banana_milk.webp",
+    imagePath: "./assets/images/products/banana_milk.png",
     category: PRODUCT_CATEGORIES.DRINK,
     purchasePrice: 1000,
     salePrice: 1800,
@@ -65,7 +65,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "spicy_shrimp_snack",
     name: "매콤 새우스낵",
-    imagePath: "./assets/images/products/spicy_shrimp_snack.webp",
+    imagePath: "./assets/images/products/spicy_shrimp_snack.png",
     category: PRODUCT_CATEGORIES.SNACK,
     purchasePrice: 800,
     salePrice: 1400,
@@ -76,7 +76,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "water",
     name: "맑은 생수",
-    imagePath: "./assets/images/products/water.webp",
+    imagePath: "./assets/images/products/water.png",
     category: PRODUCT_CATEGORIES.DRINK,
     purchasePrice: 500,
     salePrice: 1000,
@@ -87,7 +87,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "cola",
     name: "톡톡 콜라",
-    imagePath: "./assets/images/products/cola.webp",
+    imagePath: "./assets/images/products/cola.png",
     category: PRODUCT_CATEGORIES.DRINK,
     purchasePrice: 900,
     salePrice: 1700,
@@ -98,7 +98,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "orange_juice",
     name: "상쾌 오렌지주스",
-    imagePath: "./assets/images/products/orange_juice.webp",
+    imagePath: "./assets/images/products/orange_juice.png",
     category: PRODUCT_CATEGORIES.DRINK,
     purchasePrice: 1100,
     salePrice: 2000,
@@ -109,7 +109,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "coffee",
     name: "잠깨는 캔커피",
-    imagePath: "./assets/images/products/coffee.webp",
+    imagePath: "./assets/images/products/coffee.png",
     category: PRODUCT_CATEGORIES.DRINK,
     purchasePrice: 1000,
     salePrice: 1800,
@@ -120,7 +120,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "energy_drink",
     name: "번쩍 에너지드링크",
-    imagePath: "./assets/images/products/coffee.webp",
+    imagePath: "./assets/images/products/energy_drink.png",
     category: PRODUCT_CATEGORIES.DRINK,
     purchasePrice: 1000,
     salePrice: 1800,
@@ -131,7 +131,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "triangle_kimbap",
     name: "든든 참치삼각밥",
-    imagePath: "./assets/images/products/triangle_kimbap.webp",
+    imagePath: "./assets/images/products/triangle_kimbap.png",
     category: PRODUCT_CATEGORIES.READY_MEAL,
     purchasePrice: 800,
     salePrice: 1400,
@@ -142,7 +142,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "spicy_pork_lunchbox",
     name: "매콤 제육도시락",
-    imagePath: "./assets/images/products/spicy_pork_lunchbox.webp",
+    imagePath: "./assets/images/products/spicy_pork_lunchbox.png",
     category: PRODUCT_CATEGORIES.READY_MEAL,
     purchasePrice: 2700,
     salePrice: 4500,
@@ -154,7 +154,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "cheese_kimchi_rice",
     name: "치즈 김치볶음밥",
-    imagePath: "./assets/images/products/cheese_kimchi_rice.webp",
+    imagePath: "./assets/images/products/cheese_kimchi_rice.png",
     category: PRODUCT_CATEGORIES.READY_MEAL,
     purchasePrice: 2400,
     salePrice: 4000,
@@ -166,7 +166,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "pork_cutlet_lunchbox",
     name: "왕돈가스 도시락",
-    imagePath: "./assets/images/products/pork_cutlet_lunchbox.webp",
+    imagePath: "./assets/images/products/pork_cutlet_lunchbox.png",
     category: PRODUCT_CATEGORIES.READY_MEAL,
     purchasePrice: 3200,
     salePrice: 5500,
@@ -178,7 +178,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "ramen",
     name: "뜨끈 매운컵면",
-    imagePath: "./assets/images/products/ramen.webp",
+    imagePath: "./assets/images/products/ramen.png",
     category: PRODUCT_CATEGORIES.INSTANT_FOOD,
     purchasePrice: 900,
     salePrice: 1600,
@@ -189,7 +189,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "udon",
     name: "만번 조린 셰프의 우동",
-    imagePath: "./assets/images/products/udon.webp",
+    imagePath: "./assets/images/products/udon.png",
     category: PRODUCT_CATEGORIES.INSTANT_FOOD,
     purchasePrice: 1100,
     salePrice: 1900,
@@ -200,7 +200,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "egg_sandwich",
     name: "촉촉 달걀샌드",
-    imagePath: "./assets/images/products/egg_sandwich.webp",
+    imagePath: "./assets/images/products/egg_sandwich.png",
     category: PRODUCT_CATEGORIES.FRESH_FOOD,
     purchasePrice: 1500,
     salePrice: 2800,
@@ -211,7 +211,7 @@ export const PRODUCTS = Object.freeze([
   createProduct({
     id: "sausage_hotbar",
     name: "소시지 핫바",
-    imagePath: "./assets/images/products/sausage_hotbar.webp",
+    imagePath: "./assets/images/products/sausage_hotbar.png",
     category: PRODUCT_CATEGORIES.FRESH_FOOD,
     purchasePrice: 1200,
     salePrice: 2200,
