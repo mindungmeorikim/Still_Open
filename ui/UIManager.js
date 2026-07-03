@@ -58,6 +58,7 @@ export const UIManager = {
   resultReward2xAdTimerId: null,
   upgradeModal: null,
   endingModal: null,
+  infiniteGameOverModal: null,
   dayScenarioModal: null,
   orderModal: null,
   staffHireModal: null,
@@ -122,6 +123,7 @@ export const UIManager = {
     this.createResultModal();
     this.createUpgradeModal();
     this.createEndingModal();
+    this.createInfiniteGameOverModal();
     this.createCustomerEventModal();
     this.createTitleScreen();
     this.createSettingsModal();
@@ -273,15 +275,40 @@ export const UIManager = {
     if (resumeState) {
       const saveSummary = SaveSystem.getSaveSummary();
 
-      resumeState.textContent = hasSaveData && saveSummary
-        ? `저장 데이터 있음 · Day ${saveSummary.day} · ₩${saveSummary.money.toLocaleString("ko-KR")}`
-        : "저장 데이터 없음";
+      if (hasSaveData && saveSummary) {
+        const modeText = saveSummary.isEndlessMode
+          ? "무한 모드 재도전 가능"
+          : "저장 데이터 있음";
+
+        resumeState.textContent = `${modeText} · Day ${saveSummary.day} · ₩${saveSummary.money.toLocaleString("ko-KR")}`;
+      } else {
+        resumeState.textContent = "저장 데이터 없음";
+      }
     }
   },
 
   enterGameFromTitle() {
     this.closeTitleScreen();
     this.showMessage("새 영업을 시작합니다. 발주 버튼으로 Day 1 준비를 시작하세요.");
+  },
+
+  showTitleScreen(message = "타이틀 화면으로 돌아왔습니다.") {
+    if (!this.titleScreen) {
+      this.createTitleScreen();
+    }
+
+    this.setElementHiddenSafely(this.titleScreen, false);
+    document.body.classList.add("is-title-screen-active");
+    this.renderTitleResumeButton();
+    this.render();
+
+    window.requestAnimationFrame(() => {
+      this.focusElementSafely(document.getElementById("title-new-game-button"));
+    });
+
+    if (message) {
+      this.showMessage(message);
+    }
   },
 
   clearFocusInsideElement(element) {
@@ -4806,7 +4833,15 @@ export const UIManager = {
     const reward2xButton = document.getElementById("result-reward-2x-ad-button");
     const reward2xStatus = document.getElementById("result-reward-2x-ad-status");
 
-    const resultText = resultData.success ? "오늘 영업 성공" : "오늘 영업 실패";
+    const isInfiniteGameOver = resultData.infiniteGameOver?.isGameOver === true;
+
+    if (isInfiniteGameOver) {
+      SaveSystem.clearSaveData();
+    }
+
+    const resultText = isInfiniteGameOver
+      ? "무한 모드 종료"
+      : resultData.success ? "오늘 영업 성공" : "오늘 영업 실패";
     const resultChecks = Array.isArray(resultData.resultChecks)
       ? resultData.resultChecks
       : [];
@@ -4816,6 +4851,9 @@ export const UIManager = {
       ? `<p class="modal-note">※ 임시 MVP 테스트 데이터가 적용되었습니다.</p>`
       : "";
     const staffResult = resultData.staff ?? {};
+    const infiniteGameOverNotice = this.createInfiniteGameOverResultNotice(
+      resultData.infiniteGameOver
+    );
     const staffResultRows = staffResult.hired
       ? `
         <div class="result-row result-row-staff">
@@ -4834,10 +4872,12 @@ export const UIManager = {
     body.innerHTML = `
       <div class="result-landscape-layout">
         <section class="result-left-panel" aria-label="영업 기록">
-          <div class="result-summary ${resultData.success ? "success" : "fail"}">
+          <div class="result-summary ${isInfiniteGameOver ? "fail is-game-over" : resultData.success ? "success" : "fail"}">
             <strong>${resultText}</strong>
             <span>${resultData.resultSummaryText ?? ""}</span>
           </div>
+
+          ${infiniteGameOverNotice}
 
           <p class="result-section-title">영업 기록</p>
 
@@ -4906,7 +4946,9 @@ export const UIManager = {
       button: reward2xButton,
       statusNode: reward2xStatus,
       resultData,
-      onReward2xAdComplete: options.onReward2xAdComplete,
+      onReward2xAdComplete: isInfiniteGameOver
+        ? null
+        : options.onReward2xAdComplete,
       onReward2xAdFail: options.onReward2xAdFail
     });
 
@@ -5090,6 +5132,123 @@ export const UIManager = {
 
     this.clearResultReward2xAdTimer();
     this.resultModal.classList.add("hidden");
+  },
+
+  createInfiniteGameOverResultNotice(infiniteGameOver = {}) {
+    if (!infiniteGameOver?.isGameOver) {
+      return "";
+    }
+
+    const reasons = Array.isArray(infiniteGameOver.reasons)
+      ? infiniteGameOver.reasons
+      : [];
+    const reasonItems = reasons.length > 0
+      ? reasons.map((reason) => {
+          return `<li><strong>${reason.label}</strong><span>${reason.detailText}</span></li>`;
+        }).join("")
+      : "<li><strong>운영 한계</strong><span>무한 모드 종료 조건이 발생했습니다.</span></li>";
+
+    return `
+      <section class="infinite-game-over-result-note" aria-label="무한 모드 종료 사유">
+        <strong>무한 모드 게임 오버</strong>
+        <p>이번 정산 확인 후 무한 모드 진행만 Day 6 초기 상태로 리셋됩니다. 타이틀의 이어하기로 다시 도전할 수 있습니다.</p>
+        <ul>${reasonItems}</ul>
+      </section>
+    `;
+  },
+
+  createInfiniteGameOverModal() {
+    if (document.getElementById("infinite-game-over-modal")) {
+      this.infiniteGameOverModal = document.getElementById("infinite-game-over-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "infinite-game-over-modal";
+    modal.className = "modal infinite-game-over-modal hidden";
+    modal.setAttribute("aria-hidden", "true");
+
+    modal.innerHTML = `
+      <div
+        class="modal-content infinite-game-over-modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="infinite-game-over-title"
+      >
+        <p class="infinite-game-over-kicker">무한 모드 종료</p>
+        <h2 id="infinite-game-over-title">오늘도 정상영업 실패...</h2>
+        <p id="infinite-game-over-description" class="infinite-game-over-description"></p>
+        <ul id="infinite-game-over-reasons" class="infinite-game-over-reasons"></ul>
+        <div class="infinite-game-over-reset-box">
+          <strong>리셋 안내</strong>
+          <p>Day 5 클리어 기록은 유지하고, 무한 모드 진행만 Day 6 초기 상태로 리셋됩니다. 타이틀의 이어하기 버튼으로 Day 6 무한 모드부터 다시 시작할 수 있습니다.</p>
+          <p class="infinite-game-over-reset-help">새로 시작을 누르면 Day 1부터 완전히 새 유저처럼 다시 시작합니다. 유료 BM 유지 처리는 이번 버전에서는 보류 상태입니다.</p>
+        </div>
+        <button id="infinite-game-over-reset-button" type="button" class="infinite-game-over-reset-button">
+          타이틀로 돌아가기
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    this.infiniteGameOverModal = modal;
+    this.prepareUiImageButtons(modal);
+  },
+
+  showInfiniteGameOverModal(infiniteGameOver = {}) {
+    if (!this.infiniteGameOverModal) {
+      this.createInfiniteGameOverModal();
+    }
+
+    const description = document.getElementById("infinite-game-over-description");
+    const reasonList = document.getElementById("infinite-game-over-reasons");
+    const resetButton = document.getElementById("infinite-game-over-reset-button");
+    const reasons = Array.isArray(infiniteGameOver.reasons)
+      ? infiniteGameOver.reasons
+      : [];
+
+    if (description) {
+      description.textContent = `Day ${infiniteGameOver.day ?? GameState.day} 무한 모드에서 운영 한계에 도달했습니다. 타이틀로 돌아가면 이어하기로 Day 6 초기 무한 모드부터 재도전할 수 있습니다.`;
+    }
+
+    if (reasonList) {
+      reasonList.innerHTML = reasons.length > 0
+        ? reasons.map((reason) => {
+            return `
+              <li>
+                <strong>${reason.label}</strong>
+                <span>${reason.detailText}</span>
+              </li>
+            `;
+          }).join("")
+        : "<li><strong>운영 한계</strong><span>무한 모드 종료 조건이 발생했습니다.</span></li>";
+    }
+
+    if (resetButton) {
+      resetButton.onclick = () => {
+        this.hideInfiniteGameOverModal();
+        const resetStatus = SaveSystem.resetInfiniteModeRun();
+        this.renderCustomers();
+        this.renderTitleResumeButton();
+
+        const message = resetStatus?.success === false
+          ? "무한 모드 초기화 저장에 실패했습니다. 새로 시작을 이용해주세요."
+          : "무한 모드 진행이 Day 6 초기 상태로 리셋되었습니다. 이어하기로 무한 모드부터 재도전하거나, 새로 시작으로 Day 1부터 완전히 다시 시작할 수 있습니다.";
+
+        this.showTitleScreen(message);
+      };
+    }
+
+    this.setElementHiddenSafely(this.infiniteGameOverModal, false);
+    window.requestAnimationFrame(() => {
+      this.focusElementSafely(resetButton);
+    });
+  },
+
+  hideInfiniteGameOverModal() {
+    if (!this.infiniteGameOverModal) return;
+
+    this.setElementHiddenSafely(this.infiniteGameOverModal, true);
   },
 
   createEndingModal() {

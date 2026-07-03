@@ -14925,3 +14925,137 @@ body.is-title-screen-active #game-root {
   55% { transform: scale(1.025); filter: brightness(1.16); }
   100% { transform: scale(1); filter: brightness(1); }
 }
+
+/* v7.0 Infinite mode game over */
+.infinite-game-over-result-note {
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border: 2px solid rgba(235, 93, 76, 0.35);
+  border-radius: 16px;
+  background: rgba(255, 238, 230, 0.92);
+  color: #5a2d24;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.46);
+}
+
+.infinite-game-over-result-note > strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.infinite-game-over-result-note p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.infinite-game-over-result-note ul,
+.infinite-game-over-reasons {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.infinite-game-over-result-note li,
+.infinite-game-over-reasons li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.infinite-game-over-result-note li strong,
+.infinite-game-over-reasons li strong {
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.infinite-game-over-result-note li span,
+.infinite-game-over-reasons li span {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.infinite-game-over-modal-content {
+  width: min(520px, calc(100vw - 34px));
+  padding: 26px;
+  border: 3px solid rgba(80, 44, 34, 0.2);
+  border-radius: 24px;
+  background: linear-gradient(180deg, #fff8e9 0%, #ffe8dc 100%);
+  color: #41281f;
+  text-align: center;
+}
+
+.infinite-game-over-kicker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 8px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(235, 93, 76, 0.16);
+  color: #b6483b;
+  font-size: 13px;
+  font-weight: 950;
+}
+
+.infinite-game-over-modal-content h2 {
+  margin: 0 0 10px;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 950;
+}
+
+.infinite-game-over-description {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.infinite-game-over-reset-box {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  text-align: left;
+}
+
+.infinite-game-over-reset-box strong {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 950;
+}
+
+.infinite-game-over-reset-box p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.infinite-game-over-reset-box .infinite-game-over-reset-help {
+  margin-top: 6px;
+  color: rgba(84, 49, 21, 0.76);
+}
+
+.infinite-game-over-reset-button {
+  min-width: 220px;
+  margin-top: 18px;
+  padding: 13px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #ff8d3b;
+  color: #fff;
+  font-weight: 950;
+  font-size: 16px;
+  box-shadow: 0 8px 0 #d76b25, 0 12px 18px rgba(80, 42, 24, 0.22);
+  cursor: pointer;
+}
+
+.infinite-game-over-reset-button:active {
+  transform: translateY(3px);
+  box-shadow: 0 5px 0 #d76b25, 0 8px 14px rgba(80, 42, 24, 0.18);
+}

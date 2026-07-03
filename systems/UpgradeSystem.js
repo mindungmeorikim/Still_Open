@@ -64,6 +64,11 @@ export const UpgradeSystem = {
       UIManager.showResultModal(
         resultData,
         () => {
+          if (resultData.infiniteGameOver?.isGameOver) {
+            UIManager.showInfiniteGameOverModal(resultData.infiniteGameOver);
+            return;
+          }
+
           EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
         },
         {

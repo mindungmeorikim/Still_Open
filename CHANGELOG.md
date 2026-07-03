@@ -1,3 +1,11 @@
+## [v7.0] Infinite mode game over conditions
+- Added: 무한 모드 게임오버 조건 판정 구조 추가
+- Added: 멘탈 0 이하 / 만족도 0 이하 / 연속 영업 실패 3회 / 최저 발주 비용 미만 + 재고 없음 조건 처리
+- Added: 무한 모드 게임오버 안내 모달 및 종료 사유 표시
+- Changed: 무한 모드 게임오버 시 업그레이드 단계로 넘어가지 않고 타이틀 복귀 흐름으로 전환
+- Fixed: 게임오버 확정 시 저장 데이터와 무한 모드 진행 데이터를 전체 리셋하도록 처리
+- Deferred: 유료 BM 유지 처리는 실제 BM 연동 전까지 보류
+
 ## [v6.9] Upgrade and unlock effects
 - Added: 신규 상품 해금 시 unlock effect 토스트 표시
 - Added: 업그레이드 선택 시 upgrade sparkle 토스트 및 카드 선택 피드백 표시
@@ -1344,3 +1352,17 @@
 - 수정 파일: `data/ExpansionData.js`, `style.css`, `CHANGELOG.md`
 - 현재 화면 구성은 `background.png`, `unified_store_stage1`, `state/all_dark_empty_space`, `two_dark_empty_space`, `one_dark_empty_space` 중심 구조 유지
 - 택배 박스 크기/클릭 영역, PlayerAction 판정 복구, 영업 시작 즉시 실패 방지 로직은 유지
+## [v7.0.1] Infinite mode retry checkpoint
+### Changed
+- 무한 모드 게임오버 후 `타이틀로 돌아가기`를 누르면 전체 새 게임 리셋이 아니라 Day 6 초기 무한 모드 체크포인트로 저장되도록 변경
+- Day 5 클리어 기록은 유지하고, 타이틀의 `이어하기` 버튼으로 Day 6 무한 모드부터 다시 시작할 수 있게 조정
+- `새로 시작` 버튼은 기존처럼 저장 데이터를 삭제하고 Day 1부터 완전히 새 유저 상태로 시작하도록 유지
+- 타이틀 이어하기 상태 문구에 무한 모드 재도전 가능 상태를 표시
+
+### Fixed
+- 무한 모드 게임오버 후 이어하기 버튼이 비활성화되거나 Day 1로 리셋되던 흐름 수정
+- 게임오버 안내 문구를 `무한 모드 진행만 초기화 / 새로 시작은 완전 초기화`로 구분해 혼동을 줄임
+
+### Notes
+- 수정 파일: `systems/SaveSystem.js`, `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 유료 BM 유지 처리는 실제 BM 연동 전까지 보류

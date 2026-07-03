@@ -21,7 +21,8 @@ import { ExpansionSystem } from "./ExpansionSystem.js";
 
 const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
-const SAVE_VERSION = "v6.8";
+const SAVE_VERSION = "v7.0.1";
+const INFINITE_MODE_START_DAY = GAME_CONFIG.MAX_STORY_DAY + 1;
 const SAVEABLE_PHASES = new Set([
   GAME_PHASE.READY,
   GAME_PHASE.DAY_START,
@@ -87,11 +88,16 @@ export const SaveSystem = {
     const money = Math.max(0, Math.floor(Number(saveData.gameState?.money) || 0));
     const savedAt = saveData.savedAt ?? null;
 
+    const isEndlessMode = saveData.gameState?.isEndlessMode === true || day > GAME_CONFIG.MAX_STORY_DAY;
+    const storyCleared = saveData.gameState?.storyCleared === true || isEndlessMode;
+
     return {
       day,
       money,
       savedAt,
-      version: saveData.version ?? "unknown"
+      version: saveData.version ?? "unknown",
+      isEndlessMode,
+      storyCleared
     };
   },
 
@@ -259,6 +265,42 @@ export const SaveSystem = {
     this.isResettingNewGame = false;
   },
 
+  resetInfiniteModeRun() {
+    if (!this.canUseLocalStorage()) {
+      return {
+        success: false,
+        reason: "local_storage_unavailable",
+        message: "저장소를 사용할 수 없어 무한 모드를 초기화하지 못했습니다."
+      };
+    }
+
+    this.isResettingNewGame = true;
+
+    this.applyGameStateSnapshot(this.createInfiniteModeStartSnapshot());
+    this.applyInventorySnapshot(this.createInfiniteModeStartInventorySnapshot());
+    this.applyExpansionSnapshot({
+      unlockedZoneIds: ["zone_basic"],
+      constructionZoneId: null
+    });
+
+    this.isResettingNewGame = false;
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    const saveStatus = this.saveNow("infinite_mode_game_over_checkpoint");
+
+    this.lastSaveStatus = {
+      ...saveStatus,
+      success: saveStatus.success === true,
+      reason: "infinite_mode_game_over_checkpoint",
+      day: INFINITE_MODE_START_DAY,
+      storyCleared: true,
+      message: "무한 모드가 Day 6 초기 상태로 리셋되었습니다."
+    };
+
+    return this.lastSaveStatus;
+  },
+
   readSaveData() {
     if (!this.canUseLocalStorage()) {
       return null;
@@ -309,6 +351,7 @@ export const SaveSystem = {
       phase: this.normalizeSavedPhase(GameState.phase),
       day: this.toPositiveInteger(GameState.day, 1),
       isEndlessMode: GameState.isEndlessMode === true,
+      storyCleared: GameState.storyCleared === true || GameState.isEndlessMode === true || GameState.day > GAME_CONFIG.MAX_STORY_DAY,
       money: this.toNonNegativeInteger(GameState.money),
       mental: this.clampStat(GameState.mental, GAME_CONFIG.START_MENTAL),
       satisfaction: this.clampStat(GameState.satisfaction, GAME_CONFIG.START_SATISFACTION),
@@ -317,6 +360,7 @@ export const SaveSystem = {
       upgrades: Array.isArray(GameState.upgrades) ? GameState.upgrades : [],
       upgradeEffects: GameState.upgradeEffects ?? null,
       difficulty: GameState.difficulty,
+      infiniteMode: GameState.infiniteMode ?? null,
       staff: GameState.staff ?? null,
       player: GameState.player ?? null,
       expansion: GameState.expansion ?? null
@@ -328,6 +372,7 @@ export const SaveSystem = {
       phase: GAME_PHASE.READY,
       day: 1,
       isEndlessMode: false,
+      storyCleared: false,
       money: GAME_CONFIG.START_MONEY,
       mental: GAME_CONFIG.START_MENTAL,
       satisfaction: GAME_CONFIG.START_SATISFACTION,
@@ -344,6 +389,12 @@ export const SaveSystem = {
         stockDecreaseRate: 1,
         eventRate: 1
       },
+      infiniteMode: {
+        consecutiveFailures: 0,
+        isGameOver: false,
+        lastGameOverReason: null,
+        lastCheckedDay: 1
+      },
       staff: null,
       player: {
         x: 600,
@@ -357,6 +408,62 @@ export const SaveSystem = {
         constructionZoneId: null,
         lastUpdatedDay: 1
       }
+    };
+  },
+
+  createInfiniteModeStartSnapshot() {
+    return {
+      ...this.createDefaultGameStateSnapshot(),
+      phase: GAME_PHASE.ENDLESS,
+      day: INFINITE_MODE_START_DAY,
+      isEndlessMode: true,
+      storyCleared: true,
+      dailyGoal: this.createInfiniteModeStartDailyGoal(),
+      difficulty: this.createInfiniteModeStartDifficulty(),
+      infiniteMode: {
+        consecutiveFailures: 0,
+        isGameOver: false,
+        lastGameOverReason: null,
+        lastGameOverDay: null,
+        lastCheckedDay: INFINITE_MODE_START_DAY
+      },
+      expansion: {
+        unlockedZoneIds: ["zone_basic"],
+        movementBounds: [],
+        customerAccessibleZones: ["door", "shelf", "counter", "exit"],
+        constructionZoneId: null,
+        lastUpdatedDay: INFINITE_MODE_START_DAY
+      }
+    };
+  },
+
+  createInfiniteModeStartDailyGoal() {
+    const extraDay = INFINITE_MODE_START_DAY - GAME_CONFIG.MAX_STORY_DAY;
+
+    return {
+      targetRevenue: 100000 + extraDay * 25000,
+      targetSatisfaction: Math.min(90, 78 + extraDay)
+    };
+  },
+
+  createInfiniteModeStartDifficulty() {
+    const extraDay = INFINITE_MODE_START_DAY - GAME_CONFIG.MAX_STORY_DAY;
+
+    return {
+      customerSpawnRate: Number((1.75 + extraDay * 0.12).toFixed(2)),
+      angryCustomerRate: Number((1.3 + extraDay * 0.07).toFixed(2)),
+      stockDecreaseRate: Number((1.28 + extraDay * 0.06).toFixed(2)),
+      eventRate: Number((1.3 + extraDay * 0.07).toFixed(2))
+    };
+  },
+
+  createInfiniteModeStartInventorySnapshot() {
+    return {
+      lots: [],
+      lotSequence: 0,
+      initializedProductIds: PRODUCTS
+        .filter((product) => product.unlockDay <= INFINITE_MODE_START_DAY)
+        .map((product) => product.id)
     };
   },
 
@@ -421,6 +528,7 @@ export const SaveSystem = {
     GameState.phase = this.normalizeLoadedPhase(nextState.phase);
     GameState.day = this.toPositiveInteger(nextState.day, 1);
     GameState.isEndlessMode = nextState.isEndlessMode === true;
+    GameState.storyCleared = nextState.storyCleared === true || GameState.isEndlessMode === true || GameState.day > GAME_CONFIG.MAX_STORY_DAY;
     GameState.money = this.toNonNegativeInteger(nextState.money);
     GameState.mental = this.clampStat(nextState.mental, GAME_CONFIG.START_MENTAL);
     GameState.satisfaction = this.clampStat(
@@ -436,6 +544,9 @@ export const SaveSystem = {
       ? this.deepClone(nextState.upgrades)
       : [];
     GameState.difficulty = this.deepClone(nextState.difficulty ?? defaultSnapshot.difficulty);
+    GameState.infiniteMode = this.normalizeInfiniteModeSnapshot(
+      nextState.infiniteMode ?? defaultSnapshot.infiniteMode
+    );
     GameState.expansion = this.deepClone(nextState.expansion ?? defaultSnapshot.expansion);
     GameState.player = this.deepClone(nextState.player ?? defaultSnapshot.player);
 
@@ -493,6 +604,22 @@ export const SaveSystem = {
     }
 
     return GAME_PHASE.READY;
+  },
+
+  normalizeInfiniteModeSnapshot(snapshot = {}) {
+    return {
+      consecutiveFailures: Math.max(
+        0,
+        Math.floor(Number(snapshot.consecutiveFailures) || 0)
+      ),
+      isGameOver: snapshot.isGameOver === true,
+      lastGameOverReason: snapshot.lastGameOverReason ?? null,
+      lastGameOverDay: snapshot.lastGameOverDay ?? null,
+      lastCheckedDay: Math.max(
+        1,
+        Math.floor(Number(snapshot.lastCheckedDay) || GameState.day || 1)
+      )
+    };
   },
 
 

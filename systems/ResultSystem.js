@@ -19,8 +19,10 @@
 
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
-import { EVENTS, GAME_PHASE } from "../core/Constants.js";
+import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
+import { getUnlockedProducts } from "../data/ProductData.js";
+import { InventorySystem } from "./InventorySystem.js";
 
 export const ResultSystem = {
   calculatedResultDay: null,
@@ -244,10 +246,20 @@ export const ResultSystem = {
     const mentalSuccess =
       GameState.mental > 0;
 
-    const success =
+    const daySuccess =
       revenueSuccess &&
       satisfactionSuccess &&
       mentalSuccess;
+
+    const infiniteModeProgress = this.updateInfiniteModeProgress(daySuccess);
+    const infiniteGameOver = this.evaluateInfiniteModeGameOver({
+      daySuccess,
+      revenueSuccess,
+      satisfactionSuccess,
+      mentalSuccess,
+      infiniteModeProgress
+    });
+    const success = daySuccess && !infiniteGameOver.isGameOver;
 
     const revenueGap = stats.revenue - GameState.dailyGoal.targetRevenue;
     const satisfactionGap =
@@ -268,12 +280,14 @@ export const ResultSystem = {
       satisfactionSuccess,
       mentalSuccess
     });
-    const resultSummaryText = this.createResultSummaryText(success, {
-      revenueSuccess,
-      satisfactionSuccess,
-      mentalSuccess
-    });
-    const nextStepText = this.createNextStepText(success);
+    const resultSummaryText = infiniteGameOver.isGameOver
+      ? infiniteGameOver.summaryText
+      : this.createResultSummaryText(success, {
+          revenueSuccess,
+          satisfactionSuccess,
+          mentalSuccess
+        });
+    const nextStepText = this.createNextStepText(success, infiniteGameOver);
 
     const resultData = {
       day: GameState.day,
@@ -311,9 +325,12 @@ export const ResultSystem = {
       satisfactionSuccess,
       mentalSuccess,
       success,
+      daySuccess,
       resultChecks,
       resultSummaryText,
       nextStepText,
+      infiniteModeProgress,
+      infiniteGameOver,
 
       mvpTestDataApplied: stats.mvpTestDataApplied === true
     };
@@ -395,6 +412,160 @@ export const ResultSystem = {
       profit: resultData.profit,
       money: resultData.money
     };
+  },
+
+  isInfiniteModeActive() {
+    return GameState.isEndlessMode === true || Number(GameState.day) > GAME_CONFIG.MAX_STORY_DAY;
+  },
+
+  ensureInfiniteModeState() {
+    if (!GameState.infiniteMode || typeof GameState.infiniteMode !== "object") {
+      GameState.infiniteMode = {};
+    }
+
+    GameState.infiniteMode.consecutiveFailures = Math.max(
+      0,
+      Math.floor(Number(GameState.infiniteMode.consecutiveFailures) || 0)
+    );
+    GameState.infiniteMode.lastCheckedDay = Math.max(
+      1,
+      Math.floor(Number(GameState.infiniteMode.lastCheckedDay) || GameState.day || 1)
+    );
+    GameState.infiniteMode.lastGameOverReason = GameState.infiniteMode.lastGameOverReason ?? null;
+    GameState.infiniteMode.isGameOver = GameState.infiniteMode.isGameOver === true;
+
+    return GameState.infiniteMode;
+  },
+
+  updateInfiniteModeProgress(daySuccess) {
+    const infiniteState = this.ensureInfiniteModeState();
+
+    if (!this.isInfiniteModeActive()) {
+      infiniteState.consecutiveFailures = 0;
+      infiniteState.isGameOver = false;
+      infiniteState.lastGameOverReason = null;
+      infiniteState.lastCheckedDay = GameState.day;
+      return {
+        isActive: false,
+        consecutiveFailures: infiniteState.consecutiveFailures,
+        lastCheckedDay: infiniteState.lastCheckedDay
+      };
+    }
+
+    if (daySuccess) {
+      infiniteState.consecutiveFailures = 0;
+    } else {
+      infiniteState.consecutiveFailures += 1;
+    }
+
+    infiniteState.lastCheckedDay = GameState.day;
+    infiniteState.isGameOver = false;
+    infiniteState.lastGameOverReason = null;
+
+    return {
+      isActive: true,
+      consecutiveFailures: infiniteState.consecutiveFailures,
+      lastCheckedDay: infiniteState.lastCheckedDay
+    };
+  },
+
+  evaluateInfiniteModeGameOver(context = {}) {
+    const infiniteState = this.ensureInfiniteModeState();
+    const isActive = this.isInfiniteModeActive();
+    const minimumOrderCost = this.getMinimumOrderCostForCurrentDay();
+    const totalInventoryQuantity = this.getTotalInventoryQuantity();
+    const hasNoInventory = totalInventoryQuantity <= 0;
+    const hasOrderDeadlock =
+      minimumOrderCost > 0 &&
+      GameState.money < minimumOrderCost &&
+      hasNoInventory;
+    const reasons = [];
+
+    if (isActive && GameState.mental <= 0) {
+      reasons.push({
+        code: "mental_zero",
+        label: "멘탈 0",
+        detailText: "멘탈이 0 이하가 되어 더 이상 영업을 이어갈 수 없습니다."
+      });
+    }
+
+    if (isActive && GameState.satisfaction <= 0) {
+      reasons.push({
+        code: "satisfaction_zero",
+        label: "만족도 0",
+        detailText: "만족도가 0 이하가 되어 손님 신뢰를 잃었습니다."
+      });
+    }
+
+    if (isActive && context.infiniteModeProgress?.consecutiveFailures >= 3) {
+      reasons.push({
+        code: "consecutive_failures",
+        label: "연속 영업 실패 3회",
+        detailText: `무한 모드에서 ${context.infiniteModeProgress.consecutiveFailures}회 연속 영업 실패가 누적되었습니다.`
+      });
+    }
+
+    if (isActive && hasOrderDeadlock) {
+      reasons.push({
+        code: "order_deadlock",
+        label: "발주 불가",
+        detailText: `보유금 ₩${Math.max(0, Math.floor(GameState.money)).toLocaleString("ko-KR")}이 최저 발주 비용 ₩${minimumOrderCost.toLocaleString("ko-KR")}보다 낮고 재고도 없습니다.`
+      });
+    }
+
+    const isGameOver = reasons.length > 0;
+
+    if (isGameOver) {
+      infiniteState.isGameOver = true;
+      infiniteState.lastGameOverReason = reasons[0].code;
+      infiniteState.lastGameOverDay = GameState.day;
+    }
+
+    return {
+      isGameOver,
+      day: GameState.day,
+      reasons,
+      primaryReason: reasons[0] ?? null,
+      consecutiveFailures: context.infiniteModeProgress?.consecutiveFailures ?? infiniteState.consecutiveFailures,
+      minimumOrderCost,
+      totalInventoryQuantity,
+      money: GameState.money,
+      summaryText: isGameOver
+        ? `무한 모드 종료: ${reasons[0]?.label ?? "운영 한계"} 조건이 발생했습니다.`
+        : ""
+    };
+  },
+
+  getMinimumOrderCostForCurrentDay() {
+    const unlockedProducts = getUnlockedProducts(GameState.day);
+    const costs = unlockedProducts
+      .map((product) => Math.floor(Number(product.purchasePrice) || 0))
+      .filter((cost) => cost > 0);
+
+    if (costs.length === 0) {
+      return 0;
+    }
+
+    return Math.min(...costs);
+  },
+
+  getTotalInventoryQuantity() {
+    if (typeof InventorySystem.getInventorySnapshot === "function") {
+      const snapshot = InventorySystem.getInventorySnapshot();
+      const totalQuantity = Math.floor(Number(snapshot?.totalQuantity) || 0);
+
+      if (totalQuantity >= 0) {
+        return totalQuantity;
+      }
+    }
+
+    if (Array.isArray(InventorySystem.lots)) {
+      return InventorySystem.lots.reduce((total, lot) => {
+        return total + Math.max(0, Math.floor(Number(lot.quantity) || 0));
+      }, 0);
+    }
+
+    return 0;
   },
 
   shouldApplyMvpTestData() {
@@ -510,7 +681,11 @@ export const ResultSystem = {
     return `${failedLabels.join(", ")} 조건을 놓쳤습니다. 업그레이드로 내일 다시 만회해봅시다.`;
   },
 
-  createNextStepText(success) {
+  createNextStepText(success, infiniteGameOver = {}) {
+    if (infiniteGameOver.isGameOver) {
+      return "확인하면 무한 모드 진행 데이터가 초기화되고 타이틀 화면으로 돌아갑니다.";
+    }
+
     return success
       ? "정산 확인 후 오늘의 보상 업그레이드를 선택하고 다음 Day로 진행합니다."
       : "정산 확인 후 보완용 업그레이드를 선택하고 다음 Day에서 재도전합니다.";
