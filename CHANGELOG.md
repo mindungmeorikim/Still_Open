@@ -1,3 +1,8 @@
+## [v7.0.2] Title logo replacement
+- Changed: 시작 화면 로고를 신규 고화질 안전 로고 에셋으로 교체
+- Removed: 기존 title logo 파일 참조 제거
+- Maintained: 기존 타이틀 화면 버튼, 이어하기, 설정 흐름 유지
+
 ## [v7.0] Infinite mode game over conditions
 - Added: 무한 모드 게임오버 조건 판정 구조 추가
 - Added: 멘탈 0 이하 / 만족도 0 이하 / 연속 영업 실패 3회 / 최저 발주 비용 미만 + 재고 없음 조건 처리
