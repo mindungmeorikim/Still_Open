@@ -25,6 +25,7 @@ import { UIManager } from "../ui/UIManager.js";
 export const ResultSystem = {
   calculatedResultDay: null,
   processedCheckoutKeys: new Set(),
+  reward2xAppliedDay: null,
 
   init() {
     EventBus.on(EVENTS.DAY_ENDED, () => this.calculateResult());
@@ -37,6 +38,7 @@ export const ResultSystem = {
   bindPlayerEvents() {
     EventBus.on(EVENTS.DAY_STARTED, () => {
       this.processedCheckoutKeys.clear();
+      this.reward2xAppliedDay = null;
     });
 
     EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data = {}) => {
@@ -322,6 +324,77 @@ export const ResultSystem = {
 
     EventBus.emit(EVENTS.RESULT_CALCULATED, resultData);
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  applyReward2xAdBonus(resultData = {}) {
+    if (!resultData || Number(resultData.day) !== Number(GameState.day)) {
+      console.warn("[ResultSystem] 보상 2배 적용 실패: 현재 정산 데이터가 아닙니다.", resultData);
+      return {
+        success: false,
+        reason: "invalid_result",
+        message: "현재 정산 보상에만 2배를 적용할 수 있습니다."
+      };
+    }
+
+    if (GameState.phase !== GAME_PHASE.RESULT) {
+      console.warn("[ResultSystem] 보상 2배 적용 실패: 정산 단계가 아닙니다.", {
+        phase: GameState.phase,
+        resultData
+      });
+      return {
+        success: false,
+        reason: "invalid_phase",
+        message: "정산 화면에서만 보상 2배를 적용할 수 있습니다."
+      };
+    }
+
+    if (this.reward2xAppliedDay === GameState.day || resultData.reward2xAdApplied === true) {
+      console.warn("[ResultSystem] 보상 2배 중복 적용 차단:", resultData);
+      return {
+        success: false,
+        reason: "already_applied",
+        message: "이미 보상 2배를 받았습니다."
+      };
+    }
+
+    const baseBonus = Math.max(0, this.toNumber(resultData.reward2xBaseBonus ?? resultData.bmBonus));
+
+    if (baseBonus <= 0) {
+      console.warn("[ResultSystem] 보상 2배 적용 실패: 적용 가능한 BM 보상이 없습니다.", resultData);
+      return {
+        success: false,
+        reason: "no_reward",
+        message: "2배로 받을 보상 재화가 없습니다."
+      };
+    }
+
+    const extraBonus = baseBonus;
+
+    this.reward2xAppliedDay = GameState.day;
+    GameState.todayStats.bmBonus += extraBonus;
+    GameState.todayStats.profit += extraBonus;
+    GameState.money += extraBonus;
+
+    resultData.reward2xBaseBonus = baseBonus;
+    resultData.reward2xExtraBonus = extraBonus;
+    resultData.reward2xAdApplied = true;
+    resultData.bmBonus = GameState.todayStats.bmBonus;
+    resultData.bmScore = GameState.todayStats.bmBonus;
+    resultData.profit = GameState.todayStats.profit;
+    resultData.money = GameState.money;
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    return {
+      success: true,
+      reason: "applied",
+      message: `보상 2배 적용 완료 (+${extraBonus.toLocaleString("ko-KR")})`,
+      baseBonus,
+      extraBonus,
+      totalBmBonus: resultData.bmBonus,
+      profit: resultData.profit,
+      money: resultData.money
+    };
   },
 
   shouldApplyMvpTestData() {

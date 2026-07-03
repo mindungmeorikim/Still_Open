@@ -22,6 +22,7 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
+import { ResultSystem } from "./ResultSystem.js";
 
 export const UpgradeSystem = {
   availableUpgrades: [
@@ -60,9 +61,17 @@ export const UpgradeSystem = {
         정산 결과 확인 버튼을 누른 뒤
         업그레이드 선택 단계로 이동한다.
       */
-      UIManager.showResultModal(resultData, () => {
-        EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
-      });
+      UIManager.showResultModal(
+        resultData,
+        () => {
+          EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
+        },
+        {
+          onReward2xAdComplete: (currentResultData) => {
+            return ResultSystem.applyReward2xAdBonus(currentResultData);
+          }
+        }
+      );
     });
 
     EventBus.on(EVENTS.UPGRADE_PHASE_STARTED, (resultData) => {

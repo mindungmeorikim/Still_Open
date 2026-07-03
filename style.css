@@ -14493,8 +14493,19 @@ body {
 .result-modal-actions {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  grid-template-areas:
+    "reward confirm"
+    "status status";
   gap: 10px;
   margin-top: 18px;
+}
+
+.result-modal-actions #result-reward-2x-ad-button {
+  grid-area: reward;
+}
+
+.result-modal-actions #result-confirm-button {
+  grid-area: confirm;
 }
 
 .result-modal-actions #result-confirm-button,
@@ -14506,4 +14517,23 @@ body {
 #result-reward-2x-ad-button {
   min-height: 52px !important;
   font-size: 13px !important;
+}
+
+.result-reward-2x-ad-status {
+  grid-area: status;
+  min-height: 18px;
+  margin: 0;
+  color: #5f4a22;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.result-reward-2x-ad-status.is-warning {
+  color: #8a5a16;
+}
+
+.result-reward-2x-ad-status.is-success {
+  color: #2f7a49;
 }

@@ -1,3 +1,12 @@
+## [v6.6] Reward 2x ad dummy BM
+- Added: 정산 화면 보상 2배 광고 더미 기능
+- Added: 광고 시청 중 2초 더미 처리 흐름
+- Added: 광고 완료 후 정산 보상 2배 적용
+- Added: 보상 2배 버튼 disabled 및 중복 보상 방지
+- Added: 다음 정산에서 다시 사용할 수 있도록 사용 상태 초기화
+- Maintained: 기존 매출 계산, Day 진행, 진열대/계산대/손님 흐름 유지
+- Deferred: 실제 광고 SDK 연동은 배포 단계로 분리
+
 ## [v6.5] UI and interaction polish
 - Added: 상호작용 가능 오브젝트 glow ring 표시 구조
 - Added: 상호작용 가능 상태 finger tap 안내 아이콘 구조

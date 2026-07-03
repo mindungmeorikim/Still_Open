@@ -46,6 +46,7 @@ const STAFF_EVENTS = {
 
 export const UIManager = {
   resultModal: null,
+  resultReward2xAdTimerId: null,
   upgradeModal: null,
   endingModal: null,
   dayScenarioModal: null,
@@ -4326,8 +4327,9 @@ export const UIManager = {
             disabled
             aria-disabled="true"
           >
-            Reward 2x Ad
+            보상 2배 광고
           </button>
+          <p id="result-reward-2x-ad-status" class="result-reward-2x-ad-status" aria-live="polite"></p>
           <button id="result-confirm-button" type="button">
             확인
           </button>
@@ -4341,14 +4343,18 @@ export const UIManager = {
     this.prepareUiImageButtons(modal);
   },
 
-  showResultModal(resultData, onConfirm) {
+  showResultModal(resultData, onConfirm, options = {}) {
     if (!this.resultModal) {
       this.createResultModal();
     }
 
+    this.clearResultReward2xAdTimer();
+
     const title = document.getElementById("result-modal-title");
     const body = document.getElementById("result-modal-body");
     const confirmButton = document.getElementById("result-confirm-button");
+    const reward2xButton = document.getElementById("result-reward-2x-ad-button");
+    const reward2xStatus = document.getElementById("result-reward-2x-ad-status");
 
     const resultText = resultData.success ? "오늘 영업 성공" : "오늘 영업 실패";
     const resultChecks = Array.isArray(resultData.resultChecks)
@@ -4392,12 +4398,12 @@ export const UIManager = {
 
           <div class="result-row">
             <span>순이익</span>
-            <strong>₩${resultData.profit.toLocaleString()}</strong>
+            <strong id="result-profit-value">₩${resultData.profit.toLocaleString()}</strong>
           </div>
 
           <div class="result-row">
             <span>병맛 점수</span>
-            <strong>${(resultData.bmScore ?? resultData.bmBonus ?? 0).toLocaleString()}</strong>
+            <strong id="result-bm-score-value">${(resultData.bmScore ?? resultData.bmBonus ?? 0).toLocaleString()}</strong>
           </div>
 
           <div class="result-row">
@@ -4446,6 +4452,14 @@ export const UIManager = {
       </div>
     `;
 
+    this.configureResultReward2xAdButton({
+      button: reward2xButton,
+      statusNode: reward2xStatus,
+      resultData,
+      onReward2xAdComplete: options.onReward2xAdComplete,
+      onReward2xAdFail: options.onReward2xAdFail
+    });
+
     confirmButton.onclick = () => {
       this.hideResultModal();
 
@@ -4457,9 +4471,174 @@ export const UIManager = {
     this.resultModal.classList.remove("hidden");
   },
 
+  configureResultReward2xAdButton({
+    button,
+    statusNode,
+    resultData,
+    onReward2xAdComplete,
+    onReward2xAdFail
+  }) {
+    if (!button) return;
+
+    const baseBonus = Math.max(
+      0,
+      Number(resultData.reward2xBaseBonus ?? resultData.bmBonus ?? resultData.bmScore ?? 0) || 0
+    );
+    const alreadyApplied = resultData.reward2xAdApplied === true;
+    const hasReward = baseBonus > 0;
+    const canUse = hasReward && !alreadyApplied && typeof onReward2xAdComplete === "function";
+
+    resultData.reward2xBaseBonus = baseBonus;
+    resultData.reward2xAdWatching = false;
+    button.onclick = null;
+
+    if (!hasReward) {
+      this.setResultReward2xAdState(button, statusNode, {
+        disabled: true,
+        label: "2배 보상 없음",
+        statusText: "2배로 받을 보상 재화가 없습니다.",
+        statusKind: "warning"
+      });
+      return;
+    }
+
+    if (alreadyApplied) {
+      this.setResultReward2xAdState(button, statusNode, {
+        disabled: true,
+        label: "2배 적용 완료",
+        statusText: `보상 2배 적용 완료 (+${(Number(resultData.reward2xExtraBonus) || baseBonus).toLocaleString("ko-KR")})`,
+        statusKind: "success"
+      });
+      this.renderResultReward2xValues(resultData);
+      return;
+    }
+
+    this.setResultReward2xAdState(button, statusNode, {
+      disabled: !canUse,
+      label: "보상 2배 광고",
+      statusText: canUse
+        ? `광고 시청 시 병맛 점수 +${baseBonus.toLocaleString("ko-KR")}`
+        : "보상 2배 기능을 사용할 수 없습니다.",
+      statusKind: canUse ? "info" : "warning"
+    });
+
+    if (!canUse) return;
+
+    button.onclick = () => {
+      this.handleResultReward2xAdClick({
+        button,
+        statusNode,
+        resultData,
+        onReward2xAdComplete,
+        onReward2xAdFail
+      });
+    };
+  },
+
+  handleResultReward2xAdClick({
+    button,
+    statusNode,
+    resultData,
+    onReward2xAdComplete,
+    onReward2xAdFail
+  }) {
+    if (!button || button.disabled || resultData.reward2xAdWatching || resultData.reward2xAdApplied) {
+      return;
+    }
+
+    resultData.reward2xAdWatching = true;
+    this.setResultReward2xAdState(button, statusNode, {
+      disabled: true,
+      label: "광고 시청 중...",
+      statusText: "광고 시청 중... 2초 후 보상이 적용됩니다.",
+      statusKind: "info"
+    });
+
+    this.clearResultReward2xAdTimer();
+    this.resultReward2xAdTimerId = window.setTimeout(() => {
+      this.resultReward2xAdTimerId = null;
+      resultData.reward2xAdWatching = false;
+
+      let rewardResult = null;
+
+      try {
+        rewardResult = onReward2xAdComplete(resultData);
+      } catch (error) {
+        console.warn("[UIManager] 보상 2배 더미 광고 완료 처리 실패:", error);
+        rewardResult = {
+          success: false,
+          reason: "callback_error",
+          message: "광고 완료 처리 중 문제가 발생했습니다."
+        };
+      }
+
+      if (rewardResult?.success) {
+        this.renderResultReward2xValues(resultData);
+        this.setResultReward2xAdState(button, statusNode, {
+          disabled: true,
+          label: "2배 적용 완료",
+          statusText: rewardResult.message ?? "보상 2배 적용 완료",
+          statusKind: "success"
+        });
+        return;
+      }
+
+      console.warn("[UIManager] 보상 2배 더미 광고 실패:", rewardResult);
+      onReward2xAdFail?.(rewardResult, resultData);
+
+      const shouldDisable =
+        rewardResult?.reason === "already_applied" ||
+        rewardResult?.reason === "no_reward";
+
+      this.setResultReward2xAdState(button, statusNode, {
+        disabled: shouldDisable,
+        label: shouldDisable ? "2배 적용 불가" : "보상 2배 광고",
+        statusText: rewardResult?.message ?? "광고 보상 적용에 실패했습니다.",
+        statusKind: "warning"
+      });
+    }, 2000);
+  },
+
+  setResultReward2xAdState(button, statusNode, state = {}) {
+    if (button) {
+      button.disabled = state.disabled === true;
+      button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
+      button.textContent = state.label ?? "보상 2배 광고";
+      this.syncUiImageButtonState(button);
+    }
+
+    if (statusNode) {
+      statusNode.textContent = state.statusText ?? "";
+      statusNode.classList.toggle("is-warning", state.statusKind === "warning");
+      statusNode.classList.toggle("is-success", state.statusKind === "success");
+    }
+  },
+
+  renderResultReward2xValues(resultData = {}) {
+    const profitValue = document.getElementById("result-profit-value");
+    const bmScoreValue = document.getElementById("result-bm-score-value");
+
+    if (profitValue) {
+      profitValue.textContent = `₩${(Number(resultData.profit) || 0).toLocaleString("ko-KR")}`;
+    }
+
+    if (bmScoreValue) {
+      bmScoreValue.textContent = (Number(resultData.bmScore ?? resultData.bmBonus) || 0)
+        .toLocaleString("ko-KR");
+    }
+  },
+
+  clearResultReward2xAdTimer() {
+    if (!this.resultReward2xAdTimerId) return;
+
+    window.clearTimeout(this.resultReward2xAdTimerId);
+    this.resultReward2xAdTimerId = null;
+  },
+
   hideResultModal() {
     if (!this.resultModal) return;
 
+    this.clearResultReward2xAdTimer();
     this.resultModal.classList.add("hidden");
   },
 
