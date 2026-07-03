@@ -1,3 +1,16 @@
+## [v6.5] Shelf/Fridge visual placement tuning
+- Changed: 진열대/음료 냉장고 위치 간격 및 레이어 순서 보정
+- Fixed: 오브젝트 뒤에 보이던 반투명/흐림 배경 제거
+- Fixed: visual wrapper / hitbox 영역의 불필요한 배경 표시 제거
+- Maintained: 재고 1개 이상일 때 half로 보이는 현재 시각 상태 기준 유지
+
+## [v6.4] Shelf/Fridge visual asset integration
+- Added: 진열대/음료 냉장고 상태별 이미지 연결
+- Added: stock/capacity 기반 full / half / empty 시각 상태 반영
+- Added: left / right 방향별 오브젝트 이미지 표시
+- Changed: 오브젝트 이미지는 visual 영역, 상호작용은 hitbox 영역으로 분리
+- Fixed: 투명 이미지 영역이 클릭을 과도하게 받는 문제 방지
+
 ## [v6.1.3] - 진열대 상호작용 오작동 수정
 
 ## [v6.3] Asset integration prep

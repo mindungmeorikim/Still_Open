@@ -14048,3 +14048,171 @@ body {
 .ui-image-button-icon {
   pointer-events: none;
 }
+
+/* v6.4 shelf/fridge visual asset integration */
+#store-interaction-layer > .store-object-zone {
+  position: absolute !important;
+  z-index: 84 !important;
+  display: block !important;
+  width: var(--store-object-hit-width, 128px) !important;
+  min-width: 0 !important;
+  height: var(--store-object-hit-height, 58px) !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+#store-interaction-layer > .store-object-zone::before,
+#store-interaction-layer > .store-object-zone::after {
+  display: none !important;
+  content: none !important;
+}
+
+#store-interaction-layer > #shelf-zone.store-object-zone {
+  left: 500px !important;
+  top: 572px !important;
+  z-index: 88 !important;
+  --store-object-hit-width: 128px;
+  --store-object-hit-height: 58px;
+  --store-object-visual-width: 120px;
+  --store-object-visual-height: 166px;
+  --store-object-visual-bottom: -4px;
+  --store-object-hitbox-left: 23px;
+  --store-object-hitbox-right: 23px;
+  --store-object-hitbox-top: 9px;
+  --store-object-hitbox-bottom: 5px;
+}
+
+#store-interaction-layer > #beverage-fridge-zone.store-object-zone {
+  left: 705px !important;
+  top: 492px !important;
+  z-index: 82 !important;
+  --store-object-hit-width: 104px;
+  --store-object-hit-height: 62px;
+  --store-object-visual-width: 90px;
+  --store-object-visual-height: 164px;
+  --store-object-visual-bottom: -6px;
+  --store-object-hitbox-left: 28px;
+  --store-object-hitbox-right: 28px;
+  --store-object-hitbox-top: 8px;
+  --store-object-hitbox-bottom: 6px;
+}
+
+#store-interaction-layer > .store-object-zone .store-object-visual {
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: var(--store-object-visual-bottom, 0) !important;
+  z-index: 1 !important;
+  width: var(--store-object-visual-width, 100%) !important;
+  height: var(--store-object-visual-height, 100%) !important;
+  transform: translateX(-50%) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  mix-blend-mode: normal !important;
+  pointer-events: none !important;
+}
+
+#store-interaction-layer > .store-object-zone .store-object-visual > img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  mix-blend-mode: normal !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+#store-interaction-layer > .store-object-zone .store-object-hitbox {
+  position: absolute !important;
+  left: var(--store-object-hitbox-left, 0) !important;
+  right: var(--store-object-hitbox-right, 0) !important;
+  top: var(--store-object-hitbox-top, 0) !important;
+  bottom: var(--store-object-hitbox-bottom, 0) !important;
+  z-index: 4 !important;
+  border-radius: 14px !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+
+#store-interaction-layer > .store-object-zone .store-object-effect {
+  position: absolute !important;
+  inset: -12px !important;
+  z-index: 3 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+#store-interaction-layer > .store-object-zone .store-object-label {
+  position: absolute !important;
+  left: 50% !important;
+  top: calc(100% + 3px) !important;
+  z-index: 5 !important;
+  width: max-content !important;
+  max-width: 120px !important;
+  transform: translateX(-50%) !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.72) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}

@@ -13,6 +13,11 @@ import {
   EXPANSION_ZONES,
   getPreviousExpansionZone
 } from "../data/ExpansionData.js";
+import {
+  OBJECT_FACINGS,
+  STOCK_VISUAL_OBJECT_TYPES,
+  getObjectVisualAsset
+} from "../data/AssetData.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 
@@ -252,6 +257,7 @@ export const UIManager = {
 
       this.renderInventorySummary();
       this.renderProductCards();
+      this.renderStoreObjectVisuals();
     });
   },
 
@@ -479,12 +485,240 @@ export const UIManager = {
     this.renderDailyGoalPanel();
     this.renderFocusedZonePanel();
     this.moveTopIconMenuToRoot();
+    this.renderStoreObjectVisuals();
     this.renderPlayer();
     this.renderDeliveryBox(this.orderDeliveredData);
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+  },
+
+  renderStoreObjectVisuals() {
+    const interactionLayer = this.getStoreInteractionLayer();
+
+    if (!interactionLayer) return;
+
+    const objectConfigs = [
+      {
+        nodeId: "shelf-zone",
+        objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+        facing: OBJECT_FACINGS.LEFT,
+        label: "진열대",
+        createIfMissing: false
+      },
+      {
+        nodeId: "beverage-fridge-zone",
+        objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
+        facing: OBJECT_FACINGS.RIGHT,
+        label: "음료 냉장고",
+        createIfMissing: true
+      }
+    ];
+
+    objectConfigs.forEach((config) => {
+      const node = this.getStoreObjectNode(config, interactionLayer);
+
+      if (!node) return;
+
+      const stockData = this.getStoreObjectStockData(config.objectType);
+      const visualAsset = getObjectVisualAsset(
+        config.objectType,
+        stockData.stock,
+        stockData.capacity,
+        { facing: config.facing }
+      );
+
+      if (!visualAsset?.path) return;
+
+      this.applyStoreObjectVisual(node, {
+        ...config,
+        ...stockData,
+        visualAsset
+      });
+    });
+  },
+
+  getStoreObjectNode(config, interactionLayer) {
+    let node = document.getElementById(config.nodeId);
+
+    if (!node && config.createIfMissing) {
+      node = document.createElement("div");
+      node.id = config.nodeId;
+      node.className = "store-zone";
+      node.textContent = config.label;
+    }
+
+    if (!node) {
+      return null;
+    }
+
+    if (node.parentElement !== interactionLayer) {
+      interactionLayer.appendChild(node);
+    }
+
+    return node;
+  },
+
+  getStoreObjectStockData(objectType) {
+    const isFridge = objectType === STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE;
+    const items = this.getInventoryItemsForObjectVisuals();
+    const itemsByProductId = items.reduce((itemMap, item) => {
+      itemMap[item.productId] = item;
+      return itemMap;
+    }, {});
+    const matchingProducts = PRODUCTS.filter((product) => {
+      return this.isProductStoredInFridge(product) === isFridge;
+    });
+    const visibleProducts = matchingProducts.filter((product) => {
+      const item = itemsByProductId[product.id];
+
+      return item?.isUnlocked || product.unlockDay <= GameState.day;
+    });
+    const stock = visibleProducts.reduce((total, product) => {
+      const item = itemsByProductId[product.id];
+
+      return total + (Number(item?.quantity) || 0);
+    }, 0);
+    const capacity = visibleProducts.reduce((total, product) => {
+      const item = itemsByProductId[product.id];
+      const configuredCapacity = Number(product.initialStock) || 0;
+      const currentQuantity = Number(item?.quantity) || 0;
+
+      return total + Math.max(configuredCapacity, currentQuantity);
+    }, 0);
+
+    return {
+      stock,
+      capacity
+    };
+  },
+
+  getInventoryItemsForObjectVisuals() {
+    const snapshotItems = Array.isArray(this.inventorySnapshot?.items)
+      ? this.inventorySnapshot.items
+      : null;
+
+    if (snapshotItems) {
+      return snapshotItems;
+    }
+
+    return PRODUCTS.map((product) => {
+      const inventoryItem = this.inventoryByProductId[product.id];
+
+      return {
+        productId: product.id,
+        isUnlocked: product.unlockDay <= GameState.day,
+        quantity: Number(inventoryItem?.quantity) || 0
+      };
+    });
+  },
+
+  isProductStoredInFridge(product) {
+    return product.category === "drink";
+  },
+
+  applyStoreObjectVisual(node, config) {
+    const visualAsset = config.visualAsset;
+    const originalLabel = node.dataset.objectLabel ||
+      node.textContent.trim() ||
+      config.label;
+
+    node.dataset.objectLabel = originalLabel;
+    node.dataset.objectType = visualAsset.objectType;
+    node.dataset.objectFacing = visualAsset.facing;
+    node.dataset.stockVisualState = visualAsset.state;
+    node.dataset.stock = String(config.stock);
+    node.dataset.capacity = String(config.capacity);
+    node.style.setProperty("--asset-object-image", `url("${visualAsset.path}")`);
+    node.classList.add(
+      "store-object-zone",
+      `store-object-${visualAsset.objectType}`
+    );
+    node.classList.remove(
+      "is-stock-empty",
+      "is-stock-half",
+      "is-stock-full",
+      "store-object-facing-left",
+      "store-object-facing-right"
+    );
+    node.classList.add(
+      `is-stock-${visualAsset.state}`,
+      `store-object-facing-${visualAsset.facing}`
+    );
+    node.setAttribute(
+      "aria-label",
+      `${config.label} ${visualAsset.state} ${config.stock}/${config.capacity}`
+    );
+
+    const visualNode = this.ensureStoreObjectChild(
+      node,
+      "asset-object-visual",
+      "span"
+    );
+    const imageNode = this.ensureStoreObjectImage(visualNode);
+
+    visualNode.className = "asset-object-visual store-object-visual";
+    visualNode.setAttribute("aria-hidden", "true");
+    imageNode.src = visualAsset.path;
+    imageNode.alt = "";
+    imageNode.draggable = false;
+
+    const hitboxNode = this.ensureStoreObjectChild(
+      node,
+      "asset-object-hitbox",
+      "span"
+    );
+
+    hitboxNode.className = "asset-object-hitbox store-object-hitbox";
+    hitboxNode.dataset.objectType = visualAsset.objectType;
+    hitboxNode.dataset.stockVisualState = visualAsset.state;
+    hitboxNode.setAttribute("aria-hidden", "true");
+
+    const effectNode = this.ensureStoreObjectChild(
+      node,
+      "asset-object-effect",
+      "span"
+    );
+
+    effectNode.className = "asset-object-effect interaction-effect glow-ring store-object-effect";
+    effectNode.setAttribute("aria-hidden", "true");
+
+    const labelNode = this.ensureStoreObjectChild(
+      node,
+      "store-object-label",
+      "span"
+    );
+
+    labelNode.textContent = originalLabel;
+  },
+
+  ensureStoreObjectChild(parentNode, className, tagName) {
+    const existingChild = [...parentNode.children].find((child) => {
+      return child.classList.contains(className);
+    });
+
+    if (existingChild) {
+      return existingChild;
+    }
+
+    const child = document.createElement(tagName);
+
+    child.className = className;
+    parentNode.appendChild(child);
+
+    return child;
+  },
+
+  ensureStoreObjectImage(visualNode) {
+    let imageNode = visualNode.querySelector("img");
+
+    if (!imageNode) {
+      imageNode = document.createElement("img");
+      visualNode.appendChild(imageNode);
+    }
+
+    return imageNode;
   },
 
   renderPhaseChip() {
