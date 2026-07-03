@@ -1,5 +1,25 @@
 ## [v6.1.3] - 진열대 상호작용 오작동 수정
 
+## [v6.3] Asset integration prep
+
+- Added: 신규 게임용 이미지 assets 적용 전 준비 구조 추가
+
+- Added: AssetData.js 경로 검증
+
+- Added: 진열대/display stand와 음료 냉장고/beverage fridge의 full / half / empty 상태 기반 이미지 구조 준비
+
+- Added: stock/capacity 기준 visual state 유틸 함수 준비
+
+- Added: 이미지 visual 영역과 클릭 hitbox 분리 구조 준비
+
+- Added: interaction effect, glow ring, sparkle, finger tap의 pointer-events: none 처리 준비
+
+- Added: UI 버튼 normal / pressed / disabled 상태 관리 구조 준비
+
+- Added: 이미지 preload 함수 준비
+
+- Fixed: 투명 여백 제거 에셋 적용 시 클릭 범위가 과도하게 잡힐 수 있는 문제 사전 대응
+
 ### Fixed
 - 플레이어가 진열대에서 상호작용 키를 눌렀을 때 계산대 상호작용으로 잘못 판정되어 손님이 사라지던 문제를 수정했습니다.
 - 상호작용 대상 판정을 `계산대 우선` 방식에서 `가장 가까운 대상 우선` 방식으로 변경해 진열대/계산대 입력 충돌을 줄였습니다.

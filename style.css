@@ -13937,3 +13937,114 @@ body {
   margin: 0 !important;
   white-space: nowrap !important;
 }
+
+/* v6.3.0 asset wiring prep: opt-in classes only */
+.asset-object {
+  position: absolute;
+  width: var(--asset-object-width, 96px);
+  height: var(--asset-object-height, 96px);
+  pointer-events: none;
+}
+
+.asset-object-visual {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  background-image: var(--asset-object-image, none);
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.asset-object-visual > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.asset-object-hitbox {
+  position: absolute;
+  inset: var(--asset-hitbox-inset, 0);
+  z-index: 2;
+  border-radius: var(--asset-hitbox-radius, 12px);
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.asset-object-effect,
+.interaction-effect,
+.glow-ring,
+.interactable-glow-ring,
+.sparkle,
+.click-sparkle,
+.finger-tap,
+.interaction-finger-tap {
+  pointer-events: none;
+  user-select: none;
+}
+
+.asset-object-effect {
+  position: absolute;
+  inset: var(--asset-effect-inset, 0);
+  z-index: 3;
+}
+
+.asset-object.is-stock-empty .asset-object-visual,
+.asset-object[data-stock-visual-state="empty"] .asset-object-visual {
+  opacity: var(--asset-empty-opacity, 1);
+}
+
+.asset-object.is-stock-half .asset-object-visual,
+.asset-object[data-stock-visual-state="half"] .asset-object-visual,
+.asset-object.is-stock-full .asset-object-visual,
+.asset-object[data-stock-visual-state="full"] .asset-object-visual {
+  opacity: 1;
+}
+
+.ui-image-button {
+  --ui-button-image-current: var(--ui-button-image-normal, none);
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--ui-button-width, 96px);
+  min-height: var(--ui-button-height, 44px);
+  padding: var(--ui-button-padding, 0);
+  border: 0;
+  background-color: transparent;
+  background-image: var(--ui-button-image-current);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  color: var(--ui-button-text-color, inherit);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.ui-image-button.is-normal {
+  --ui-button-image-current: var(--ui-button-image-normal, none);
+}
+
+.ui-image-button.is-pressed {
+  --ui-button-image-current: var(--ui-button-image-pressed, var(--ui-button-image-normal, none));
+  transform: translateY(1px);
+}
+
+.ui-image-button.is-disabled,
+.ui-image-button:disabled {
+  --ui-button-image-current: var(--ui-button-image-disabled, var(--ui-button-image-normal, none));
+  cursor: not-allowed;
+  opacity: var(--ui-button-disabled-opacity, 1);
+  transform: none;
+}
+
+.ui-image-button-label,
+.ui-image-button-icon {
+  pointer-events: none;
+}
