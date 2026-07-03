@@ -14,12 +14,28 @@ import {
   getPreviousExpansionZone
 } from "../data/ExpansionData.js";
 import {
+  ASSET_PATHS,
   OBJECT_FACINGS,
   STOCK_VISUAL_OBJECT_TYPES,
   getObjectVisualAsset
 } from "../data/AssetData.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
+const INTERACTION_FEEDBACK_DISTANCE = 120;
+
+const UI_IMAGE_BUTTON_VARIANTS = {
+  commonBase: ASSET_PATHS.ui.buttons.common.base,
+  commonLarge: ASSET_PATHS.ui.buttons.common.large,
+  commonSmall: ASSET_PATHS.ui.buttons.common.small,
+  iconBack: ASSET_PATHS.ui.buttons.icon.back,
+  iconCancel: ASSET_PATHS.ui.buttons.icon.cancel,
+  iconClose: ASSET_PATHS.ui.buttons.icon.close,
+  iconConfirm: ASSET_PATHS.ui.buttons.icon.confirm,
+  iconWarning: ASSET_PATHS.ui.buttons.icon.warning,
+  specialContinue: ASSET_PATHS.ui.buttons.special.continue,
+  specialReward2xAd: ASSET_PATHS.ui.buttons.special.reward2xAd,
+  specialSettings: ASSET_PATHS.ui.buttons.special.settings
+};
 
 const STAFF_EVENTS = {
   HIRE_OFFERED: "STAFF_HIRE_OFFERED",
@@ -59,6 +75,7 @@ export const UIManager = {
   pendingStaffHireData: null,
   notificationTimerId: null,
   isWorldCameraBound: false,
+  sparkleTimeoutIds: {},
   worldCamera: {
     x: 0,
     y: 0,
@@ -103,6 +120,7 @@ export const UIManager = {
     this.createStaffCharacter();
     this.createExpansionPanel();
     this.createProductPanel();
+    this.prepareUiImageButtons();
     this.render();
     this.renderCustomers();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
@@ -184,6 +202,20 @@ export const UIManager = {
         : "원하던 상품이 없어 손님이 돌아갔습니다.";
 
       this.showMessage(message);
+    });
+
+    EventBus.on(EVENTS.CHECKOUT_COMPLETED, () => {
+      this.showInteractionSparkle("counter-zone");
+    });
+
+    EventBus.on(EVENTS.RESTOCK_COMPLETED, (data = {}) => {
+      const source = String(data.source ?? "");
+      const targetId = source.startsWith("delivery_box") ||
+        source.startsWith("order_delivery")
+        ? "delivery-box-zone"
+        : "shelf-zone";
+
+      this.showInteractionSparkle(targetId);
     });
   },
 
@@ -487,7 +519,9 @@ export const UIManager = {
     this.moveTopIconMenuToRoot();
     this.renderStoreObjectVisuals();
     this.renderPlayer();
+    this.prepareUiImageButtons();
     this.renderDeliveryBox(this.orderDeliveredData);
+    this.renderInteractionFeedback();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
@@ -675,14 +709,8 @@ export const UIManager = {
     hitboxNode.dataset.stockVisualState = visualAsset.state;
     hitboxNode.setAttribute("aria-hidden", "true");
 
-    const effectNode = this.ensureStoreObjectChild(
-      node,
-      "asset-object-effect",
-      "span"
-    );
-
-    effectNode.className = "asset-object-effect interaction-effect glow-ring store-object-effect";
-    effectNode.setAttribute("aria-hidden", "true");
+    this.ensureInteractionFeedbackNodes(node);
+    this.bindInteractionFeedbackNode(node);
 
     const labelNode = this.ensureStoreObjectChild(
       node,
@@ -721,6 +749,172 @@ export const UIManager = {
     return imageNode;
   },
 
+  renderInteractionFeedback() {
+    const playerCenter = this.getInteractionPlayerCenter();
+
+    this.getInteractionFeedbackTargets().forEach((target) => {
+      const node = document.getElementById(target.nodeId);
+
+      if (!node || node.hidden) return;
+
+      this.ensureInteractionFeedbackNodes(node);
+      this.bindInteractionFeedbackNode(node);
+
+      const targetCenter = this.getInteractionTargetCenter(node, target.fallback);
+      const distance = playerCenter && targetCenter
+        ? this.getPointDistance(playerCenter, targetCenter)
+        : null;
+      const isReady = distance !== null &&
+        distance <= (target.distance ?? INTERACTION_FEEDBACK_DISTANCE);
+
+      node.classList.add("interaction-feedback-target");
+      node.classList.toggle("is-interactable", Boolean(target.isInteractable));
+      node.classList.toggle("is-interaction-ready", isReady);
+    });
+  },
+
+  getInteractionFeedbackTargets() {
+    return [
+      {
+        nodeId: "shelf-zone",
+        isInteractable: true,
+        fallback: { x: 540, y: 680 }
+      },
+      {
+        nodeId: "counter-zone",
+        isInteractable: true
+      },
+      {
+        nodeId: "delivery-box-zone",
+        isInteractable: true
+      }
+    ];
+  },
+
+  getInteractionPlayerCenter() {
+    if (!GameState.player) {
+      return null;
+    }
+
+    const playerNode = document.getElementById("player-zone");
+    const playerWidth = Number(playerNode?.offsetWidth) || 42;
+    const playerHeight = Number(playerNode?.offsetHeight) || 58;
+
+    return {
+      x: (Number(GameState.player.x) || 0) + playerWidth / 2,
+      y: (Number(GameState.player.y) || 0) + playerHeight / 2
+    };
+  },
+
+  getInteractionTargetCenter(node, fallback = null) {
+    if (!node) {
+      return fallback;
+    }
+
+    const width = Number(node.offsetWidth) || 0;
+    const height = Number(node.offsetHeight) || 0;
+    const x = (Number(node.offsetLeft) || 0) + width / 2;
+    const y = (Number(node.offsetTop) || 0) + height / 2;
+
+    return {
+      x,
+      y
+    };
+  },
+
+  getPointDistance(firstPoint, secondPoint) {
+    const dx = firstPoint.x - secondPoint.x;
+    const dy = firstPoint.y - secondPoint.y;
+
+    return Math.sqrt(dx * dx + dy * dy);
+  },
+
+  ensureInteractionFeedbackNodes(node) {
+    const glowNode = this.ensureInteractionFeedbackChild(
+      node,
+      "interaction-glow-ring",
+      "span",
+      "asset-object-effect"
+    );
+    const tapNode = this.ensureInteractionFeedbackChild(
+      node,
+      "interaction-finger-tap",
+      "span"
+    );
+    const sparkleNode = this.ensureInteractionFeedbackChild(
+      node,
+      "interaction-click-sparkle",
+      "span"
+    );
+
+    node.classList.add("interaction-feedback-target");
+    node.style.setProperty(
+      "--interaction-glow-image",
+      `url("${ASSET_PATHS.effects.interaction.glowRing}")`
+    );
+    node.style.setProperty(
+      "--interaction-finger-image",
+      `url("${ASSET_PATHS.effects.interaction.fingerTap}")`
+    );
+    node.style.setProperty(
+      "--interaction-sparkle-image",
+      `url("${ASSET_PATHS.effects.interaction.clickSparkle}")`
+    );
+
+    glowNode.className = "asset-object-effect interaction-effect interaction-glow-ring glow-ring";
+    tapNode.className = "interaction-effect interaction-finger-tap finger-tap";
+    sparkleNode.className = "interaction-effect interaction-click-sparkle click-sparkle";
+
+    [glowNode, tapNode, sparkleNode].forEach((effectNode) => {
+      effectNode.setAttribute("aria-hidden", "true");
+    });
+  },
+
+  ensureInteractionFeedbackChild(parentNode, className, tagName, legacyClassName = null) {
+    const existingChild = [...parentNode.children].find((child) => {
+      return child.classList.contains(className) ||
+        (legacyClassName && child.classList.contains(legacyClassName));
+    });
+
+    if (existingChild) {
+      return existingChild;
+    }
+
+    const child = document.createElement(tagName);
+
+    child.className = className;
+    parentNode.appendChild(child);
+
+    return child;
+  },
+
+  bindInteractionFeedbackNode(node) {
+    if (!node || node.dataset.interactionFeedbackBound === "true") {
+      return;
+    }
+
+    node.dataset.interactionFeedbackBound = "true";
+    node.addEventListener("click", () => {
+      this.showInteractionSparkle(node.id);
+    });
+  },
+
+  showInteractionSparkle(nodeId) {
+    const node = document.getElementById(nodeId);
+
+    if (!node) return;
+
+    this.ensureInteractionFeedbackNodes(node);
+    node.classList.remove("is-click-sparkling");
+    void node.offsetWidth;
+    node.classList.add("is-click-sparkling");
+
+    window.clearTimeout(this.sparkleTimeoutIds[nodeId]);
+    this.sparkleTimeoutIds[nodeId] = window.setTimeout(() => {
+      node.classList.remove("is-click-sparkling");
+    }, 520);
+  },
+
   renderPhaseChip() {
     const phaseChip = document.getElementById("phase-chip");
 
@@ -751,6 +945,113 @@ export const UIManager = {
     if (topIconMenu.parentElement !== gameRoot) {
       gameRoot.appendChild(topIconMenu);
     }
+  },
+
+  prepareUiImageButtons(root = document) {
+    const scopedRoot = root ?? document;
+
+    this.applyUiImageButtonSet(scopedRoot, [
+      {
+        selector: "#start-day-button, #end-day-button, #upgrade-shortcut-button, #shop-shortcut-button",
+        variant: "commonSmall",
+        classNames: ["ui-common-button", "ui-common-button-small"]
+      },
+      {
+        selector: "#open-store-button",
+        variant: "commonLarge",
+        classNames: ["ui-common-button", "ui-common-button-large"]
+      },
+      {
+        selector: "#result-confirm-button, #day-scenario-confirm-button, #order-confirm-button, .store-expansion-popover-action, .expansion-action-button, .customer-event-close-button, .staff-hire-skip-button",
+        variant: "commonBase",
+        classNames: ["ui-common-button", "ui-common-button-base"]
+      },
+      {
+        selector: "#ending-continue-button",
+        variant: "specialContinue",
+        classNames: ["ui-special-button", "ui-special-continue-button"]
+      },
+      {
+        selector: "#result-reward-2x-ad-button",
+        variant: "specialReward2xAd",
+        classNames: ["ui-special-button", "ui-special-reward-2x-ad-button"]
+      },
+      {
+        selector: ".store-expansion-popover-close",
+        variant: "iconClose",
+        classNames: ["ui-icon-image-button", "ui-icon-button-close"]
+      },
+      {
+        selector: "#expansion-carousel-prev",
+        variant: "iconBack",
+        classNames: ["ui-icon-image-button", "ui-icon-button-back"]
+      }
+    ]);
+
+    const topIconButtons = [...document.querySelectorAll("#top-icon-menu .hud-icon-button")];
+    const settingsButton = topIconButtons[2] ?? null;
+
+    if (settingsButton) {
+      this.applyUiImageButton(settingsButton, "specialSettings", [
+        "ui-icon-image-button",
+        "ui-special-settings-button"
+      ]);
+    }
+  },
+
+  applyUiImageButtonSet(root, configs = []) {
+    configs.forEach((config) => {
+      root.querySelectorAll?.(config.selector).forEach((button) => {
+        this.applyUiImageButton(button, config.variant, config.classNames);
+      });
+    });
+  },
+
+  applyUiImageButton(button, variant, classNames = []) {
+    const assets = UI_IMAGE_BUTTON_VARIANTS[variant];
+
+    if (!button || !assets) return;
+
+    button.classList.add("ui-image-button", `ui-image-button-${variant}`, ...classNames);
+    button.style.setProperty("--ui-button-image-normal", `url("${assets.normal}")`);
+    button.style.setProperty("--ui-button-image-pressed", `url("${assets.pressed}")`);
+    button.style.setProperty("--ui-button-image-disabled", `url("${assets.disabled}")`);
+
+    if (button.dataset.uiImageButtonBound !== "true") {
+      button.dataset.uiImageButtonBound = "true";
+      button.addEventListener("pointerdown", () => {
+        if (this.isUiImageButtonDisabled(button)) return;
+
+        button.classList.remove("is-normal");
+        button.classList.add("is-pressed");
+      });
+
+      ["pointerup", "pointerleave", "pointercancel", "blur"].forEach((eventName) => {
+        button.addEventListener(eventName, () => {
+          button.classList.remove("is-pressed");
+          this.syncUiImageButtonState(button);
+        });
+      });
+    }
+
+    this.syncUiImageButtonState(button);
+  },
+
+  isUiImageButtonDisabled(button) {
+    return button.disabled ||
+      button.getAttribute("aria-disabled") === "true";
+  },
+
+  syncUiImageButtonState(button) {
+    const isDisabled = this.isUiImageButtonDisabled(button);
+    const isPressed = !isDisabled && button.classList.contains("is-pressed");
+
+    if (isDisabled) {
+      button.classList.remove("is-pressed");
+    }
+
+    button.classList.toggle("is-disabled", isDisabled);
+    button.classList.toggle("is-normal", !isDisabled && !isPressed);
   },
 
   queueInitialCameraFocus() {
@@ -2570,6 +2871,8 @@ export const UIManager = {
     const closeButton = popover.querySelector(".store-expansion-popover-close");
     const actionButton = popover.querySelector(".store-expansion-popover-action");
 
+    this.prepareUiImageButtons(popover);
+
     if (closeButton) {
       closeButton.onclick = (event) => {
         event.stopPropagation();
@@ -3458,6 +3761,8 @@ export const UIManager = {
       `;
     }).join("");
 
+    this.prepareUiImageButtons(this.staffHireModal);
+
     list.querySelectorAll(".staff-hire-button").forEach((button) => {
       button.onclick = () => {
         const candidateId = button.dataset.staffId;
@@ -3694,6 +3999,7 @@ export const UIManager = {
       </div>
     `;
 
+    this.prepareUiImageButtons(body);
     this.bindOrderDraftControls(orderableProducts);
 
     if (options.preserveScroll) {
@@ -4012,15 +4318,27 @@ export const UIManager = {
 
         <div id="result-modal-body"></div>
 
-        <button id="result-confirm-button" type="button">
-          확인
-        </button>
+        <div class="result-modal-actions">
+          <button
+            id="result-reward-2x-ad-button"
+            class="result-reward-2x-ad-button"
+            type="button"
+            disabled
+            aria-disabled="true"
+          >
+            Reward 2x Ad
+          </button>
+          <button id="result-confirm-button" type="button">
+            확인
+          </button>
+        </div>
       </div>
     `;
 
     document.body.appendChild(modal);
 
     this.resultModal = modal;
+    this.prepareUiImageButtons(modal);
   },
 
   showResultModal(resultData, onConfirm) {

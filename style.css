@@ -14216,3 +14216,294 @@ body {
   white-space: nowrap !important;
   pointer-events: none !important;
 }
+
+/* v6.5 UI and interaction polish */
+.interaction-feedback-target {
+  --interaction-effect-width: 92px;
+  --interaction-effect-height: 52px;
+  --interaction-tap-size: 38px;
+  --interaction-sparkle-size: 66px;
+  overflow: visible !important;
+}
+
+#store-interaction-layer > .interaction-feedback-target > .interaction-effect,
+#store-interaction-layer > .interaction-feedback-target > .interaction-glow-ring,
+#store-interaction-layer > .interaction-feedback-target > .interaction-finger-tap,
+#store-interaction-layer > .interaction-feedback-target > .interaction-click-sparkle {
+  position: absolute !important;
+  display: block !important;
+  border: 0 !important;
+  background-color: transparent !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: contain !important;
+  box-shadow: none !important;
+  filter: none !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+#store-interaction-layer > .interaction-feedback-target > .interaction-glow-ring {
+  left: 50% !important;
+  bottom: -18px !important;
+  z-index: 2 !important;
+  width: var(--interaction-effect-width) !important;
+  height: var(--interaction-effect-height) !important;
+  background-image: var(--interaction-glow-image) !important;
+  opacity: 0 !important;
+  transform: translateX(-50%) scale(0.94) !important;
+  transition: opacity 140ms ease, transform 140ms ease !important;
+}
+
+#store-interaction-layer > .interaction-feedback-target.is-interaction-ready > .interaction-glow-ring {
+  opacity: 0.95 !important;
+  transform: translateX(-50%) scale(1) !important;
+  animation: interaction-glow-pulse 1180ms ease-in-out infinite !important;
+}
+
+#store-interaction-layer > .interaction-feedback-target > .interaction-finger-tap {
+  right: -26px !important;
+  top: -34px !important;
+  z-index: 6 !important;
+  width: var(--interaction-tap-size) !important;
+  height: var(--interaction-tap-size) !important;
+  background-image: var(--interaction-finger-image) !important;
+  opacity: 0 !important;
+  transform: translateY(4px) scale(0.96);
+  transition: opacity 130ms ease, transform 130ms ease !important;
+}
+
+#store-interaction-layer > .interaction-feedback-target.is-interaction-ready > .interaction-finger-tap {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1);
+  animation: interaction-finger-tap 940ms ease-in-out infinite !important;
+}
+
+#store-interaction-layer > .interaction-feedback-target > .interaction-click-sparkle {
+  left: 50% !important;
+  top: 50% !important;
+  z-index: 7 !important;
+  width: var(--interaction-sparkle-size) !important;
+  height: var(--interaction-sparkle-size) !important;
+  background-image: var(--interaction-sparkle-image) !important;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.7);
+}
+
+#store-interaction-layer > .interaction-feedback-target.is-click-sparkling > .interaction-click-sparkle {
+  animation: interaction-click-sparkle 520ms ease-out both !important;
+}
+
+#store-interaction-layer > #counter-zone.interaction-feedback-target {
+  --interaction-effect-width: 128px;
+  --interaction-effect-height: 68px;
+  --interaction-tap-size: 36px;
+}
+
+#store-interaction-layer > #delivery-box-zone.interaction-feedback-target {
+  --interaction-effect-width: 138px;
+  --interaction-effect-height: 74px;
+  --interaction-tap-size: 34px;
+}
+
+#store-interaction-layer > .store-object-zone.interaction-feedback-target {
+  --interaction-effect-width: 118px;
+  --interaction-effect-height: 64px;
+}
+
+#store-interaction-layer > .store-object-zone.interaction-feedback-target > .interaction-glow-ring {
+  bottom: -22px !important;
+}
+
+@keyframes interaction-glow-pulse {
+  0%, 100% {
+    filter: brightness(1) drop-shadow(0 0 0 rgba(255, 233, 120, 0));
+  }
+  50% {
+    filter: brightness(1.1) drop-shadow(0 0 12px rgba(255, 233, 120, 0.55));
+  }
+}
+
+@keyframes interaction-finger-tap {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(5px) scale(0.94);
+  }
+}
+
+@keyframes interaction-click-sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55) rotate(-8deg);
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.24) rotate(10deg);
+  }
+}
+
+.ui-button-common-base,
+.ui-common-button-base {
+  --ui-button-image-normal: url("./assets/ui/buttons/common/base/ui_btn_base_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/common/base/ui_btn_base_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/common/base/ui_btn_base_disabled.png");
+}
+
+.ui-button-common-large,
+.ui-common-button-large {
+  --ui-button-image-normal: url("./assets/ui/buttons/common/large/ui_btn_large_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/common/large/ui_btn_large_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/common/large/ui_btn_large_disabled.png");
+}
+
+.ui-button-common-small,
+.ui-common-button-small {
+  --ui-button-image-normal: url("./assets/ui/buttons/common/small/ui_btn_small_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/common/small/ui_btn_small_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/common/small/ui_btn_small_disabled.png");
+}
+
+.ui-icon-button-close {
+  --ui-button-image-normal: url("./assets/ui/buttons/icon/ui_icon_close_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/icon/ui_icon_close_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/icon/ui_icon_close_disabled.png");
+}
+
+.ui-icon-button-back {
+  --ui-button-image-normal: url("./assets/ui/buttons/icon/ui_icon_back_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/icon/ui_icon_back_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/icon/ui_icon_back_disabled.png");
+}
+
+.ui-icon-button-confirm {
+  --ui-button-image-normal: url("./assets/ui/buttons/icon/ui_icon_confirm_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/icon/ui_icon_confirm_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/icon/ui_icon_confirm_disabled.png");
+}
+
+.ui-icon-button-cancel {
+  --ui-button-image-normal: url("./assets/ui/buttons/icon/ui_icon_cancel_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/icon/ui_icon_cancel_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/icon/ui_icon_cancel_disabled.png");
+}
+
+.ui-icon-button-warning {
+  --ui-button-image-normal: url("./assets/ui/buttons/icon/ui_icon_warning_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/icon/ui_icon_warning_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/icon/ui_icon_warning_disabled.png");
+}
+
+.ui-special-continue-button {
+  --ui-button-image-normal: url("./assets/ui/buttons/special/continue/ui_btn_continue_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/special/continue/ui_btn_continue_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/special/continue/ui_btn_continue_disabled.png");
+}
+
+.ui-special-settings-button {
+  --ui-button-image-normal: url("./assets/ui/buttons/special/settings/ui_icon_settings_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/special/settings/ui_icon_settings_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/special/settings/ui_icon_settings_disabled.png");
+}
+
+.ui-special-reward-2x-ad-button {
+  --ui-button-image-normal: url("./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_normal.png");
+  --ui-button-image-pressed: url("./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_pressed.png");
+  --ui-button-image-disabled: url("./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_disabled.png");
+}
+
+.ui-image-button {
+  --ui-button-image-current: var(--ui-button-image-normal, none);
+  display: inline-grid !important;
+  place-items: center !important;
+  border: 0 !important;
+  background-color: transparent !important;
+  background-image: var(--ui-button-image-current) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  transition: transform 90ms ease, filter 120ms ease !important;
+}
+
+.ui-image-button.is-normal {
+  --ui-button-image-current: var(--ui-button-image-normal, none);
+}
+
+.ui-image-button.is-pressed {
+  --ui-button-image-current: var(--ui-button-image-pressed, var(--ui-button-image-normal, none));
+  transform: translateY(2px) scale(0.99) !important;
+}
+
+.ui-image-button.is-disabled,
+.ui-image-button:disabled,
+.ui-image-button[aria-disabled="true"] {
+  --ui-button-image-current: var(--ui-button-image-disabled, var(--ui-button-image-normal, none));
+  cursor: not-allowed !important;
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+.ui-common-button {
+  min-height: 50px !important;
+  padding: 9px 16px 11px !important;
+  color: #ffffff !important;
+  font-weight: 950 !important;
+  text-shadow: 0 1px 0 rgba(63, 48, 23, 0.24) !important;
+}
+
+.ui-common-button-small {
+  min-height: 66px !important;
+  padding: 9px 8px 10px !important;
+}
+
+.ui-common-button-large {
+  min-height: 88px !important;
+  padding: 12px 18px 14px !important;
+  font-size: 24px !important;
+}
+
+.ui-icon-image-button {
+  width: 46px !important;
+  min-width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 0 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-shadow: none !important;
+}
+
+#top-icon-menu .ui-special-settings-button {
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+}
+
+.result-modal-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.result-modal-actions #result-confirm-button,
+.result-modal-actions #result-reward-2x-ad-button {
+  width: 100% !important;
+  margin-top: 0 !important;
+}
+
+#result-reward-2x-ad-button {
+  min-height: 52px !important;
+  font-size: 13px !important;
+}

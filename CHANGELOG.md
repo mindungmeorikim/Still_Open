@@ -1,3 +1,14 @@
+## [v6.5] UI and interaction polish
+- Added: 상호작용 가능 오브젝트 glow ring 표시 구조
+- Added: 상호작용 가능 상태 finger tap 안내 아이콘 구조
+- Added: 클릭/상호작용 성공 시 click sparkle 피드백
+- Added: UI 버튼 normal / pressed / disabled 상태 이미지 적용 구조
+- Added: 아이콘 버튼 close / back / confirm / cancel / warning 상태 이미지 적용 구조
+- Added: 이어하기 / 설정 / 보상 2배 광고 버튼 상태 이미지 적용 구조
+- Fixed: 상호작용 이펙트가 클릭을 가로채지 않도록 pointer-events: none 유지
+- Maintained: 기존 플레이어 이동, 진열대, 계산대, 손님 흐름 유지
+- Deferred: 보상 2배 광고의 실제 BM 보상 지급 로직은 다음 작업으로 분리
+
 ## [v6.5] Shelf/Fridge visual placement tuning
 - Changed: 진열대/음료 냉장고 위치 간격 및 레이어 순서 보정
 - Fixed: 오브젝트 뒤에 보이던 반투명/흐림 배경 제거
