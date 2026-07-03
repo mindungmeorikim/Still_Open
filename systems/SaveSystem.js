@@ -18,10 +18,6 @@ import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { PRODUCTS } from "../data/ProductData.js";
 import { InventorySystem } from "./InventorySystem.js";
 import { ExpansionSystem } from "./ExpansionSystem.js";
-import {
-  SanitationSystem,
-  SANITATION_EVENTS
-} from "./SanitationSystem.js";
 
 const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
@@ -45,7 +41,6 @@ export const SaveSystem = {
     if (this.isInitialized) return;
 
     this.isInitialized = true;
-    SanitationSystem.init();
 
     EventBus.on(EVENTS.DAY_STARTED, () => {
       this.saveNow("day_started");
@@ -73,10 +68,6 @@ export const SaveSystem = {
 
     EventBus.on(EVENTS.UPGRADE_SELECTED, () => {
       this.requestAutosave("upgrade_selected");
-    });
-
-    EventBus.on(SANITATION_EVENTS.CHANGED, () => {
-      this.requestAutosave("sanitation_changed");
     });
   },
 
@@ -236,7 +227,6 @@ export const SaveSystem = {
     this.applyGameStateSnapshot(saveData.gameState);
     this.applyInventorySnapshot(saveData.inventory);
     this.applyExpansionSnapshot(saveData.expansion);
-    this.applySanitationSnapshot(saveData.sanitation);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
@@ -269,7 +259,6 @@ export const SaveSystem = {
     this.applyGameStateSnapshot(this.createDefaultGameStateSnapshot());
     this.applyInventorySnapshot({ lots: [], lotSequence: 0, initializedProductIds: [] });
     this.applyExpansionSnapshot({ unlockedZoneIds: ["zone_basic"], constructionZoneId: null });
-    this.applySanitationSnapshot(null);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
@@ -293,7 +282,6 @@ export const SaveSystem = {
       unlockedZoneIds: ["zone_basic"],
       constructionZoneId: null
     });
-    this.applySanitationSnapshot(null);
 
     this.isResettingNewGame = false;
 
@@ -354,7 +342,6 @@ export const SaveSystem = {
       gameState: this.createGameStateSnapshot(),
       inventory: this.createInventorySnapshot(),
       expansion: this.createExpansionSnapshot(),
-      sanitation: this.createSanitationSnapshot(),
       settings: this.readSettings()
     };
   },
@@ -531,10 +518,6 @@ export const SaveSystem = {
     };
   },
 
-  createSanitationSnapshot() {
-    return SanitationSystem.serialize();
-  },
-
   applyGameStateSnapshot(snapshot = {}) {
     const defaultSnapshot = this.createDefaultGameStateSnapshot();
     const nextState = {
@@ -615,10 +598,6 @@ export const SaveSystem = {
     }
   },
 
-  applySanitationSnapshot(snapshot = null) {
-    SanitationSystem.hydrate(snapshot);
-  },
-
   normalizeLoadedPhase(phase) {
     if (SAVEABLE_PHASES.has(phase)) {
       return phase;
@@ -648,7 +627,6 @@ export const SaveSystem = {
     const gameState = saveData.gameState ?? {};
     const inventory = saveData.inventory ?? {};
     const expansion = saveData.expansion ?? {};
-    const sanitation = saveData.sanitation ?? {};
     const todayStats = gameState.todayStats ?? {};
     const unlockedZoneIds = Array.isArray(expansion.unlockedZoneIds)
       ? expansion.unlockedZoneIds
@@ -667,11 +645,6 @@ export const SaveSystem = {
     const hasTodayProgress = Object.values(todayStats).some((value) => {
       return Number.isFinite(Number(value)) && Number(value) !== 0;
     });
-    const sanitationValue = Number(sanitation.value ?? sanitation.sanitation);
-    const hasSanitationProgress =
-      (Number.isFinite(sanitationValue) && sanitationValue !== 100) ||
-      sanitation.isCleaningNeeded === true ||
-      sanitation.isCleaning === true;
 
     return (
       day > 1 ||
@@ -680,8 +653,7 @@ export const SaveSystem = {
       hasInventoryLots ||
       hasUpgrades ||
       hasExpandedStore ||
-      hasTodayProgress ||
-      hasSanitationProgress
+      hasTodayProgress
     );
   },
 

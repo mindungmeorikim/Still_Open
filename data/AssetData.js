@@ -80,18 +80,9 @@ export const ASSET_PATHS = deepFreeze({
         left: "./assets/objects/food_warmer/food_warmer_empty_left.png",
         right: "./assets/objects/food_warmer/food_warmer_empty_right.png"
       }
-    },
-    cleaning: {
-      floorStain: "./assets/objects/cleaning/floor_stain.png",
-      cleaningTools: "./assets/objects/cleaning/cleaning_tools.png",
-      trashCan: "./assets/objects/cleaning/trash_can.png",
-      overflowingTrashCan: "./assets/objects/cleaning/overflowing_trash_can.png"
     }
   },
   effects: {
-    cleaning: {
-      cleanSparkle: "./assets/effects/cleaning/clean_sparkle.png"
-    },
     interaction: {
       clickSparkle: "./assets/effects/interaction/click_sparkle.png",
       fingerTap: "./assets/effects/interaction/interaction_finger_tap.png",
@@ -106,9 +97,6 @@ export const ASSET_PATHS = deepFreeze({
     constructionComplete: "./assets/effects/construction/construction_complete_effect.png"
   },
   ui: {
-    icons: {
-      sanitationCheck: "./assets/ui/icons/sanitation_check.png"
-    },
     buttons: {
       common: {
         base: {

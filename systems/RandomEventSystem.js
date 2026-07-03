@@ -39,7 +39,6 @@ const SURPRISE_EVENT_CHANCE_MIN = 0.1;
 const SURPRISE_EVENT_CHANCE_BASE = 0.1;
 const SURPRISE_EVENT_CHANCE_MAX = 0.1;
 const MAX_EVENTS_PER_CUSTOMER_PER_DAY = 1;
-const CUSTOMER_RANDOM_EVENT_TRIGGERED = "CUSTOMER_RANDOM_EVENT_TRIGGERED";
 
 export const RandomEventSystem = {
   stateDay: null,
@@ -523,7 +522,7 @@ export const RandomEventSystem = {
 
     const customerId = customer.customerId ?? customer.id ?? null;
 
-    const payload = {
+    return {
       day: this.getCurrentDay(),
       eventInstanceId: `customer-event-${this.getCurrentDay()}-${customerId ?? "unknown"}-${this.rollTick}`,
       eventId: detail.id,
@@ -540,10 +539,6 @@ export const RandomEventSystem = {
       choices,
       ui: detail.ui ?? {}
     };
-
-    EventBus.emit(CUSTOMER_RANDOM_EVENT_TRIGGERED, payload);
-
-    return payload;
   },
 
   applyCustomerEventChoiceEffects(eventPayload = {}, choice = {}) {

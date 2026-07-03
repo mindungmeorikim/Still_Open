@@ -23,7 +23,6 @@ import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 import { getUnlockedProducts } from "../data/ProductData.js";
 import { InventorySystem } from "./InventorySystem.js";
-import { SanitationSystem } from "./SanitationSystem.js";
 
 export const ResultSystem = {
   calculatedResultDay: null,
@@ -218,10 +217,6 @@ export const ResultSystem = {
       stats.satisfiedCustomers * 2 -
       stats.angryCustomers * 3 -
       stats.lostCustomers * 5;
-    const sanitationPenalty = SanitationSystem.getSettlementPenalty();
-    const sanitationSatisfactionPenalty = sanitationPenalty.satisfactionPenalty;
-    const totalSatisfactionChange =
-      satisfactionChange + sanitationSatisfactionPenalty;
 
     const mentalChange =
       stats.checkoutSuccessCount -
@@ -229,7 +224,7 @@ export const ResultSystem = {
       Math.floor(stats.eventPenalty * 0.01);
 
     GameState.satisfaction = this.clamp(
-      GameState.satisfaction + totalSatisfactionChange,
+      GameState.satisfaction + satisfactionChange,
       0,
       100
     );
@@ -312,12 +307,6 @@ export const ResultSystem = {
       satisfaction: GameState.satisfaction,
       targetSatisfaction: GameState.dailyGoal.targetSatisfaction,
       satisfactionGap,
-      satisfactionChange: totalSatisfactionChange,
-      sanitationValue: sanitationPenalty.sanitationValue,
-      sanitationStatus: sanitationPenalty.status,
-      sanitationPenaltyApplied: sanitationPenalty.applies,
-      sanitationSatisfactionPenalty,
-      sanitationPenaltyReason: sanitationPenalty.reason,
       mental: GameState.mental,
       mentalGoal,
       mentalGap,
@@ -665,9 +654,6 @@ export const ResultSystem = {
     const mvpText = resultData.mvpTestDataApplied
       ? " / 임시 MVP 데이터 적용"
       : "";
-    const sanitationText = resultData.sanitationPenaltyApplied
-      ? ` | ${resultData.sanitationPenaltyReason}`
-      : "";
 
     return (
       `Day ${resultData.day} 정산 완료 | ` +
@@ -677,7 +663,7 @@ export const ResultSystem = {
       `목표 ₩${resultData.targetRevenue.toLocaleString()} | ` +
       `만족도 ${resultData.satisfaction}/${resultData.targetSatisfaction} | ` +
       `멘탈 ${resultData.mental} | ` +
-      `병맛 점수 ${resultData.bmScore.toLocaleString()}${sanitationText}${mvpText}`
+      `병맛 점수 ${resultData.bmScore.toLocaleString()}${mvpText}`
     );
   },
 

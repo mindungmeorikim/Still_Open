@@ -20,10 +20,6 @@ import {
   getObjectVisualAsset
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
-import {
-  SanitationSystem,
-  SANITATION_EVENTS
-} from "../systems/SanitationSystem.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
@@ -85,7 +81,6 @@ export const UIManager = {
   eventModalCloseTimerId: null,
   isEventModalClosing: false,
   inventorySummary: null,
-  sanitationHud: null,
   staffSummary: null,
   staffCharacter: null,
   productPanel: null,
@@ -106,7 +101,6 @@ export const UIManager = {
   notificationTimerId: null,
   isWorldCameraBound: false,
   sparkleTimeoutIds: {},
-  cleaningSparkleTimerId: null,
   assetEffectToastTimerId: null,
   worldCamera: {
     x: 0,
@@ -131,7 +125,6 @@ export const UIManager = {
     SaveSystem.init();
     this.bindButtons();
     this.bindGameEvents();
-    this.bindSanitationEvents();
     this.bindDayStartEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
@@ -149,14 +142,12 @@ export const UIManager = {
     this.createTitleScreen();
     this.createSettingsModal();
     this.createInventorySummary();
-    this.createSanitationHud();
     this.createStaffSummary();
     this.createDailyGoalPanel();
     this.createFocusedZonePanel();
     this.moveTopIconMenuToRoot();
     this.configureTopSettingsMenu();
     this.createStoreComposition();
-    this.createSanitationZone();
     this.createStaffCharacter();
     this.createExpansionPanel();
     this.createProductPanel();
@@ -548,6 +539,16 @@ export const UIManager = {
       playerNode.textContent = "플레이어";
     }
 
+    playerNode.classList.add("player-character");
+    playerNode.setAttribute("role", "img");
+    playerNode.setAttribute("aria-label", "플레이어 캐릭터");
+
+    [...playerNode.childNodes].forEach((childNode) => {
+      if (childNode.nodeType === Node.TEXT_NODE) {
+        childNode.remove();
+      }
+    });
+
     const targetParent = interactionLayer ?? storeArea;
 
     if (playerNode.parentElement !== targetParent) {
@@ -566,11 +567,13 @@ export const UIManager = {
 
     const x = Number(GameState.player.x) || 0;
     const y = Number(GameState.player.y) || 0;
+    const direction = GameState.player.direction || "down";
 
     playerNode.style.setProperty("left", `${x}px`, "important");
     playerNode.style.setProperty("top", `${y}px`, "important");
     playerNode.style.setProperty("--player-x", `${x}px`);
     playerNode.style.setProperty("--player-y", `${y}px`);
+    playerNode.dataset.direction = direction;
   },
 
   bindButtons() {
@@ -625,40 +628,6 @@ export const UIManager = {
       }
 
       this.showInteractionSparkle("shelf-zone");
-    });
-  },
-
-  bindSanitationEvents() {
-    EventBus.on(SANITATION_EVENTS.CHANGED, (data = {}) => {
-      this.renderSanitationHud(data.state);
-      this.renderSanitationZone(data.state);
-      this.renderInteractionFeedback();
-    });
-
-    EventBus.on(SANITATION_EVENTS.MESSAGE_REQUESTED, (data = {}) => {
-      const delayMs = Math.max(0, Number(data.delayMs) || 0);
-      const showSanitationMessage = () => {
-        this.showMessage(data.message, {
-          duration: data.duration
-        });
-      };
-
-      if (delayMs > 0) {
-        window.setTimeout(showSanitationMessage, delayMs);
-        return;
-      }
-
-      showSanitationMessage();
-    });
-
-    EventBus.on(SANITATION_EVENTS.CLEANING_STARTED, (data = {}) => {
-      this.renderSanitationZone(data.state);
-    });
-
-    EventBus.on(SANITATION_EVENTS.CLEANING_COMPLETED, (data = {}) => {
-      this.renderSanitationHud(data.state);
-      this.renderSanitationZone(data.state);
-      this.playSanitationSparkle();
     });
   },
 
@@ -1048,7 +1017,6 @@ export const UIManager = {
 
   render() {
     this.renderInventorySummary();
-    this.renderSanitationHud();
     this.renderStaffSummary();
     this.renderStaffCharacter();
     this.renderProductCards();
@@ -1060,7 +1028,6 @@ export const UIManager = {
     this.moveTopIconMenuToRoot();
     this.configureTopSettingsMenu();
     this.renderStoreObjectVisuals();
-    this.renderSanitationZone();
     this.renderPlayer();
     this.prepareUiImageButtons();
     this.renderDeliveryBox(this.orderDeliveredData);
@@ -1121,105 +1088,6 @@ export const UIManager = {
         visualAsset
       });
     });
-  },
-
-  createSanitationZone() {
-    const interactionLayer = this.getStoreInteractionLayer();
-
-    if (!interactionLayer) return null;
-
-    let zone = document.getElementById("sanitation-cleaning-zone");
-
-    if (!zone) {
-      zone = document.createElement("button");
-      zone.id = "sanitation-cleaning-zone";
-      zone.type = "button";
-      zone.className = "sanitation-cleaning-zone";
-      zone.dataset.playerAction = "sanitation_cleaning";
-      zone.innerHTML = `
-        <span class="cleaning-zone-shadow" aria-hidden="true"></span>
-        <img class="cleaning-zone-tools" alt="" draggable="false" />
-        <img class="cleaning-zone-stain" alt="" draggable="false" />
-        <img class="cleaning-zone-sparkle" alt="" draggable="false" />
-        <span class="cleaning-zone-progress" aria-hidden="true"></span>
-      `;
-    }
-
-    if (zone.parentElement !== interactionLayer) {
-      interactionLayer.appendChild(zone);
-    }
-
-    return zone;
-  },
-
-  renderSanitationZone(state = SanitationSystem.getState()) {
-    const zone = this.createSanitationZone();
-
-    if (!zone) return;
-
-    const status = state.status ?? "clean";
-    const isCleaningNeeded = state.isCleaningNeeded === true;
-    const isCleaning = state.isCleaning === true;
-    const toolsImage = zone.querySelector(".cleaning-zone-tools");
-    const stainImage = zone.querySelector(".cleaning-zone-stain");
-    const sparkleImage = zone.querySelector(".cleaning-zone-sparkle");
-    const progressNode = zone.querySelector(".cleaning-zone-progress");
-
-    if (toolsImage) {
-      toolsImage.src = ASSET_PATHS.objects.cleaning.cleaningTools;
-    }
-
-    if (stainImage) {
-      stainImage.src = ASSET_PATHS.objects.cleaning.floorStain;
-    }
-
-    if (sparkleImage) {
-      sparkleImage.src = ASSET_PATHS.effects.cleaning.cleanSparkle;
-    }
-
-    zone.dataset.sanitationStatus = status;
-    zone.disabled = isCleaning || !isCleaningNeeded;
-    zone.setAttribute(
-      "aria-label",
-      isCleaning
-        ? "청소 중"
-        : isCleaningNeeded
-          ? "청소하기"
-          : "청소 구역"
-    );
-    zone.classList.remove(
-      "sanitation-clean",
-      "sanitation-normal",
-      "sanitation-warning",
-      "sanitation-critical"
-    );
-    zone.classList.add(`sanitation-${status}`);
-    zone.classList.toggle("is-cleaning-needed", isCleaningNeeded);
-    zone.classList.toggle("is-cleaning", isCleaning);
-    zone.classList.toggle("is-clean", !isCleaningNeeded && !isCleaning);
-
-    if (progressNode) {
-      progressNode.textContent = isCleaning
-        ? "청소 중..."
-        : isCleaningNeeded
-          ? "청소 필요"
-          : "";
-    }
-  },
-
-  playSanitationSparkle() {
-    const zone = this.createSanitationZone();
-
-    if (!zone) return;
-
-    window.clearTimeout(this.cleaningSparkleTimerId);
-    zone.classList.remove("is-cleaning-sparkling");
-    void zone.offsetWidth;
-    zone.classList.add("is-cleaning-sparkling");
-
-    this.cleaningSparkleTimerId = window.setTimeout(() => {
-      zone.classList.remove("is-cleaning-sparkling");
-    }, 900);
   },
 
   getStoreObjectNode(config, interactionLayer) {
@@ -1438,21 +1306,12 @@ export const UIManager = {
   },
 
   getInteractionFeedbackTargets() {
-    const sanitationState = SanitationSystem.getState();
-
     return [
       {
         nodeId: "shelf-zone",
         isInteractable: true,
         fallback: { x: 540, y: 680 }
       },
-      ...(sanitationState.isCleaningNeeded && !sanitationState.isCleaning
-        ? [{
-            nodeId: "sanitation-cleaning-zone",
-            isInteractable: true,
-            fallback: { x: 380, y: 680 }
-          }]
-        : []),
       {
         nodeId: "counter-zone",
         isInteractable: true
@@ -2247,57 +2106,6 @@ export const UIManager = {
         </span>
       `;
     }).join("");
-  },
-
-  createSanitationHud() {
-    const existingHud = document.getElementById("sanitation-info");
-
-    if (existingHud) {
-      this.sanitationHud = existingHud;
-      return existingHud;
-    }
-
-    const statusPanel = document.getElementById("status-panel");
-
-    if (!statusPanel) {
-      return null;
-    }
-
-    const sanitationHud = document.createElement("p");
-
-    sanitationHud.id = "sanitation-info";
-    sanitationHud.className = "sanitation-status sanitation-clean";
-    sanitationHud.style.setProperty(
-      "--sanitation-icon-image",
-      `url("${ASSET_PATHS.ui.icons.sanitationCheck}")`
-    );
-    sanitationHud.textContent = "위생 100%";
-
-    statusPanel.appendChild(sanitationHud);
-    this.sanitationHud = sanitationHud;
-
-    return sanitationHud;
-  },
-
-  renderSanitationHud(state = SanitationSystem.getState()) {
-    const sanitationHud = this.createSanitationHud();
-
-    if (!sanitationHud) {
-      return;
-    }
-
-    const status = state.status ?? "clean";
-    const value = Math.max(0, Math.min(100, Math.floor(Number(state.value) || 0)));
-
-    sanitationHud.textContent = `위생 ${value}%`;
-    sanitationHud.dataset.sanitationStatus = status;
-    sanitationHud.classList.remove(
-      "sanitation-clean",
-      "sanitation-normal",
-      "sanitation-warning",
-      "sanitation-critical"
-    );
-    sanitationHud.classList.add(`sanitation-${status}`);
   },
 
   renderStockInfo(totalQuantity = null) {
@@ -5269,14 +5077,6 @@ export const UIManager = {
         </div>
       `
       : "";
-    const sanitationResultRows = resultData.sanitationPenaltyApplied
-      ? `
-        <div class="result-row result-row-sanitation">
-          <span>위생 관리</span>
-          <strong>${resultData.sanitationPenaltyReason}</strong>
-        </div>
-      `
-      : "";
 
     title.textContent = `Day ${resultData.day} 정산 결과`;
 
@@ -5311,8 +5111,6 @@ export const UIManager = {
             <span>만족도</span>
             <strong>${resultData.satisfaction} / ${resultData.targetSatisfaction}</strong>
           </div>
-
-          ${sanitationResultRows}
 
           <div class="result-row">
             <span>멘탈</span>

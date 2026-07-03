@@ -27,12 +27,13 @@ export const PlayerMovementSystem = {
   defaultPlayer: {
     x: 600,
     y: 705,
-    speed: 4
+    speed: 4,
+    direction: "down"
   },
 
   defaultPlayerSize: {
-    width: 42,
-    height: 58
+    width: 74,
+    height: 130
   },
 
   isInitialized: false,
@@ -111,6 +112,8 @@ export const PlayerMovementSystem = {
       return;
     }
 
+    player.direction = this.getDirectionFromMovement(moveX, moveY, player.direction);
+
     const isDiagonal = moveX !== 0 && moveY !== 0;
     const moveSpeed = isDiagonal ? speed * 0.707 : speed;
 
@@ -119,6 +122,19 @@ export const PlayerMovementSystem = {
     this.clampPlayerToAllowedMovement(player);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  getDirectionFromMovement(moveX, moveY, fallbackDirection = "down") {
+    if (moveX < 0 && moveY < 0) return "upLeft";
+    if (moveX > 0 && moveY < 0) return "upRight";
+    if (moveX < 0 && moveY > 0) return "downLeft";
+    if (moveX > 0 && moveY > 0) return "downRight";
+    if (moveY < 0) return "up";
+    if (moveY > 0) return "down";
+    if (moveX > 0) return "right";
+    if (moveX < 0) return "left";
+
+    return fallbackDirection || "down";
   },
 
   clampPlayerToAllowedMovement(player) {
