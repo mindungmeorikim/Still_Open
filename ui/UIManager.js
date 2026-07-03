@@ -86,6 +86,7 @@ export const UIManager = {
   notificationTimerId: null,
   isWorldCameraBound: false,
   sparkleTimeoutIds: {},
+  assetEffectToastTimerId: null,
   worldCamera: {
     x: 0,
     y: 0,
@@ -568,12 +569,12 @@ export const UIManager = {
 
     EventBus.on(EVENTS.RESTOCK_COMPLETED, (data = {}) => {
       const source = String(data.source ?? "");
-      const targetId = source.startsWith("delivery_box") ||
-        source.startsWith("order_delivery")
-        ? "delivery-box-zone"
-        : "shelf-zone";
 
-      this.showInteractionSparkle(targetId);
+      if (source.startsWith("delivery_box") || source.startsWith("order_delivery")) {
+        return;
+      }
+
+      this.showInteractionSparkle("shelf-zone");
     });
   },
 
@@ -648,6 +649,10 @@ export const UIManager = {
       this.renderInventorySummary();
       this.renderProductCards();
       this.renderStoreObjectVisuals();
+
+      if (data.source === "products_unlocked" && Array.isArray(data.unlockedProductIds) && data.unlockedProductIds.length > 0) {
+        this.playAssetEffectToast("unlock", `신규 상품 ${data.unlockedProductIds.length}종 해금!`);
+      }
     });
   },
 
@@ -659,6 +664,7 @@ export const UIManager = {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.playAssetEffectToast("loading", "공사 진행 중...");
     });
 
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
@@ -668,6 +674,7 @@ export const UIManager = {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.playAssetEffectToast("construction", "공사 완료!");
       this.playStoreExpansionUnlockEffect(data.animation?.zoneId ?? data.zoneId);
     });
 
@@ -1142,10 +1149,6 @@ export const UIManager = {
       {
         nodeId: "counter-zone",
         isInteractable: true
-      },
-      {
-        nodeId: "delivery-box-zone",
-        isInteractable: true
       }
     ];
   },
@@ -1272,6 +1275,77 @@ export const UIManager = {
     this.sparkleTimeoutIds[nodeId] = window.setTimeout(() => {
       node.classList.remove("is-click-sparkling");
     }, 520);
+  },
+
+  getAssetEffectToastConfig(effectType) {
+    const effectConfigs = {
+      unlock: {
+        className: "asset-effect-toast--unlock",
+        image: ASSET_PATHS.effects.unlock,
+        defaultLabel: "해금 완료!",
+        duration: 1100
+      },
+      upgrade: {
+        className: "asset-effect-toast--upgrade",
+        image: ASSET_PATHS.effects.upgrade,
+        defaultLabel: "업그레이드 완료!",
+        duration: 1050
+      },
+      construction: {
+        className: "asset-effect-toast--construction",
+        image: ASSET_PATHS.effects.constructionComplete,
+        defaultLabel: "공사 완료!",
+        duration: 1200
+      },
+      loading: {
+        className: "asset-effect-toast--loading",
+        image: ASSET_PATHS.effects.loading.dots,
+        defaultLabel: "진행 중...",
+        duration: 1300
+      }
+    };
+
+    return effectConfigs[effectType] ?? effectConfigs.unlock;
+  },
+
+  playAssetEffectToast(effectType, labelText = "") {
+    const gameScreen = document.getElementById("game-screen") ?? document.body;
+    const config = this.getAssetEffectToastConfig(effectType);
+    let toast = document.getElementById("asset-effect-toast");
+
+    if (!toast) {
+      toast = document.createElement("div");
+      toast.id = "asset-effect-toast";
+      toast.setAttribute("aria-live", "polite");
+      toast.innerHTML = `
+        <span class="asset-effect-toast-image" aria-hidden="true"></span>
+        <strong class="asset-effect-toast-label"></strong>
+      `;
+      gameScreen.appendChild(toast);
+    }
+
+    const imageNode = toast.querySelector(".asset-effect-toast-image");
+    const labelNode = toast.querySelector(".asset-effect-toast-label");
+
+    toast.className = `asset-effect-toast ${config.className}`;
+    toast.style.setProperty("--asset-effect-toast-image", `url("${config.image}")`);
+
+    if (imageNode) {
+      imageNode.style.backgroundImage = `url("${config.image}")`;
+    }
+
+    if (labelNode) {
+      labelNode.textContent = labelText || config.defaultLabel;
+    }
+
+    toast.classList.remove("is-visible");
+    void toast.offsetWidth;
+    toast.classList.add("is-visible");
+
+    window.clearTimeout(this.assetEffectToastTimerId);
+    this.assetEffectToastTimerId = window.setTimeout(() => {
+      toast.classList.remove("is-visible");
+    }, config.duration);
   },
 
   renderPhaseChip() {
@@ -4502,6 +4576,7 @@ export const UIManager = {
       storeArea.appendChild(deliveryBox);
     }
 
+    deliveryBox.classList.remove("interaction-feedback-target", "is-interactable", "is-interaction-ready", "is-click-sparkling");
     deliveryBox.innerHTML = `
       <span class="delivery-box-icon">📦</span>
       <span>택배 박스</span>
@@ -5174,12 +5249,17 @@ export const UIManager = {
 
         alreadySelected = true;
 
+        button.classList.add("is-upgrade-selected");
+
         const upgradeButtons = list.querySelectorAll(".upgrade-card");
         upgradeButtons.forEach((upgradeButton) => {
           upgradeButton.disabled = true;
         });
 
-        this.hideUpgradeModal();
+        this.playAssetEffectToast("upgrade", `${upgrade.name} 적용 완료!`);
+        window.setTimeout(() => {
+          this.hideUpgradeModal();
+        }, 280);
 
         if (typeof onSelect === "function") {
           onSelect(upgrade.id);

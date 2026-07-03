@@ -14806,3 +14806,122 @@ body.is-title-screen-active #game-root {
     font-size: 12px !important;
   }
 }
+
+/* v6.8.2 delivery box effect cleanup + v6.9 asset effect polish */
+#store-interaction-layer > #delivery-box-zone.interaction-feedback-target {
+  --interaction-effect-width: 0px;
+  --interaction-effect-height: 0px;
+}
+
+#store-interaction-layer > #delivery-box-zone .interaction-effect,
+#store-interaction-layer > #delivery-box-zone .interaction-glow-ring,
+#store-interaction-layer > #delivery-box-zone .interaction-finger-tap,
+#store-interaction-layer > #delivery-box-zone .interaction-click-sparkle,
+#store-interaction-layer > #delivery-box-zone .asset-object-effect {
+  display: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  background-image: none !important;
+}
+
+.asset-effect-toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 9800;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  width: 190px;
+  min-height: 160px;
+  padding: 18px 18px 16px;
+  border-radius: 28px;
+  background: rgba(54, 43, 30, 0.86);
+  border: 2px solid rgba(255, 235, 161, 0.82);
+  box-shadow: 0 18px 38px rgba(32, 21, 9, 0.28), inset 0 0 0 2px rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -46%) scale(0.88);
+  transition: opacity 160ms ease, transform 180ms ease;
+}
+
+.asset-effect-toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  animation: assetEffectToastPop 920ms ease-out both;
+}
+
+.asset-effect-toast-image {
+  display: block;
+  width: 104px;
+  height: 104px;
+  background-image: var(--asset-effect-toast-image);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.2));
+  pointer-events: none;
+}
+
+.asset-effect-toast-label {
+  display: block;
+  font-size: 15px;
+  line-height: 1.2;
+  font-weight: 950;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.34);
+  word-break: keep-all;
+}
+
+.asset-effect-toast--loading .asset-effect-toast-image {
+  width: 82px;
+  height: 42px;
+  animation: assetEffectLoadingBounce 760ms ease-in-out infinite;
+}
+
+.asset-effect-toast--upgrade .asset-effect-toast-image,
+.asset-effect-toast--unlock .asset-effect-toast-image,
+.asset-effect-toast--construction .asset-effect-toast-image {
+  animation: assetEffectImagePulse 780ms ease-out both;
+}
+
+.store-expansion-puff {
+  background-image: url("./assets/effects/construction/construction_complete_effect.png") !important;
+  background-color: transparent !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: contain !important;
+  border-radius: 0 !important;
+  opacity: 0.95;
+  filter: drop-shadow(0 10px 18px rgba(255, 203, 84, 0.34));
+}
+
+.upgrade-card.is-upgrade-selected,
+.upgrade-card:active:not(:disabled) {
+  animation: upgradeCardSparklePulse 360ms ease-out both;
+}
+
+@keyframes assetEffectToastPop {
+  0% { opacity: 0; transform: translate(-50%, -42%) scale(0.82); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+  72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -56%) scale(0.96); }
+}
+
+@keyframes assetEffectImagePulse {
+  0% { transform: scale(0.72) rotate(-6deg); opacity: 0; }
+  30% { transform: scale(1.08) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes assetEffectLoadingBounce {
+  0%, 100% { transform: translateY(0); opacity: 0.82; }
+  50% { transform: translateY(-5px); opacity: 1; }
+}
+
+@keyframes upgradeCardSparklePulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  55% { transform: scale(1.025); filter: brightness(1.16); }
+  100% { transform: scale(1); filter: brightness(1); }
+}

@@ -1,3 +1,15 @@
+## [v6.9] Upgrade and unlock effects
+- Added: 신규 상품 해금 시 unlock effect 토스트 표시
+- Added: 업그레이드 선택 시 upgrade sparkle 토스트 및 카드 선택 피드백 표시
+- Added: 매장 공사 시작/완료 시 loading/construction effect 토스트 표시
+- Changed: 확장 완료 puff에 공사 완료 에셋을 사용하도록 시각 효과 보강
+- Maintained: 기존 저장/이어하기, 발주, 정산, 업그레이드, 확장 흐름 유지
+
+## [v6.8.2] Delivery box interaction effect cleanup
+- Fixed: 택배 박스에 glow ring / finger tap / click sparkle 이펙트가 표시되지 않도록 제거
+- Changed: 택배 박스는 기존 클릭/정리 기능만 유지하고 상호작용 이펙트 대상에서 제외
+- Maintained: 진열대/계산대 상호작용 이펙트 유지
+
 ## [v6.8] Save and continue system
 
 
