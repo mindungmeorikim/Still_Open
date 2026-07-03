@@ -15059,3 +15059,199 @@ body.is-title-screen-active #game-root {
   transform: translateY(3px);
   box-shadow: 0 5px 0 #d76b25, 0 8px 14px rgba(80, 42, 24, 0.18);
 }
+
+/* v7.0.4 NPC / player textbox assets */
+.customer-dialogue-box {
+  width: max-content;
+  min-width: 148px;
+  max-width: 230px;
+  min-height: 58px;
+  padding: 15px 22px 18px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-shadow: none !important;
+  color: #332617;
+  font-size: 12px;
+  font-weight: 950;
+  line-height: 1.25;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.42);
+}
+
+.customer-dialogue-box::after {
+  display: none !important;
+}
+
+.customer-dialogue-box--normal {
+  background-image: url("./assets/ui/textbox/normalcustomer_npc_textbox.png");
+}
+
+.customer-dialogue-box--bad {
+  background-image: url("./assets/ui/textbox/badcustomer_textbox.png");
+  color: #4b1d16;
+}
+
+.customer-dialogue-box--leaving {
+  min-width: 184px;
+  max-width: 260px;
+}
+
+.customer-dialogue-box .customer-wanted-image {
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: rgba(255,255,255,0.68);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.12);
+}
+
+.customer-dialogue-text {
+  display: inline-block;
+  min-width: 0;
+  max-width: 172px;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+#message-panel.message-panel--player-textbox {
+  min-height: 74px;
+  padding: 19px 30px 22px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-image: url("./assets/ui/textbox/player_textbox.png") !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  color: #1f1710;
+}
+
+#message-panel.message-panel--player-textbox::before {
+  display: none !important;
+}
+
+#message-panel.message-panel--player-textbox #system-message,
+#message-panel.message-panel--player-textbox p {
+  color: #1f1710 !important;
+  font-weight: 950;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.customer-event-modal-dialogue--normal,
+.customer-event-modal-dialogue--bad {
+  min-height: 70px;
+  padding: 22px 28px 24px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-shadow: none !important;
+  color: #332617;
+  font-weight: 950;
+}
+
+.customer-event-modal-dialogue--normal {
+  background-image: url("./assets/ui/textbox/normalcustomer_npc_textbox.png");
+}
+
+.customer-event-modal-dialogue--bad {
+  background-image: url("./assets/ui/textbox/badcustomer_textbox.png");
+  color: #4b1d16;
+}
+
+.customer-event-modal-dialogue--normal::after,
+.customer-event-modal-dialogue--bad::after {
+  display: none !important;
+}
+
+
+/* v7.0.4.1 player textbox anchor hotfix
+   플레이어/알바생 대사는 전역 알림 토스트가 아니라 플레이어 캐릭터 위에 고정한다. */
+#store-interaction-layer > #player-zone,
+#player-zone {
+  overflow: visible !important;
+}
+
+.player-dialogue-bubble {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 13px) !important;
+  z-index: 99999 !important;
+  width: 190px !important;
+  min-height: 66px !important;
+  padding: 17px 24px 20px !important;
+  transform: translateX(-50%) translateY(0) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-image: url("./assets/ui/textbox/player_textbox.png") !important;
+  background-repeat: no-repeat !important;
+  background-position: center center !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s linear 150ms !important;
+}
+
+.player-dialogue-bubble.is-visible {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: translateX(-50%) translateY(-4px) !important;
+  transition: opacity 150ms ease, transform 150ms ease, visibility 0s !important;
+}
+
+.player-dialogue-bubble.is-hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.player-dialogue-bubble::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 6px !important;
+  width: 18px !important;
+  height: 12px !important;
+  transform: translateX(-50%) rotate(45deg) !important;
+  background: rgba(74, 49, 29, 0.92) !important;
+  border-radius: 3px !important;
+  pointer-events: none !important;
+}
+
+.player-dialogue-text {
+  display: block !important;
+  position: relative !important;
+  z-index: 1 !important;
+  margin: 0 !important;
+  color: #1f1710 !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  line-height: 1.18 !important;
+  text-align: center !important;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+  white-space: normal !important;
+}
+
+@media (max-width: 980px), (max-height: 560px) {
+  .player-dialogue-bubble {
+    width: 166px !important;
+    min-height: 58px !important;
+    padding: 15px 20px 17px !important;
+  }
+
+  .player-dialogue-text {
+    font-size: 11px !important;
+  }
+}

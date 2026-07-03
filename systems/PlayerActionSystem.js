@@ -26,11 +26,14 @@ const STAFF_EVENTS = {
   AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED"
 };
 
+const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
+
 export const PlayerActionSystem = {
   isInitialized: false,
   checkoutSequence: 0,
   isCheckoutInputLocked: false,
   isPlayerBusy: false,
+  actionMessageTimerId: null,
 
   shelf: {
     x: 540,
@@ -425,16 +428,16 @@ completeShelfRestock() {
 },
 
   showActionMessage(message) {
-    const messageNode =
-      document.getElementById("message-log") ??
-      document.getElementById("system-message");
+    const normalizedMessage = String(message ?? "").trim();
 
-    if (messageNode) {
-      messageNode.textContent = message;
+    if (!normalizedMessage) {
       return;
     }
 
-    console.log(message);
+    EventBus.emit(PLAYER_DIALOGUE_REQUESTED, {
+      message: normalizedMessage,
+      duration: 2600
+    });
   },
 
   handlePointerAction(event) {
@@ -561,7 +564,7 @@ completeShelfRestock() {
       actorType: "player",
       checkoutIdPrefix: "checkout",
       successMessage: (checkoutPayload) => {
-        return `${checkoutPayload.productName} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`;
+        return `계산해드릴게요. ${checkoutPayload.productName} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`;
       }
     });
   },

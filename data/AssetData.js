@@ -145,6 +145,11 @@ export const ASSET_PATHS = deepFreeze({
         }
       }
     },
+    textboxes: {
+      normalCustomer: "./assets/ui/textbox/normalcustomer_npc_textbox.png",
+      player: "./assets/ui/textbox/player_textbox.png",
+      badCustomer: "./assets/ui/textbox/badcustomer_textbox.png"
+    },
     components: {
       tabs: {
         normal: "./assets/ui/components/tabs/ui_tab_button_normal.png",

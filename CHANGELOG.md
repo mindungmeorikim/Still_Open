@@ -1,3 +1,9 @@
+
+## [v7.0.4.2] Player textbox readability hotfix
+- Fixed: 플레이어/알바생 텍스트박스 글씨를 흰색에서 검은색 계열로 변경해 가독성을 개선
+- Changed: 플레이어 대사 텍스트 그림자를 어두운 그림자에서 밝은 하이라이트로 조정
+- Maintained: 일반 손님 / 진상 손님 텍스트박스 색상과 표시 흐름 유지
+
 ## [v7.0.3] Settings vibration option cleanup
 - Removed: 설정 팝업에서 사용하지 않는 진동 옵션 제거
 - Maintained: 효과음 / 배경음 표시와 기존 설정 열기/닫기 흐름 유지
@@ -1375,3 +1381,26 @@
 ### Notes
 - 수정 파일: `systems/SaveSystem.js`, `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
 - 유료 BM 유지 처리는 실제 BM 연동 전까지 보류
+
+## [v7.0.4] NPC and player textbox assets
+### Added
+- 손님 NPC 대사에 `normalcustomer_npc_textbox.png` 텍스트박스 에셋 적용
+- 진상 손님/분노 상태 손님 대사에 `badcustomer_textbox.png` 텍스트박스 에셋 적용
+- 플레이어/알바생 행동 메시지에 `player_textbox.png` 텍스트박스 에셋 적용
+- 계산대 대기 손님 기본 대사 추가: `계산해주세요`, `계산 부탁드립니다`, `저 급해요` 등 손님 타입별 기본 문구 분기
+- 고객 이벤트 모달의 손님 대사에도 normal/bad customer 텍스트박스 분기 적용
+
+### Changed
+- 기존 상품명 중심 말풍선을 NPC가 직접 말하는 대사형 텍스트박스로 변경
+- 계산 성공 메시지를 `계산해드릴게요` 톤의 플레이어 대사로 보이도록 조정
+
+### Notes
+- 수정 파일: `data/AssetData.js`, `ui/UIManager.js`, `systems/PlayerActionSystem.js`, `style.css`, `CHANGELOG.md`
+- 추가 에셋: `assets/ui/textbox/normalcustomer_npc_textbox.png`, `assets/ui/textbox/player_textbox.png`, `assets/ui/textbox/badcustomer_textbox.png`
+- 기존 손님 이동, 계산대, 진열대, 저장/이어하기, 설정 흐름은 유지
+
+## [v7.0.4.1] Player textbox anchor hotfix
+- Fixed: 플레이어/알바생 대사가 전역 알림 토스트 위치에 떠서 계산대/진열대 위에 겹쳐 보이던 문제 수정
+- Changed: 플레이어 행동 메시지를 `#message-panel`이 아니라 `#player-zone` 위 전용 대사 박스로 표시하도록 변경
+- Maintained: 일반 손님 / 진상 손님 텍스트박스 표시 흐름 유지
+

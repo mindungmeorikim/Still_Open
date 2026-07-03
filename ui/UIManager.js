@@ -23,6 +23,13 @@ import { SaveSystem } from "../systems/SaveSystem.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
+const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
+
+const UI_TEXTBOX_VARIANTS = {
+  normalCustomer: ASSET_PATHS.ui.textboxes.normalCustomer,
+  player: ASSET_PATHS.ui.textboxes.player,
+  badCustomer: ASSET_PATHS.ui.textboxes.badCustomer
+};
 
 const UI_IMAGE_BUTTON_VARIANTS = {
   commonBase: ASSET_PATHS.ui.buttons.common.base,
@@ -574,6 +581,10 @@ export const UIManager = {
       this.renderCustomers();
     });
 
+    EventBus.on(PLAYER_DIALOGUE_REQUESTED, (data = {}) => {
+      this.showPlayerDialogue(data.message, { duration: data.duration });
+    });
+
     EventBus.on(EVENTS.CUSTOMER_LEFT, (data = {}) => {
       if (data.reason !== "wanted_product_out_of_stock") {
         return;
@@ -823,13 +834,15 @@ export const UIManager = {
     customerNode.appendChild(label);
 
     if (customer.bubbleText) {
-      const leavingBubble = document.createElement("span");
-      leavingBubble.className = "customer-wanted-bubble";
-
-      const leavingText = document.createElement("span");
-      leavingText.className = "customer-wanted-text";
-      leavingText.textContent = customer.bubbleText;
-      leavingBubble.appendChild(leavingText);
+      const leavingBubble = this.createCustomerDialogueBubble(
+        customer,
+        customer.bubbleText,
+        {
+          productName: customer.carriedProductName ?? customer.wantedProductName,
+          productImagePath: customer.carriedProductImagePath ?? null,
+          context: "leaving"
+        }
+      );
 
       customerNode.appendChild(leavingBubble);
       return;
@@ -839,26 +852,115 @@ export const UIManager = {
       return;
     }
 
-    const wantedBubble = document.createElement("span");
     const productName =
       customer.carriedProductName ?? customer.wantedProductName;
+    const dialogueText = this.getCustomerDialogueText(customer, {
+      productName,
+      context: "checkout"
+    });
+    const wantedBubble = this.createCustomerDialogueBubble(
+      customer,
+      dialogueText,
+      {
+        productName,
+        productImagePath: customer.carriedProductImagePath,
+        context: "checkout"
+      }
+    );
 
-    wantedBubble.className = "customer-wanted-bubble";
+    customerNode.appendChild(wantedBubble);
+  },
 
-    if (customer.carriedProductImagePath) {
+  createCustomerDialogueBubble(customer, dialogueText, options = {}) {
+    const bubble = document.createElement("span");
+    const textboxVariant = this.getCustomerTextboxVariant(customer);
+    const productName = options.productName ?? customer.wantedProductName ?? "상품";
+
+    bubble.className = [
+      "customer-wanted-bubble",
+      "customer-dialogue-box",
+      `customer-dialogue-box--${textboxVariant}`,
+      options.context ? `customer-dialogue-box--${options.context}` : ""
+    ].filter(Boolean).join(" ");
+    bubble.dataset.textboxVariant = textboxVariant;
+
+    if (options.productImagePath) {
       const productImage = document.createElement("img");
       productImage.className = "customer-wanted-image";
-      productImage.src = customer.carriedProductImagePath;
+      productImage.src = options.productImagePath;
       productImage.alt = productName;
-      wantedBubble.appendChild(productImage);
+      bubble.appendChild(productImage);
     }
 
     const wantedText = document.createElement("span");
-    wantedText.className = "customer-wanted-text";
-    wantedText.textContent = productName;
-    wantedBubble.appendChild(wantedText);
+    wantedText.className = "customer-wanted-text customer-dialogue-text";
+    wantedText.textContent = String(dialogueText || "계산해주세요!").trim();
+    bubble.appendChild(wantedText);
 
-    customerNode.appendChild(wantedBubble);
+    return bubble;
+  },
+
+  getCustomerTextboxVariant(customer = {}) {
+    const typeId = customer.typeId ?? customer.customerTypeId;
+    const status = customer.status;
+    const mood = customer.mood;
+
+    if (
+      typeId === "difficult" ||
+      status === "angry" ||
+      mood === "angry"
+    ) {
+      return "bad";
+    }
+
+    return "normal";
+  },
+
+  getCustomerDialogueText(customer = {}, options = {}) {
+    if (customer.bubbleText) {
+      return customer.bubbleText;
+    }
+
+    const typeId = customer.typeId ?? customer.customerTypeId ?? "normal";
+    const context = options.context ?? "checkout";
+
+    if (context === "leaving") {
+      return "앗, 찾던 상품이 없네… 다음에 올게요.";
+    }
+
+    const checkoutDialogues = {
+      difficult: [
+        "빨리 계산 좀 해주세요.",
+        "계산 아직이에요?",
+        "저 기다리는 거 싫어하거든요."
+      ],
+      hurried: [
+        "저 급해요, 계산해주세요!",
+        "빨리 계산 부탁드려요!",
+        "회사 가야 해서요, 계산해주세요!"
+      ],
+      office_worker: [
+        "계산 부탁드립니다.",
+        "이거 계산해주세요.",
+        "영수증도 부탁드려요."
+      ],
+      student: [
+        "이거 계산해주세요!",
+        "간식 계산해주세요!",
+        "빨리 먹고 싶어요!"
+      ],
+      normal: [
+        "계산해주세요!",
+        "이거 계산 부탁드려요.",
+        "계산할게요."
+      ]
+    };
+    const candidates = checkoutDialogues[typeId] ?? checkoutDialogues.normal;
+    const seed = String(customer.customerId ?? customer.id ?? typeId).split("").reduce((sum, char) => {
+      return sum + char.charCodeAt(0);
+    }, 0);
+
+    return candidates[seed % candidates.length];
   },
 
   applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes) {
@@ -3948,10 +4050,19 @@ export const UIManager = {
       messagePanel.classList.remove("is-visible");
       messagePanel.classList.add("is-hidden");
       messageNode.textContent = "";
+      if (options.speaker === "player") {
+        this.hidePlayerDialogue();
+      }
+      return;
+    }
+
+    if (options.speaker === "player") {
+      this.showPlayerDialogue(normalizedMessage, options);
       return;
     }
 
     messageNode.textContent = normalizedMessage;
+    messagePanel.classList.remove("message-panel--player-textbox");
     messagePanel.classList.remove("is-hidden");
     messagePanel.classList.add("is-visible");
 
@@ -3961,6 +4072,69 @@ export const UIManager = {
       messagePanel.classList.remove("is-visible");
       messagePanel.classList.add("is-hidden");
     }, duration);
+  },
+
+  getPlayerDialogueNode() {
+    const playerNode = this.getPlayerNode();
+
+    if (!playerNode) return null;
+
+    let dialogueNode = playerNode.querySelector(".player-dialogue-bubble");
+
+    if (!dialogueNode) {
+      dialogueNode = document.createElement("div");
+      dialogueNode.className = "player-dialogue-bubble is-hidden";
+      dialogueNode.setAttribute("aria-live", "polite");
+      dialogueNode.innerHTML = `<p class="player-dialogue-text"></p>`;
+      playerNode.appendChild(dialogueNode);
+    }
+
+    return dialogueNode;
+  },
+
+  showPlayerDialogue(message, options = {}) {
+    const normalizedMessage = String(message ?? "").trim();
+    const dialogueNode = this.getPlayerDialogueNode();
+
+    if (!dialogueNode) {
+      if (normalizedMessage) {
+        this.showMessage(normalizedMessage);
+      }
+      return;
+    }
+
+    window.clearTimeout(this.playerDialogueTimerId);
+
+    if (!normalizedMessage) {
+      this.hidePlayerDialogue();
+      return;
+    }
+
+    const textNode = dialogueNode.querySelector(".player-dialogue-text");
+
+    if (textNode) {
+      textNode.textContent = normalizedMessage;
+    }
+
+    dialogueNode.classList.remove("is-hidden");
+    dialogueNode.classList.add("is-visible");
+
+    const duration = Number(options.duration) || 2400;
+
+    this.playerDialogueTimerId = window.setTimeout(() => {
+      this.hidePlayerDialogue();
+    }, duration);
+  },
+
+  hidePlayerDialogue() {
+    window.clearTimeout(this.playerDialogueTimerId);
+
+    const dialogueNode = document.querySelector("#player-zone .player-dialogue-bubble");
+
+    if (!dialogueNode) return;
+
+    dialogueNode.classList.remove("is-visible");
+    dialogueNode.classList.add("is-hidden");
   },
 
   showResult(resultData) {
@@ -5662,6 +5836,12 @@ export const UIManager = {
     title.textContent = payload.eventTitle || "고객 이벤트";
     meta.textContent = metaParts.join(" / ");
     dialogue.textContent = payload.dialogue || "손님이 말을 걸었습니다.";
+    dialogue.className = [
+      "customer-event-modal-dialogue",
+      payload.customerTypeId === "difficult"
+        ? "customer-event-modal-dialogue--bad"
+        : "customer-event-modal-dialogue--normal"
+    ].join(" ");
     summary.textContent = payload.eventSummary || "";
     choiceList.innerHTML = "";
     choiceList.hidden = false;
