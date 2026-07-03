@@ -19,6 +19,7 @@ import {
   STOCK_VISUAL_OBJECT_TYPES,
   getObjectVisualAsset
 } from "../data/AssetData.js";
+import { SaveSystem } from "../systems/SaveSystem.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
@@ -105,6 +106,7 @@ export const UIManager = {
   },
 
   init() {
+    SaveSystem.init();
     this.bindButtons();
     this.bindGameEvents();
     this.bindDayStartEvents();
@@ -216,6 +218,8 @@ export const UIManager = {
 
     if (newGameButton) {
       newGameButton.onclick = () => {
+        SaveSystem.resetNewGameState();
+        this.renderTitleResumeButton();
         this.enterGameFromTitle();
       };
     }
@@ -223,11 +227,22 @@ export const UIManager = {
     if (resumeButton) {
       resumeButton.onclick = () => {
         if (!this.hasTitleResumeData()) {
+          this.renderTitleResumeButton();
+          return;
+        }
+
+        const loadResult = SaveSystem.loadGame();
+
+        if (!loadResult.success) {
+          this.showMessage(loadResult.message ?? "저장 데이터를 불러오지 못했습니다.");
+          this.renderTitleResumeButton();
           return;
         }
 
         this.closeTitleScreen();
-        this.showMessage("이어하기 복원은 다음 작업에서 연결됩니다.");
+        this.render();
+        this.renderCustomers();
+        this.showMessage(loadResult.message ?? `Day ${GameState.day} 저장 데이터를 불러왔습니다.`);
       };
     }
 
@@ -239,7 +254,7 @@ export const UIManager = {
   },
 
   hasTitleResumeData() {
-    return false;
+    return SaveSystem.hasSaveData();
   },
 
   renderTitleResumeButton() {
@@ -255,7 +270,11 @@ export const UIManager = {
     }
 
     if (resumeState) {
-      resumeState.textContent = hasSaveData ? "저장 데이터 있음" : "저장 데이터 없음";
+      const saveSummary = SaveSystem.getSaveSummary();
+
+      resumeState.textContent = hasSaveData && saveSummary
+        ? `저장 데이터 있음 · Day ${saveSummary.day} · ₩${saveSummary.money.toLocaleString("ko-KR")}`
+        : "저장 데이터 없음";
     }
   },
 

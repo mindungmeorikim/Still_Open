@@ -1,3 +1,20 @@
+## [v6.8] Save and continue system
+
+
+## [v6.8.1] Save/Continue reset hotfix
+- Fixed: 새로 시작 직후 기본 Day 1 상태가 자동 저장되어 이어하기 시 초기화처럼 보이던 문제 수정
+- Fixed: 의미 있는 진행 데이터가 없는 기본 저장값은 이어하기 데이터로 인정하지 않도록 방어 처리
+- Added: Day 시작/발주 확정/발주 도착 시점의 저장 트리거 보강
+- Maintained: 기존 타이틀 화면, 설정 팝업, Day 진행, 발주/재고 흐름 유지
+
+- Added: localStorage 기반 저장/불러오기 시스템 추가
+- Added: 타이틀 화면 이어하기 버튼을 실제 저장 데이터와 연결
+- Added: 저장 데이터가 있으면 이어하기 활성화, 없으면 disabled 유지
+- Added: Day, 보유금, 만족도, 멘탈, 목표, 재고 lot, 확장, 업그레이드, 플레이어 위치 등 안전한 상태 저장
+- Changed: 새로 시작 클릭 시 기존 저장 데이터를 초기화하고 새 게임 상태로 시작
+- Fixed: 손상된 저장 데이터 파싱 실패 시 게임이 멈추지 않도록 방어 처리
+- Maintained: index.html, main.js, core/GameState.js, core/EventBus.js, core/Constants.js 미수정
+
 ## [v6.7.2] Screen focus accessibility hotfix
 - Fixed: 타이틀 화면 숨김 처리 시 새로 시작 버튼에 focus가 남아 발생하던 aria-hidden 경고 제거
 - Changed: 화면/모달 숨김 처리 전 내부 focus를 안전하게 제거하는 공통 처리 추가
