@@ -1,3 +1,7 @@
+## [v7.0.3] Settings vibration option cleanup
+- Removed: 설정 팝업에서 사용하지 않는 진동 옵션 제거
+- Maintained: 효과음 / 배경음 표시와 기존 설정 열기/닫기 흐름 유지
+
 ## [v7.0.2] Title logo replacement
 - Changed: 시작 화면 로고를 신규 고화질 안전 로고 에셋으로 교체
 - Removed: 기존 title logo 파일 참조 제거

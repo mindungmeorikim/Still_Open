@@ -389,10 +389,6 @@ export const UIManager = {
               <span>배경음</span>
               <input type="checkbox" checked disabled />
             </label>
-            <label class="settings-option-row">
-              <span>진동</span>
-              <input type="checkbox" disabled />
-            </label>
           </div>
         </div>
       `;
