@@ -1,3 +1,15 @@
+## [v6.7.1] Settings modal focus hotfix
+- Fixed: 설정 모달 닫기 시 aria-hidden 내부 요소에 focus가 남아 발생하던 접근성 경고 제거
+- Changed: 설정 모달 닫기 전 focus blur 또는 안전한 focus 이동 처리
+- Maintained: 기존 설정 팝업 열기/닫기 흐름 유지
+
+## [v6.7] Title screen and settings entry
+- Added: 타이틀 화면 버튼 구조 정리
+- Added: 새로 시작 / 이어하기 / 설정 버튼 배치
+- Added: 저장 데이터 없음 상태의 이어하기 disabled 표시 준비
+- Added: 인게임 설정 버튼 진입 구조
+- Deferred: 실제 저장/이어하기 복원 기능은 다음 작업으로 분리
+
 ## [v6.6] Reward 2x ad dummy BM
 - Added: 정산 화면 보상 2배 광고 더미 기능
 - Added: 광고 시청 중 2초 더미 처리 흐름

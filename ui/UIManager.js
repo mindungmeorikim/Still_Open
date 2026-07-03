@@ -27,6 +27,11 @@ const UI_IMAGE_BUTTON_VARIANTS = {
   commonBase: ASSET_PATHS.ui.buttons.common.base,
   commonLarge: ASSET_PATHS.ui.buttons.common.large,
   commonSmall: ASSET_PATHS.ui.buttons.common.small,
+  titleStart: {
+    normal: "./assets/title/buttons/start_base/title_start_button_base_normal.png",
+    pressed: "./assets/title/buttons/start_base/title_start_button_base_pressed.png",
+    disabled: "./assets/title/buttons/start_base/title_start_button_base_disabled.png"
+  },
   iconBack: ASSET_PATHS.ui.buttons.icon.back,
   iconCancel: ASSET_PATHS.ui.buttons.icon.cancel,
   iconClose: ASSET_PATHS.ui.buttons.icon.close,
@@ -45,6 +50,9 @@ const STAFF_EVENTS = {
 };
 
 export const UIManager = {
+  titleScreen: null,
+  settingsModal: null,
+  settingsEscapeKeyBound: false,
   resultModal: null,
   resultReward2xAdTimerId: null,
   upgradeModal: null,
@@ -112,11 +120,14 @@ export const UIManager = {
     this.createUpgradeModal();
     this.createEndingModal();
     this.createCustomerEventModal();
+    this.createTitleScreen();
+    this.createSettingsModal();
     this.createInventorySummary();
     this.createStaffSummary();
     this.createDailyGoalPanel();
     this.createFocusedZonePanel();
     this.moveTopIconMenuToRoot();
+    this.configureTopSettingsMenu();
     this.createStoreComposition();
     this.createStaffCharacter();
     this.createExpansionPanel();
@@ -127,6 +138,310 @@ export const UIManager = {
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
     this.queueInitialCameraFocus();
   },
+
+  createTitleScreen() {
+    let titleScreen = document.getElementById("title-screen");
+
+    if (!titleScreen) {
+      titleScreen = document.createElement("section");
+      titleScreen.id = "title-screen";
+      titleScreen.className = "title-screen";
+      titleScreen.setAttribute("aria-labelledby", "title-screen-logo");
+      titleScreen.innerHTML = `
+        <div class="title-screen-inner">
+          <img
+            id="title-screen-logo"
+            class="title-logo"
+            src="./assets/title/logo/game_logo_today_open_900.png"
+            alt="오늘도 정상영업"
+            draggable="false"
+          />
+
+          <div class="title-menu" aria-label="타이틀 메뉴">
+            <button
+              id="title-new-game-button"
+              class="title-menu-button title-new-game-button"
+              type="button"
+              aria-label="새로 시작"
+            >
+              <span class="title-button-caption">새로 시작</span>
+            </button>
+
+            <button
+              id="title-resume-button"
+              class="title-menu-button title-resume-button"
+              type="button"
+              aria-label="이어하기"
+              aria-describedby="title-resume-state"
+            >
+              <span class="title-button-caption">이어하기</span>
+            </button>
+
+            <button
+              id="title-settings-button"
+              class="title-menu-button title-settings-button"
+              type="button"
+              aria-label="설정"
+            >
+              <span class="title-button-caption">설정</span>
+            </button>
+          </div>
+
+          <p id="title-resume-state" class="title-resume-state" aria-live="polite"></p>
+        </div>
+      `;
+
+      const gameRoot = document.getElementById("game-root");
+
+      if (gameRoot?.parentElement) {
+        gameRoot.parentElement.insertBefore(titleScreen, gameRoot);
+      } else {
+        document.body.prepend(titleScreen);
+      }
+    }
+
+    this.titleScreen = titleScreen;
+    document.body.classList.toggle(
+      "is-title-screen-active",
+      !titleScreen.classList.contains("hidden")
+    );
+    this.bindTitleScreenButtons();
+    this.renderTitleResumeButton();
+  },
+
+  bindTitleScreenButtons() {
+    const newGameButton = document.getElementById("title-new-game-button");
+    const resumeButton = document.getElementById("title-resume-button");
+    const settingsButton = document.getElementById("title-settings-button");
+
+    if (newGameButton) {
+      newGameButton.onclick = () => {
+        this.enterGameFromTitle();
+      };
+    }
+
+    if (resumeButton) {
+      resumeButton.onclick = () => {
+        if (!this.hasTitleResumeData()) {
+          return;
+        }
+
+        this.closeTitleScreen();
+        this.showMessage("이어하기 복원은 다음 작업에서 연결됩니다.");
+      };
+    }
+
+    if (settingsButton) {
+      settingsButton.onclick = () => {
+        this.openSettingsModal("title");
+      };
+    }
+  },
+
+  hasTitleResumeData() {
+    return false;
+  },
+
+  renderTitleResumeButton() {
+    const resumeButton = document.getElementById("title-resume-button");
+    const resumeState = document.getElementById("title-resume-state");
+    const hasSaveData = this.hasTitleResumeData();
+
+    if (resumeButton) {
+      resumeButton.disabled = !hasSaveData;
+      resumeButton.setAttribute("aria-disabled", hasSaveData ? "false" : "true");
+      resumeButton.dataset.saveAvailable = hasSaveData ? "true" : "false";
+      this.syncUiImageButtonState(resumeButton);
+    }
+
+    if (resumeState) {
+      resumeState.textContent = hasSaveData ? "저장 데이터 있음" : "저장 데이터 없음";
+    }
+  },
+
+  enterGameFromTitle() {
+    this.closeTitleScreen();
+    this.showMessage("새 영업을 시작합니다. 발주 버튼으로 Day 1 준비를 시작하세요.");
+  },
+
+  closeTitleScreen() {
+    if (!this.titleScreen) return;
+
+    this.titleScreen.classList.add("hidden");
+    this.titleScreen.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("is-title-screen-active");
+  },
+
+  createSettingsModal() {
+    let modal = document.getElementById("settings-modal");
+
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "settings-modal";
+      modal.className = "modal settings-modal hidden";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <div
+          class="modal-content settings-modal-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-modal-title"
+        >
+          <div class="settings-modal-header">
+            <h2 id="settings-modal-title">설정</h2>
+            <button id="settings-close-button" class="settings-close-button" type="button" aria-label="설정 닫기">
+              닫기
+            </button>
+          </div>
+
+          <div class="settings-option-list">
+            <label class="settings-option-row">
+              <span>효과음</span>
+              <input type="checkbox" checked disabled />
+            </label>
+            <label class="settings-option-row">
+              <span>배경음</span>
+              <input type="checkbox" checked disabled />
+            </label>
+            <label class="settings-option-row">
+              <span>진동</span>
+              <input type="checkbox" disabled />
+            </label>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+    }
+
+    this.settingsModal = modal;
+    this.bindSettingsModalButtons();
+    this.prepareUiImageButtons(modal);
+  },
+
+  bindSettingsModalButtons() {
+    if (!this.settingsModal) return;
+
+    const closeButton = document.getElementById("settings-close-button");
+
+    if (closeButton) {
+      closeButton.onclick = () => {
+        this.hideSettingsModal();
+      };
+    }
+
+    this.settingsModal.onclick = (event) => {
+      if (event.target === this.settingsModal) {
+        this.hideSettingsModal();
+      }
+    };
+
+    if (!this.settingsEscapeKeyBound) {
+      this.settingsEscapeKeyBound = true;
+      document.addEventListener("keydown", (event) => {
+        if (
+          event.key === "Escape" &&
+          this.settingsModal &&
+          !this.settingsModal.classList.contains("hidden")
+        ) {
+          this.hideSettingsModal();
+        }
+      });
+    }
+  },
+
+  openSettingsModal(source = "ingame") {
+    if (!this.settingsModal) {
+      this.createSettingsModal();
+    }
+
+    this.settingsModal.dataset.source = source;
+    this.settingsModal.classList.remove("hidden");
+    this.settingsModal.setAttribute("aria-hidden", "false");
+    this.prepareUiImageButtons(this.settingsModal);
+
+    window.requestAnimationFrame(() => {
+      document.getElementById("settings-close-button")?.focus();
+    });
+  },
+
+  hideSettingsModal() {
+    if (!this.settingsModal) return;
+
+    const activeElement = document.activeElement;
+
+    if (activeElement && this.settingsModal.contains(activeElement)) {
+      activeElement.blur?.();
+    }
+
+    const source = this.settingsModal.dataset.source;
+    const returnFocusTarget = source === "title"
+      ? document.getElementById("title-settings-button")
+      : document.getElementById("ingame-settings-button");
+
+    this.settingsModal.classList.add("hidden");
+    this.settingsModal.setAttribute("aria-hidden", "true");
+
+    if (
+      returnFocusTarget &&
+      !returnFocusTarget.disabled &&
+      !returnFocusTarget.hidden &&
+      !returnFocusTarget.closest(".hidden")
+    ) {
+      returnFocusTarget.focus?.({ preventScroll: true });
+    }
+  },
+
+  configureTopSettingsMenu() {
+    const topIconMenu = document.getElementById("top-icon-menu");
+
+    if (!topIconMenu) return;
+
+    let settingsButton = document.getElementById("ingame-settings-button");
+    const menuButtons = [...topIconMenu.querySelectorAll(".hud-icon-button")];
+
+    if (!settingsButton) {
+      settingsButton = menuButtons[2] ?? menuButtons[menuButtons.length - 1] ?? null;
+    }
+
+    if (!settingsButton) {
+      settingsButton = document.createElement("button");
+      settingsButton.className = "hud-icon-button";
+      topIconMenu.appendChild(settingsButton);
+    }
+
+    settingsButton.id = "ingame-settings-button";
+    settingsButton.type = "button";
+    settingsButton.disabled = false;
+    settingsButton.hidden = false;
+    settingsButton.tabIndex = 0;
+    settingsButton.textContent = "설정";
+    settingsButton.title = "설정";
+    settingsButton.setAttribute("aria-label", "설정");
+    settingsButton.setAttribute("aria-disabled", "false");
+    settingsButton.removeAttribute("aria-hidden");
+    settingsButton.classList.add("ingame-settings-button");
+    settingsButton.onclick = () => {
+      this.openSettingsModal("ingame");
+    };
+
+    [...topIconMenu.querySelectorAll(".hud-icon-button")].forEach((button) => {
+      const isSettingsButton = button === settingsButton;
+
+      button.hidden = !isSettingsButton;
+      button.classList.toggle("top-icon-secondary-hidden", !isSettingsButton);
+
+      if (isSettingsButton) {
+        button.removeAttribute("aria-hidden");
+        button.tabIndex = 0;
+        return;
+      }
+
+      button.setAttribute("aria-hidden", "true");
+      button.tabIndex = -1;
+    });
+  },
+
   getPlayerNode() {
     const interactionLayer = this.getStoreInteractionLayer();
     const storeArea = document.getElementById("store-area");
@@ -518,6 +833,7 @@ export const UIManager = {
     this.renderDailyGoalPanel();
     this.renderFocusedZonePanel();
     this.moveTopIconMenuToRoot();
+    this.configureTopSettingsMenu();
     this.renderStoreObjectVisuals();
     this.renderPlayer();
     this.prepareUiImageButtons();
@@ -953,6 +1269,21 @@ export const UIManager = {
 
     this.applyUiImageButtonSet(scopedRoot, [
       {
+        selector: "#title-new-game-button",
+        variant: "titleStart",
+        classNames: ["ui-title-button", "ui-title-start-button"]
+      },
+      {
+        selector: "#title-resume-button",
+        variant: "specialContinue",
+        classNames: ["ui-title-button", "ui-special-button", "ui-special-continue-button"]
+      },
+      {
+        selector: "#title-settings-button",
+        variant: "specialSettings",
+        classNames: ["ui-title-icon-button", "ui-special-button", "ui-special-settings-button"]
+      },
+      {
         selector: "#start-day-button, #end-day-button, #upgrade-shortcut-button, #shop-shortcut-button",
         variant: "commonSmall",
         classNames: ["ui-common-button", "ui-common-button-small"]
@@ -978,7 +1309,7 @@ export const UIManager = {
         classNames: ["ui-special-button", "ui-special-reward-2x-ad-button"]
       },
       {
-        selector: ".store-expansion-popover-close",
+        selector: ".store-expansion-popover-close, #settings-close-button",
         variant: "iconClose",
         classNames: ["ui-icon-image-button", "ui-icon-button-close"]
       },
@@ -990,7 +1321,9 @@ export const UIManager = {
     ]);
 
     const topIconButtons = [...document.querySelectorAll("#top-icon-menu .hud-icon-button")];
-    const settingsButton = topIconButtons[2] ?? null;
+    const settingsButton = document.getElementById("ingame-settings-button") ??
+      topIconButtons[2] ??
+      null;
 
     if (settingsButton) {
       this.applyUiImageButton(settingsButton, "specialSettings", [
