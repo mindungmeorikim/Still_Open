@@ -264,12 +264,51 @@ export const UIManager = {
     this.showMessage("새 영업을 시작합니다. 발주 버튼으로 Day 1 준비를 시작하세요.");
   },
 
+  clearFocusInsideElement(element) {
+    if (!element) return false;
+
+    const activeElement = document.activeElement;
+
+    if (activeElement instanceof HTMLElement && element.contains(activeElement)) {
+      activeElement.blur();
+      return true;
+    }
+
+    return false;
+  },
+
+  setElementHiddenSafely(element, isHidden = true) {
+    if (!element) return;
+
+    if (isHidden) {
+      this.clearFocusInsideElement(element);
+      element.classList.add("hidden");
+      element.setAttribute("aria-hidden", "true");
+      return;
+    }
+
+    element.classList.remove("hidden");
+    element.setAttribute("aria-hidden", "false");
+  },
+
+  focusElementSafely(element) {
+    if (
+      element instanceof HTMLElement &&
+      !element.disabled &&
+      !element.hidden &&
+      !element.closest(".hidden") &&
+      element.getAttribute("aria-hidden") !== "true"
+    ) {
+      element.focus?.({ preventScroll: true });
+    }
+  },
+
   closeTitleScreen() {
     if (!this.titleScreen) return;
 
-    this.titleScreen.classList.add("hidden");
-    this.titleScreen.setAttribute("aria-hidden", "true");
+    this.setElementHiddenSafely(this.titleScreen, true);
     document.body.classList.remove("is-title-screen-active");
+    this.focusElementSafely(document.getElementById("start-day-button"));
   },
 
   createSettingsModal() {
@@ -356,8 +395,7 @@ export const UIManager = {
     }
 
     this.settingsModal.dataset.source = source;
-    this.settingsModal.classList.remove("hidden");
-    this.settingsModal.setAttribute("aria-hidden", "false");
+    this.setElementHiddenSafely(this.settingsModal, false);
     this.prepareUiImageButtons(this.settingsModal);
 
     window.requestAnimationFrame(() => {
@@ -368,28 +406,13 @@ export const UIManager = {
   hideSettingsModal() {
     if (!this.settingsModal) return;
 
-    const activeElement = document.activeElement;
-
-    if (activeElement && this.settingsModal.contains(activeElement)) {
-      activeElement.blur?.();
-    }
-
     const source = this.settingsModal.dataset.source;
     const returnFocusTarget = source === "title"
       ? document.getElementById("title-settings-button")
       : document.getElementById("ingame-settings-button");
 
-    this.settingsModal.classList.add("hidden");
-    this.settingsModal.setAttribute("aria-hidden", "true");
-
-    if (
-      returnFocusTarget &&
-      !returnFocusTarget.disabled &&
-      !returnFocusTarget.hidden &&
-      !returnFocusTarget.closest(".hidden")
-    ) {
-      returnFocusTarget.focus?.({ preventScroll: true });
-    }
+    this.setElementHiddenSafely(this.settingsModal, true);
+    this.focusElementSafely(returnFocusTarget);
   },
 
   configureTopSettingsMenu() {

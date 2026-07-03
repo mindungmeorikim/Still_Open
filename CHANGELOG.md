@@ -1,3 +1,8 @@
+## [v6.7.2] Screen focus accessibility hotfix
+- Fixed: 타이틀 화면 숨김 처리 시 새로 시작 버튼에 focus가 남아 발생하던 aria-hidden 경고 제거
+- Changed: 화면/모달 숨김 처리 전 내부 focus를 안전하게 제거하는 공통 처리 추가
+- Maintained: 기존 타이틀 화면, 설정 팝업, 새로 시작 흐름 유지
+
 ## [v6.7.1] Settings modal focus hotfix
 - Fixed: 설정 모달 닫기 시 aria-hidden 내부 요소에 focus가 남아 발생하던 접근성 경고 제거
 - Changed: 설정 모달 닫기 전 focus blur 또는 안전한 focus 이동 처리
