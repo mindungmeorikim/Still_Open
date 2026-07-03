@@ -25,6 +25,13 @@ const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 
+const FOOD_WARMER_PRODUCT_IDS = new Set([
+  "sausage_hotbar",
+  "steamed_bun",
+  "hoppang",
+  "hotbar"
+]);
+
 const UI_TEXTBOX_VARIANTS = {
   normalCustomer: ASSET_PATHS.ui.textboxes.normalCustomer,
   player: ASSET_PATHS.ui.textboxes.player,
@@ -1038,6 +1045,13 @@ export const UIManager = {
         facing: OBJECT_FACINGS.RIGHT,
         label: "음료 냉장고",
         createIfMissing: true
+      },
+      {
+        nodeId: "food-warmer-zone",
+        objectType: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+        facing: OBJECT_FACINGS.RIGHT,
+        label: "온장고",
+        createIfMissing: true
       }
     ];
 
@@ -1086,14 +1100,13 @@ export const UIManager = {
   },
 
   getStoreObjectStockData(objectType) {
-    const isFridge = objectType === STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE;
     const items = this.getInventoryItemsForObjectVisuals();
     const itemsByProductId = items.reduce((itemMap, item) => {
       itemMap[item.productId] = item;
       return itemMap;
     }, {});
     const matchingProducts = PRODUCTS.filter((product) => {
-      return this.isProductStoredInFridge(product) === isFridge;
+      return this.getProductStockVisualObjectType(product) === objectType;
     });
     const visibleProducts = matchingProducts.filter((product) => {
       const item = itemsByProductId[product.id];
@@ -1137,6 +1150,22 @@ export const UIManager = {
         quantity: Number(inventoryItem?.quantity) || 0
       };
     });
+  },
+
+  getProductStockVisualObjectType(product) {
+    if (this.isProductStoredInFoodWarmer(product)) {
+      return STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER;
+    }
+
+    if (this.isProductStoredInFridge(product)) {
+      return STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE;
+    }
+
+    return STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND;
+  },
+
+  isProductStoredInFoodWarmer(product) {
+    return FOOD_WARMER_PRODUCT_IDS.has(product.id);
   },
 
   isProductStoredInFridge(product) {

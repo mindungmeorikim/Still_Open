@@ -22,7 +22,8 @@ export const STOCK_VISUAL_STATES = Object.freeze({
 
 export const STOCK_VISUAL_OBJECT_TYPES = Object.freeze({
   DISPLAY_STAND: "displayStand",
-  BEVERAGE_FRIDGE: "beverageFridge"
+  BEVERAGE_FRIDGE: "beverageFridge",
+  FOOD_WARMER: "foodWarmer"
 });
 
 export const OBJECT_FACINGS = Object.freeze({
@@ -64,6 +65,20 @@ export const ASSET_PATHS = deepFreeze({
       empty: {
         left: "./assets/objects/beverage_fridge/beverage_fridge_empty_left.png",
         right: "./assets/objects/beverage_fridge/beverage_fridge_empty_right.png"
+      }
+    },
+    foodWarmer: {
+      full: {
+        left: "./assets/objects/food_warmer/food_warmer_full_left.png",
+        right: "./assets/objects/food_warmer/food_warmer_full_right.png"
+      },
+      half: {
+        left: "./assets/objects/food_warmer/food_warmer_left.png",
+        right: "./assets/objects/food_warmer/food_warmer_right.png"
+      },
+      empty: {
+        left: "./assets/objects/food_warmer/food_warmer_empty_left.png",
+        right: "./assets/objects/food_warmer/food_warmer_empty_right.png"
       }
     }
   },
@@ -176,7 +191,13 @@ const OBJECT_TYPE_ALIASES = Object.freeze({
   beverageFridge: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
   beverage_fridge: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
   "beverage-fridge": STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
-  fridge: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE
+  fridge: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
+  foodWarmer: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+  food_warmer: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+  "food-warmer": STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+  warmer: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+  hotbar: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+  hoppang: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER
 });
 
 export const STOCK_VISUAL_OBJECTS = deepFreeze({
@@ -191,6 +212,12 @@ export const STOCK_VISUAL_OBJECTS = deepFreeze({
     label: "beverage fridge",
     defaultFacing: OBJECT_FACINGS.LEFT,
     assets: ASSET_PATHS.objects.beverageFridge
+  },
+  foodWarmer: {
+    objectType: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
+    label: "food warmer",
+    defaultFacing: OBJECT_FACINGS.RIGHT,
+    assets: ASSET_PATHS.objects.foodWarmer
   }
 });
 
@@ -320,6 +347,15 @@ export function getDisplayStandVisualAsset(stock, capacity, options = {}) {
 export function getBeverageFridgeVisualAsset(stock, capacity, options = {}) {
   return getObjectVisualAsset(
     STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
+    stock,
+    capacity,
+    options
+  );
+}
+
+export function getFoodWarmerVisualAsset(stock, capacity, options = {}) {
+  return getObjectVisualAsset(
+    STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
     stock,
     capacity,
     options

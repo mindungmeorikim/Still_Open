@@ -1,4 +1,12 @@
 
+## [v7.0.5] Food warmer asset integration
+- Added: 온장고(food warmer) full / half / empty, left / right 상태별 에셋 추가
+- Added: AssetData.js에 foodWarmer 오브젝트 타입 및 상태별 이미지 경로 추가
+- Added: UIManager.js에 온장고 시각 오브젝트 렌더링 구조 추가
+- Changed: 소시지 핫바 계열 상품은 향후 온장고 비주얼 재고로 분리되도록 매핑 준비
+- Maintained: 기존 진열대/음료 냉장고/계산대/손님/저장 흐름 유지
+
+
 ## [v7.0.4.2] Player textbox readability hotfix
 - Fixed: 플레이어/알바생 텍스트박스 글씨를 흰색에서 검은색 계열로 변경해 가독성을 개선
 - Changed: 플레이어 대사 텍스트 그림자를 어두운 그림자에서 밝은 하이라이트로 조정

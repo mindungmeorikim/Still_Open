@@ -14112,6 +14112,21 @@ body {
   --store-object-hitbox-bottom: 6px;
 }
 
+#store-interaction-layer > #food-warmer-zone.store-object-zone {
+  left: 624px !important;
+  top: 540px !important;
+  z-index: 85 !important;
+  --store-object-hit-width: 92px;
+  --store-object-hit-height: 54px;
+  --store-object-visual-width: 84px;
+  --store-object-visual-height: 122px;
+  --store-object-visual-bottom: -5px;
+  --store-object-hitbox-left: 20px;
+  --store-object-hitbox-right: 20px;
+  --store-object-hitbox-top: 8px;
+  --store-object-hitbox-bottom: 5px;
+}
+
 #store-interaction-layer > .store-object-zone .store-object-visual {
   position: absolute !important;
   left: 50% !important;
