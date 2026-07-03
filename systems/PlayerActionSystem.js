@@ -168,7 +168,19 @@ export const PlayerActionSystem = {
       return;
     }
 
-    if (this.isNearCounter()) {
+    const target = this.getPrimaryInteractionTarget();
+
+    if (!target) {
+      this.showActionMessage("상호작용 가능한 대상에 더 가까이 가야 합니다.");
+      return;
+    }
+
+    if (target.type === "shelf") {
+      this.handleShelfRestockAction();
+      return;
+    }
+
+    if (target.type === "counter") {
       if (!this.tryLockCheckoutInput()) {
         return;
       }
@@ -182,10 +194,7 @@ export const PlayerActionSystem = {
       });
 
       this.handleCheckoutAction();
-      return;
     }
-
-    this.handleShelfRestockAction();
   },
 
   handleShelfRestockAction() {
@@ -217,54 +226,81 @@ export const PlayerActionSystem = {
   },
 
   isNearShelf() {
-    const playerCenter = this.getPlayerCenter();
-    const shelfCenter = this.getZoneCenter("shelf-zone", this.shelf);
+    const distance = this.getDistanceToZone("shelf-zone", this.shelf);
 
-    const dx = playerCenter.x - shelfCenter.x;
-    const dy = playerCenter.y - shelfCenter.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    return distance <= this.interactionDistance;
+    return distance !== null && distance <= this.interactionDistance;
   },
 
   isNearCounter() {
+    const distance = this.getDistanceToZone("counter-zone", null);
+
+    return distance !== null && distance <= this.interactionDistance;
+  },
+
+  getPrimaryInteractionTarget() {
+    const targets = [
+      {
+        type: "shelf",
+        distance: this.getDistanceToZone("shelf-zone", this.shelf)
+      },
+      {
+        type: "counter",
+        distance: this.getDistanceToZone("counter-zone", null)
+      }
+    ]
+      .filter((target) => {
+        return (
+          target.distance !== null &&
+          target.distance <= this.interactionDistance
+        );
+      })
+      .sort((first, second) => first.distance - second.distance);
+
+    return targets[0] ?? null;
+  },
+
+  getDistanceToZone(zoneId, fallback = null) {
     if (!GameState.player) {
-      return false;
+      return null;
     }
 
     const playerCenter = this.getPlayerCenter();
-    const counterCenter = this.getZoneCenter("counter-zone", null);
+    const zoneCenter = this.getZoneCenter(zoneId, fallback);
 
-    if (!counterCenter) {
-      return false;
+    if (!zoneCenter) {
+      return null;
     }
 
-    const dx = playerCenter.x - counterCenter.x;
-    const dy = playerCenter.y - counterCenter.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const dx = playerCenter.x - zoneCenter.x;
+    const dy = playerCenter.y - zoneCenter.y;
 
-    return distance <= this.interactionDistance;
+    return Math.sqrt(dx * dx + dy * dy);
   },
 
   getPlayerCenter() {
     const player = GameState.player ?? { x: 0, y: 0 };
+    const playerNode = document.getElementById("player-zone");
+    const playerWidth = Number(playerNode?.offsetWidth) || 42;
+    const playerHeight = Number(playerNode?.offsetHeight) || 58;
 
     return {
-      x: (Number(player.x) || 0) + 36,
-      y: (Number(player.y) || 0) + 22
+      x: (Number(player.x) || 0) + playerWidth / 2,
+      y: (Number(player.y) || 0) + playerHeight / 2
     };
   },
 
   getZoneCenter(zoneId, fallback = null) {
     const zoneNode = document.getElementById(zoneId);
-    const storeNode = document.getElementById("store-area");
 
-    if (zoneNode && storeNode) {
-      const zoneRect = zoneNode.getBoundingClientRect();
-      const storeRect = storeNode.getBoundingClientRect();
-
+    if (zoneNode) {
+      /*
+        월드맵 카메라가 translate/scale 되는 구조라 getBoundingClientRect()는
+        화면 좌표를 반환한다. 플레이어 좌표는 월드맵 내부 좌표이므로
+        같은 좌표계인 offsetLeft/offsetTop 기준으로 비교해야 한다.
+      */
       return {
-        x: zoneRect.left - storeRect.left + zoneRect.width / 2,
-        y: zoneRect.top - storeRect.top + zoneRect.height / 2
+        x: (Number(zoneNode.offsetLeft) || 0) + (Number(zoneNode.offsetWidth) || 0) / 2,
+        y: (Number(zoneNode.offsetTop) || 0) + (Number(zoneNode.offsetHeight) || 0) / 2
       };
     }
 
