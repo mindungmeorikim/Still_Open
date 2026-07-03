@@ -15270,3 +15270,221 @@ body.is-title-screen-active #game-root {
     font-size: 11px !important;
   }
 }
+
+/* v7.0.6 sanitation and cleaning MVP */
+#sanitation-info.sanitation-status {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  min-width: 84px !important;
+  white-space: nowrap !important;
+}
+
+#sanitation-info.sanitation-status::before {
+  content: "" !important;
+  display: block !important;
+  flex: 0 0 17px !important;
+  width: 17px !important;
+  height: 17px !important;
+  background-image: var(--sanitation-icon-image) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: contain !important;
+}
+
+#sanitation-info.sanitation-clean {
+  color: #e9fff7 !important;
+}
+
+#sanitation-info.sanitation-normal {
+  color: #fff7d6 !important;
+}
+
+#sanitation-info.sanitation-warning {
+  color: #ffd9aa !important;
+}
+
+#sanitation-info.sanitation-critical {
+  color: #ffd0d0 !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone {
+  position: absolute !important;
+  left: 336px !important;
+  top: 638px !important;
+  z-index: 87 !important;
+  display: block !important;
+  width: 126px !important;
+  height: 78px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  cursor: pointer !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone:disabled {
+  cursor: default !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-shadow,
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-tools,
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-stain,
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-sparkle {
+  position: absolute !important;
+  display: block !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-shadow {
+  left: 26px !important;
+  right: 20px !important;
+  bottom: 6px !important;
+  height: 20px !important;
+  border-radius: 999px !important;
+  background: rgba(21, 23, 25, 0.22) !important;
+  filter: blur(3px) !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-tools {
+  right: 2px !important;
+  bottom: 12px !important;
+  z-index: 2 !important;
+  width: 58px !important;
+  height: 72px !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  opacity: 0.92 !important;
+  transform: translateY(0) !important;
+  transition: opacity 160ms ease, transform 160ms ease !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-stain {
+  left: 4px !important;
+  bottom: 4px !important;
+  z-index: 1 !important;
+  width: 74px !important;
+  height: 54px !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  opacity: 0 !important;
+  transform: scale(0.9) !important;
+  transition: opacity 160ms ease, transform 160ms ease !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.is-cleaning-needed .cleaning-zone-stain,
+#store-interaction-layer > #sanitation-cleaning-zone.is-cleaning .cleaning-zone-stain {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.is-clean .cleaning-zone-tools {
+  opacity: 0.68 !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.is-cleaning .cleaning-zone-tools {
+  transform: translateY(-3px) rotate(-5deg) !important;
+  animation: sanitation-tool-scrub 620ms ease-in-out infinite !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-sparkle {
+  left: 50% !important;
+  top: 44% !important;
+  z-index: 8 !important;
+  width: 96px !important;
+  height: 96px !important;
+  object-fit: contain !important;
+  opacity: 0 !important;
+  transform: translate(-50%, -50%) scale(0.68) !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.is-cleaning-sparkling .cleaning-zone-sparkle {
+  animation: sanitation-clean-sparkle 880ms ease-out both !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone .cleaning-zone-progress {
+  position: absolute !important;
+  left: 50% !important;
+  top: calc(100% + 2px) !important;
+  z-index: 9 !important;
+  width: max-content !important;
+  max-width: 112px !important;
+  transform: translateX(-50%) !important;
+  color: #ffffff !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.78) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.is-cleaning-needed .cleaning-zone-progress,
+#store-interaction-layer > #sanitation-cleaning-zone.is-cleaning .cleaning-zone-progress {
+  opacity: 1 !important;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.interaction-feedback-target {
+  --interaction-effect-width: 116px;
+  --interaction-effect-height: 62px;
+  --interaction-tap-size: 34px;
+  --interaction-sparkle-size: 72px;
+}
+
+#store-interaction-layer > #sanitation-cleaning-zone.interaction-feedback-target > .interaction-glow-ring {
+  bottom: -16px !important;
+}
+
+#result-modal .result-row-sanitation strong {
+  color: #f07b52 !important;
+}
+
+@keyframes sanitation-tool-scrub {
+  0%, 100% {
+    transform: translateY(-3px) rotate(-5deg);
+  }
+
+  50% {
+    transform: translateY(1px) rotate(5deg);
+  }
+}
+
+@keyframes sanitation-clean-sparkle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.62);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.16);
+  }
+}
+
+@media (max-width: 980px), (max-height: 560px) {
+  #sanitation-info.sanitation-status {
+    min-width: 76px !important;
+  }
+
+  #sanitation-info.sanitation-status::before {
+    flex-basis: 15px !important;
+    width: 15px !important;
+    height: 15px !important;
+  }
+}

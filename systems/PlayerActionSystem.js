@@ -20,6 +20,10 @@ import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
 import { CustomerSystem } from "./CustomerSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
+import {
+  SanitationSystem,
+  SANITATION_EVENTS
+} from "./SanitationSystem.js";
 
 const STAFF_EVENTS = {
   AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
@@ -49,10 +53,11 @@ export const PlayerActionSystem = {
 
   interactionDistance: 120,
   restockDuration: 5000,
-  
+
   restockTimerId: null,
   restockRemainingSeconds: 0,
   restockPhase: null,
+  cleaningProgressTimerId: null,
 
   autoMoveTimerId: null,
   autoMoveSpeed: 4,
@@ -66,15 +71,33 @@ export const PlayerActionSystem = {
     if (this.isInitialized) return;
 
     this.isInitialized = true;
+    SanitationSystem.init();
     this.bindCounterCheckoutAction();
     this.bindPointerActions();
     this.bindKeyboardActions();
     this.bindStaffAutoCheckoutEvents();
+    this.bindSanitationEvents();
   },
 
   bindStaffAutoCheckoutEvents() {
     EventBus.on(STAFF_EVENTS.AUTO_CHECKOUT_REQUESTED, (data = {}) => {
       this.handleStaffAutoCheckoutRequest(data);
+    });
+  },
+
+  bindSanitationEvents() {
+    EventBus.on(SANITATION_EVENTS.CLEANING_STARTED, (data = {}) => {
+      this.beginCleaningAction(data.durationMs);
+    });
+
+    EventBus.on(SANITATION_EVENTS.CLEANING_COMPLETED, () => {
+      this.finishCleaningAction();
+    });
+
+    EventBus.on(SANITATION_EVENTS.CLEANING_FAILED, () => {
+      if (this.restockPhase === "cleaning") {
+        this.finishCleaningAction();
+      }
     });
   },
 
@@ -183,6 +206,11 @@ export const PlayerActionSystem = {
       return;
     }
 
+    if (target.type === "cleaning") {
+      this.handleCleaningAction("keyboard");
+      return;
+    }
+
     if (target.type === "counter") {
       if (!this.tryLockCheckoutInput()) {
         return;
@@ -204,7 +232,7 @@ export const PlayerActionSystem = {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
-    } 
+    }
 
     if (!GameState.player) return;
 
@@ -223,7 +251,7 @@ export const PlayerActionSystem = {
     if (this.warehouse.stock <= 0) {
       this.showActionMessage("창고에 재고가 없습니다.");
       return;
-    } 
+    }
 
     this.startShelfRestock();
   },
@@ -240,12 +268,31 @@ export const PlayerActionSystem = {
     return distance !== null && distance <= this.interactionDistance;
   },
 
+  isNearCleaningZone() {
+    const distance = this.getDistanceToZone("sanitation-cleaning-zone", {
+      x: 380,
+      y: 680
+    });
+
+    return distance !== null && distance <= this.interactionDistance;
+  },
+
   getPrimaryInteractionTarget() {
+    const sanitationState = SanitationSystem.getState();
     const targets = [
       {
         type: "shelf",
         distance: this.getDistanceToZone("shelf-zone", this.shelf)
       },
+      ...(sanitationState.isCleaningNeeded && !sanitationState.isCleaning
+        ? [{
+            type: "cleaning",
+            distance: this.getDistanceToZone("sanitation-cleaning-zone", {
+              x: 380,
+              y: 680
+            })
+          }]
+        : []),
       {
         type: "counter",
         distance: this.getDistanceToZone("counter-zone", null)
@@ -427,6 +474,78 @@ completeShelfRestock() {
   });
 },
 
+  handleCleaningAction(source = "player_action_system") {
+    if (this.isPlayerBusy) {
+      this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
+      return;
+    }
+
+    if (!this.isNearCleaningZone()) {
+      this.showActionMessage("청소 구역 가까이에서 다시 시도해주세요.");
+      return;
+    }
+
+    EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
+      day: GameState.day,
+      actionType: "sanitation_cleaning",
+      orderId: null,
+      productId: null,
+      source
+    });
+
+    const result = SanitationSystem.startCleaning({
+      source,
+      day: GameState.day
+    });
+
+    if (!result.success) {
+      this.showActionMessage(result.message ?? "청소를 시작할 수 없습니다.");
+      return;
+    }
+
+    if (this.restockPhase !== "cleaning") {
+      this.beginCleaningAction(result.durationMs);
+    }
+  },
+
+  beginCleaningAction(durationMs = 5000) {
+    if (this.isPlayerBusy && this.restockPhase !== "cleaning") {
+      return;
+    }
+
+    this.isPlayerBusy = true;
+    this.restockPhase = "cleaning";
+    this.startCleaningProgressMessages(durationMs);
+  },
+
+  startCleaningProgressMessages(durationMs = 5000) {
+    window.clearInterval(this.cleaningProgressTimerId);
+
+    this.restockRemainingSeconds = Math.ceil(durationMs / 1000);
+    this.showActionMessage(`청소 중... ${this.restockRemainingSeconds}초`);
+
+    this.cleaningProgressTimerId = window.setInterval(() => {
+      this.restockRemainingSeconds = Math.max(0, this.restockRemainingSeconds - 1);
+
+      if (this.restockRemainingSeconds > 0) {
+        this.showActionMessage(`청소 중... ${this.restockRemainingSeconds}초`);
+      }
+    }, 1000);
+  },
+
+  finishCleaningAction() {
+    window.clearInterval(this.cleaningProgressTimerId);
+    this.cleaningProgressTimerId = null;
+
+    if (this.restockPhase !== "cleaning") {
+      return;
+    }
+
+    this.isPlayerBusy = false;
+    this.restockPhase = null;
+    this.restockRemainingSeconds = 0;
+  },
+
   showActionMessage(message) {
     const normalizedMessage = String(message ?? "").trim();
 
@@ -452,9 +571,14 @@ completeShelfRestock() {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
-    } 
+    }
 
     if (this.isCheckoutAction(actionType) && !this.tryLockCheckoutInput()) {
+      return;
+    }
+
+    if (this.isCleaningAction(actionType)) {
+      this.handleCleaningAction("player_action_system_pointer");
       return;
     }
 
@@ -473,6 +597,10 @@ completeShelfRestock() {
 
   isCheckoutAction(actionType) {
     return actionType === "checkout" || actionType === "checkout_counter";
+  },
+
+  isCleaningAction(actionType) {
+    return actionType === "sanitation_cleaning";
   },
 
   tryLockCheckoutInput() {

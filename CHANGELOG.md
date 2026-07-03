@@ -1,4 +1,16 @@
 
+## [v7.0.6] Sanitation and cleaning MVP
+- Added: 위생 수치 100 기반 청결 관리 시스템
+- Added: 진상 손님 또는 부정 고객 이벤트 발생 시 위생 -5 감소
+- Added: 위생 50 이하 경고 메시지
+- Added: 고정 청소 구역 및 청소 필요 표시
+- Added: 플레이어 청소 상호작용 및 5초 청소 진행
+- Added: 청소 완료 시 위생 회복 및 clean_sparkle 피드백
+- Added: 위생 50 이하 정산 시 만족도 페널티
+- Added: 위생 상태 저장/이어하기 연동
+- Maintained: 기존 발주, 재고, 계산, 손님, 저장, 무한모드 흐름 유지
+- Deferred: 위생 게임오버, 자동 청소, 다중 청소 구역, 청소 도구 업그레이드
+
 ## [v7.0.5] Food warmer asset integration
 - Added: 온장고(food warmer) full / half / empty, left / right 상태별 에셋 추가
 - Added: AssetData.js에 foodWarmer 오브젝트 타입 및 상태별 이미지 경로 추가
@@ -1411,4 +1423,3 @@
 - Fixed: 플레이어/알바생 대사가 전역 알림 토스트 위치에 떠서 계산대/진열대 위에 겹쳐 보이던 문제 수정
 - Changed: 플레이어 행동 메시지를 `#message-panel`이 아니라 `#player-zone` 위 전용 대사 박스로 표시하도록 변경
 - Maintained: 일반 손님 / 진상 손님 텍스트박스 표시 흐름 유지
-
