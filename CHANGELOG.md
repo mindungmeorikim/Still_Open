@@ -1,3 +1,36 @@
+## [v7.3.3] Warehouse placement and arrival box cleanup hotfix
+
+### Changed
+- BasicBox 창고 박스를 이전보다 더 위쪽으로 이동해 창고 자리와 맞췄습니다.
+- ArriveBox 도착 박스를 입구 오른쪽 부근으로 재배치했습니다.
+- ArriveBox 도착 박스 표시 크기를 추가로 확대했습니다.
+
+### Fixed
+- ArriveBox 주변에 남아 있던 직사각형 형태의 반투명 배경이 덜 보이도록 에셋 마스킹을 추가로 보정했습니다.
+
+## [v7.3.2] Warehouse visual alignment hotfix
+
+### Changed
+- BasicBox 창고 박스 위치를 화면 왼쪽 창고 자리 쪽으로 더 위로 올려 재배치했습니다.
+- ArriveBox 도착 박스의 화면 표시 크기를 키워 가시성을 높였습니다.
+
+### Fixed
+- 창고/도착 박스 이미지 주변의 배경이 덜 남도록 에셋 투명 영역을 추가 정리했습니다.
+- 도착 박스가 너무 작게 보이던 문제를 보정했습니다.
+
+## [v7.3.1] Warehouse box hotfix
+
+### Fixed
+- 창고 박스 위치를 가게 맵 바깥 왼쪽 목표 위치로 재조정했습니다.
+- 발주 도착 박스와 창고 박스의 이동 좌표가 시각 오브젝트 위치와 어긋나던 문제를 수정했습니다.
+- 발주 전에도 테스트용 기본 창고 재고로 진열대 보충이 가능하던 문제를 차단했습니다.
+- 진열대 보충 이벤트가 InventorySystem의 총 재고를 새로 증가시키지 않도록 `player_shelf_restock` source 예외 처리를 추가했습니다.
+- 박스 에셋의 불필요한 배경/체커보드 영역을 줄이고, 시각 영역과 hitbox가 과하게 튀어나오지 않도록 보정했습니다.
+
+### Maintained
+- 창고/진열대 수동 작업 시간 5초는 알바 고용 필요성을 위한 피로도 설계로 유지했습니다.
+
+
 ## [v7.2.2] HUD 재화 아이콘 에셋 적용
 
 ### Changed
@@ -1468,3 +1501,19 @@
 - Changed: 플레이어 행동 메시지를 `#message-panel`이 아니라 `#player-zone` 위 전용 대사 박스로 표시하도록 변경
 - Maintained: 일반 손님 / 진상 손님 텍스트박스 표시 흐름 유지
 
+## [v7.3.0] Warehouse box interaction and carrying animation
+
+### Added
+- BasicBox를 기존 창고 좌표와 연결된 맵 오브젝트로 배치
+- ArriveBox 발주 도착/입고 운반 연출 추가
+- 플레이어 카테고리별 박스 운반 레이어 추가
+- warehouse/box 에셋 경로 매핑 추가
+
+### Changed
+- 발주 도착 클릭 시 즉시 입고 모달 대신 ArriveBox 이동, 창고 운반, 물류 정리 대기 후 기존 입고 흐름을 실행하도록 변경
+- 재고 보충 시 창고 5초 작업 후 상품 카테고리에 맞는 박스를 들고 진열대로 이동하도록 변경
+
+### Maintained
+- 기존 수동 창고/진열대 5초 작업 시간 유지
+- 기존 발주/입고 데이터 구조와 RESTOCK_COMPLETED 기반 재고 반영 흐름 유지
+- index.html, main.js, core/GameState.js, core/EventBus.js, core/Constants.js 미수정

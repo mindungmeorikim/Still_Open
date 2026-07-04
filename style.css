@@ -10333,14 +10333,14 @@ body {
   }
 
   #time-info {
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   #phase-chip {
     min-height: 24px !important;
     padding: 5px 7px !important;
     border-radius: 12px !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   #status-panel {
@@ -10352,7 +10352,7 @@ body {
     min-height: 40px !important;
     gap: 5px !important;
     padding: 5px 8px !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   #money-info::before,
@@ -10397,7 +10397,7 @@ body {
     min-height: 46px !important;
     padding: 5px 3px !important;
     border-radius: 12px !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   .dock-button::before,
@@ -10436,7 +10436,7 @@ body {
 
   #system-message,
   #message-panel p {
-    font-size: 10px !important;
+    font-size: 11px !important;
     line-height: 1.22 !important;
   }
 
@@ -10504,7 +10504,7 @@ body {
   border-radius: 999px !important;
   background: rgba(14, 22, 20, 0.78) !important;
   color: #ffffff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 950 !important;
   line-height: 1 !important;
   box-shadow: 0 7px 16px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255,255,255,0.14) !important;
@@ -10588,12 +10588,12 @@ body {
 
   #message-panel::before {
     padding: 3px 6px !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   #system-message,
   #message-panel p {
-    font-size: 10px !important;
+    font-size: 11px !important;
     line-height: 1.18 !important;
   }
 }
@@ -10844,7 +10844,7 @@ body {
 
 #daily-goal-day-label {
   color: rgba(255,255,255,0.72) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 850 !important;
 }
 
@@ -10863,7 +10863,7 @@ body {
 
 .daily-goal-main span {
   color: rgba(255,255,255,0.72) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 850 !important;
 }
 
@@ -10895,7 +10895,7 @@ body {
 
 .daily-goal-sub {
   color: rgba(255,255,255,0.68) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 800 !important;
   line-height: 1.2 !important;
 }
@@ -10934,7 +10934,7 @@ body {
   border-radius: 999px !important;
   background: rgba(125, 202, 255, 0.16) !important;
   color: #bfeaff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 950 !important;
   line-height: 1 !important;
 }
@@ -10958,7 +10958,7 @@ body {
   margin: 0 !important;
   overflow: hidden !important;
   color: #ffffff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 830 !important;
   line-height: 1.18 !important;
   -webkit-line-clamp: 2 !important;
@@ -10980,7 +10980,7 @@ body {
   .daily-goal-panel-header strong {
     min-height: 19px !important;
     padding: 3px 7px !important;
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   #daily-goal-day-label,
@@ -10990,7 +10990,7 @@ body {
   }
 
   #daily-goal-revenue-text {
-    font-size: 10px !important;
+    font-size: 11px !important;
   }
 
   .daily-goal-progress {
@@ -11157,7 +11157,7 @@ body {
   border-radius: 999px !important;
   background: rgba(244, 201, 98, 0.18) !important;
   color: #ffe69a !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 950 !important;
   line-height: 1 !important;
 }
@@ -11190,7 +11190,7 @@ body {
 #daily-goal-revenue-text {
   overflow: hidden !important;
   color: #ffffff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 950 !important;
   text-overflow: ellipsis !important;
   white-space: nowrap !important;
@@ -11387,7 +11387,7 @@ body {
   border-radius: 999px !important;
   background: rgba(125, 202, 255, 0.16) !important;
   color: #bfeaff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 950 !important;
   line-height: 1 !important;
 }
@@ -11406,7 +11406,7 @@ body {
 #message-panel p {
   max-width: 330px !important;
   color: #ffffff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 820 !important;
   line-height: 1.16 !important;
   -webkit-line-clamp: 2 !important;
@@ -11583,8 +11583,8 @@ body {
 }
 
 #store-interaction-layer > #delivery-box-zone {
-  left: 470px !important;
-  top: 690px !important;
+  left: 538px !important;
+  top: 545px !important;
 }
 
 /* 해금 후 사용할 2~4번 임시 기능 박스도 새 구역 좌표에 맞춘다. */
@@ -11895,7 +11895,7 @@ body {
 
 .focused-zone-panel-header span {
   color: rgba(255, 255, 255, 0.72) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 900 !important;
 }
 
@@ -11915,7 +11915,7 @@ body {
 
 .focused-zone-panel-body span {
   color: rgba(255, 255, 255, 0.74) !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 800 !important;
 }
 
@@ -12068,7 +12068,7 @@ body {
   .order-product-row span,
   .order-product-prices span,
   .order-product-status {
-    font-size: 10px !important;
+    font-size: 11px !important;
     line-height: 1.25 !important;
   }
 
@@ -12109,7 +12109,7 @@ body {
   }
 
   .delivered-product-button {
-    min-height: 108px !important;
+    min-height: 128px !important;
     padding: 8px !important;
   }
 
@@ -12120,7 +12120,7 @@ body {
 
   .focused-zone-panel {
     top: calc(100% + 78px) !important;
-    width: 124px !important;
+    width: 148px !important;
     padding: 7px 8px !important;
   }
 
@@ -12231,7 +12231,7 @@ body {
 #order-modal .order-product-row span,
 #order-modal .order-product-prices span,
 #order-modal .order-product-status {
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.23 !important;
 }
 
@@ -12843,7 +12843,7 @@ body {
 }
 
 #upgrade-modal .upgrade-card {
-  min-height: 78px !important;
+  min-height: 88px !important;
   padding: 12px 14px !important;
 }
 
@@ -13177,8 +13177,8 @@ body {
 }
 
 #store-interaction-layer > #delivery-box-zone {
-  left: 604px !important;
-  top: 610px !important;
+  left: 538px !important;
+  top: 545px !important;
 }
 
 #result-modal .modal-content.result-modal-content {
@@ -13512,7 +13512,7 @@ body {
   flex: 0 0 auto !important;
   min-height: 18px !important;
   padding: 2px 7px !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1 !important;
 }
 
@@ -13530,7 +13530,7 @@ body {
   min-height: 34px !important;
   padding: 4px 5px !important;
   border-radius: 11px !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.12 !important;
   text-align: center !important;
   white-space: normal !important;
@@ -13602,7 +13602,7 @@ body {
   border-radius: 999px !important;
   background: #fff5bd !important;
   color: #8a5e00 !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 950 !important;
   line-height: 1 !important;
   white-space: nowrap !important;
@@ -14055,8 +14055,8 @@ body {
 
 #order-modal .order-product-row {
   grid-template-columns: minmax(250px, 1fr) 172px 126px !important;
-  min-height: 76px !important;
-  height: 76px !important;
+  min-height: 128px !important;
+  height: 128px !important;
   align-items: center !important;
   overflow: hidden !important;
 }
@@ -14094,7 +14094,7 @@ body {
   max-width: 74px !important;
   min-height: 18px !important;
   padding: 2px 7px !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
 }
 
 #order-modal .order-recommend-placeholder {
@@ -14183,7 +14183,7 @@ body {
 #store-interaction-layer > #delivery-box-zone,
 #delivery-box-zone.delivery-box-zone {
   width: 92px !important;
-  min-height: 76px !important;
+  min-height: 128px !important;
   padding: 8px 9px !important;
   border-radius: 16px !important;
   gap: 4px !important;
@@ -14213,7 +14213,7 @@ body {
 }
 
 #delivery-box-zone.delivery-box-zone strong {
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.15 !important;
 }
 
@@ -14258,7 +14258,7 @@ body {
 }
 
 #delivery-box-zone.delivery-box-zone span:not(.delivery-box-icon) {
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.05 !important;
   font-weight: 900 !important;
   white-space: nowrap !important;
@@ -14318,7 +14318,7 @@ body {
 }
 
 #delivery-box-zone.delivery-box-zone span:not(.delivery-box-icon) {
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.05 !important;
   font-weight: 900 !important;
   margin: 0 !important;
@@ -14326,7 +14326,7 @@ body {
 }
 
 #delivery-box-zone.delivery-box-zone strong {
-  font-size: 10px !important;
+  font-size: 11px !important;
   line-height: 1.05 !important;
   font-weight: 950 !important;
   margin: 0 !important;
@@ -14618,7 +14618,7 @@ body {
   background-image: none !important;
   box-shadow: none !important;
   color: #ffffff !important;
-  font-size: 10px !important;
+  font-size: 11px !important;
   font-weight: 900 !important;
   line-height: 1.1 !important;
   text-align: center !important;
@@ -15897,6 +15897,183 @@ body.is-title-screen-active #game-root {
   .daily-reward-frame {
     width: 98vw;
   }
+}
+
+/* v7.3.0 warehouse box interaction and carrying visuals */
+#store-interaction-layer > #warehouse-box-zone.warehouse-box-zone,
+#warehouse-box-zone.warehouse-box-zone {
+  position: absolute !important;
+  z-index: 116 !important;
+  width: 96px !important;
+  height: 88px !important;
+  min-width: 96px !important;
+  min-height: 88px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+#warehouse-box-zone .warehouse-box-visual,
+#warehouse-box-zone .warehouse-box-hitbox {
+  position: absolute !important;
+  display: block !important;
+}
+
+#warehouse-box-zone .warehouse-box-visual {
+  inset: 0 !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+
+#warehouse-box-zone .warehouse-box-visual img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  filter: drop-shadow(0 9px 8px rgba(0, 0, 0, 0.22)) !important;
+  -webkit-user-drag: none !important;
+}
+
+#warehouse-box-zone .warehouse-box-hitbox {
+  left: 18% !important;
+  top: 24% !important;
+  z-index: 2 !important;
+  width: 64% !important;
+  height: 58% !important;
+  pointer-events: none !important;
+}
+
+#warehouse-box-zone[data-box-state="open"] .warehouse-box-visual {
+  transform: translateY(2px) scale(1.02) !important;
+}
+
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone {
+  position: absolute !important;
+  left: 538px !important;
+  top: 545px !important;
+  z-index: 240 !important;
+  width: 148px !important;
+  height: 128px !important;
+  min-width: 148px !important;
+  max-width: 148px !important;
+  min-height: 128px !important;
+  max-height: 128px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  display: block !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone::before,
+#delivery-box-zone.delivery-box-zone::after {
+  display: none !important;
+  content: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual,
+#delivery-box-zone.delivery-box-zone .delivery-box-hitbox {
+  position: absolute !important;
+  display: block !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual {
+  inset: 0 !important;
+  z-index: 1 !important;
+  pointer-events: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  filter: drop-shadow(0 9px 8px rgba(0, 0, 0, 0.24)) !important;
+  -webkit-user-drag: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-hitbox {
+  left: 19% !important;
+  top: 22% !important;
+  z-index: 2 !important;
+  width: 62% !important;
+  height: 56% !important;
+  border-radius: 12px !important;
+  pointer-events: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-count {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: -10px !important;
+  z-index: 3 !important;
+  min-width: 40px !important;
+  padding: 3px 6px !important;
+  border-radius: 999px !important;
+  background: rgba(38, 30, 20, 0.86) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  transform: translateX(-50%) !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone:focus-visible {
+  outline: 3px solid rgba(255, 225, 126, 0.72) !important;
+  outline-offset: 2px !important;
+}
+
+#delivery-box-zone.delivery-box-zone:active {
+  transform: scale(0.98) !important;
+}
+
+#store-interaction-layer > #player-zone .player-carrying-box,
+#player-zone.player-character .player-carrying-box {
+  position: absolute !important;
+  left: 50% !important;
+  top: 58% !important;
+  z-index: 8 !important;
+  width: 50px !important;
+  height: 42px !important;
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+#store-interaction-layer > #player-zone[data-carrying-box="arrive"] .player-carrying-box,
+#player-zone.player-character[data-carrying-box="arrive"] .player-carrying-box {
+  width: 58px !important;
+  height: 46px !important;
+  top: 56% !important;
+}
+
+#store-interaction-layer > #player-zone .player-carrying-box img,
+#player-zone.player-character .player-carrying-box img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  filter: drop-shadow(0 5px 4px rgba(0, 0, 0, 0.22)) !important;
+  -webkit-user-drag: none !important;
 }
 
 /* v7.2.1 compact 5-item HUD fix

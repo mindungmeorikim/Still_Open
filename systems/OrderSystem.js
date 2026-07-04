@@ -18,6 +18,8 @@ import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
 import { BMSystem } from "./BMSystem.js";
 
+const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
+
 export const OrderSystem = {
   isInitialized: false,
   orderSequence: 0,
@@ -175,11 +177,37 @@ export const OrderSystem = {
   },
 
   handlePlayerActionRecorded(data = {}) {
+    if (data.actionType === "open_delivery_box") {
+      this.handleDeliveryBoxPickupRequested(data);
+      return;
+    }
+
     if (data.actionType !== "sort_delivery_item") {
       return;
     }
 
     this.handleDeliveryItemSorted(data);
+  },
+
+  handleDeliveryBoxPickupRequested(data = {}) {
+    if (!this.pendingDelivery || !this.pendingDelivery.isArrived) {
+      return;
+    }
+
+    const requestedOrderId = data.orderId ?? this.pendingDelivery.orderId;
+
+    if (requestedOrderId !== this.pendingDelivery.orderId) {
+      return;
+    }
+
+    if (this.isDeliveryFullySorted()) {
+      return;
+    }
+
+    EventBus.emit(ORDER_DELIVERY_PICKUP_REQUESTED, {
+      ...this.createDeliveryPayload("pickup_requested"),
+      source: data.source ?? "delivery_box_zone"
+    });
   },
 
   handleDeliveryItemSorted(data = {}) {

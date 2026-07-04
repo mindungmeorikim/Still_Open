@@ -17,7 +17,11 @@
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
-import { getProductById } from "../data/ProductData.js";
+import {
+  PRODUCT_CATEGORIES,
+  PRODUCT_DISPLAY_CATEGORIES,
+  getProductById
+} from "../data/ProductData.js";
 import { CustomerSystem } from "./CustomerSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
 
@@ -27,6 +31,16 @@ const STAFF_EVENTS = {
 };
 
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
+const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
+const VALID_CARRYING_BOX_TYPES = new Set([
+  "arrive",
+  "basic",
+  "drink",
+  "ramen",
+  "lunch",
+  "snack",
+  "refrigerated"
+]);
 
 export const PlayerActionSystem = {
   isInitialized: false,
@@ -38,13 +52,13 @@ export const PlayerActionSystem = {
   shelf: {
     x: 540,
     y: 680,
-    productId: "potato-chips",
+    productId: "potato_chips",
     currentStock: 0,
     maxStock: 3
   },
 
   warehouse: {
-    stock: 25
+    stock: 0
   },
 
   interactionDistance: 120,
@@ -58,23 +72,46 @@ export const PlayerActionSystem = {
   autoMoveSpeed: 4,
 
   warehouseZone: {
-    x: 420,
-    y: 790,
+    x: 300,
+    y: 470,
+  },
+
+  deliveryBoxZone: {
+    x: 560,
+    y: 560,
   },
 
   init() {
     if (this.isInitialized) return;
 
     this.isInitialized = true;
+    this.initializeWarehouseBoxState();
     this.bindCounterCheckoutAction();
     this.bindPointerActions();
     this.bindKeyboardActions();
     this.bindStaffAutoCheckoutEvents();
+    this.bindDeliveryBoxEvents();
+  },
+
+  initializeWarehouseBoxState() {
+    GameState.warehouseBoxPosition = {
+      ...this.warehouseZone
+    };
+
+    if (!GameState.warehouseBoxState) {
+      GameState.warehouseBoxState = "closed";
+    }
   },
 
   bindStaffAutoCheckoutEvents() {
     EventBus.on(STAFF_EVENTS.AUTO_CHECKOUT_REQUESTED, (data = {}) => {
       this.handleStaffAutoCheckoutRequest(data);
+    });
+  },
+
+  bindDeliveryBoxEvents() {
+    EventBus.on(ORDER_DELIVERY_PICKUP_REQUESTED, (data = {}) => {
+      this.handleDeliveryBoxPickupRequested(data);
     });
   },
 
@@ -220,10 +257,12 @@ export const PlayerActionSystem = {
       return;
     }
 
-    if (this.warehouse.stock <= 0) {
-      this.showActionMessage("창고에 재고가 없습니다.");
+    const availableWarehouseStock = this.getAvailableWarehouseStock(this.shelf.productId);
+
+    if (availableWarehouseStock <= 0) {
+      this.showActionMessage("창고에 입고된 재고가 없습니다. 먼저 발주 물류를 정리해주세요.");
       return;
-    } 
+    }
 
     this.startShelfRestock();
   },
@@ -310,8 +349,201 @@ export const PlayerActionSystem = {
     return fallback;
   },
 
+  getPlayerStandPositionForZone(zoneId, fallbackPosition) {
+    const zoneNode = document.getElementById(zoneId);
+
+    if (!zoneNode) {
+      return fallbackPosition;
+    }
+
+    const zoneCenter = this.getZoneCenter(zoneId, null);
+
+    if (!zoneCenter) {
+      return fallbackPosition;
+    }
+
+    const playerNode = document.getElementById("player-zone");
+    const playerWidth = Number(playerNode?.offsetWidth) || 74;
+    const playerHeight = Number(playerNode?.offsetHeight) || 130;
+
+    return {
+      x: zoneCenter.x - playerWidth / 2,
+      y: zoneCenter.y - playerHeight / 2
+    };
+  },
+
+  setCarryingBoxType(boxType) {
+    if (!GameState.player) {
+      return;
+    }
+
+    const nextBoxType = VALID_CARRYING_BOX_TYPES.has(boxType) ? boxType : null;
+
+    if (GameState.player.carryingBoxType === nextBoxType) {
+      return;
+    }
+
+    GameState.player.carryingBoxType = nextBoxType;
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  setWarehouseBoxState(state) {
+    const nextState = state === "open" ? "open" : "closed";
+
+    if (GameState.warehouseBoxState === nextState) {
+      return;
+    }
+
+    GameState.warehouseBoxState = nextState;
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  setDeliveryBoxState(state) {
+    const nextState = state === "carrying" ? "carrying" : null;
+
+    if (GameState.deliveryBoxState === nextState) {
+      return;
+    }
+
+    GameState.deliveryBoxState = nextState;
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  handleDeliveryBoxPickupRequested(data = {}) {
+    if (this.isPlayerBusy) {
+      this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
+      return;
+    }
+
+    const deliveredItems = Array.isArray(data.items)
+      ? data.items.filter((item) => Number(item.quantity) > 0 && !item.isSorted)
+      : [];
+
+    if (!GameState.player || !data.orderId || deliveredItems.length === 0 || data.isCompleted) {
+      return;
+    }
+
+    this.isPlayerBusy = true;
+    this.setCarryingBoxType(null);
+    this.setDeliveryBoxState(null);
+    this.showActionMessage("도착한 물류 박스로 이동 중입니다.");
+
+    this.movePlayerToDeliveryBox(() => {
+      this.setDeliveryBoxState("carrying");
+      this.setCarryingBoxType("arrive");
+      this.showActionMessage("물류 박스를 창고로 옮기는 중입니다.");
+
+      this.movePlayerToWarehouse(() => {
+        this.startTimedRestockPhase({
+          phase: "delivery",
+          message: "물류 정리 중",
+          onComplete: () => {
+            EventBus.emit(EVENTS.STOCK_ORGANIZED, {
+              day: data.day ?? GameState.day,
+              orderId: data.orderId,
+              items: deliveredItems.map((item) => ({ ...item })),
+              totalCost: Number(data.totalCost) || 0,
+              source: "delivery_box_sorted",
+              message: "물류 정리가 완료되었습니다. 입고 상품이 재고에 반영되었습니다."
+            });
+
+            this.setCarryingBoxType(null);
+            this.setDeliveryBoxState(null);
+            this.setWarehouseBoxState("closed");
+            this.isPlayerBusy = false;
+            this.restockPhase = null;
+            this.showActionMessage("입고 정리가 완료되었습니다.");
+          }
+        });
+      });
+    });
+  },
+
+  getCarryingBoxTypeForProduct(productId) {
+    const product = this.getProductForBoxClassification(productId);
+    const productText = [
+      product?.id,
+      product?.name,
+      product?.finalName,
+      product?.category,
+      product?.displayCategory,
+      ...(product?.customerRequestIds ?? []),
+      productId
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    if (
+      product?.category === PRODUCT_CATEGORIES.DRINK ||
+      /drink|water|cola|milk|coffee|juice|americano|banana/.test(productText)
+    ) {
+      return "drink";
+    }
+
+    if (
+      /ice|cream|pudding|macaron|tiramisu|frozen|dessert|refrigerated|cold/.test(productText)
+    ) {
+      return "refrigerated";
+    }
+
+    if (
+      product?.category === PRODUCT_CATEGORIES.READY_MEAL ||
+      product?.displayCategory === PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF ||
+      /lunch|sandwich|salad|kimbap|rice|cutlet|dosirak/.test(productText)
+    ) {
+      return "lunch";
+    }
+
+    if (
+      product?.category === PRODUCT_CATEGORIES.INSTANT_FOOD ||
+      /ramen|udon|noodle/.test(productText)
+    ) {
+      return "ramen";
+    }
+
+    if (
+      product?.category === PRODUCT_CATEGORIES.SNACK ||
+      /snack|chips|cookie|chocolate|bar/.test(productText)
+    ) {
+      return "snack";
+    }
+
+    return "basic";
+  },
+
+  getProductForBoxClassification(productId) {
+    const id = String(productId ?? "").trim();
+    const normalizedId = id.replace(/-/g, "_");
+
+    return getProductById(id) ?? getProductById(normalizedId) ?? null;
+  },
+
+  getResolvedProductId(productId = this.shelf.productId) {
+    const product = this.getProductForBoxClassification(productId);
+
+    if (product?.id) {
+      return product.id;
+    }
+
+    return String(productId ?? "").trim().replace(/-/g, "_");
+  },
+
+  getAvailableWarehouseStock(productId = this.shelf.productId) {
+    const resolvedProductId = this.getResolvedProductId(productId);
+
+    if (!resolvedProductId) {
+      return 0;
+    }
+
+    return Math.max(0, Math.floor(Number(
+      InventorySystem.getStockQuantity?.(resolvedProductId)
+    ) || 0));
+  },
+
   startShelfRestock() {
   this.isPlayerBusy = true;
+  this.setCarryingBoxType(null);
 
   this.showActionMessage("창고로 이동 중입니다.");
 
@@ -320,6 +552,7 @@ export const PlayerActionSystem = {
       phase: "warehouse",
       message: "창고에서 상품을 꺼내는 중입니다",
       onComplete: () => {
+        this.setCarryingBoxType(this.getCarryingBoxTypeForProduct(this.shelf.productId));
         this.showActionMessage("진열대로 이동 중입니다.");
 
         this.movePlayerToShelf(() => {
@@ -339,19 +572,27 @@ export const PlayerActionSystem = {
 movePlayerToPosition(targetPosition, onComplete) {
   if (!GameState.player) return;
 
+  const targetX = Number(targetPosition?.x);
+  const targetY = Number(targetPosition?.y);
+
+  if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) {
+    onComplete?.();
+    return;
+  }
+
   if (this.autoMoveTimerId) {
     clearInterval(this.autoMoveTimerId);
     this.autoMoveTimerId = null;
   }
 
   this.autoMoveTimerId = setInterval(() => {
-    const dx = targetPosition.x - GameState.player.x;
-    const dy = targetPosition.y - GameState.player.y;
+    const dx = targetX - GameState.player.x;
+    const dy = targetY - GameState.player.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance <= this.autoMoveSpeed) {
-      GameState.player.x = targetPosition.x;
-      GameState.player.y = targetPosition.y;
+      GameState.player.x = targetX;
+      GameState.player.y = targetY;
 
       clearInterval(this.autoMoveTimerId);
       this.autoMoveTimerId = null;
@@ -391,16 +632,31 @@ getDirectionFromMovement(dx, dy, fallbackDirection = "down") {
 },
 
 movePlayerToWarehouse(onComplete) {
-  this.movePlayerToPosition(this.warehouseZone, onComplete);
+  this.movePlayerToPosition(
+    this.getPlayerStandPositionForZone("warehouse-box-zone", this.warehouseZone),
+    onComplete
+  );
 },
 
 movePlayerToShelf(onComplete) {
   this.movePlayerToPosition(this.shelf, onComplete);
 },
 
+movePlayerToDeliveryBox(onComplete) {
+  this.movePlayerToPosition(
+    this.getPlayerStandPositionForZone("delivery-box-zone", this.deliveryBoxZone),
+    onComplete
+  );
+},
+
 startTimedRestockPhase({ phase, message, onComplete }) {
   this.restockPhase = phase;
   this.restockRemainingSeconds = Math.ceil(this.restockDuration / 1000);
+  const usesWarehouseBox = phase === "warehouse" || phase === "delivery";
+
+  if (usesWarehouseBox) {
+    this.setWarehouseBoxState("open");
+  }
 
   this.showActionMessage(`${message}... ${this.restockRemainingSeconds}초`);
 
@@ -419,33 +675,51 @@ startTimedRestockPhase({ phase, message, onComplete }) {
     }
 
     this.restockRemainingSeconds = 0;
+
+    if (usesWarehouseBox) {
+      this.setWarehouseBoxState("closed");
+    }
+
     onComplete?.();
   }, this.restockDuration);
 },
 
 completeShelfRestock() {
   const needStock = this.shelf.maxStock - this.shelf.currentStock;
-  const restockAmount = Math.min(needStock, this.warehouse.stock);
+  const availableWarehouseStock = this.getAvailableWarehouseStock(this.shelf.productId);
+  const restockAmount = Math.min(needStock, availableWarehouseStock);
+
+  if (restockAmount <= 0) {
+    this.isPlayerBusy = false;
+    this.restockPhase = null;
+    this.setCarryingBoxType(null);
+    this.setWarehouseBoxState("closed");
+    this.showActionMessage("창고에 입고된 재고가 없어 보충할 수 없습니다.");
+    return;
+  }
 
   this.shelf.currentStock += restockAmount;
-  this.warehouse.stock -= restockAmount;
+  this.warehouse.stock = availableWarehouseStock;
 
   EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
     day: GameState.day,
-    productId: this.shelf.productId,
-    quantity: restockAmount
+    productId: this.getResolvedProductId(this.shelf.productId),
+    quantity: restockAmount,
+    source: "player_shelf_restock"
   });
 
   this.isPlayerBusy = false;
   this.restockPhase = null;
+  this.setCarryingBoxType(null);
+  this.setWarehouseBoxState("closed");
 
   this.showActionMessage(
-    `진열대 보충 완료! 상품 ${restockAmount}개를 채웠습니다. 진열대: ${this.shelf.currentStock}/${this.shelf.maxStock}, 창고: ${this.warehouse.stock}`
+    `진열대 보충 완료! 상품 ${restockAmount}개를 채웠습니다. 진열대: ${this.shelf.currentStock}/${this.shelf.maxStock}, 창고 재고: ${availableWarehouseStock}개`
   );
 
   console.log("[PlayerActionSystem] 진열대 보충 완료:", {
     shelfStock: this.shelf.currentStock,
-    warehouseStock: this.warehouse.stock
+    warehouseStock: availableWarehouseStock
   });
 },
 

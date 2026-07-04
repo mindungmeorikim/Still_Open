@@ -80,6 +80,19 @@ export const ASSET_PATHS = deepFreeze({
         left: "./assets/objects/food_warmer/food_warmer_empty_left.png",
         right: "./assets/objects/food_warmer/food_warmer_empty_right.png"
       }
+    },
+    warehouse: {
+      boxes: {
+        basic: "./assets/images/warehouse/basic_box.png",
+        basicOpen: "./assets/images/warehouse/basic_box_open.png",
+        basicDouble: "./assets/images/warehouse/basic_box_double.png",
+        arrive: "./assets/images/warehouse/arrive_box.png",
+        drink: "./assets/images/warehouse/drink_box.png",
+        ramen: "./assets/images/warehouse/ramen_box.png",
+        lunch: "./assets/images/warehouse/lunch_box.png",
+        snack: "./assets/images/warehouse/snack_box.png",
+        refrigerated: "./assets/images/warehouse/refrigerated_box.png"
+      }
     }
   },
   effects: {
@@ -220,6 +233,34 @@ export const STOCK_VISUAL_OBJECTS = deepFreeze({
     assets: ASSET_PATHS.objects.foodWarmer
   }
 });
+
+export const WAREHOUSE_BOX_TYPES = Object.freeze({
+  ARRIVE: "arrive",
+  BASIC: "basic",
+  BASIC_OPEN: "basicOpen",
+  BASIC_DOUBLE: "basicDouble",
+  DRINK: "drink",
+  RAMEN: "ramen",
+  LUNCH: "lunch",
+  SNACK: "snack",
+  REFRIGERATED: "refrigerated"
+});
+
+export const WAREHOUSE_BOX_ASSETS = deepFreeze({
+  [WAREHOUSE_BOX_TYPES.ARRIVE]: ASSET_PATHS.objects.warehouse.boxes.arrive,
+  [WAREHOUSE_BOX_TYPES.BASIC]: ASSET_PATHS.objects.warehouse.boxes.basic,
+  [WAREHOUSE_BOX_TYPES.BASIC_OPEN]: ASSET_PATHS.objects.warehouse.boxes.basicOpen,
+  [WAREHOUSE_BOX_TYPES.BASIC_DOUBLE]: ASSET_PATHS.objects.warehouse.boxes.basicDouble,
+  [WAREHOUSE_BOX_TYPES.DRINK]: ASSET_PATHS.objects.warehouse.boxes.drink,
+  [WAREHOUSE_BOX_TYPES.RAMEN]: ASSET_PATHS.objects.warehouse.boxes.ramen,
+  [WAREHOUSE_BOX_TYPES.LUNCH]: ASSET_PATHS.objects.warehouse.boxes.lunch,
+  [WAREHOUSE_BOX_TYPES.SNACK]: ASSET_PATHS.objects.warehouse.boxes.snack,
+  [WAREHOUSE_BOX_TYPES.REFRIGERATED]: ASSET_PATHS.objects.warehouse.boxes.refrigerated
+});
+
+export function getWarehouseBoxAsset(boxType) {
+  return WAREHOUSE_BOX_ASSETS[boxType] ?? WAREHOUSE_BOX_ASSETS[WAREHOUSE_BOX_TYPES.BASIC];
+}
 
 export function normalizeStockVisualState(state) {
   const value = String(state ?? "").trim();

@@ -17,7 +17,8 @@ import {
   ASSET_PATHS,
   OBJECT_FACINGS,
   STOCK_VISUAL_OBJECT_TYPES,
-  getObjectVisualAsset
+  getObjectVisualAsset,
+  getWarehouseBoxAsset
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
 import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
@@ -26,6 +27,7 @@ import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
+const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 300, y: 470 });
 
 const FOOD_WARMER_PRODUCT_IDS = new Set([
   "sausage_hotbar",
@@ -683,6 +685,34 @@ export const UIManager = {
     playerNode.style.setProperty("--player-x", `${x}px`);
     playerNode.style.setProperty("--player-y", `${y}px`);
     playerNode.dataset.direction = direction;
+    this.renderPlayerCarryingBox(playerNode, GameState.player.carryingBoxType ?? null);
+  },
+
+  renderPlayerCarryingBox(playerNode, carryingBoxType = null) {
+    let carryingBox = playerNode.querySelector(".player-carrying-box");
+    const imagePath = carryingBoxType ? getWarehouseBoxAsset(carryingBoxType) : null;
+
+    playerNode.dataset.carryingBox = carryingBoxType ?? "";
+
+    if (!imagePath) {
+      carryingBox?.remove();
+      return;
+    }
+
+    if (!carryingBox) {
+      carryingBox = document.createElement("span");
+      carryingBox.className = "player-carrying-box";
+      carryingBox.setAttribute("aria-hidden", "true");
+      playerNode.appendChild(carryingBox);
+    }
+
+    carryingBox.innerHTML = `
+      <img
+        src="${imagePath}"
+        alt=""
+        draggable="false"
+      />
+    `;
   },
 
   bindButtons() {
@@ -1212,6 +1242,7 @@ export const UIManager = {
     this.moveTopIconMenuToRoot();
     this.configureTopSettingsMenu();
     this.renderStoreObjectVisuals();
+    this.renderWarehouseBox();
     this.renderPlayer();
     this.prepareUiImageButtons();
     this.renderDeliveryBox(this.orderDeliveredData);
@@ -1280,6 +1311,53 @@ export const UIManager = {
         visualAsset
       });
     });
+  },
+
+  renderWarehouseBox() {
+    const interactionLayer = this.getStoreInteractionLayer();
+
+    if (!interactionLayer) return;
+
+    let warehouseBox = document.getElementById("warehouse-box-zone");
+
+    if (!warehouseBox) {
+      warehouseBox = document.createElement("div");
+      warehouseBox.id = "warehouse-box-zone";
+      warehouseBox.className = "warehouse-box-zone";
+      warehouseBox.setAttribute("role", "img");
+      warehouseBox.setAttribute("aria-label", "창고 박스");
+      interactionLayer.appendChild(warehouseBox);
+    } else if (warehouseBox.parentElement !== interactionLayer) {
+      interactionLayer.appendChild(warehouseBox);
+    }
+
+    const position = GameState.warehouseBoxPosition ?? DEFAULT_WAREHOUSE_BOX_POSITION;
+    const x = Number(position.x);
+    const y = Number(position.y);
+    const isOpen = GameState.warehouseBoxState === "open";
+    const imagePath = getWarehouseBoxAsset(isOpen ? "basicOpen" : "basic");
+
+    warehouseBox.style.setProperty(
+      "left",
+      `${Number.isFinite(x) ? x : DEFAULT_WAREHOUSE_BOX_POSITION.x}px`,
+      "important"
+    );
+    warehouseBox.style.setProperty(
+      "top",
+      `${Number.isFinite(y) ? y : DEFAULT_WAREHOUSE_BOX_POSITION.y}px`,
+      "important"
+    );
+    warehouseBox.dataset.boxState = isOpen ? "open" : "closed";
+    warehouseBox.innerHTML = `
+      <span class="warehouse-box-visual" aria-hidden="true">
+        <img
+          src="${imagePath}"
+          alt=""
+          draggable="false"
+        />
+      </span>
+      <span class="warehouse-box-hitbox" aria-hidden="true"></span>
+    `;
   },
 
   getStoreObjectNode(config, interactionLayer) {
@@ -2662,6 +2740,7 @@ export const UIManager = {
       "entrance-zone",
       "shelf-zone",
       "counter-zone",
+      "warehouse-box-zone",
       "player-zone",
       "customer-layer",
       "staff-character",
@@ -5432,9 +5511,12 @@ export const UIManager = {
 
     const deliveredItems = this.getDeliveredItems(orderData);
     const hasOpenDelivery = Boolean(orderData && deliveredItems.length > 0 && !orderData.isCompleted);
+    const isCarryingDeliveryBox =
+      GameState.deliveryBoxState === "carrying" ||
+      GameState.player?.carryingBoxType === "arrive";
     let deliveryBox = document.getElementById("delivery-box-zone");
 
-    if (!hasOpenDelivery) {
+    if (!hasOpenDelivery || isCarryingDeliveryBox) {
       this.clearDeliveryBox();
       return;
     }
@@ -5452,9 +5534,15 @@ export const UIManager = {
 
     deliveryBox.classList.remove("interaction-feedback-target", "is-interactable", "is-interaction-ready", "is-click-sparkling");
     deliveryBox.innerHTML = `
-      <span class="delivery-box-icon">📦</span>
-      <span>택배 박스</span>
-      <strong>${remainingCount}종 정리 필요</strong>
+      <span class="delivery-box-visual" aria-hidden="true">
+        <img
+          src="${getWarehouseBoxAsset("arrive")}"
+          alt=""
+          draggable="false"
+        />
+      </span>
+      <span class="delivery-box-hitbox" aria-hidden="true"></span>
+      <strong class="delivery-box-count">${remainingCount}종</strong>
     `;
 
     deliveryBox.onpointerdown = (event) => {
@@ -5472,8 +5560,6 @@ export const UIManager = {
         orderId: orderData.orderId ?? null,
         source: "delivery_box_zone"
       });
-
-      this.showOrderDelivered(this.orderDeliveredData ?? orderData);
     };
   },
 

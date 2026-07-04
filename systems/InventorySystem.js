@@ -173,6 +173,20 @@ export const InventorySystem = {
   },
 
   handleRestockCompleted(data = {}) {
+    const source = String(data.source ?? "").trim();
+
+    // 진열대 보충은 창고 재고를 매대로 옮기는 플레이 행동이므로
+    // InventorySystem의 총 재고를 새로 증가시키지 않는다.
+    // 발주 입고(order_delivery_compat, delivery_box_item 등)만 실제 재고 증가로 처리한다.
+    if (source === "player_shelf_restock") {
+      this.emitInventoryChanged("shelf_restock_visual_only", {
+        productId: data.productId,
+        quantity: this.toPositiveInteger(data.quantity),
+        source
+      });
+      return;
+    }
+
     const productId = data.productId;
     const quantity = this.toPositiveInteger(data.quantity);
 
