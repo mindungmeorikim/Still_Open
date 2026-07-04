@@ -20,6 +20,7 @@ import {
   getObjectVisualAsset
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
+import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
@@ -68,6 +69,7 @@ export const UIManager = {
   titleScreen: null,
   settingsModal: null,
   settingsEscapeKeyBound: false,
+  dailyRewardModal: null,
   resultModal: null,
   resultReward2xAdTimerId: null,
   upgradeModal: null,
@@ -123,6 +125,7 @@ export const UIManager = {
 
   init() {
     SaveSystem.init();
+    DailyRewardSystem.init();
     this.bindButtons();
     this.bindGameEvents();
     this.bindDayStartEvents();
@@ -141,6 +144,7 @@ export const UIManager = {
     this.createCustomerEventModal();
     this.createTitleScreen();
     this.createSettingsModal();
+    this.createDailyRewardModal();
     this.createInventorySummary();
     this.createStaffSummary();
     this.createDailyGoalPanel();
@@ -260,6 +264,7 @@ export const UIManager = {
         this.render();
         this.renderCustomers();
         this.showMessage(loadResult.message ?? `Day ${GameState.day} 저장 데이터를 불러왔습니다.`);
+        this.showDailyRewardIfAvailable();
       };
     }
 
@@ -304,6 +309,7 @@ export const UIManager = {
   enterGameFromTitle() {
     this.closeTitleScreen();
     this.showMessage("새 영업을 시작합니다. 발주 버튼으로 Day 1 준비를 시작하세요.");
+    this.showDailyRewardIfAvailable();
   },
 
   showTitleScreen(message = "타이틀 화면으로 돌아왔습니다.") {
@@ -470,6 +476,104 @@ export const UIManager = {
 
     this.setElementHiddenSafely(this.settingsModal, true);
     this.focusElementSafely(returnFocusTarget);
+  },
+
+  createDailyRewardModal() {
+    let modal = document.getElementById("daily-reward-modal");
+
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "daily-reward-modal";
+      modal.className = "modal daily-reward-modal hidden";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <div
+          class="daily-reward-frame"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="daily-reward-title"
+          aria-describedby="daily-reward-description"
+        >
+          <h2 id="daily-reward-title" class="sr-only">7일 출석 보상</h2>
+          <p id="daily-reward-description" class="sr-only">오늘의 출석 보상이 자동 지급되었습니다. 확인 버튼을 눌러 보상을 받으세요.</p>
+          <img
+            id="daily-reward-image"
+            class="daily-reward-image"
+            src="./assets/ui/dailyreward/day1_basic.png"
+            alt="7일 출석 보상"
+            draggable="false"
+          />
+          <button
+            id="daily-reward-confirm-area"
+            class="daily-reward-confirm-area"
+            type="button"
+            aria-label="출석 보상 확인"
+          >
+            <span class="sr-only">확인</span>
+          </button>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+    }
+
+    this.dailyRewardModal = modal;
+    this.bindDailyRewardModalButtons();
+  },
+
+  bindDailyRewardModalButtons() {
+    const confirmButton = document.getElementById("daily-reward-confirm-area");
+
+    if (!confirmButton) return;
+
+    confirmButton.onclick = () => {
+      const result = DailyRewardSystem.claimToday();
+
+      if (result.success) {
+        this.hideDailyRewardModal();
+        this.render();
+        this.showMessage(result.message ?? "출석 보상이 지급되었습니다.");
+        return;
+      }
+
+      this.hideDailyRewardModal();
+      this.showMessage(result.message ?? "오늘 출석 보상을 확인했습니다.");
+    };
+  },
+
+  showDailyRewardIfAvailable() {
+    if (!this.dailyRewardModal) {
+      this.createDailyRewardModal();
+    }
+
+    const claimInfo = DailyRewardSystem.getTodayClaimInfo();
+
+    if (!claimInfo.canClaim || !claimInfo.reward) {
+      return false;
+    }
+
+    const rewardImage = document.getElementById("daily-reward-image");
+    const confirmButton = document.getElementById("daily-reward-confirm-area");
+
+    if (rewardImage) {
+      rewardImage.src = claimInfo.reward.imagePath;
+      rewardImage.alt = `7일 출석 보상 ${claimInfo.attendanceDay}일차 - ${claimInfo.reward.displayName}`;
+    }
+
+    this.setElementHiddenSafely(this.dailyRewardModal, false);
+
+    window.requestAnimationFrame(() => {
+      this.focusElementSafely(confirmButton);
+    });
+
+    return true;
+  },
+
+  hideDailyRewardModal() {
+    if (!this.dailyRewardModal) return;
+
+    this.setElementHiddenSafely(this.dailyRewardModal, true);
+    this.focusElementSafely(document.getElementById("start-day-button"));
   },
 
   configureTopSettingsMenu() {

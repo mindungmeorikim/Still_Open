@@ -15404,3 +15404,86 @@ body.is-title-screen-active #game-root {
   background-image: url("./assets/images/player/player_left_8dir.png") !important;
 }
 
+
+/* v7.1.0 7-day daily reward popup */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.daily-reward-modal {
+  z-index: 2300;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.daily-reward-frame {
+  position: relative;
+  width: min(96vw, 1060px);
+  max-height: calc(100vh - 24px);
+  aspect-ratio: 1423 / 949;
+  filter: drop-shadow(0 18px 34px rgba(0, 0, 0, 0.34));
+}
+
+.daily-reward-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+
+.daily-reward-confirm-area {
+  position: absolute;
+  left: 32.4%;
+  top: 85.1%;
+  width: 35.2%;
+  height: 8.4%;
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  box-shadow: none;
+  outline: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.daily-reward-confirm-area:focus,
+.daily-reward-confirm-area:focus-visible,
+.daily-reward-confirm-area:hover,
+.daily-reward-confirm-area:active {
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.daily-reward-confirm-area:active {
+  transform: none;
+}
+
+@media (max-width: 760px) {
+  .daily-reward-modal {
+    padding: 8px;
+  }
+
+  .daily-reward-frame {
+    width: 98vw;
+  }
+}

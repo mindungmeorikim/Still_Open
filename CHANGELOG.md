@@ -1,4 +1,19 @@
 
+## [v7.1.1] 출석보상 확인 버튼 클릭 영역 보정
+
+### Fixed
+- 출석보상 팝업 확인 버튼 위 투명 클릭 영역이 화면에 티나 보이던 문제를 수정했습니다.
+- 클릭 영역 위치를 기존보다 아래로 조정하고, 브라우저 기본 버튼/포커스/탭 하이라이트 효과가 노출되지 않도록 처리했습니다.
+
+## [v7.1.0] 7-day daily reward popup
+- Added: 7일 출석보상 통이미지 에셋(day1_basic~day7_basic, clickbutton)을 assets/ui/dailyreward/에 추가
+- Added: DailyRewardData.js로 1~7일차 보상 데이터와 이미지 경로 분리
+- Added: DailyRewardSystem.js로 KST 기준 하루 1회 출석 수령, 7일 주기 갱신, localStorage 저장 구조 추가
+- Added: 타이틀에서 새로 시작/이어하기로 게임 진입 시 출석보상 팝업 자동 표시
+- Changed: 확인 버튼은 이미지 위 투명 클릭 영역으로 처리해 별도 버튼 이미지 없이도 수령 가능
+- Maintained: index.html, main.js, core/GameState.js, core/EventBus.js, core/Constants.js 미수정
+
+
 ## [v7.0.5.1] Player 8-direction asset merge
 - Added: 플레이어 8방향 PNG 에셋을 assets/images/player/에 추가
 - Added: 키보드/WASD 이동 시 플레이어 방향값 계산 및 data-direction 반영
