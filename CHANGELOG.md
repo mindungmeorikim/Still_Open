@@ -1,3 +1,45 @@
+## [v7.3.9] ArriveBox size fine tune
+
+### Changed
+- 발주 도착 박스(ArriveBox) 맵 표시 크기를 추가로 약 5% 축소했습니다.
+- 축소 후 위치가 자연스럽도록 좌표를 미세 조정했습니다.
+
+## [v7.3.8] ArriveBox size tune
+
+### Changed
+- 발주 도착 박스(ArriveBox) 맵 표시 크기를 소폭 축소했습니다.
+- 축소 후에도 입구 오른쪽 배치가 자연스럽게 보이도록 위치를 미세 조정했습니다.
+
+## [v7.3.7] Delivery box wrapper transparency reset
+
+### Fixed
+- ArriveBox 주변에 남아 보이던 직사각형/투명 영역이 에셋이 아니라 래퍼 스타일에서 생기는 상황을 대비해 delivery-box wrapper 전체의 background / backdrop-filter / box-shadow를 강제 제거했습니다.
+- delivery-box visual/img에 투명 배경 강제값을 추가했습니다.
+
+## [v7.3.6] Exact user box assets applied
+
+### Fixed
+- 사용자가 직접 누끼 딴 박스 에셋 원본을 리사이즈/재가공 없이 그대로 적용했습니다.
+- 모든 창고/도착/카테고리 박스 이미지를 사용자가 전달한 최신 파일로 일괄 교체했습니다.
+
+### Maintained
+- 게임 내 표시 크기는 기존 CSS/레이아웃 기준을 유지해 일관되게 보이도록 했습니다.
+
+## [v7.3.5] User-cleaned warehouse box assets applied
+
+### Changed
+- 사용자가 새로 누끼 딴 창고/재고 박스 에셋으로 전면 교체했습니다.
+- arrive/basic/category 박스 에셋을 기존 표시 기준에 맞춰 일관된 크기로 재정렬해 적용했습니다.
+
+### Maintained
+- 기존 창고 박스/도착 박스 배치와 로직 연결은 유지했습니다.
+
+## [v7.3.4] ArriveBox transparent background fix
+
+### Fixed
+- ArriveBox 원본에 남아 있던 반투명 노란 사각 배경/블러 영역을 제거했습니다.
+- 도착 박스는 박스와 상품, 일부 반짝임만 남도록 재마스킹했습니다.
+
 ## [v7.3.3] Warehouse placement and arrival box cleanup hotfix
 
 ### Changed

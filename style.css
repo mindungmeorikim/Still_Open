@@ -11583,8 +11583,8 @@ body {
 }
 
 #store-interaction-layer > #delivery-box-zone {
-  left: 538px !important;
-  top: 545px !important;
+  left: 545px !important;
+  top: 553px !important;
 }
 
 /* 해금 후 사용할 2~4번 임시 기능 박스도 새 구역 좌표에 맞춘다. */
@@ -12109,7 +12109,7 @@ body {
   }
 
   .delivered-product-button {
-    min-height: 128px !important;
+    min-height: 112px !important;
     padding: 8px !important;
   }
 
@@ -12120,7 +12120,7 @@ body {
 
   .focused-zone-panel {
     top: calc(100% + 78px) !important;
-    width: 148px !important;
+    width: 131px !important;
     padding: 7px 8px !important;
   }
 
@@ -13177,8 +13177,8 @@ body {
 }
 
 #store-interaction-layer > #delivery-box-zone {
-  left: 538px !important;
-  top: 545px !important;
+  left: 545px !important;
+  top: 553px !important;
 }
 
 #result-modal .modal-content.result-modal-content {
@@ -14055,8 +14055,8 @@ body {
 
 #order-modal .order-product-row {
   grid-template-columns: minmax(250px, 1fr) 172px 126px !important;
-  min-height: 128px !important;
-  height: 128px !important;
+  min-height: 112px !important;
+  height: 112px !important;
   align-items: center !important;
   overflow: hidden !important;
 }
@@ -14183,7 +14183,7 @@ body {
 #store-interaction-layer > #delivery-box-zone,
 #delivery-box-zone.delivery-box-zone {
   width: 92px !important;
-  min-height: 128px !important;
+  min-height: 112px !important;
   padding: 8px 9px !important;
   border-radius: 16px !important;
   gap: 4px !important;
@@ -15956,15 +15956,15 @@ body.is-title-screen-active #game-root {
 #store-interaction-layer > #delivery-box-zone.delivery-box-zone,
 #delivery-box-zone.delivery-box-zone {
   position: absolute !important;
-  left: 538px !important;
-  top: 545px !important;
+  left: 545px !important;
+  top: 553px !important;
   z-index: 240 !important;
-  width: 148px !important;
-  height: 128px !important;
-  min-width: 148px !important;
-  max-width: 148px !important;
-  min-height: 128px !important;
-  max-height: 128px !important;
+  width: 131px !important;
+  height: 112px !important;
+  min-width: 131px !important;
+  max-width: 131px !important;
+  min-height: 112px !important;
+  max-height: 112px !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -16204,4 +16204,36 @@ body.is-title-screen-active #game-root {
     height: 18px !important;
     min-width: 18px !important;
   }
+}
+
+
+/* v7.3.7 delivery box visual wrapper hard reset */
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone,
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone *,
+#delivery-box-zone.delivery-box-zone * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone .delivery-box-visual,
+#delivery-box-zone.delivery-box-zone .delivery-box-hitbox,
+#delivery-box-zone.delivery-box-zone .delivery-box-visual img,
+#delivery-box-zone.delivery-box-zone::before,
+#delivery-box-zone.delivery-box-zone::after {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual {
+  isolation: isolate !important;
+  overflow: visible !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual img {
+  image-rendering: auto !important;
+  mix-blend-mode: normal !important;
 }
