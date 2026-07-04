@@ -20,6 +20,7 @@ import {
   getObjectVisualAsset
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
+import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
 import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
@@ -72,11 +73,13 @@ export const UIManager = {
   dailyRewardModal: null,
   resultModal: null,
   resultReward2xAdTimerId: null,
+  resultMentalRecoveryAdTimerId: null,
   upgradeModal: null,
   endingModal: null,
   infiniteGameOverModal: null,
   dayScenarioModal: null,
   orderModal: null,
+  bmContractShopModal: null,
   staffHireModal: null,
   eventModal: null,
   eventModalOnClose: null,
@@ -131,11 +134,13 @@ export const UIManager = {
     this.bindDayStartEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
+    this.bindBMEvents();
     this.bindEndingEvents();
     this.bindOrderEvents();
     this.bindStaffEvents();
     this.createDayScenarioModal();
     this.createOrderModal();
+    this.createBMContractShopModal();
     this.createStaffHireModal();
     this.createResultModal();
     this.createUpgradeModal();
@@ -684,6 +689,7 @@ export const UIManager = {
     const startDayButton = document.getElementById("start-day-button");
     const openStoreButton = document.getElementById("open-store-button");
     const endDayButton = document.getElementById("end-day-button");
+    const shopShortcutButton = document.getElementById("shop-shortcut-button");
 
     startDayButton.addEventListener("click", () => {
       EventBus.emit(EVENTS.DAY_START_REQUESTED);
@@ -696,6 +702,14 @@ export const UIManager = {
     endDayButton.addEventListener("click", () => {
       EventBus.emit(EVENTS.STORE_CLOSE_REQUESTED);
     });
+
+    if (shopShortcutButton) {
+      shopShortcutButton.addEventListener("click", () => {
+        if (shopShortcutButton.disabled) return;
+
+        this.showBMContractShopModal();
+      });
+    }
   },
 
   bindGameEvents() {
@@ -842,6 +856,72 @@ export const UIManager = {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+    });
+  },
+
+  bindBMEvents() {
+    EventBus.on(BM_EVENTS.STATE_CHANGED, () => {
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.CONTRACT_SHOP_UNLOCKED, (data = {}) => {
+      const count = Array.isArray(data.unlockedProductIds)
+        ? data.unlockedProductIds.length
+        : 0;
+
+      if (count > 0) {
+        this.showMessage(`판매권 ${count}종이 상점에 해금되었습니다.`);
+      }
+
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.CONTRACT_PURCHASED, (data = {}) => {
+      this.showMessage(data.message ?? "판매권 구매 완료!");
+      this.renderBMContractShopModal();
+      this.renderProductCards();
+    });
+
+    EventBus.on(BM_EVENTS.CONTRACT_PURCHASE_FAILED, (data = {}) => {
+      this.showMessage(data.message ?? "판매권 구매 조건을 확인해주세요.");
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.PREMIUM_PRODUCT_PURCHASED, (data = {}) => {
+      this.showMessage(data.message ?? "프리미엄 상품 구매 완료!");
+      this.renderBMContractShopModal();
+      this.renderProductCards();
+    });
+
+    EventBus.on(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_FAILED, (data = {}) => {
+      this.showMessage(data.message ?? "프리미엄 상품 구매 조건을 확인해주세요.");
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.CONTRACT_UNLOCK_SKIPPED, (data = {}) => {
+      this.showMessage(data.message ?? "판매권 해금 대기일을 스킵했습니다.");
+      this.renderBMContractShopModal();
+      this.renderProductCards();
+    });
+
+    EventBus.on(BM_EVENTS.CONTRACT_UNLOCK_SKIP_FAILED, (data = {}) => {
+      this.showMessage(data.message ?? "스킵권 사용 조건을 확인해주세요.");
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.PEAK_COUPON_ACTIVATED, (data = {}) => {
+      this.showMessage(data.message ?? "피크타임 쿠폰이 적용되었습니다.");
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.PEAK_COUPON_FAILED, (data = {}) => {
+      this.showMessage(data.message ?? "피크타임 쿠폰 사용 조건을 확인해주세요.");
+      this.renderBMContractShopModal();
+    });
+
+    EventBus.on(BM_EVENTS.PEAK_COUPON_EXPIRED, (data = {}) => {
+      this.showMessage(data.message ?? "피크타임 쿠폰 효과가 종료되었습니다.");
+      this.renderBMContractShopModal();
     });
   },
 
@@ -1138,6 +1218,14 @@ export const UIManager = {
     this.renderInteractionFeedback();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
+    const diamondInfoNode = document.getElementById("diamond-info");
+
+    if (diamondInfoNode) {
+      const diamond = BMSystem.getBMState().diamond;
+
+      diamondInfoNode.textContent = `다이아 ${diamond.toLocaleString("ko-KR")}`;
+    }
+
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
     document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
   },
@@ -1680,7 +1768,7 @@ export const UIManager = {
         classNames: ["ui-common-button", "ui-common-button-large"]
       },
       {
-        selector: "#result-confirm-button, #day-scenario-confirm-button, #order-confirm-button, .store-expansion-popover-action, .expansion-action-button, .customer-event-close-button, .staff-hire-skip-button",
+        selector: "#result-confirm-button, #result-mental-recovery-ad-button, #day-scenario-confirm-button, #order-confirm-button, .store-expansion-popover-action, .expansion-action-button, .customer-event-close-button, .staff-hire-skip-button, .bm-contract-purchase-button, .bm-premium-purchase-button, #bm-contract-skip-button",
         variant: "commonBase",
         classNames: ["ui-common-button", "ui-common-button-base"]
       },
@@ -1695,7 +1783,7 @@ export const UIManager = {
         classNames: ["ui-special-button", "ui-special-reward-2x-ad-button"]
       },
       {
-        selector: ".store-expansion-popover-close, #settings-close-button",
+        selector: ".store-expansion-popover-close, #settings-close-button, #bm-contract-shop-close-button",
         variant: "iconClose",
         classNames: ["ui-icon-image-button", "ui-icon-button-close"]
       },
@@ -2237,6 +2325,7 @@ export const UIManager = {
     const startDayButton = document.getElementById("start-day-button");
     const openStoreButton = document.getElementById("open-store-button");
     const endDayButton = document.getElementById("end-day-button");
+    const shopShortcutButton = document.getElementById("shop-shortcut-button");
 
     if (startDayButton) {
       startDayButton.disabled = [
@@ -2255,6 +2344,14 @@ export const UIManager = {
 
     if (endDayButton) {
       endDayButton.disabled = GameState.phase !== GAME_PHASE.STORE_RUNNING;
+    }
+
+    if (shopShortcutButton) {
+      shopShortcutButton.disabled = [
+        GAME_PHASE.STORE_RUNNING,
+        GAME_PHASE.DAY_END,
+        GAME_PHASE.RESULT
+      ].includes(GameState.phase);
     }
   },
 
@@ -4041,7 +4138,7 @@ export const UIManager = {
     if (!productGrid) return;
 
     const unlockedCount = PRODUCTS.filter((product) => {
-      return product.unlockDay <= GameState.day;
+      return this.isProductOrderable(product);
     }).length;
 
     if (unlockSummary) {
@@ -4052,13 +4149,14 @@ export const UIManager = {
       return {
         productId: product.id,
         productName: product.name,
-        isUnlocked: product.unlockDay <= GameState.day
+        isUnlocked: this.isProductOrderable(product)
       };
     });
 
     productGrid.innerHTML = PRODUCTS.map((product) => {
       const inventoryItem = this.inventoryByProductId[product.id];
-      const isLocked = product.unlockDay > GameState.day;
+      const isLocked = !this.isProductOrderable(product);
+      const lockReason = this.getOrderUnavailableReason(product);
       const quantity = inventoryItem?.quantity;
       const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
       const stockText = Number.isFinite(quantity) ? `${quantity}개` : "-";
@@ -4087,7 +4185,7 @@ export const UIManager = {
             />
             ${
               isLocked
-                ? `<span class="product-lock-badge">Day ${product.unlockDay} 해금</span>`
+                ? `<span class="product-lock-badge">${lockReason}</span>`
                 : safeQuantity <= 0
                   ? `<span class="product-lock-badge product-stock-badge">재고 없음</span>`
                 : ""
@@ -4176,6 +4274,12 @@ export const UIManager = {
     };
 
     return categoryLabels[category] ?? "상품";
+  },
+
+  isProductOrderable(product) {
+    if (!product) return false;
+
+    return BMSystem.canOrderProduct(product.id);
   },
 
   showMessage(message, options = {}) {
@@ -4461,7 +4565,7 @@ export const UIManager = {
       recommendedProductIds.filter((productId) => {
         const product = PRODUCTS.find((item) => item.id === productId);
 
-        return existingProductIds.has(productId) && product?.unlockDay <= GameState.day;
+        return existingProductIds.has(productId) && this.isProductOrderable(product);
       })
     );
   },
@@ -4587,6 +4691,434 @@ export const UIManager = {
     if (!this.staffHireModal) return;
 
     this.staffHireModal.classList.add("hidden");
+  },
+
+  createBMContractShopModal() {
+    if (document.getElementById("bm-contract-shop-modal")) {
+      this.bmContractShopModal = document.getElementById("bm-contract-shop-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+
+    modal.id = "bm-contract-shop-modal";
+    modal.className = "modal hidden";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "bm-contract-shop-title");
+    modal.innerHTML = `
+      <div class="modal-content bm-contract-shop-content">
+        <div class="bm-contract-shop-header">
+          <div>
+            <p class="bm-contract-shop-kicker">BM 상점</p>
+            <h2 id="bm-contract-shop-title">BM 상품 상점</h2>
+            <p>일반 상품 판매권과 프리미엄 BM 상품을 구매할 수 있습니다.</p>
+          </div>
+          <button
+            id="bm-contract-shop-close-button"
+            class="bm-contract-shop-close"
+            type="button"
+            aria-label="판매권 상점 닫기"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div class="bm-contract-shop-wallet" aria-label="보유 재화">
+          <span id="bm-contract-shop-gold">골드 0</span>
+          <span id="bm-contract-shop-diamond">다이아 0</span>
+        </div>
+
+        <div id="bm-contract-skip-panel" class="bm-contract-skip-panel"></div>
+        <div id="bm-peak-coupon-panel" class="bm-peak-coupon-panel"></div>
+        <div id="bm-contract-shop-list" class="bm-contract-shop-list"></div>
+        <p id="bm-contract-shop-next" class="bm-contract-shop-next"></p>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    this.bmContractShopModal = modal;
+    this.bindBMContractShopStaticButtons();
+    this.prepareUiImageButtons(modal);
+  },
+
+  bindBMContractShopStaticButtons() {
+    const closeButton = document.getElementById("bm-contract-shop-close-button");
+
+    if (closeButton) {
+      closeButton.onclick = () => {
+        this.hideBMContractShopModal();
+      };
+    }
+  },
+
+  showBMContractShopModal() {
+    if (!this.bmContractShopModal) {
+      this.createBMContractShopModal();
+    }
+
+    this.renderBMContractShopModal();
+    this.bmContractShopModal.classList.remove("hidden");
+  },
+
+  hideBMContractShopModal() {
+    if (!this.bmContractShopModal) return;
+
+    this.bmContractShopModal.classList.add("hidden");
+  },
+
+  renderBMContractShopModal() {
+    if (!this.bmContractShopModal) return;
+
+    const goldNode = document.getElementById("bm-contract-shop-gold");
+    const diamondNode = document.getElementById("bm-contract-shop-diamond");
+    const skipPanelNode = document.getElementById("bm-contract-skip-panel");
+    const peakCouponPanelNode = document.getElementById("bm-peak-coupon-panel");
+    const listNode = document.getElementById("bm-contract-shop-list");
+    const nextNode = document.getElementById("bm-contract-shop-next");
+
+    if (!listNode) return;
+
+    const bmState = BMSystem.getBMState();
+    const contractProducts = BMSystem.getContractUnlockQueue();
+    const premiumProducts = BMSystem.getPremiumProducts();
+    const nextProducts = BMSystem.getNextContractUnlockProducts();
+
+    if (goldNode) {
+      goldNode.textContent = `골드 ${GameState.money.toLocaleString("ko-KR")}`;
+    }
+
+    if (diamondNode) {
+      diamondNode.textContent = `다이아 ${bmState.diamond.toLocaleString("ko-KR")}`;
+    }
+
+    if (skipPanelNode) {
+      skipPanelNode.innerHTML = this.createBMContractSkipPanelMarkup(
+        bmState.contractUnlockSkip
+      );
+    }
+
+    if (peakCouponPanelNode) {
+      peakCouponPanelNode.innerHTML = this.createBMPeakCouponPanelMarkup(
+        bmState.peakCoupon
+      );
+    }
+
+    listNode.innerHTML = `
+      <section class="bm-shop-section">
+        <h3>일반 상품 판매권</h3>
+        <div class="bm-shop-card-list">
+          ${contractProducts.map((product) => {
+            const status = this.getBMContractShopItemStatus(product);
+            const contractCost = Number(product.contractCost) || 0;
+
+            return `
+              <article class="bm-contract-shop-card ${status.className}" data-product-id="${product.id}">
+                <div class="bm-contract-product-main">
+                  <span class="bm-contract-product-image-box">
+                    <img
+                      class="bm-contract-product-image"
+                      src="${product.imagePath}"
+                      alt="${product.name}"
+                      loading="lazy"
+                      decoding="async"
+                      onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+                    />
+                    <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
+                  </span>
+                  <div class="bm-contract-product-copy">
+                    <strong>${product.name}</strong>
+                    <span>최종 강화명: ${product.finalName}</span>
+                    <em>${status.message}</em>
+                  </div>
+                </div>
+                <div class="bm-contract-product-meta">
+                  <span>${this.getDisplayCategoryLabel(product.displayCategory)}</span>
+                  <span>판매가 ₩${product.salePrice.toLocaleString("ko-KR")}</span>
+                  <span>판매권 ₩${contractCost.toLocaleString("ko-KR")}</span>
+                </div>
+                <button
+                  class="bm-contract-purchase-button"
+                  type="button"
+                  data-product-id="${product.id}"
+                  ${status.canPurchase ? "" : "disabled"}
+                >
+                  ${status.buttonText}
+                </button>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+
+      <section class="bm-shop-section bm-premium-shop-section">
+        <h3>프리미엄 BM 상품</h3>
+        <div class="bm-shop-card-list">
+          ${premiumProducts.map((product) => {
+            const status = this.getBMPremiumProductStatus(product);
+            const diamondPrice = Number(product.diamondPrice) || 0;
+
+            return `
+              <article class="bm-contract-shop-card bm-premium-product-card ${status.className}" data-product-id="${product.id}">
+                <div class="bm-contract-product-main">
+                  <span class="bm-contract-product-image-box">
+                    <img
+                      class="bm-contract-product-image"
+                      src="${product.imagePath}"
+                      alt="${product.name}"
+                      loading="lazy"
+                      decoding="async"
+                      onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+                    />
+                    <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
+                  </span>
+                  <div class="bm-contract-product-copy">
+                    <strong>${product.name}</strong>
+                    <span>최종 강화명: ${product.finalName}</span>
+                    <em>${status.message}</em>
+                  </div>
+                </div>
+                <div class="bm-contract-product-meta">
+                  <span>${this.getDisplayCategoryLabel(product.displayCategory)}</span>
+                  <span>판매가 ₩${product.salePrice.toLocaleString("ko-KR")}</span>
+                  <span>가격 ${diamondPrice.toLocaleString("ko-KR")} 다이아</span>
+                </div>
+                <button
+                  class="bm-premium-purchase-button"
+                  type="button"
+                  data-product-id="${product.id}"
+                  ${status.canPurchase ? "" : "disabled"}
+                >
+                  ${status.buttonText}
+                </button>
+              </article>
+            `;
+          }).join("")}
+        </div>
+      </section>
+    `;
+
+    if (nextNode) {
+      nextNode.textContent = nextProducts.length > 0
+        ? `다음 해금 예정: ${nextProducts.map((product) => product.name).join(", ")}`
+        : "모든 일반 상품 판매권이 상점에 해금되었습니다.";
+    }
+
+    this.bindBMContractPurchaseButtons();
+    this.bindBMPremiumPurchaseButtons();
+    this.bindBMContractSkipButton();
+    this.bindBMPeakCouponButton();
+  },
+
+  createBMContractSkipPanelMarkup(skipState = {}) {
+    const nextNames = Array.isArray(skipState.nextProducts)
+      ? skipState.nextProducts
+          .map((product) => product?.productName)
+          .filter(Boolean)
+      : [];
+    const nextText = nextNames.length > 0
+      ? nextNames.join(", ")
+      : "해금 대기 상품 없음";
+    const buttonText = skipState.canUse ? "스킵권 사용" : "사용 불가";
+
+    return `
+      <div class="bm-contract-skip-copy">
+        <strong>판매권 해금 대기일 스킵권</strong>
+        <span>다음 판매권 2종을 상점에 즉시 해금합니다. 판매권 구매 비용은 별도입니다.</span>
+        <em>다음 대상: ${nextText}</em>
+        <small>${skipState.message ?? ""}</small>
+      </div>
+      <button
+        id="bm-contract-skip-button"
+        class="bm-contract-skip-button"
+        type="button"
+        ${skipState.canUse ? "" : "disabled"}
+      >
+        ${buttonText} · ${Number(skipState.priceDiamond ?? 50).toLocaleString("ko-KR")} 다이아
+      </button>
+    `;
+  },
+
+  createBMPeakCouponPanelMarkup(peakState = {}) {
+    const multiplier = Number(peakState.revenueMultiplier ?? 1.5);
+    const durationSeconds = Number(peakState.durationSeconds ?? 60);
+    const priceDiamond = Number(peakState.priceDiamond ?? 20);
+    const stateText = peakState.isActive
+      ? "효과 적용 중"
+      : peakState.message ?? "영업 중에 사용할 수 있습니다.";
+    const buttonText = peakState.isActive
+      ? "적용 중"
+      : peakState.canUse
+        ? "쿠폰 사용"
+        : "사용 불가";
+
+    return `
+      <div class="bm-peak-coupon-copy">
+        <strong>피크타임 쿠폰</strong>
+        <span>${durationSeconds}초 동안 계산 매출이 ${multiplier}배로 증가합니다. 하루 1회 사용할 수 있습니다.</span>
+        <em>${stateText}</em>
+      </div>
+      <button
+        id="bm-peak-coupon-button"
+        class="bm-peak-coupon-button"
+        type="button"
+        ${peakState.canUse ? "" : "disabled"}
+      >
+        ${buttonText} · ${priceDiamond.toLocaleString("ko-KR")} 다이아
+      </button>
+    `;
+  },
+
+  getBMContractShopItemStatus(product) {
+    const isShopUnlocked = BMSystem.isContractShopUnlocked(product.id);
+    const isOwned = BMSystem.hasProductContract(product.id);
+    const contractCost = Number(product.contractCost) || 0;
+    const hasEnoughGold = GameState.money >= contractCost;
+
+    if (isOwned) {
+      return {
+        className: "is-owned",
+        canPurchase: false,
+        buttonText: "보유 중",
+        message: "판매권을 이미 보유하고 있습니다."
+      };
+    }
+
+    if (!isShopUnlocked) {
+      return {
+        className: "is-locked",
+        canPurchase: false,
+        buttonText: "해금 대기",
+        message: `Day ${product.unlockDay} 상점 해금 예정`
+      };
+    }
+
+    if (!hasEnoughGold) {
+      return {
+        className: "is-not-enough-gold",
+        canPurchase: false,
+        buttonText: "골드 부족",
+        message: `구매 가능하지만 골드가 ${contractCost.toLocaleString("ko-KR")} 필요합니다.`
+      };
+    }
+
+    return {
+      className: "is-purchasable",
+      canPurchase: true,
+      buttonText: "구매",
+      message: "판매권 구매 가능"
+    };
+  },
+
+  bindBMContractPurchaseButtons() {
+    document.querySelectorAll(".bm-contract-purchase-button").forEach((button) => {
+      button.onclick = () => {
+        if (button.disabled) return;
+
+        EventBus.emit(BM_EVENTS.CONTRACT_PURCHASE_REQUESTED, {
+          day: GameState.day,
+          productId: button.dataset.productId,
+          source: "bm_contract_shop_ui"
+        });
+      };
+    });
+  },
+
+  getBMPremiumProductStatus(product) {
+    const isPurchased = BMSystem.isPremiumProductPurchased(product.id);
+    const isZoneUnlocked = BMSystem.isZoneUnlocked(product.requiredZoneId);
+    const diamondPrice = Number(product.diamondPrice) || 0;
+    const bmState = BMSystem.getBMState();
+    const hasEnoughDiamond = bmState.diamond >= diamondPrice;
+
+    if (isPurchased) {
+      return {
+        className: "is-owned",
+        canPurchase: false,
+        buttonText: "보유 중",
+        message: "프리미엄 상품을 이미 구매했습니다."
+      };
+    }
+
+    if (!isZoneUnlocked) {
+      return {
+        className: "is-locked",
+        canPurchase: false,
+        buttonText: "구역 필요",
+        message: "상품이 배치된 구역 해금이 필요합니다."
+      };
+    }
+
+    if (!hasEnoughDiamond) {
+      return {
+        className: "is-not-enough-diamond",
+        canPurchase: false,
+        buttonText: "다이아 부족",
+        message: `구매 가능하지만 다이아가 ${diamondPrice.toLocaleString("ko-KR")} 필요합니다.`
+      };
+    }
+
+    return {
+      className: "is-purchasable is-premium-purchasable",
+      canPurchase: true,
+      buttonText: "구매",
+      message: "프리미엄 상품 구매 가능"
+    };
+  },
+
+  bindBMPremiumPurchaseButtons() {
+    document.querySelectorAll(".bm-premium-purchase-button").forEach((button) => {
+      button.onclick = () => {
+        if (button.disabled) return;
+
+        EventBus.emit(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_REQUESTED, {
+          day: GameState.day,
+          productId: button.dataset.productId,
+          source: "bm_premium_product_shop_ui"
+        });
+      };
+    });
+  },
+
+  bindBMContractSkipButton() {
+    const button = document.getElementById("bm-contract-skip-button");
+
+    if (!button) return;
+
+    button.onclick = () => {
+      if (button.disabled) return;
+
+      EventBus.emit(BM_EVENTS.CONTRACT_UNLOCK_SKIP_REQUESTED, {
+        day: GameState.day,
+        source: "bm_contract_shop_skip_ui"
+      });
+    };
+  },
+
+  bindBMPeakCouponButton() {
+    const button = document.getElementById("bm-peak-coupon-button");
+
+    if (!button) return;
+
+    button.onclick = () => {
+      if (button.disabled) return;
+
+      EventBus.emit(BM_EVENTS.PEAK_COUPON_USE_REQUESTED, {
+        day: GameState.day,
+        source: "bm_peak_coupon_ui"
+      });
+    };
+  },
+
+  getDisplayCategoryLabel(displayCategory) {
+    const categoryLabels = {
+      basic_shelf: "기본 매대",
+      fresh_shelf: "신선 매대",
+      fridge: "냉장고",
+      warmer: "온장고"
+    };
+
+    return categoryLabels[displayCategory] ?? "매대";
   },
 
   createOrderModal() {
@@ -5075,16 +5607,12 @@ export const UIManager = {
 
   getOrderableProducts() {
     return PRODUCTS.filter((product) => {
-      return product.unlockDay <= GameState.day;
+      return this.isProductOrderable(product);
     });
   },
 
   getOrderUnavailableReason(product) {
-    if (product.unlockDay > GameState.day) {
-      return `Day ${product.unlockDay} 해금`;
-    }
-
-    return "발주 조건 확인 필요";
+    return BMSystem.getProductLockReason(product.id).message;
   },
 
   getOrderTotalCost(products = this.getOrderableProducts()) {
@@ -5121,7 +5649,17 @@ export const UIManager = {
           >
             보상 2배 광고
           </button>
+          <button
+            id="result-mental-recovery-ad-button"
+            class="result-mental-recovery-ad-button"
+            type="button"
+            disabled
+            aria-disabled="true"
+          >
+            멘탈 회복 광고
+          </button>
           <p id="result-reward-2x-ad-status" class="result-reward-2x-ad-status" aria-live="polite"></p>
+          <p id="result-mental-recovery-ad-status" class="result-mental-recovery-ad-status" aria-live="polite"></p>
           <button id="result-confirm-button" type="button">
             확인
           </button>
@@ -5141,12 +5679,15 @@ export const UIManager = {
     }
 
     this.clearResultReward2xAdTimer();
+    this.clearResultMentalRecoveryAdTimer();
 
     const title = document.getElementById("result-modal-title");
     const body = document.getElementById("result-modal-body");
     const confirmButton = document.getElementById("result-confirm-button");
     const reward2xButton = document.getElementById("result-reward-2x-ad-button");
     const reward2xStatus = document.getElementById("result-reward-2x-ad-status");
+    const mentalRecoveryButton = document.getElementById("result-mental-recovery-ad-button");
+    const mentalRecoveryStatus = document.getElementById("result-mental-recovery-ad-status");
 
     const isInfiniteGameOver = resultData.infiniteGameOver?.isGameOver === true;
 
@@ -5218,7 +5759,7 @@ export const UIManager = {
 
           <div class="result-row">
             <span>멘탈</span>
-            <strong>${resultData.mental} / 100</strong>
+            <strong id="result-mental-value">${resultData.mental} / 100</strong>
           </div>
 
           <div class="result-row">
@@ -5267,6 +5808,16 @@ export const UIManager = {
       onReward2xAdFail: options.onReward2xAdFail
     });
 
+    this.configureResultMentalRecoveryAdButton({
+      button: mentalRecoveryButton,
+      statusNode: mentalRecoveryStatus,
+      resultData,
+      onMentalRecoveryAdComplete: isInfiniteGameOver
+        ? null
+        : options.onMentalRecoveryAdComplete,
+      onMentalRecoveryAdFail: options.onMentalRecoveryAdFail
+    });
+
     confirmButton.onclick = () => {
       this.hideResultModal();
 
@@ -5292,28 +5843,22 @@ export const UIManager = {
       Number(resultData.reward2xBaseBonus ?? resultData.bmBonus ?? resultData.bmScore ?? 0) || 0
     );
     const alreadyApplied = resultData.reward2xAdApplied === true;
-    const hasReward = baseBonus > 0;
-    const canUse = hasReward && !alreadyApplied && typeof onReward2xAdComplete === "function";
+    const diamondRewardAmount = BMSystem.getAdDiamondRewardAmount();
+    const canUse = !alreadyApplied && typeof onReward2xAdComplete === "function";
 
     resultData.reward2xBaseBonus = baseBonus;
     resultData.reward2xAdWatching = false;
     button.onclick = null;
 
-    if (!hasReward) {
-      this.setResultReward2xAdState(button, statusNode, {
-        disabled: true,
-        label: "2배 보상 없음",
-        statusText: "2배로 받을 보상 재화가 없습니다.",
-        statusKind: "warning"
-      });
-      return;
-    }
-
     if (alreadyApplied) {
+      const extraBonus = Number(resultData.reward2xExtraBonus) || 0;
+
       this.setResultReward2xAdState(button, statusNode, {
         disabled: true,
-        label: "2배 적용 완료",
-        statusText: `보상 2배 적용 완료 (+${(Number(resultData.reward2xExtraBonus) || baseBonus).toLocaleString("ko-KR")})`,
+        label: "광고 보상 완료",
+        statusText: extraBonus > 0
+          ? `다이아 +${diamondRewardAmount.toLocaleString("ko-KR")} / 병맛 점수 +${extraBonus.toLocaleString("ko-KR")}`
+          : `다이아 +${diamondRewardAmount.toLocaleString("ko-KR")} 보상 완료`,
         statusKind: "success"
       });
       this.renderResultReward2xValues(resultData);
@@ -5322,10 +5867,12 @@ export const UIManager = {
 
     this.setResultReward2xAdState(button, statusNode, {
       disabled: !canUse,
-      label: "보상 2배 광고",
+      label: "광고 보상 받기",
       statusText: canUse
-        ? `광고 시청 시 병맛 점수 +${baseBonus.toLocaleString("ko-KR")}`
-        : "보상 2배 기능을 사용할 수 없습니다.",
+        ? baseBonus > 0
+          ? `광고 시청 시 다이아 +${diamondRewardAmount.toLocaleString("ko-KR")} / 병맛 점수 +${baseBonus.toLocaleString("ko-KR")}`
+          : `광고 시청 시 다이아 +${diamondRewardAmount.toLocaleString("ko-KR")}`
+        : "광고 보상을 사용할 수 없습니다.",
       statusKind: canUse ? "info" : "warning"
     });
 
@@ -5338,6 +5885,72 @@ export const UIManager = {
         resultData,
         onReward2xAdComplete,
         onReward2xAdFail
+      });
+    };
+  },
+
+  configureResultMentalRecoveryAdButton({
+    button,
+    statusNode,
+    resultData,
+    onMentalRecoveryAdComplete,
+    onMentalRecoveryAdFail
+  }) {
+    if (!button) return;
+
+    const recoveryAmount = BMSystem.getMentalRecoveryAdAmount();
+    const currentMental = Number(resultData.mental ?? GameState.mental) || 0;
+    const alreadyApplied =
+      resultData.mentalRecoveryAdApplied === true ||
+      BMSystem.isMentalRecoveryAdUsedToday(resultData.day ?? GameState.day);
+    const needsRecovery = currentMental < 100;
+    const canUse =
+      needsRecovery &&
+      !alreadyApplied &&
+      typeof onMentalRecoveryAdComplete === "function";
+
+    resultData.mentalRecoveryAdWatching = false;
+    button.onclick = null;
+
+    if (alreadyApplied) {
+      this.setResultMentalRecoveryAdState(button, statusNode, {
+        disabled: true,
+        label: "회복 완료",
+        statusText: `멘탈 회복 광고 사용 완료`,
+        statusKind: "success"
+      });
+      this.renderResultMentalRecoveryValues(resultData);
+      return;
+    }
+
+    if (!needsRecovery) {
+      this.setResultMentalRecoveryAdState(button, statusNode, {
+        disabled: true,
+        label: "회복 필요 없음",
+        statusText: "멘탈이 이미 최대치입니다.",
+        statusKind: "warning"
+      });
+      return;
+    }
+
+    this.setResultMentalRecoveryAdState(button, statusNode, {
+      disabled: !canUse,
+      label: "멘탈 회복 광고",
+      statusText: canUse
+        ? `광고 시청 시 멘탈 +${recoveryAmount.toLocaleString("ko-KR")}`
+        : "멘탈 회복 광고를 사용할 수 없습니다.",
+      statusKind: canUse ? "info" : "warning"
+    });
+
+    if (!canUse) return;
+
+    button.onclick = () => {
+      this.handleResultMentalRecoveryAdClick({
+        button,
+        statusNode,
+        resultData,
+        onMentalRecoveryAdComplete,
+        onMentalRecoveryAdFail
       });
     };
   },
@@ -5371,7 +5984,7 @@ export const UIManager = {
       try {
         rewardResult = onReward2xAdComplete(resultData);
       } catch (error) {
-        console.warn("[UIManager] 보상 2배 더미 광고 완료 처리 실패:", error);
+        console.warn("[UIManager] 광고 보상 완료 처리 실패:", error);
         rewardResult = {
           success: false,
           reason: "callback_error",
@@ -5383,24 +5996,92 @@ export const UIManager = {
         this.renderResultReward2xValues(resultData);
         this.setResultReward2xAdState(button, statusNode, {
           disabled: true,
-          label: "2배 적용 완료",
-          statusText: rewardResult.message ?? "보상 2배 적용 완료",
+          label: "광고 보상 완료",
+          statusText: rewardResult.message ?? "광고 보상 완료",
           statusKind: "success"
         });
         return;
       }
 
-      console.warn("[UIManager] 보상 2배 더미 광고 실패:", rewardResult);
+      console.warn("[UIManager] 광고 보상 실패:", rewardResult);
       onReward2xAdFail?.(rewardResult, resultData);
 
       const shouldDisable =
-        rewardResult?.reason === "already_applied" ||
-        rewardResult?.reason === "no_reward";
+        rewardResult?.reason === "already_applied";
 
       this.setResultReward2xAdState(button, statusNode, {
         disabled: shouldDisable,
-        label: shouldDisable ? "2배 적용 불가" : "보상 2배 광고",
+        label: shouldDisable ? "광고 보상 완료" : "광고 보상 받기",
         statusText: rewardResult?.message ?? "광고 보상 적용에 실패했습니다.",
+        statusKind: "warning"
+      });
+    }, 2000);
+  },
+
+  handleResultMentalRecoveryAdClick({
+    button,
+    statusNode,
+    resultData,
+    onMentalRecoveryAdComplete,
+    onMentalRecoveryAdFail
+  }) {
+    if (
+      !button ||
+      button.disabled ||
+      resultData.mentalRecoveryAdWatching ||
+      resultData.mentalRecoveryAdApplied
+    ) {
+      return;
+    }
+
+    resultData.mentalRecoveryAdWatching = true;
+    this.setResultMentalRecoveryAdState(button, statusNode, {
+      disabled: true,
+      label: "광고 시청 중...",
+      statusText: "광고 시청 중... 2초 후 멘탈이 회복됩니다.",
+      statusKind: "info"
+    });
+
+    this.clearResultMentalRecoveryAdTimer();
+    this.resultMentalRecoveryAdTimerId = window.setTimeout(() => {
+      this.resultMentalRecoveryAdTimerId = null;
+      resultData.mentalRecoveryAdWatching = false;
+
+      let recoveryResult = null;
+
+      try {
+        recoveryResult = onMentalRecoveryAdComplete(resultData);
+      } catch (error) {
+        console.warn("[UIManager] 멘탈 회복 광고 완료 처리 실패:", error);
+        recoveryResult = {
+          success: false,
+          reason: "callback_error",
+          message: "멘탈 회복 처리 중 문제가 발생했습니다."
+        };
+      }
+
+      if (recoveryResult?.success) {
+        this.renderResultMentalRecoveryValues(resultData);
+        this.setResultMentalRecoveryAdState(button, statusNode, {
+          disabled: true,
+          label: "회복 완료",
+          statusText: recoveryResult.message ?? "멘탈 회복 완료",
+          statusKind: "success"
+        });
+        return;
+      }
+
+      console.warn("[UIManager] 멘탈 회복 광고 실패:", recoveryResult);
+      onMentalRecoveryAdFail?.(recoveryResult, resultData);
+
+      const shouldDisable =
+        recoveryResult?.reason === "already_applied" ||
+        recoveryResult?.reason === "mental_full";
+
+      this.setResultMentalRecoveryAdState(button, statusNode, {
+        disabled: shouldDisable,
+        label: shouldDisable ? "회복 불가" : "멘탈 회복 광고",
+        statusText: recoveryResult?.message ?? "멘탈 회복 광고 적용에 실패했습니다.",
         statusKind: "warning"
       });
     }, 2000);
@@ -5410,7 +6091,22 @@ export const UIManager = {
     if (button) {
       button.disabled = state.disabled === true;
       button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
-      button.textContent = state.label ?? "보상 2배 광고";
+      button.textContent = state.label ?? "광고 보상 받기";
+      this.syncUiImageButtonState(button);
+    }
+
+    if (statusNode) {
+      statusNode.textContent = state.statusText ?? "";
+      statusNode.classList.toggle("is-warning", state.statusKind === "warning");
+      statusNode.classList.toggle("is-success", state.statusKind === "success");
+    }
+  },
+
+  setResultMentalRecoveryAdState(button, statusNode, state = {}) {
+    if (button) {
+      button.disabled = state.disabled === true;
+      button.setAttribute("aria-disabled", button.disabled ? "true" : "false");
+      button.textContent = state.label ?? "멘탈 회복 광고";
       this.syncUiImageButtonState(button);
     }
 
@@ -5435,6 +6131,20 @@ export const UIManager = {
     }
   },
 
+  renderResultMentalRecoveryValues(resultData = {}) {
+    const mentalValue = document.getElementById("result-mental-value");
+    const mentalInfo = document.getElementById("mental-info");
+    const mental = Math.max(0, Math.min(100, Number(resultData.mental ?? GameState.mental) || 0));
+
+    if (mentalValue) {
+      mentalValue.textContent = `${mental} / 100`;
+    }
+
+    if (mentalInfo) {
+      mentalInfo.textContent = `멘탈 ${mental}`;
+    }
+  },
+
   clearResultReward2xAdTimer() {
     if (!this.resultReward2xAdTimerId) return;
 
@@ -5442,10 +6152,18 @@ export const UIManager = {
     this.resultReward2xAdTimerId = null;
   },
 
+  clearResultMentalRecoveryAdTimer() {
+    if (!this.resultMentalRecoveryAdTimerId) return;
+
+    window.clearTimeout(this.resultMentalRecoveryAdTimerId);
+    this.resultMentalRecoveryAdTimerId = null;
+  },
+
   hideResultModal() {
     if (!this.resultModal) return;
 
     this.clearResultReward2xAdTimer();
+    this.clearResultMentalRecoveryAdTimer();
     this.resultModal.classList.add("hidden");
   },
 

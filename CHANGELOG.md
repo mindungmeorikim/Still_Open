@@ -1,3 +1,19 @@
+## [v7.2.0] BM 작업본 + 출석보상 병합
+
+### Added
+- 팀원 BM 작업본의 판매권/프리미엄 상품/멘탈 회복/광고 보상 관련 변경사항과 7일 출석보상 시스템을 한 작업본으로 병합했습니다.
+- 출석보상 에셋과 DailyRewardData.js, DailyRewardSystem.js를 BM 작업본에 추가했습니다.
+
+### Changed
+- UIManager.js에서 BMSystem/BM_EVENTS와 DailyRewardSystem import 및 팝업 진입 흐름이 함께 동작하도록 병합했습니다.
+- 출석보상 다이아 보상이 BMSystem이 사용하는 GameState.bm.diamond에도 반영되도록 연결했습니다.
+- style.css의 BM UI 스타일과 출석보상 팝업/투명 확인 버튼 스타일을 함께 유지했습니다.
+
+### Fixed
+- UIManager.js, style.css 병합 충돌을 해소했습니다.
+- JS 문법 검사 기준으로 신규/수정 JS 파일에 syntax error가 없음을 확인했습니다.
+
+
 
 ## [v7.1.1] 출석보상 확인 버튼 클릭 영역 보정
 

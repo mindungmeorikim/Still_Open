@@ -249,7 +249,7 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     id: "EVENT_NEG_004",
     type: CUSTOMER_EVENT_TYPES.NEGATIVE,
     title: "지각은 나의 것, 계산은 너의 것",
-    summary: "급한 직장인이 커피, 삼각김밥, 에너지드링크를 들고 계산대로 달려왔습니다.",
+    summary: "급한 직장인이 커피, 삼각김밥, 얼음 아메리카노를 들고 계산대로 달려왔습니다.",
     unlockDay: 3,
     recommendedDay: 3,
     allowedTypeIds: ["office_worker", "hurried"],
@@ -268,7 +268,7 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
         inventoryChanges: [
           { label: "커피", productId: "coffee", quantity: -1 },
           { label: "삼각김밥", productId: "triangle_kimbap", quantity: -1 },
-          { label: "에너지드링크", productId: "energy_drink", quantity: -1 }
+          { label: "얼음 아메리카노", productId: "iced_americano", quantity: -1 }
         ],
         specialEffect: "없음"
       },
@@ -284,7 +284,7 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
         inventoryChanges: [
           { label: "커피", productId: "coffee", quantity: -1 },
           { label: "삼각김밥", productId: "triangle_kimbap", quantity: -1 },
-          { label: "에너지드링크", productId: "energy_drink", quantity: -1 }
+          { label: "얼음 아메리카노", productId: "iced_americano", quantity: -1 }
         ],
         specialEffect: "만족도 상승폭 감소"
       },
@@ -300,7 +300,7 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
         inventoryChanges: [
           { label: "커피", productId: "coffee", quantity: -1 },
           { label: "삼각김밥", productId: "triangle_kimbap", quantity: -1 },
-          { label: "에너지드링크", productId: "energy_drink", quantity: -1 }
+          { label: "얼음 아메리카노", productId: "iced_americano", quantity: -1 }
         ],
         specialEffect: "만족도 감소"
       }

@@ -9,7 +9,8 @@
   저장 방식:
   - 출석 진행도와 BM성 보상 지갑은 localStorage에 별도 저장
   - 골드는 GameState.money에 즉시 반영
-  - 다이아/티켓류는 GameState.bmWallet에도 미러링하여 추후 상점/BM UI에서 재사용 가능
+  - 다이아는 BMSystem이 사용하는 GameState.bm.diamond에 즉시 반영
+  - 티켓류는 GameState.bmWallet에도 미러링하여 추후 상점/BM UI에서 재사용 가능
 */
 
 import { GameState } from "../core/GameState.js";
@@ -134,7 +135,9 @@ export const DailyRewardSystem = {
     const wallet = this.readWallet();
 
     if (reward.type === "diamond") {
-      wallet.diamonds += amount;
+      const bm = this.ensureGameStateBM();
+      bm.diamond += amount;
+      wallet.diamonds = bm.diamond;
     } else if (reward.type === "coffeeTicket") {
       wallet.coffeeTickets += amount;
     } else if (reward.type === "adSkipTicket") {
@@ -156,7 +159,8 @@ export const DailyRewardSystem = {
       success: true,
       type: reward.type,
       amount,
-      wallet
+      wallet,
+      bm: GameState.bm ?? null
     };
   },
 
@@ -203,12 +207,34 @@ export const DailyRewardSystem = {
   },
 
   syncGameStateWallet(wallet = this.readWallet()) {
-    GameState.bmWallet = {
+    const normalizedWallet = {
       ...DEFAULT_BM_WALLET,
       ...wallet
     };
 
+    if (GameState.bm && typeof GameState.bm === "object") {
+      normalizedWallet.diamonds = Math.max(
+        0,
+        Math.floor(Number(GameState.bm.diamond) || 0)
+      );
+    }
+
+    GameState.bmWallet = normalizedWallet;
+
     return GameState.bmWallet;
+  },
+
+  ensureGameStateBM() {
+    if (!GameState.bm || typeof GameState.bm !== "object") {
+      GameState.bm = {};
+    }
+
+    GameState.bm.diamond = Math.max(
+      0,
+      Math.floor(Number(GameState.bm.diamond) || 0)
+    );
+
+    return GameState.bm;
   },
 
   readJson(key, fallback) {

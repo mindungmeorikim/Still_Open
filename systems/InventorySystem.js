@@ -23,10 +23,10 @@ import { EVENTS } from "../core/Constants.js";
 import {
   PRODUCTS,
   getProductById,
-  getProductsByCustomerRequestId,
-  getUnlockedProducts
+  getProductsByCustomerRequestId
 } from "../data/ProductData.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
+import { BMSystem, BM_EVENTS } from "./BMSystem.js";
 
 export const InventorySystem = {
   lots: [],
@@ -59,6 +59,10 @@ export const InventorySystem = {
       this.handleExpiredLossRecorded(data);
     });
 
+    EventBus.on(BM_EVENTS.STATE_CHANGED, () => {
+      this.handleBMStateChanged();
+    });
+
     this.unlockProductsForDay(GameState.day);
     this.emitInventoryChanged("inventory_initialized");
   },
@@ -81,9 +85,19 @@ export const InventorySystem = {
     this.emitInventoryChanged("store_open_stock_check");
   },
 
+  handleBMStateChanged() {
+    const unlockedProductIds = this.unlockProductsForDay(GameState.day);
+
+    this.emitInventoryChanged("bm_sellable_products_changed", {
+      unlockedProductIds
+    });
+  },
+
   unlockProductsForDay(day) {
     const newlyUnlockedProductIds = [];
-    const products = getUnlockedProducts(day);
+    const products = PRODUCTS.filter((product) => {
+      return BMSystem.canSellProduct(product.id);
+    });
 
     products.forEach((product) => {
       if (this.initializedProductIds.has(product.id)) return;
@@ -123,7 +137,7 @@ export const InventorySystem = {
     if (actualProductId) {
       product = getProductById(actualProductId);
 
-      if (!product || product.unlockDay > GameState.day) {
+      if (!product || !BMSystem.canSellProduct(product.id)) {
         this.emitInventoryChanged("invalid_sale_product", {
           ...saleDetails,
           quantity
@@ -207,7 +221,7 @@ export const InventorySystem = {
       return null;
     }
 
-    if (product.unlockDay > GameState.day) {
+    if (!BMSystem.canOrderProduct(product.id)) {
       return null;
     }
 
@@ -379,7 +393,7 @@ export const InventorySystem = {
         };
       }
 
-      if (product.unlockDay > GameState.day) {
+      if (!BMSystem.canSellProduct(product.id)) {
         return {
           isValid: false,
           reason: "locked_product",
@@ -421,7 +435,7 @@ export const InventorySystem = {
     const candidates = getProductsByCustomerRequestId(requestId)
       .filter((product) => {
         return (
-          product.unlockDay <= GameState.day &&
+          BMSystem.canSellProduct(product.id) &&
           this.getStockQuantity(product.id) >= requiredQuantity
         );
       })
@@ -481,7 +495,7 @@ export const InventorySystem = {
 
     requestIds.forEach((requestId) => {
       getProductsByCustomerRequestId(requestId).forEach((product) => {
-        if (product.unlockDay <= safeDay) {
+        if (BMSystem.canSellProduct(product.id)) {
           sellableProductIds.add(product.id);
         }
       });
@@ -522,7 +536,7 @@ export const InventorySystem = {
         salePrice: product.salePrice,
         shelfLifeDays: product.shelfLifeDays,
         unlockDay: product.unlockDay,
-        isUnlocked: product.unlockDay <= GameState.day,
+        isUnlocked: BMSystem.canSellProduct(product.id),
         quantity,
         nextExpireDay: lots[0]?.expireDay ?? null,
         lots

@@ -74,6 +74,9 @@ export const UpgradeSystem = {
         {
           onReward2xAdComplete: (currentResultData) => {
             return ResultSystem.applyReward2xAdBonus(currentResultData);
+          },
+          onMentalRecoveryAdComplete: (currentResultData) => {
+            return ResultSystem.applyMentalRecoveryAdBonus(currentResultData);
           }
         }
       );

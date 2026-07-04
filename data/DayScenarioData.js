@@ -144,7 +144,7 @@ export const DAY_SCENARIOS = Object.freeze({
       "triangle_kimbap",
       "banana_milk",
       "coffee",
-      "energy_drink",
+      "iced_americano",
       "lunch_box",
       "ramen",
       "udon",
@@ -176,11 +176,11 @@ export const DAY_SCENARIOS = Object.freeze({
     marketInfo: {
       weatherLabel: "야근 상권",
       headline: "근처 회사에 야근 인원이 늘었습니다.",
-      message: "늦은 시간까지 버티는 손님이 많아질 것 같습니다. 에너지드링크, 캔커피, 간단히 먹을 수 있는 샌드위치를 추천합니다."
+      message: "늦은 시간까지 버티는 손님이 많아질 것 같습니다. 얼음 아메리카노, 캔커피, 간단히 먹을 수 있는 샌드위치를 추천합니다."
     },
-    recommendedProductIds: ["energy_drink", "coffee", "egg_sandwich"],
+    recommendedProductIds: ["iced_americano", "coffee", "egg_sandwich"],
     recommendedProductReasons: {
-      energy_drink: "야근 손님 각성 음료 수요",
+      iced_americano: "야근 손님 각성 음료 수요",
       coffee: "직장인 반복 구매 수요",
       egg_sandwich: "간단한 식사 대체 상품"
     },
@@ -189,7 +189,7 @@ export const DAY_SCENARIOS = Object.freeze({
       "triangle_kimbap",
       "banana_milk",
       "coffee",
-      "energy_drink",
+      "iced_americano",
       "lunch_box",
       "ramen",
       "udon",
@@ -225,10 +225,10 @@ export const DAY_SCENARIOS = Object.freeze({
       headline: "프롤로그 마지막 영업으로 다양한 손님이 몰릴 예정입니다.",
       message: "오늘은 식사류, 음료, 간식 수요가 한꺼번에 섞입니다. 객단가가 높은 도시락과 빠르게 팔릴 수 있는 음료를 함께 준비하세요."
     },
-    recommendedProductIds: ["pork_cutlet_lunchbox", "energy_drink", "sausage_hotbar"],
+    recommendedProductIds: ["pork_cutlet_lunchbox", "iced_americano", "sausage_hotbar"],
     recommendedProductReasons: {
       pork_cutlet_lunchbox: "높은 객단가 식사류",
-      energy_drink: "급한 손님과 직장인 수요",
+      iced_americano: "급한 손님과 직장인 수요",
       sausage_hotbar: "간식/식사 사이 수요"
     },
     responseUnlocks: ["종합 대응"],
@@ -236,7 +236,7 @@ export const DAY_SCENARIOS = Object.freeze({
       "triangle_kimbap",
       "banana_milk",
       "coffee",
-      "energy_drink",
+      "iced_americano",
       "lunch_box",
       "ramen",
       "udon",
@@ -284,7 +284,7 @@ export const DAY_SCENARIOS = Object.freeze({
       "triangle_kimbap",
       "banana_milk",
       "coffee",
-      "energy_drink",
+      "iced_americano",
       "lunch_box",
       "ramen",
       "udon",

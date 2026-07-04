@@ -42,6 +42,16 @@ export const GameState = {
 
   upgrades: [],
 
+  bm: {
+    diamond: 0,
+    ownedContractProductIds: ["potato_chips", "water"],
+    shopUnlockedContractProductIds: [],
+    purchasedPremiumProductIds: [],
+    lastContractUnlockDay: null,
+    contractSkipUsedDay: null,
+    peakCouponUsedDay: null
+  },
+
   expansion: {
     unlockedZoneIds: ["zone_basic"],
     movementBounds: [],

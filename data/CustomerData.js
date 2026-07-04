@@ -59,8 +59,8 @@ export const CUSTOMER_WANTED_PRODUCTS = [
     name: "커피"
   },
   {
-    id: "energy_drink",
-    name: "에너지드링크"
+    id: "iced_americano",
+    name: "얼음 아메리카노"
   },
   {
     id: "lunch_box",
@@ -125,7 +125,7 @@ export const CUSTOMER_TYPES = [
     weight: 18,
     patience: 22,
     spendBias: 1.2,
-    preferredProductIds: ["coffee", "energy_drink", "lunch_box"],
+    preferredProductIds: ["coffee", "iced_americano", "lunch_box"],
     eventChance: 0.12
   },
   {
@@ -134,7 +134,7 @@ export const CUSTOMER_TYPES = [
     weight: 14,
     patience: 14,
     spendBias: 1,
-    preferredProductIds: ["coffee", "energy_drink", "triangle_kimbap"],
+    preferredProductIds: ["coffee", "iced_americano", "triangle_kimbap"],
     eventChance: 0.16
   },
   {
@@ -149,4 +149,3 @@ export const CUSTOMER_TYPES = [
 ];
 
 export const CUSTOMER_EVENTS = Object.freeze([]);
-

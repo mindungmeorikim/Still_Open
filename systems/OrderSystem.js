@@ -16,6 +16,7 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
+import { BMSystem } from "./BMSystem.js";
 
 export const OrderSystem = {
   isInitialized: false,
@@ -80,7 +81,19 @@ export const OrderSystem = {
       return;
     }
 
-    const items = this.normalizeOrderItems(data.items);
+    const requestedItems = Array.isArray(data.items) ? data.items : [];
+    const hasRequestedItems = requestedItems.some((item) => {
+      return this.toPositiveInteger(item.quantity) > 0;
+    });
+    const items = this.normalizeOrderItems(requestedItems);
+
+    if (hasRequestedItems && items.length === 0) {
+      console.warn("[OrderSystem] 발주 가능한 상품이 없습니다.", {
+        requestedItems,
+        reason: "no_orderable_items"
+      });
+      return;
+    }
     const totalCost = this.calculateTotalCost(items);
     const availableMoney = this.getAvailableMoney();
 
@@ -272,7 +285,16 @@ export const OrderSystem = {
       const product = getProductById(item.productId);
       const quantity = this.toPositiveInteger(item.quantity);
 
-      if (!product || product.unlockDay > GameState.day || quantity <= 0) {
+      if (!product || quantity <= 0) {
+        return normalizedItems;
+      }
+
+      if (!BMSystem.canOrderProduct(product.id)) {
+        console.warn("[OrderSystem] BM 조건 미충족 상품 발주 차단:", {
+          productId: product.id,
+          productName: product.name,
+          reason: BMSystem.getProductLockReason(product.id)
+        });
         return normalizedItems;
       }
 

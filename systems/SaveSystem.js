@@ -23,10 +23,13 @@ const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
 const SAVE_VERSION = "v7.0.1";
 const INFINITE_MODE_START_DAY = GAME_CONFIG.MAX_STORY_DAY + 1;
+const BASIC_BM_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const SAVEABLE_PHASES = new Set([
   GAME_PHASE.READY,
   GAME_PHASE.DAY_START,
   GAME_PHASE.ORDER,
+  GAME_PHASE.RESULT,
+  GAME_PHASE.UPGRADE,
   GAME_PHASE.NEXT_DAY,
   GAME_PHASE.ENDLESS
 ]);
@@ -361,6 +364,7 @@ export const SaveSystem = {
       upgradeEffects: GameState.upgradeEffects ?? null,
       difficulty: GameState.difficulty,
       infiniteMode: GameState.infiniteMode ?? null,
+      bm: this.normalizeBMSnapshot(GameState.bm),
       staff: GameState.staff ?? null,
       player: GameState.player ?? null,
       expansion: GameState.expansion ?? null
@@ -395,6 +399,7 @@ export const SaveSystem = {
         lastGameOverReason: null,
         lastCheckedDay: 1
       },
+      bm: this.createDefaultBMSnapshot(),
       staff: null,
       player: {
         x: 600,
@@ -547,6 +552,7 @@ export const SaveSystem = {
     GameState.infiniteMode = this.normalizeInfiniteModeSnapshot(
       nextState.infiniteMode ?? defaultSnapshot.infiniteMode
     );
+    GameState.bm = this.normalizeBMSnapshot(nextState.bm ?? defaultSnapshot.bm);
     GameState.expansion = this.deepClone(nextState.expansion ?? defaultSnapshot.expansion);
     GameState.player = this.deepClone(nextState.player ?? defaultSnapshot.player);
 
@@ -622,11 +628,48 @@ export const SaveSystem = {
     };
   },
 
+  createDefaultBMSnapshot() {
+    return {
+      diamond: 0,
+      ownedContractProductIds: [],
+      shopUnlockedContractProductIds: [],
+      purchasedPremiumProductIds: [],
+      lastContractUnlockDay: null,
+      contractSkipUsedDay: null,
+      peakCouponUsedDay: null,
+      mentalRecoveryAdUsedDay: null,
+      peakCouponActive: false,
+      peakCouponMultiplier: 1
+    };
+  },
+
+  normalizeBMSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object"
+      ? snapshot
+      : {};
+
+    return {
+      diamond: this.toNonNegativeInteger(source.diamond),
+      ownedContractProductIds: this.createUniqueStringArray(source.ownedContractProductIds),
+      shopUnlockedContractProductIds: this.createUniqueStringArray(source.shopUnlockedContractProductIds),
+      purchasedPremiumProductIds: this.createUniqueStringArray(source.purchasedPremiumProductIds),
+      lastContractUnlockDay: this.toNullablePositiveInteger(source.lastContractUnlockDay),
+      contractSkipUsedDay: this.toNullablePositiveInteger(source.contractSkipUsedDay),
+      peakCouponUsedDay: this.toNullablePositiveInteger(source.peakCouponUsedDay),
+      mentalRecoveryAdUsedDay: this.toNullablePositiveInteger(source.mentalRecoveryAdUsedDay),
+      peakCouponActive: source.peakCouponActive === true,
+      peakCouponMultiplier: Number(source.peakCouponMultiplier) > 0
+        ? Number(source.peakCouponMultiplier)
+        : 1
+    };
+  },
+
 
   isMeaningfulSaveData(saveData = {}) {
     const gameState = saveData.gameState ?? {};
     const inventory = saveData.inventory ?? {};
     const expansion = saveData.expansion ?? {};
+    const bm = gameState.bm ?? {};
     const todayStats = gameState.todayStats ?? {};
     const unlockedZoneIds = Array.isArray(expansion.unlockedZoneIds)
       ? expansion.unlockedZoneIds
@@ -642,6 +685,7 @@ export const SaveSystem = {
     });
     const hasUpgrades = Array.isArray(gameState.upgrades) && gameState.upgrades.length > 0;
     const hasExpandedStore = unlockedZoneIds.some((zoneId) => zoneId && zoneId !== "zone_basic");
+    const hasBMProgress = this.hasBMProgress(bm);
     const hasTodayProgress = Object.values(todayStats).some((value) => {
       return Number.isFinite(Number(value)) && Number(value) !== 0;
     });
@@ -653,7 +697,25 @@ export const SaveSystem = {
       hasInventoryLots ||
       hasUpgrades ||
       hasExpandedStore ||
+      hasBMProgress ||
       hasTodayProgress
+    );
+  },
+
+  hasBMProgress(snapshot = {}) {
+    const bm = this.normalizeBMSnapshot(snapshot);
+    const ownedProductIds = bm.ownedContractProductIds.filter((productId) => {
+      return !BASIC_BM_PRODUCT_IDS.includes(productId);
+    });
+
+    return (
+      bm.diamond > 0 ||
+      ownedProductIds.length > 0 ||
+      bm.purchasedPremiumProductIds.length > 0 ||
+      bm.contractSkipUsedDay !== null ||
+      bm.peakCouponUsedDay !== null ||
+      bm.mentalRecoveryAdUsedDay !== null ||
+      bm.peakCouponActive === true
     );
   },
 
@@ -718,6 +780,28 @@ export const SaveSystem = {
     }
 
     return numberValue;
+  },
+
+  toNullablePositiveInteger(value) {
+    const numberValue = Math.floor(Number(value));
+
+    if (!Number.isFinite(numberValue) || numberValue <= 0) {
+      return null;
+    }
+
+    return numberValue;
+  },
+
+  createUniqueStringArray(values = []) {
+    if (!Array.isArray(values)) {
+      return [];
+    }
+
+    return [...new Set(
+      values
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+    )];
   },
 
   clampStat(value, fallback = 100) {

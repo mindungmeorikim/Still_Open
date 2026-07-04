@@ -34,11 +34,12 @@ import {
 } from "../data/CustomerData.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
 import {
+  PRODUCTS,
   getProductById,
-  getProductsByCustomerRequestId,
-  getUnlockedProducts
+  getProductsByCustomerRequestId
 } from "../data/ProductData.js";
 import { RandomEventSystem } from "./RandomEventSystem.js";
+import { BMSystem } from "./BMSystem.js";
 
 export const CustomerSystem = {
   customers: [],
@@ -134,13 +135,17 @@ export const CustomerSystem = {
     const wantedProductIds = new Set(
       wantedProducts.map((product) => product.id)
     );
-    const salePrices = getUnlockedProducts(GameState.day)
+    const salePrices = PRODUCTS
       .filter((product) => {
         return (
+          BMSystem.canSellProduct(product.id) &&
           wantedProductIds.has(product.id) ||
-          (product.customerRequestIds ?? []).some((requestId) => {
-            return wantedProductIds.has(requestId);
-          })
+          (
+            BMSystem.canSellProduct(product.id) &&
+            (product.customerRequestIds ?? []).some((requestId) => {
+              return wantedProductIds.has(requestId);
+            })
+          )
         );
       })
       .map((product) => Number(product.salePrice))
@@ -350,7 +355,9 @@ export const CustomerSystem = {
   getAvailableWantedProducts() {
     const scenario = this.getCurrentDayScenario();
     const scenarioWantedProductIds = new Set(scenario.wantedProductIds ?? []);
-    const unlockedProducts = getUnlockedProducts(GameState.day);
+    const unlockedProducts = PRODUCTS.filter((product) => {
+      return BMSystem.canSellProduct(product.id);
+    });
     const unlockedRequestIds = new Set();
 
     unlockedProducts.forEach((product) => {
@@ -636,7 +643,7 @@ export const CustomerSystem = {
     const safeQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
     const candidates = getProductsByCustomerRequestId(requestId)
       .filter((product) => {
-        return product.unlockDay <= GameState.day;
+        return BMSystem.canSellProduct(product.id);
       })
       .map((product) => {
         const stockQuantity = Number(

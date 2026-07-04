@@ -21,6 +21,7 @@ import { EconomySystem } from "./systems/EconomySystem.js";
 import { RandomEventSystem } from "./systems/RandomEventSystem.js";
 import { PlayerMovementSystem } from "./systems/PlayerMovementSystem.js";
 import { PlayerActionSystem } from "./systems/PlayerActionSystem.js";
+import { BMSystem } from "./systems/BMSystem.js";
 
 function isCustomerEventModalOpen() {
   return (
@@ -123,6 +124,7 @@ function initGame() {
   OrderSystem.init();
   ExpansionSystem.init();
   EconomySystem.init();
+  BMSystem.init();
   PlayerMovementSystem.init();
   PlayerActionSystem.init();
   bindCustomerEventModalFlow();

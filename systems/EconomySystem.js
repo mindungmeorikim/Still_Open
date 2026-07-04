@@ -20,6 +20,7 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
+import { BMSystem } from "./BMSystem.js";
 
 export const EconomySystem = {
   processedCheckoutKeys: new Set(),
@@ -99,6 +100,9 @@ export const EconomySystem = {
       productName: checkout.product?.name ?? null,
       quantity: checkout.quantity,
       unitPrice: checkout.unitPrice,
+      baseAmount: checkout.baseAmount,
+      revenueMultiplier: checkout.revenueMultiplier,
+      bonusAmount: checkout.bonusAmount,
       amount: checkout.amount,
       reason: "product_sale"
     });
@@ -167,7 +171,7 @@ export const EconomySystem = {
       };
     }
 
-    if (product.unlockDay > GameState.day) {
+    if (!BMSystem.canSellProduct(product.id)) {
       return {
         isValid: false,
         reason: "아직 판매할 수 없는 잠금 상품입니다."
@@ -183,11 +187,19 @@ export const EconomySystem = {
       };
     }
 
-    const amount = product.salePrice * quantity;
+    const revenueMultiplier = BMSystem.getRevenueMultiplier();
+    const baseAmount = product.salePrice * quantity;
+    const amount = Math.floor(baseAmount * revenueMultiplier);
+    const bonusAmount = Math.max(0, amount - baseAmount);
 
     if (requestedAmount > 0 && requestedAmount !== amount) {
       console.warn(
-        `[EconomySystem] 전달 금액 ${requestedAmount}원 대신 상품 데이터 기준 ${amount}원을 적용합니다.`
+        `[EconomySystem] 전달 금액 ${requestedAmount}원 대신 상품 데이터 기준 ${amount}원을 적용합니다.`,
+        {
+          baseAmount,
+          revenueMultiplier,
+          bonusAmount
+        }
       );
     }
 
@@ -201,6 +213,9 @@ export const EconomySystem = {
       product,
       quantity,
       unitPrice: product.salePrice,
+      baseAmount,
+      revenueMultiplier,
+      bonusAmount,
       amount
     };
   },
