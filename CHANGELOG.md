@@ -1,3 +1,118 @@
+## [v-order-summary-right-quantity-fix-260705]
+### Changed
+- 발주 요약 영역(예상 발주 비용/보유금/발주 수량/발주 확정)을 왼쪽에서 오른쪽 패널로 이동했습니다.
+- 상품 카드 목록을 왼쪽 넓은 영역에 배치하도록 발주 모달 그리드 구조를 변경했습니다.
+- 작은 화면에서는 카드 폭 확보를 우선해 상품 그리드를 2열로 낮추도록 조정했습니다.
+
+### Fixed
+- 작은 화면에서 수량 조절 버튼이 상품 카드 밖으로 튀어나가던 문제를 수정했습니다.
+- 수량 조절 영역의 버튼/수량 칸 폭을 카드 내부에 맞게 줄이고, 기존 pseudo 영역의 과한 폭 영향을 제한했습니다.
+
+### Notes
+- 수정 파일: `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-tab-font-card-spacing-260705]
+### Fixed
+- 발주 카테고리 탭의 한글 글씨 크기를 키워 가독성을 개선했습니다.
+- 상품 카드 위/아래 줄이 겹치던 문제를 카드 높이와 그리드 행 간격 확대로 보정했습니다.
+- 수량 조절 영역이 카드 밖으로 밀리거나 다음 줄 카드와 겹치지 않도록 `position/transform/margin`을 정상 흐름으로 고정했습니다.
+- 매입가/판매가 영역과 수량 영역의 최소 높이를 확보해 카드 내부 레이아웃이 안정적으로 유지되도록 수정했습니다.
+
+### Notes
+- 수정 파일: `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-grid-area-final-fix-260705]
+### Fixed
+- 발주 카드형 모달에서 기존 `#order-modal-body`의 `grid-template-areas(header/list/total/message/button)` 구조가 남아 상품 영역을 밀어내던 문제를 수정했습니다.
+- 카드형 발주 화면에서만 `order-modal-body--card-draft` 클래스를 적용해 기존 grid-area 기반 레이아웃을 비활성화했습니다.
+- 기존 `.order-product-list { grid-area: list !important; }` 충돌을 카드형 발주 모달 내부에서 해제했습니다.
+- 카테고리 탭과 상품 카드 리스트가 같은 오른쪽 패널 안에서 정상적으로 위/아래 배치되도록 `toolbar/cards` 레이아웃을 새로 지정했습니다.
+- 상품 카드가 오른쪽 절반에 몰리지 않고 오른쪽 상품 패널 전체 폭을 사용하도록 재배치했습니다.
+
+### Changed
+- 발주 대기/입고 상태로 넘어갈 때 카드형 전용 body 클래스를 제거하도록 정리했습니다.
+- `온장/즉석` 카테고리 명칭은 원문 그대로 유지했습니다.
+
+### Notes
+- 수정 파일: `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-full-width-fix-260705]
+### Fixed
+- 발주 상품 패널이 오른쪽 절반 영역에 갇히던 폭 제한을 제거했습니다.
+- 카테고리 탭이 오른쪽 상품 패널 전체 가로폭을 사용하도록 수정했습니다.
+- `온장/즉석` 탭명을 유지하면서 탭 길이를 충분히 확보했습니다.
+- 상품 카드 그리드가 오른쪽에 몰리지 않고 패널 왼쪽부터 전체 폭을 사용하도록 재배치했습니다.
+- 기존 CSS에서 카드형 그리드에 남아 있던 고정 폭/반쪽 폭/offset 계열 제약을 최종 override로 무효화했습니다.
+
+### Notes
+- 수정 파일: `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-tab-label-fix-260705]
+### Fixed
+- 발주 카테고리 탭의 `온장` 축약 표기를 원래 명칭인 `온장/즉석`으로 복구했습니다.
+- `온장/즉석` 탭이 잘리지 않도록 발주 상품 영역의 가로폭을 더 확보했습니다.
+- 카테고리 탭 텍스트가 말줄임 처리되지 않도록 최종 스타일을 보정했습니다.
+
+### Notes
+- 수정 파일: `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-card-final-layout-260705]
+### Changed
+- `발주하러 가기` 버튼을 실제 버튼 ID 기준으로 다시 잡아 과도하게 길게 늘어나지 않도록 수정했습니다.
+- 카테고리 탭을 작게 압축하지 않고 상품 패널 가로폭을 사용해 한 줄로 펼치도록 수정했습니다.
+- 온장/즉석 탭 라벨을 `온장`으로 줄여 탭 전체가 한 줄에서 잘리지 않도록 정리했습니다.
+- 상품 카드를 세로형 구성으로 재배치했습니다.
+  - 이미지 정중앙
+  - 이미지 밑 상품명
+  - 상품명 밑 재고
+  - 매입가
+  - 판매가
+  - 수량 조절
+- 상품 카드가 오른쪽에 몰리지 않도록 상품 패널 전체 폭을 사용하게 수정했습니다.
+- 상품 카드 간 좌우/위아래 간격을 넓혀 여유롭게 보이도록 조정했습니다.
+
+### Notes
+- 수정 파일: `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-card-align-fix-260705]
+### Fixed
+- `발주하러 가기` 버튼이 부모 폭 전체로 과하게 늘어나던 문제를 보정했습니다.
+- 발주 카테고리 탭의 가로 스크롤바를 제거하고 5개 탭이 한 줄에 모두 보이도록 정리했습니다.
+- 카테고리 탭 클릭 시 기본 동작을 막아 탭/스크롤 상태가 튀는 현상을 줄였습니다.
+- 상품 카드 그리드가 오른쪽으로 쏠려 보이던 문제를 최종 CSS override로 중앙 재배치했습니다.
+- 기존 리스트형 `.order-product-row` 스타일이 카드형 그리드에 섞여 들어가는 문제를 카드형 전용 선택자로 무효화했습니다.
+
+### Notes
+- 수정 파일: `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-order-category-card-260705]
+### Added
+- 발주 모달에 카테고리 탭을 추가했습니다.
+  - 전체
+  - 기본 진열
+  - 신선식품
+  - 냉장식품
+  - 온장/즉석
+- 발주 상품 목록을 세로 리스트형에서 카드형 그리드 UI로 변경했습니다.
+- 상품 카드 이미지 왼쪽 위에 `[오늘의 추천]` 배지가 표시되도록 수정했습니다.
+- 카테고리별 상품 수와 현재 선택 수량을 표시하는 요약 영역을 추가했습니다.
+
+### Changed
+- 상품 카드 구성을 `이미지 → 상품명 → 매입가/판매가 → 수량 조절` 흐름으로 정리했습니다.
+- 기존 수량 증가/감소 및 발주 확정 로직은 유지하고, 렌더링 구조만 카테고리/카드형으로 변경했습니다.
+- 화면 크기에 따라 상품 카드가 2열/3열/4열로 반응형 배치되도록 조정했습니다.
+
+### Notes
+- 수정 파일: `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
 ## [v-map-topbar-left-auto-260705]
 ### Changed
 - 상단 상태바의 강제 넓은 가로폭을 제거하고, 현재 표시 내용만큼만 자연스럽게 잡히도록 수정했습니다.

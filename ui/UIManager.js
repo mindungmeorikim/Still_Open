@@ -130,6 +130,7 @@ export const UIManager = {
   orderDeliveredData: null,
   orderModalMode: "closed",
   orderListScrollTop: 0,
+  orderActiveCategory: "all",
   expansionCarouselIndex: 0,
   selectedExpansionZoneId: null,
   currentFocusedZoneId: "zone_basic",
@@ -5724,6 +5725,98 @@ export const UIManager = {
     return categoryLabels[displayCategory] ?? "매대";
   },
 
+  getOrderCategoryLabel(categoryId) {
+    const categoryLabels = {
+      all: "전체",
+      basic_shelf: "기본 진열",
+      fresh_shelf: "신선식품",
+      fridge: "냉장식품",
+      warmer: "온장/즉석"
+    };
+
+    return categoryLabels[categoryId] ?? this.getDisplayCategoryLabel(categoryId);
+  },
+
+  getOrderCategoryTabs(products = PRODUCTS) {
+    const categoryOrder = ["basic_shelf", "fresh_shelf", "fridge", "warmer"];
+    const counts = products.reduce((result, product) => {
+      const category = product.displayCategory ?? "basic_shelf";
+      result[category] = (result[category] ?? 0) + 1;
+      return result;
+    }, {});
+
+    return [
+      {
+        id: "all",
+        label: this.getOrderCategoryLabel("all"),
+        count: products.length
+      },
+      ...categoryOrder
+        .filter((categoryId) => counts[categoryId] > 0)
+        .map((categoryId) => {
+          return {
+            id: categoryId,
+            label: this.getOrderCategoryLabel(categoryId),
+            count: counts[categoryId] ?? 0
+          };
+        })
+    ];
+  },
+
+  getOrderVisibleProducts(products = PRODUCTS) {
+    const activeCategory = this.orderActiveCategory ?? "all";
+
+    if (activeCategory === "all") {
+      return products;
+    }
+
+    return products.filter((product) => {
+      return (product.displayCategory ?? "basic_shelf") === activeCategory;
+    });
+  },
+
+  renderOrderCategoryTabs(tabs = []) {
+    const activeCategory = this.orderActiveCategory ?? "all";
+
+    return `
+      <div class="order-category-tabs" role="tablist" aria-label="발주 상품 카테고리">
+        ${tabs.map((tab) => {
+          const isActive = tab.id === activeCategory;
+
+          return `
+            <button
+              class="order-category-tab${isActive ? " is-active" : ""}"
+              type="button"
+              role="tab"
+              aria-selected="${isActive ? "true" : "false"}"
+              data-order-category="${tab.id}"
+            >
+              <span>${tab.label}</span>
+              <strong>${tab.count}</strong>
+            </button>
+          `;
+        }).join("")}
+      </div>
+    `;
+  },
+
+  bindOrderCategoryTabs() {
+    document.querySelectorAll(".order-category-tab").forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const nextCategory = button.dataset.orderCategory || "all";
+
+        if (nextCategory === this.orderActiveCategory) return;
+
+        this.orderActiveCategory = nextCategory;
+        this.orderListScrollTop = 0;
+        this.renderOrderDraft();
+      };
+    });
+  },
+
   createOrderModal() {
     if (document.getElementById("order-modal")) {
       this.orderModal = document.getElementById("order-modal");
@@ -5759,6 +5852,7 @@ export const UIManager = {
     this.pendingOrderPhaseData = orderData;
     this.orderDeliveredData = null;
     this.orderModalMode = "draft";
+    this.orderActiveCategory = "all";
     this.clearDeliveryBox();
     this.orderDraftQuantities = this.getOrderableProducts().reduce(
       (quantityMap, product) => {
@@ -5812,6 +5906,12 @@ export const UIManager = {
 
   renderOrderDraft(options = {}) {
     const body = document.getElementById("order-modal-body");
+
+    if (body) {
+      body.classList.add("order-modal-body--card-draft");
+      body.classList.remove("order-modal-body--waiting", "order-modal-body--delivery");
+    }
+
     const previousList = document.querySelector(".order-product-list");
     const previousScrollTop = options.preserveScroll
       ? previousList?.scrollTop ?? this.orderListScrollTop
@@ -5824,8 +5924,19 @@ export const UIManager = {
     const orderableProductIds = new Set(
       orderableProducts.map((product) => product.id)
     );
+    const categoryTabs = this.getOrderCategoryTabs(products);
+    const activeCategoryExists = categoryTabs.some((tab) => tab.id === this.orderActiveCategory);
+
+    if (!activeCategoryExists) {
+      this.orderActiveCategory = "all";
+    }
+
+    const visibleProducts = this.getOrderVisibleProducts(products);
     const totalCost = this.getOrderTotalCost(orderableProducts);
     const totalQuantity = orderableProducts.reduce((quantityTotal, product) => {
+      return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
+    }, 0);
+    const activeCategoryQuantity = visibleProducts.reduce((quantityTotal, product) => {
       return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
     }, 0);
     const isOverBudget = totalCost > GameState.money;
@@ -5835,14 +5946,15 @@ export const UIManager = {
     const isZeroOrderBlocked = GameState.day === 1 && totalQuantity <= 0;
     const dayScenario = this.pendingOrderPhaseData?.dayScenario ?? {};
     const recommendedProductIds = this.getRecommendedProductIdSet(dayScenario);
+    const activeCategoryLabel = this.getOrderCategoryLabel(this.orderActiveCategory ?? "all");
 
     body.innerHTML = `
-      <div class="order-draft-layout">
+      <div class="order-draft-layout order-draft-layout--card">
         <section class="order-draft-sidebar" aria-label="발주 요약">
           <div class="order-modal-header">
             <h2>컴퓨터 발주</h2>
-            <p>오늘 판매할 상품 수량을 정하고 발주를 확정하세요.</p>
-            <p class="order-market-note">[오늘 추천] 상품은 오늘 상권 정보 기준으로 수요가 높을 수 있습니다.</p>
+            <p>카테고리별로 상품을 확인하고 오늘 판매할 수량을 정하세요.</p>
+            <p class="order-market-note">[오늘 추천] 상품은 이미지 왼쪽 위 배지로 표시됩니다.</p>
           </div>
 
           <div class="order-total-box">
@@ -5853,6 +5965,10 @@ export const UIManager = {
             <div>
               <span>보유금</span>
               <strong>₩${GameState.money.toLocaleString()}</strong>
+            </div>
+            <div>
+              <span>발주 수량</span>
+              <strong>${totalQuantity}개</strong>
             </div>
           </div>
 
@@ -5873,9 +5989,17 @@ export const UIManager = {
           </button>
         </section>
 
-        <section class="order-draft-list-panel" aria-label="발주 상품 목록">
-          <div class="order-product-list">
-            ${products.map((product) => {
+        <section class="order-draft-list-panel order-draft-card-panel" aria-label="발주 상품 목록">
+          <div class="order-list-toolbar">
+            ${this.renderOrderCategoryTabs(categoryTabs)}
+            <p class="order-category-summary">
+              <strong>${activeCategoryLabel}</strong>
+              <span>${visibleProducts.length}개 상품 · 선택 ${activeCategoryQuantity}개</span>
+            </p>
+          </div>
+
+          <div class="order-product-list order-product-card-grid" data-active-category="${this.orderActiveCategory ?? "all"}">
+            ${visibleProducts.map((product) => {
               const inventoryItem = this.inventoryByProductId[product.id];
               const isOrderable = orderableProductIds.has(product.id);
               const quantity = isOrderable
@@ -5888,35 +6012,33 @@ export const UIManager = {
                 ? "발주 가능"
                 : this.getOrderUnavailableReason(product);
               const isRecommended = recommendedProductIds.has(product.id);
+              const salePrice = BMSystem.getProductSalePrice(product.id) || product.salePrice;
 
               return `
-                <article class="order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}" data-product-id="${product.id}">
-                  <div class="order-product-main">
-                    <span class="order-product-image-box">
-                      <img
-                        class="order-product-thumb"
-                        src="${product.imagePath}"
-                        alt="${product.name}"
-                        loading="lazy"
-                        decoding="async"
-                        onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
-                      />
-                      <span class="order-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
-                    </span>
-                    <div class="order-product-copy">
-                      <strong class="order-product-title">
-                        ${product.name}
-                      </strong>
-                      <span>현재 재고 ${stockQuantity}개</span>
-                      <em class="order-product-status">${orderStatusText}</em>
-                    </div>
-                  </div>
+                <article class="order-product-card order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}" data-product-id="${product.id}">
+                  <span class="order-product-image-box">
+                    ${isRecommended ? `<span class="order-recommend-badge">오늘의 추천</span>` : ""}
+                    <img
+                      class="order-product-thumb"
+                      src="${product.imagePath}"
+                      alt="${product.name}"
+                      loading="lazy"
+                      decoding="async"
+                      onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+                    />
+                    <span class="order-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
+                  </span>
+
+                  <strong class="order-product-title">${product.name}</strong>
+                  <span class="order-product-stock">재고 ${stockQuantity}개</span>
+                  <em class="order-product-status">${orderStatusText}</em>
+
                   <div class="order-product-prices">
-                    <span>매입 ₩${product.purchasePrice.toLocaleString()}</span>
-                    <span>판매 ₩${(BMSystem.getProductSalePrice(product.id) || product.salePrice).toLocaleString()}</span>
+                    <span><b>매입가</b><strong>₩${product.purchasePrice.toLocaleString()}</strong></span>
+                    <span><b>판매가</b><strong>₩${salePrice.toLocaleString()}</strong></span>
                   </div>
-                  <div class="order-quantity-panel">
-                    ${isRecommended ? `<span class="order-recommend-badge">오늘 추천</span>` : `<span class="order-recommend-placeholder" aria-hidden="true"></span>`}
+
+                  <div class="order-quantity-panel" aria-label="${product.name} 발주 수량">
                     <div class="order-quantity-controls">
                       <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
                       <strong>${quantity}</strong>
@@ -5932,6 +6054,7 @@ export const UIManager = {
     `;
 
     this.prepareUiImageButtons(body);
+    this.bindOrderCategoryTabs();
     this.bindOrderDraftControls(orderableProducts);
 
     if (options.preserveScroll) {
@@ -5997,6 +6120,9 @@ export const UIManager = {
     const body = document.getElementById("order-modal-body");
 
     if (!body) return;
+
+    body.classList.remove("order-modal-body--card-draft", "order-modal-body--delivery");
+    body.classList.add("order-modal-body--waiting");
 
     this.orderModalMode = "waiting";
 
