@@ -19090,3 +19090,625 @@ body.is-title-screen-active #game-root {
     line-height: 18px !important;
   }
 }
+
+/* [v7.6.9] BM 상점 UX 리뉴얼: 로직 유지, 화면 구조/에셋 연결만 변경 */
+#bm-contract-shop-modal .bm-shop-modern-content {
+  width: min(96vw, 1180px) !important;
+  max-width: min(96vw, 1180px) !important;
+  height: min(88svh, 740px) !important;
+  max-height: calc(100svh - 18px) !important;
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) !important;
+  gap: 10px !important;
+  padding: 18px !important;
+  border: 0 !important;
+  border-radius: 22px !important;
+  background: rgba(255, 251, 237, 0.98) url("./assets/images/bm/shop/ui_shop_bg.png") center / 100% 100% no-repeat !important;
+  box-shadow: 0 18px 44px rgba(63, 42, 21, 0.28) !important;
+  overflow: hidden !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-topbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  min-height: 56px !important;
+  padding: 8px 14px 8px 18px !important;
+  border-radius: 16px 16px 10px 10px !important;
+  background: linear-gradient(180deg, rgba(86, 188, 134, 0.96) 0%, rgba(59, 155, 104, 0.98) 100%) !important;
+  border: 2px solid rgba(37, 112, 76, 0.88) !important;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.28), 0 3px 0 rgba(62, 42, 16, 0.12) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-title-block {
+  min-width: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-kicker {
+  margin: 0 0 2px !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: .03em !important;
+  text-shadow: 0 1px 0 rgba(23, 84, 53, 0.45) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-title-block h2 {
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-size: 19px !important;
+  line-height: 1.1 !important;
+  text-shadow: 0 2px 0 rgba(38, 92, 59, 0.42) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-title-block p {
+  margin: 3px 0 0 !important;
+  max-width: 680px !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 11px !important;
+  line-height: 1.32 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#bm-contract-shop-modal .bm-shop-close-image {
+  position: relative !important;
+  flex: 0 0 auto !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  text-indent: 0 !important;
+  overflow: visible !important;
+}
+
+#bm-contract-shop-modal .bm-shop-close-image img {
+  display: block !important;
+  width: 42px !important;
+  height: 42px !important;
+  object-fit: contain !important;
+  pointer-events: none !important;
+}
+
+#bm-contract-shop-modal .bm-shop-close-image span {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-wallet {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  min-height: 38px !important;
+  padding: 0 8px !important;
+  overflow-x: auto !important;
+}
+
+#bm-contract-shop-modal .bm-wallet-pill {
+  flex: 0 0 auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  min-height: 32px !important;
+  padding: 5px 10px 5px 7px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 247, 223, 0.96) !important;
+  border: 1px solid rgba(217, 179, 103, 0.9) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.65), 0 2px 0 rgba(127, 90, 34, 0.11) !important;
+  color: #5b3f13 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+#bm-contract-shop-modal .bm-wallet-icon {
+  width: 23px !important;
+  height: 23px !important;
+  object-fit: contain !important;
+}
+
+#bm-contract-shop-modal .bm-wallet-pill span {
+  color: #7a5a23 !important;
+}
+
+#bm-contract-shop-modal .bm-wallet-pill strong {
+  color: #295a3a !important;
+  font-size: 12px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-layout {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  padding: 0 6px !important;
+  flex-wrap: nowrap !important;
+}
+
+#bm-contract-shop-modal .bm-shop-tab-button {
+  min-height: 38px !important;
+  padding: 6px 8px !important;
+  border: 1px solid rgba(221, 199, 148, 0.96) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 252, 239, 0.94) !important;
+  color: #3d6248 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.76), 0 3px 0 rgba(127, 90, 34, .13) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-tab-button.is-active {
+  border-color: rgba(235, 150, 44, 0.92) !important;
+  background: linear-gradient(180deg, #ffc65e 0%, #ff9f35 100%) !important;
+  color: #4f2b09 !important;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.42), 0 4px 0 rgba(173, 100, 31, .24) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-body {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 268px !important;
+  gap: 12px !important;
+  min-height: 0 !important;
+  padding: 0 2px 4px 6px !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-list {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-content: start !important;
+  gap: 13px !important;
+  min-height: 0 !important;
+  padding: 2px 8px 12px 0 !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-guide {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, auto) !important;
+  align-content: start !important;
+  gap: 8px !important;
+  min-height: 0 !important;
+  padding: 18px 14px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 250, 236, .94) !important;
+  border: 2px solid rgba(227, 194, 128, .72) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-guide strong {
+  color: #4a3113 !important;
+  font-size: 17px !important;
+  font-weight: 900 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-guide span {
+  color: #6a5538 !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-next {
+  margin: 6px 0 0 !important;
+  padding: 10px !important;
+  border-radius: 13px !important;
+  background: rgba(255, 239, 193, 0.96) !important;
+  border: 1px solid rgba(226, 175, 82, .66) !important;
+  color: #744c0f !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1.4 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-section {
+  display: grid !important;
+  gap: 9px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-section h3 {
+  margin: 0 !important;
+  padding: 8px 12px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 244, 207, 0.96) !important;
+  border: 1px solid rgba(223, 187, 115, .66) !important;
+  color: #5f4216 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1.25 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-section-note {
+  margin: -3px 0 4px !important;
+  color: #7b694b !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-list,
+#bm-contract-shop-modal .bm-tool-grid,
+#bm-contract-shop-modal .bm-recommend-quick-grid {
+  display: grid !important;
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-list-compact,
+#bm-contract-shop-modal .bm-tool-grid {
+  grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)) !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-card {
+  position: relative !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  align-items: center !important;
+  min-height: 92px !important;
+  padding: 13px !important;
+  border-radius: 19px !important;
+  background: rgba(255, 253, 244, 0.98) !important;
+  border: 1px solid rgba(218, 196, 151, 0.92) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.82), 0 3px 0 rgba(128, 93, 38, .09) !important;
+  overflow: hidden !important;
+}
+
+#bm-contract-shop-modal .bm-shop-action-card,
+#bm-contract-shop-modal .bm-tool-card {
+  grid-template-columns: 62px minmax(0, 1fr) auto !important;
+}
+
+#bm-contract-shop-modal .bm-shop-info-card {
+  grid-template-columns: 1fr !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-card.is-purchasable {
+  border-color: rgba(73, 174, 105, 0.92) !important;
+  background: rgba(241, 255, 238, 0.98) !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-card.is-owned {
+  border-color: rgba(93, 159, 216, 0.82) !important;
+  background: rgba(238, 248, 255, 0.98) !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-card.is-premium-purchasable {
+  border-color: rgba(136, 92, 205, 0.9) !important;
+  background: rgba(249, 242, 255, 0.98) !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-card.is-locked,
+#bm-contract-shop-modal .bm-contract-shop-card.is-not-enough-gold,
+#bm-contract-shop-modal .bm-contract-shop-card.is-not-enough-diamond {
+  opacity: .76 !important;
+  filter: grayscale(.08) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-icon {
+  justify-self: center !important;
+  width: 58px !important;
+  height: 58px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 3px 0 rgba(96, 58, 18, .12)) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-label {
+  position: absolute !important;
+  top: 8px !important;
+  right: 8px !important;
+  width: 54px !important;
+  height: auto !important;
+  object-fit: contain !important;
+  pointer-events: none !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-main {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-image-box {
+  flex: 0 0 auto !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 15px !important;
+  background: #fff9e9 !important;
+  border: 1px solid rgba(226, 196, 140, 0.9) !important;
+  overflow: hidden !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-image {
+  width: 50px !important;
+  height: 50px !important;
+  object-fit: contain !important;
+  border-radius: 12px !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-copy {
+  display: grid !important;
+  gap: 4px !important;
+  min-width: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-copy strong {
+  overflow: hidden !important;
+  color: #263f2e !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-contract-product-copy small,
+#bm-contract-shop-modal .bm-contract-product-meta span {
+  color: #5d6f61 !important;
+  font-size: 11px !important;
+  line-height: 1.32 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-copy em {
+  color: #c76b18 !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-copy small {
+  color: #90795b !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-meta {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-meta span {
+  display: inline-flex !important;
+  align-items: center !important;
+  min-height: 24px !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 248, 229, 0.96) !important;
+  border: 1px solid rgba(223, 195, 139, .62) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-action-card .bm-contract-product-meta,
+#bm-contract-shop-modal .bm-tool-card .bm-contract-product-meta {
+  grid-column: 2 / 3 !important;
+}
+
+#bm-contract-shop-modal .bm-contract-purchase-button,
+#bm-contract-shop-modal .bm-premium-purchase-button,
+#bm-contract-shop-modal .bm-ad-reward-button,
+#bm-contract-shop-modal .bm-diamond-product-button,
+#bm-contract-shop-modal .bm-gold-product-button,
+#bm-contract-shop-modal .bm-shelf-upgrade-button,
+#bm-contract-shop-modal .bm-product-upgrade-button,
+#bm-contract-shop-modal .bm-staff-upgrade-button,
+#bm-contract-shop-modal #bm-warehouse-upgrade-button,
+#bm-contract-shop-modal #bm-contract-skip-button,
+#bm-contract-shop-modal #bm-peak-coupon-purchase-button,
+#bm-contract-shop-modal #bm-peak-coupon-use-button {
+  justify-self: end !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 92px !important;
+  min-height: 34px !important;
+  padding: 8px 11px !important;
+  border: 1px solid rgba(168, 92, 18, 0.45) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #ffc85d 0%, #ff9b2d 100%) !important;
+  color: #4f2b09 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 3px 0 rgba(166, 88, 24, .22) !important;
+  white-space: normal !important;
+}
+
+#bm-contract-shop-modal .bm-product-upgrade-button {
+  min-width: 118px !important;
+}
+
+#bm-contract-shop-modal .bm-tool-actions {
+  justify-self: end !important;
+  display: flex !important;
+  gap: 7px !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+
+#bm-contract-shop-modal .bm-staff-upgrade-actions {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  justify-content: stretch !important;
+}
+
+#bm-contract-shop-modal .bm-staff-upgrade-actions .bm-staff-upgrade-button {
+  flex: 1 1 86px !important;
+  min-width: 0 !important;
+}
+
+#bm-contract-shop-modal button:disabled,
+#bm-contract-shop-modal .bm-tool-actions button:disabled,
+#bm-contract-shop-modal .bm-daily-mission-reward-button:disabled,
+#bm-contract-shop-modal .bm-ad-reward-button:disabled,
+#bm-contract-shop-modal .bm-diamond-product-button:disabled,
+#bm-contract-shop-modal .bm-gold-product-button:disabled,
+#bm-contract-shop-modal .bm-shelf-upgrade-button:disabled,
+#bm-contract-shop-modal .bm-product-upgrade-button:disabled,
+#bm-contract-shop-modal .bm-staff-upgrade-button:disabled,
+#bm-contract-shop-modal #bm-warehouse-upgrade-button:disabled,
+#bm-contract-shop-modal #bm-contract-skip-button:disabled,
+#bm-contract-shop-modal #bm-peak-coupon-purchase-button:disabled,
+#bm-contract-shop-modal #bm-peak-coupon-use-button:disabled {
+  border-color: rgba(120, 130, 126, 0.35) !important;
+  background: linear-gradient(180deg, #d9ddd8 0%, #aeb5ae 100%) !important;
+  color: #69716b !important;
+  text-shadow: none !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 3px 0 rgba(110, 117, 111, .18) !important;
+  cursor: not-allowed !important;
+}
+
+#bm-contract-shop-modal .bm-recommend-main-card {
+  display: grid !important;
+  gap: 6px !important;
+  padding: 16px !important;
+  border-radius: 19px !important;
+  background: linear-gradient(135deg, rgba(255, 244, 204, .98) 0%, rgba(232, 255, 238, .96) 100%) !important;
+  border: 2px solid rgba(239, 187, 87, .68) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-eyebrow {
+  display: inline-flex !important;
+  width: fit-content !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  background: #ffb33f !important;
+  color: #5a310b !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+}
+
+#bm-contract-shop-modal .bm-recommend-main-card strong {
+  color: #284532 !important;
+  font-size: 18px !important;
+  font-weight: 900 !important;
+}
+
+#bm-contract-shop-modal .bm-recommend-main-card p {
+  margin: 0 !important;
+  color: #62705e !important;
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-list {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)) !important;
+  gap: 9px !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-card {
+  border-radius: 16px !important;
+  background: rgba(255, 248, 224, .98) !important;
+  border: 1px solid rgba(228, 190, 93, .62) !important;
+  padding: 11px !important;
+  display: grid !important;
+  gap: 4px !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-card.is-complete {
+  background: rgba(232, 255, 241, .98) !important;
+  border-color: rgba(42, 190, 96, .45) !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-card strong,
+#bm-contract-shop-modal .bm-daily-mission-card em {
+  color: #304938 !important;
+  font-weight: 900 !important;
+  font-style: normal !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-card span {
+  color: #697463 !important;
+  font-size: 11px !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-rewards {
+  margin-top: 8px !important;
+  display: flex !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+#bm-contract-shop-modal .bm-daily-mission-reward-button {
+  min-height: 32px !important;
+  padding: 8px 11px !important;
+}
+
+#bm-contract-shop-modal .bm-product-upgrade-card {
+  grid-template-columns: minmax(0, 1fr) 130px !important;
+}
+
+@media (max-width: 980px) {
+  #bm-contract-shop-modal .bm-shop-modern-content {
+    width: calc(100vw - 14px) !important;
+    height: calc(100svh - 14px) !important;
+    padding: 12px !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-modern-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-modern-guide {
+    display: none !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-modern-tabs {
+    grid-template-columns: repeat(5, max-content) !important;
+    overflow-x: auto !important;
+    padding-bottom: 3px !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-tab-button {
+    min-width: 92px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #bm-contract-shop-modal .bm-shop-modern-title-block p {
+    display: none !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-modern-wallet {
+    padding: 0 !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-action-card,
+  #bm-contract-shop-modal .bm-tool-card,
+  #bm-contract-shop-modal .bm-contract-shop-card,
+  #bm-contract-shop-modal .bm-product-upgrade-card {
+    grid-template-columns: 56px minmax(0, 1fr) !important;
+    align-items: center !important;
+  }
+
+  #bm-contract-shop-modal .bm-contract-shop-card button,
+  #bm-contract-shop-modal .bm-tool-actions {
+    grid-column: 1 / -1 !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+
+  #bm-contract-shop-modal .bm-tool-actions button {
+    flex: 1 1 120px !important;
+  }
+}

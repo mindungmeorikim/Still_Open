@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [v7.6.10] BM 상점 구매 확인/렌더 안정화 재검토
+- Fixed: 상점 내 판매권/프리미엄/재화 상품 외에 스킵권, 피크타임 쿠폰, 창고 확장, 진열대 강화, 상품 강화, 알바 강화도 바로 실행되지 않고 확인창을 거치도록 보완.
+- Fixed: 구매 확인창을 열 수 없거나 상품 데이터를 찾지 못했을 때 즉시 구매 콜백이 실행될 수 있던 fallback을 차단.
+- Changed: BM 상태 변경/구매 성공 이벤트가 연속 발생할 때 상점 전체 렌더를 `requestAnimationFrame` 기준으로 1회 병합해 이미지 깜빡임 가능성을 줄임.
+- Changed: 상점 지갑 아이콘 영역은 값이 바뀐 경우에만 갱신하도록 정리.
+- Verified: 발주 모달 수량 변경 부분 갱신, 발주 확정 버튼 상태 동기화, 발주창 닫기 버튼, OrderSystem InventorySystem import 핫픽스 유지 확인.
+
+## [v7.6.9] BM 상점 UX 구조 리뉴얼
+- Changed: 기존 BM 로직은 유지하고 상점 화면 탭 구조를 추천 / 무료충전 / 재화충전 / 편의상품 / 성장·계약으로 재구성.
+- Changed: BM 상점 상단 보유 재화 영역에 골드, 다이아, 광고 스킵권, 피크타임 쿠폰 아이콘 적용.
+- Changed: 무료 보상, 재화 상품, 편의 아이템, 성장 카드에 현재 BM 에셋을 연결.
+- Added: SHOP_UX_REDESIGN_NOTES.md에 상점 탭 구조와 보류 전용 에셋 목록 기록.
+- Added: BMAssetMap.js에 골드/다이아 패키지 에셋 경로 추가.
+- Fixed: 기존 구매/사용/강화 이벤트 클래스는 그대로 유지하여 BMSystem 동작 충돌을 방지.
+
 ## [v7.6.9] BM 에셋 폴더 정리
 - Added: BM 에셋을 `assets/images/bm/` 하위 용도별 폴더로 정리
 - Added: `BM_ASSET_MANIFEST.md`와 `assets/images/bm/BM_ASSET_MANIFEST.json` 추가

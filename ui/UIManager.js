@@ -26,6 +26,7 @@ import { SaveSystem } from "../systems/SaveSystem.js";
 import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
 import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
 import { DailyMissionSystem, DAILY_MISSION_EVENTS } from "../systems/DailyMissionSystem.js";
+import { BM_ASSETS } from "../data/BMAssetMap.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
@@ -114,7 +115,8 @@ export const UIManager = {
   orderModal: null,
   bmContractShopModal: null,
   bmPurchaseConfirmModal: null,
-  bmShopActiveTab: "charge",
+  bmShopActiveTab: "recommend",
+  bmShopRenderRafId: null,
   staffHireModal: null,
   eventModal: null,
   eventModalOnClose: null,
@@ -948,16 +950,16 @@ export const UIManager = {
 
   bindBMEvents() {
     EventBus.on(BM_EVENTS.STATE_CHANGED, () => {
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(DAILY_MISSION_EVENTS.STATE_CHANGED, () => {
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(DAILY_MISSION_EVENTS.REWARD_CLAIMED, (data = {}) => {
       this.showMessage(data.message ?? "일일 미션 보상을 받았습니다.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(DAILY_MISSION_EVENTS.REWARD_FAILED, (data = {}) => {
@@ -973,55 +975,55 @@ export const UIManager = {
         this.showMessage(`판매권 ${count}종이 상점에 해금되었습니다.`);
       }
 
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(BM_EVENTS.CONTRACT_PURCHASED, (data = {}) => {
       this.showMessage(data.message ?? "판매권 구매 완료!");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
       this.renderProductCards();
     });
 
     EventBus.on(BM_EVENTS.CONTRACT_PURCHASE_FAILED, (data = {}) => {
       this.showMessage(data.message ?? "판매권 구매 조건을 확인해주세요.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(BM_EVENTS.PREMIUM_PRODUCT_PURCHASED, (data = {}) => {
       this.showMessage(data.message ?? "프리미엄 상품 구매 완료!");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
       this.renderProductCards();
     });
 
     EventBus.on(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_FAILED, (data = {}) => {
       this.showMessage(data.message ?? "프리미엄 상품 구매 조건을 확인해주세요.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(BM_EVENTS.CONTRACT_UNLOCK_SKIPPED, (data = {}) => {
       this.showMessage(data.message ?? "판매권 해금 대기일을 스킵했습니다.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
       this.renderProductCards();
     });
 
     EventBus.on(BM_EVENTS.CONTRACT_UNLOCK_SKIP_FAILED, (data = {}) => {
       this.showMessage(data.message ?? "스킵권 사용 조건을 확인해주세요.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(BM_EVENTS.PEAK_COUPON_ACTIVATED, (data = {}) => {
       this.showMessage(data.message ?? "피크타임 쿠폰이 적용되었습니다.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(BM_EVENTS.PEAK_COUPON_FAILED, (data = {}) => {
       this.showMessage(data.message ?? "피크타임 쿠폰 사용 조건을 확인해주세요.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(BM_EVENTS.PEAK_COUPON_EXPIRED, (data = {}) => {
       this.showMessage(data.message ?? "피크타임 쿠폰 효과가 종료되었습니다.");
-      this.renderBMContractShopModal();
+      this.requestBMContractShopRender();
     });
 
     [
@@ -1036,7 +1038,7 @@ export const UIManager = {
     ].forEach((eventName) => {
       EventBus.on(eventName, (data = {}) => {
         this.showMessage(data.message ?? "상점 구매가 완료되었습니다.");
-        this.renderBMContractShopModal();
+        this.requestBMContractShopRender();
         this.renderProductCards();
         this.renderInventorySummary();
         this.renderStaffSummary();
@@ -1046,7 +1048,7 @@ export const UIManager = {
     [BM_EVENTS.SHOP_PURCHASE_FAILED, BM_EVENTS.AD_REWARD_FAILED].forEach((eventName) => {
       EventBus.on(eventName, (data = {}) => {
         this.showMessage(data.message ?? "구매 조건을 확인해주세요.");
-        this.renderBMContractShopModal();
+        this.requestBMContractShopRender();
       });
     });
   },
@@ -5406,32 +5408,41 @@ export const UIManager = {
     }
 
     const modal = this.bmPurchaseConfirmModal;
+    const title = document.getElementById("bm-purchase-confirm-title");
     const body = document.getElementById("bm-purchase-confirm-body");
     const yesButton = document.getElementById("bm-purchase-confirm-yes");
     const noButton = document.getElementById("bm-purchase-confirm-no");
-    const product = options.product ?? null;
+    const product = options.product ?? {
+      id: options.id ?? "bm_shop_action",
+      name: options.name ?? "상점 상품",
+      imagePath: options.imagePath ?? BM_ASSETS.rewardIcons.reward
+    };
 
-    if (!modal || !body || !yesButton || !noButton || !product) {
-      if (typeof onConfirm === "function") onConfirm();
+    if (!modal || !body || !yesButton || !noButton) {
+      this.showMessage("구매 확인창을 열 수 없습니다. 다시 시도해주세요.");
       return;
     }
 
     const priceText = options.priceText ?? "가격 확인 필요";
     const description = options.description ?? "구매 후 해당 상품을 운영에 사용할 수 있습니다.";
+    const confirmMessage = options.confirmMessage ?? "해당 상품을 구매하시겠습니까?";
     const displayName = product.id && BMSystem.getProductDisplayName(product)
       ? BMSystem.getProductDisplayName(product)
       : product.name;
+    const imagePath = product.imagePath || options.imagePath || BM_ASSETS.rewardIcons.reward;
+
+    if (title) title.textContent = options.title ?? "구매 확인";
 
     body.innerHTML = `
       <article class="bm-purchase-confirm-card">
         <span class="bm-purchase-confirm-image-box">
-          <img src="${product.imagePath}" alt="${displayName}" draggable="false" onerror="this.hidden=true;" />
+          <img src="${imagePath}" alt="${displayName}" draggable="false" loading="eager" decoding="async" onerror="this.hidden=true;" />
         </span>
         <div class="bm-purchase-confirm-copy">
           <strong>${displayName}</strong>
           <span>${description}</span>
           <em>${priceText}</em>
-          <p>해당 상품을 구매하시겠습니까?</p>
+          <p>${confirmMessage}</p>
         </div>
       </article>
     `;
@@ -5471,31 +5482,44 @@ export const UIManager = {
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "bm-contract-shop-title");
     modal.innerHTML = `
-      <div class="modal-content bm-contract-shop-content bm-shop-tabbed-content">
-        <div class="bm-contract-shop-header">
-          <div>
-            <p class="bm-contract-shop-kicker">BM 상점</p>
+      <div class="modal-content bm-contract-shop-content bm-shop-tabbed-content bm-shop-modern-content">
+        <div class="bm-shop-modern-topbar">
+          <div class="bm-shop-modern-title-block">
+            <p class="bm-contract-shop-kicker">STORE · BM SHOP</p>
             <h2 id="bm-contract-shop-title">오늘도 정상영업 상점</h2>
-            <p>재화 충전, 편의 상품, 프리미엄 상품을 탭별로 관리합니다.</p>
+            <p id="bm-shop-tab-description">지금 필요한 무료 보상, 재화, 편의 아이템, 성장/계약을 한 곳에서 확인합니다.</p>
           </div>
-          <button id="bm-contract-shop-close-button" class="bm-contract-shop-close" type="button" aria-label="상점 닫기">닫기</button>
+          <button id="bm-contract-shop-close-button" class="bm-contract-shop-close bm-shop-close-image" type="button" aria-label="상점 닫기">
+            <img src="${BM_ASSETS.buttons.close}" alt="" aria-hidden="true" />
+            <span>닫기</span>
+          </button>
         </div>
 
-        <div class="bm-contract-shop-wallet" aria-label="보유 재화">
-          <span id="bm-contract-shop-gold">골드 0</span>
-          <span id="bm-contract-shop-diamond">다이아 0</span>
-          <span id="bm-contract-shop-adskip">광고 스킵권 0</span>
-          <span id="bm-contract-shop-peakcoupon">피크타임 쿠폰 0</span>
+        <div class="bm-shop-modern-wallet" aria-label="보유 재화">
+          <span id="bm-contract-shop-gold" class="bm-wallet-pill"></span>
+          <span id="bm-contract-shop-diamond" class="bm-wallet-pill"></span>
+          <span id="bm-contract-shop-adskip" class="bm-wallet-pill"></span>
+          <span id="bm-contract-shop-peakcoupon" class="bm-wallet-pill"></span>
         </div>
 
-        <div class="bm-shop-tabs" role="tablist" aria-label="상점 탭">
-          <button class="bm-shop-tab-button" type="button" data-tab="charge">재화 충전</button>
-          <button class="bm-shop-tab-button" type="button" data-tab="convenience">편의 상품</button>
-          <button class="bm-shop-tab-button" type="button" data-tab="premium">프리미엄 상품</button>
-        </div>
+        <div class="bm-shop-modern-layout">
+          <nav class="bm-shop-tabs bm-shop-modern-tabs" role="tablist" aria-label="상점 탭">
+            <button class="bm-shop-tab-button" type="button" data-tab="recommend">추천</button>
+            <button class="bm-shop-tab-button" type="button" data-tab="free">무료충전</button>
+            <button class="bm-shop-tab-button" type="button" data-tab="charge">재화충전</button>
+            <button class="bm-shop-tab-button" type="button" data-tab="convenience">편의상품</button>
+            <button class="bm-shop-tab-button" type="button" data-tab="growth">성장/계약</button>
+          </nav>
 
-        <div id="bm-contract-shop-list" class="bm-contract-shop-list bm-shop-tab-panel"></div>
-        <p id="bm-contract-shop-next" class="bm-contract-shop-next"></p>
+          <div class="bm-shop-modern-body">
+            <div id="bm-contract-shop-list" class="bm-contract-shop-list bm-shop-tab-panel"></div>
+            <aside class="bm-shop-modern-guide" aria-label="상점 이용 안내">
+              <strong id="bm-shop-guide-title">추천</strong>
+              <span id="bm-shop-guide-copy">오늘 바로 받을 수 있는 보상과 막힌 진행을 풀어주는 항목을 먼저 보여줍니다.</span>
+              <p id="bm-contract-shop-next" class="bm-contract-shop-next"></p>
+            </aside>
+          </div>
+        </div>
       </div>
     `;
 
@@ -5530,6 +5554,26 @@ export const UIManager = {
     this.bmContractShopModal.classList.add("hidden");
   },
 
+  requestBMContractShopRender() {
+    if (!this.bmContractShopModal || this.bmContractShopModal.classList.contains("hidden")) return;
+
+    const scheduleFrame = typeof requestAnimationFrame === "function"
+      ? requestAnimationFrame
+      : (callback) => setTimeout(callback, 0);
+    const cancelFrame = typeof cancelAnimationFrame === "function"
+      ? cancelAnimationFrame
+      : clearTimeout;
+
+    if (this.bmShopRenderRafId) {
+      cancelFrame(this.bmShopRenderRafId);
+    }
+
+    this.bmShopRenderRafId = scheduleFrame(() => {
+      this.bmShopRenderRafId = null;
+      this.renderBMContractShopModal();
+    });
+  },
+
   renderBMContractShopModal() {
     if (!this.bmContractShopModal) return;
 
@@ -5539,35 +5583,49 @@ export const UIManager = {
     const peakCouponNode = document.getElementById("bm-contract-shop-peakcoupon");
     const listNode = document.getElementById("bm-contract-shop-list");
     const nextNode = document.getElementById("bm-contract-shop-next");
+    const guideTitleNode = document.getElementById("bm-shop-guide-title");
+    const guideCopyNode = document.getElementById("bm-shop-guide-copy");
+    const tabDescriptionNode = document.getElementById("bm-shop-tab-description");
 
     if (!listNode) return;
 
     const bmState = BMSystem.getBMState();
     const nextProducts = BMSystem.getNextContractUnlockProducts();
 
-    if (goldNode) goldNode.textContent = `골드 ${GameState.money.toLocaleString("ko-KR")}`;
-    if (diamondNode) diamondNode.textContent = `다이아 ${bmState.diamond.toLocaleString("ko-KR")}`;
-    if (adSkipNode) adSkipNode.textContent = `광고 스킵권 ${Number(bmState.adSkipTickets || 0).toLocaleString("ko-KR")}`;
-    if (peakCouponNode) peakCouponNode.textContent = `피크타임 쿠폰 ${Number(bmState.peakTimeCoupons || 0).toLocaleString("ko-KR")}`;
+    this.setElementInnerHTMLIfChanged(goldNode, this.createBMWalletPillMarkup(BM_ASSETS.currency.gold, "골드", GameState.money));
+    this.setElementInnerHTMLIfChanged(diamondNode, this.createBMWalletPillMarkup(BM_ASSETS.currency.diamond, "다이아", bmState.diamond));
+    this.setElementInnerHTMLIfChanged(adSkipNode, this.createBMWalletPillMarkup(BM_ASSETS.items.adSkipTicket, "광고 스킵권", bmState.adSkipTickets || 0));
+    this.setElementInnerHTMLIfChanged(peakCouponNode, this.createBMWalletPillMarkup(BM_ASSETS.coupons.peakTime, "피크타임 쿠폰", bmState.peakTimeCoupons || 0));
+
+    const validTabs = new Set(["recommend", "free", "charge", "convenience", "growth"]);
+    if (!validTabs.has(this.bmShopActiveTab)) this.bmShopActiveTab = "recommend";
 
     document.querySelectorAll(".bm-shop-tab-button").forEach((button) => {
       const isActive = button.dataset.tab === this.bmShopActiveTab;
       button.classList.toggle("is-active", isActive);
       button.setAttribute("aria-selected", isActive ? "true" : "false");
       button.onclick = () => {
-        this.bmShopActiveTab = button.dataset.tab || "charge";
+        this.bmShopActiveTab = button.dataset.tab || "recommend";
         this.renderBMContractShopModal();
       };
     });
 
-    if (this.bmShopActiveTab === "premium") {
-      listNode.innerHTML = this.createBMPremiumTabMarkup();
+    if (this.bmShopActiveTab === "free") {
+      listNode.innerHTML = this.createBMFreeChargeTabMarkup();
+    } else if (this.bmShopActiveTab === "charge") {
+      listNode.innerHTML = this.createBMCurrencyChargeTabMarkup();
     } else if (this.bmShopActiveTab === "convenience") {
       listNode.innerHTML = this.createBMConvenienceTabMarkup();
+    } else if (this.bmShopActiveTab === "growth") {
+      listNode.innerHTML = this.createBMGrowthContractTabMarkup();
     } else {
-      this.bmShopActiveTab = "charge";
-      listNode.innerHTML = this.createBMChargeTabMarkup();
+      this.bmShopActiveTab = "recommend";
+      listNode.innerHTML = this.createBMRecommendTabMarkup();
     }
+
+    if (guideTitleNode) guideTitleNode.textContent = this.getBMShopTabLabel(this.bmShopActiveTab);
+    if (guideCopyNode) guideCopyNode.textContent = this.getBMShopTabDescription(this.bmShopActiveTab);
+    if (tabDescriptionNode) tabDescriptionNode.textContent = this.getBMShopTabDescription(this.bmShopActiveTab);
 
     if (nextNode) {
       nextNode.textContent = nextProducts.length > 0
@@ -5579,20 +5637,138 @@ export const UIManager = {
     this.prepareUiImageButtons(listNode);
   },
 
-  createBMChargeTabMarkup() {
+  createBMWalletPillMarkup(iconPath, label, value) {
+    const amount = Number(value || 0).toLocaleString("ko-KR");
+    return `
+      <img class="bm-wallet-icon" src="${iconPath}" alt="" aria-hidden="true" loading="eager" decoding="async" />
+      <span>${label}</span>
+      <strong>${amount}</strong>
+    `;
+  },
+
+  getBMShopTabLabel(tabId) {
+    const labels = {
+      recommend: "추천",
+      free: "무료충전",
+      charge: "재화충전",
+      convenience: "편의상품",
+      growth: "성장/계약"
+    };
+    return labels[tabId] ?? "추천";
+  },
+
+  getBMShopTabDescription(tabId) {
+    const descriptions = {
+      recommend: "오늘 바로 받을 수 있는 보상과 막힌 진행을 풀어주는 항목을 먼저 보여줍니다.",
+      free: "광고 보상과 일일 미션 보상을 모아둔 무료 충전소입니다.",
+      charge: "다이아와 골드를 충전하는 재화 전용 영역입니다.",
+      convenience: "판매권 대기 스킵, 피크타임 쿠폰처럼 즉시 쓰는 편의 아이템입니다.",
+      growth: "상품 계약, 프리미엄 상품, 창고·진열대·상품·알바 강화를 모아둔 성장 영역입니다."
+    };
+    return descriptions[tabId] ?? descriptions.recommend;
+  },
+
+  createBMAssetImageMarkup(src, alt = "", className = "bm-shop-card-icon") {
+    if (!src) return "";
+    return `<img class="${className}" src="${src}" alt="${alt}" loading="eager" decoding="async" />`;
+  },
+
+  setElementInnerHTMLIfChanged(node, html = "") {
+    if (!node || node.innerHTML === html) return;
+    node.innerHTML = html;
+  },
+
+  getBMAdRewardIconPath(reward = {}) {
+    if (reward.rewardType === "diamond") return BM_ASSETS.freeCharge.diamondRewardIcon;
+    if (reward.rewardType === "gold") return BM_ASSETS.freeCharge.goldRewardIcon;
+    if (reward.rewardType === "peakCouponDiscount") return BM_ASSETS.freeCharge.peakCouponDiscountIcon;
+    return BM_ASSETS.rewardIcons.adReward;
+  },
+
+  getBMDiamondProductImagePath(product = {}) {
+    const productIds = BMSystem.getDiamondProducts().map((item) => item.id);
+    const index = Math.max(0, productIds.indexOf(product.id));
+    const paths = [
+      BM_ASSETS.packs.diamond01,
+      BM_ASSETS.packs.diamond02,
+      BM_ASSETS.packs.diamond03,
+      BM_ASSETS.packs.diamond04,
+      BM_ASSETS.packs.diamond05
+    ];
+    return paths[index] ?? paths[0];
+  },
+
+  getBMGoldProductImagePath(product = {}) {
+    const productIds = BMSystem.getGoldProducts().map((item) => item.id);
+    const index = Math.max(0, productIds.indexOf(product.id));
+    const paths = [
+      BM_ASSETS.packs.goldSmall,
+      BM_ASSETS.packs.goldMedium,
+      BM_ASSETS.packs.goldLarge
+    ];
+    return paths[index] ?? paths[0];
+  },
+
+  getBMDiscountLabelPath(rate = 0) {
+    const discountMap = {
+      5: BM_ASSETS.labels.discount05,
+      10: BM_ASSETS.labels.discount10,
+      15: BM_ASSETS.labels.discount15,
+      50: BM_ASSETS.labels.discount50
+    };
+    return discountMap[Number(rate)] ?? null;
+  },
+
+  createBMRecommendTabMarkup() {
     const dailyMissionState = DailyMissionSystem.getState();
     const adRewards = BMSystem.getAdRewards();
-    const diamondProducts = BMSystem.getDiamondProducts();
-    const goldProducts = BMSystem.getGoldProducts();
+    const bmState = BMSystem.getBMState();
+    const firstClaimableReward = adRewards.find((reward) => reward.canClaim) ?? adRewards[0];
+    const nextProducts = BMSystem.getNextContractUnlockProducts();
 
     return `
+      <section class="bm-shop-section bm-shop-recommend-hero">
+        <div class="bm-recommend-main-card">
+          <span class="bm-shop-eyebrow">오늘 추천</span>
+          <strong>막힌 진행은 여기서 먼저 해결하세요</strong>
+          <p>무료 보상, 판매권 스킵, 피크타임 쿠폰, 성장/계약을 상황별로 바로 찾아갈 수 있게 정리했습니다.</p>
+        </div>
+        <div class="bm-recommend-quick-grid">
+          <article class="bm-contract-shop-card bm-shop-action-card bm-free-recharge-card ${firstClaimableReward?.isClaimed ? "is-owned" : "is-purchasable"}">
+            ${this.createBMAssetImageMarkup(this.getBMAdRewardIconPath(firstClaimableReward), firstClaimableReward?.name ?? "무료 보상")}
+            <div class="bm-contract-product-copy">
+              <strong>${firstClaimableReward?.name ?? "무료 보상"}</strong>
+              <span>${firstClaimableReward?.label ?? "오늘 보상"}</span>
+              <em>${firstClaimableReward?.isClaimed ? "오늘 수령 완료" : "바로 받을 수 있는 무료 보상"}</em>
+            </div>
+            <button class="bm-ad-reward-button" type="button" data-reward-id="${firstClaimableReward?.id ?? ""}" ${firstClaimableReward?.canClaim ? "" : "disabled"}>${firstClaimableReward?.buttonText ?? "받기"}</button>
+          </article>
+          ${this.createBMContractSkipPanelMarkup(bmState.contractUnlockSkip)}
+          ${this.createBMPeakCouponPanelMarkup(bmState.peakCoupon)}
+        </div>
+      </section>
       ${this.createBMDailyMissionPanelMarkup(dailyMissionState)}
-      <section class="bm-shop-section">
+      <section class="bm-shop-section bm-shop-next-contract-section">
+        <h3>다음 상품 판매권</h3>
+        <div class="bm-shop-card-list bm-shop-card-list-compact">
+          ${nextProducts.slice(0, 3).map((product) => this.createBMContractPreviewMarkup(product)).join("") || `<article class="bm-contract-shop-card bm-shop-info-card"><div class="bm-contract-product-copy"><strong>해금 대기 상품 없음</strong><span>현재 모든 판매권이 상점에 열려 있습니다.</span></div></article>`}
+        </div>
+      </section>
+    `;
+  },
+
+  createBMFreeChargeTabMarkup() {
+    const dailyMissionState = DailyMissionSystem.getState();
+    const adRewards = BMSystem.getAdRewards();
+
+    return `
+      <section class="bm-shop-section bm-free-charge-panel-section">
         <h3>무료 충전소</h3>
         <p class="bm-shop-section-note">각 보상은 하루 1회 받을 수 있습니다. 광고 스킵권이 있으면 광고 없이 즉시 수령합니다.</p>
         <div class="bm-shop-card-list bm-shop-card-list-compact">
           ${adRewards.map((reward) => `
-            <article class="bm-contract-shop-card bm-free-recharge-card ${reward.isClaimed ? "is-owned" : "is-purchasable"}">
+            <article class="bm-contract-shop-card bm-shop-action-card bm-free-recharge-card ${reward.isClaimed ? "is-owned" : "is-purchasable"}">
+              ${this.createBMAssetImageMarkup(this.getBMAdRewardIconPath(reward), reward.name)}
               <div class="bm-contract-product-copy">
                 <strong>${reward.name}</strong>
                 <span>${reward.label}</span>
@@ -5603,30 +5779,44 @@ export const UIManager = {
           `).join("")}
         </div>
       </section>
+      ${this.createBMDailyMissionPanelMarkup(dailyMissionState)}
+    `;
+  },
 
-      <section class="bm-shop-section">
-        <h3>다이아 상점</h3>
-        <div class="bm-shop-card-list bm-shop-card-list-compact">
-          ${diamondProducts.map((product) => `
-            <article class="bm-contract-shop-card bm-currency-card">
-              <div class="bm-contract-product-copy">
-                <strong>${product.name}</strong>
-                <span>${product.priceWon.toLocaleString("ko-KR")}원 테스트 구매</span>
-                <em>${product.discountRate > 0 ? `${product.discountRate}% 할인 가치` : "기본 상품"}</em>
-              </div>
-              <button class="bm-diamond-product-button" type="button" data-product-id="${product.id}">구매</button>
-            </article>
-          `).join("")}
+  createBMCurrencyChargeTabMarkup() {
+    const diamondProducts = BMSystem.getDiamondProducts();
+    const goldProducts = BMSystem.getGoldProducts();
+
+    return `
+      <section class="bm-shop-section bm-currency-charge-section">
+        <h3>다이아 충전</h3>
+        <div class="bm-shop-card-list bm-shop-card-list-compact bm-currency-product-grid">
+          ${diamondProducts.map((product) => {
+            const discountLabel = this.getBMDiscountLabelPath(product.discountRate);
+            return `
+              <article class="bm-contract-shop-card bm-shop-action-card bm-currency-card is-purchasable">
+                ${this.createBMAssetImageMarkup(this.getBMDiamondProductImagePath(product), product.name)}
+                <div class="bm-contract-product-copy">
+                  <strong>${product.name}</strong>
+                  <span>${product.priceWon.toLocaleString("ko-KR")}원 테스트 구매</span>
+                  <em>${product.discountRate > 0 ? `${product.discountRate}% 할인 가치` : "기본 상품"}</em>
+                </div>
+                ${discountLabel ? this.createBMAssetImageMarkup(discountLabel, `${product.discountRate}% 할인`, "bm-shop-card-label") : ""}
+                <button class="bm-diamond-product-button" type="button" data-product-id="${product.id}">구매</button>
+              </article>
+            `;
+          }).join("")}
         </div>
       </section>
 
-      <section class="bm-shop-section">
-        <h3>골드 상점</h3>
-        <div class="bm-shop-card-list bm-shop-card-list-compact">
+      <section class="bm-shop-section bm-currency-charge-section">
+        <h3>골드 충전</h3>
+        <div class="bm-shop-card-list bm-shop-card-list-compact bm-currency-product-grid">
           ${goldProducts.map((product) => {
             const canBuy = BMSystem.getBMState().diamond >= product.diamondPrice;
             return `
-              <article class="bm-contract-shop-card bm-currency-card ${canBuy ? "is-purchasable" : "is-not-enough-diamond"}">
+              <article class="bm-contract-shop-card bm-shop-action-card bm-currency-card ${canBuy ? "is-purchasable" : "is-not-enough-diamond"}">
+                ${this.createBMAssetImageMarkup(this.getBMGoldProductImagePath(product), product.name)}
                 <div class="bm-contract-product-copy">
                   <strong>${product.name}</strong>
                   <span>${product.goldAmount.toLocaleString("ko-KR")}골드 지급</span>
@@ -5639,6 +5829,10 @@ export const UIManager = {
         </div>
       </section>
     `;
+  },
+
+  createBMChargeTabMarkup() {
+    return this.createBMCurrencyChargeTabMarkup();
   },
 
   createBMDailyMissionPanelMarkup(state = {}) {
@@ -5671,19 +5865,66 @@ export const UIManager = {
 
   createBMConvenienceTabMarkup() {
     const bmState = BMSystem.getBMState();
+
+    return `
+      <section class="bm-shop-section bm-convenience-tools-section">
+        <h3>편의상품</h3>
+        <p class="bm-shop-section-note">구매/사용 기능은 기존 BM 로직 그대로 연결하고, 즉시 쓰는 아이템만 따로 모았습니다.</p>
+        <div class="bm-tool-grid bm-convenience-item-grid">
+          ${this.createBMContractSkipPanelMarkup(bmState.contractUnlockSkip)}
+          ${this.createBMPeakCouponPanelMarkup(bmState.peakCoupon)}
+          <article class="bm-contract-shop-card bm-tool-card bm-shop-inventory-card">
+            ${this.createBMAssetImageMarkup(BM_ASSETS.items.adSkipTicket, "광고 스킵권")}
+            <div class="bm-contract-product-copy">
+              <strong>광고 스킵권</strong>
+              <span>보유 ${Number(bmState.adSkipTickets || 0).toLocaleString("ko-KR")}장</span>
+              <em>무료 충전소 보상 수령 시 광고 대신 사용됩니다.</em>
+              <small>사용은 무료 충전소에서 자동 적용됩니다.</small>
+            </div>
+          </article>
+          <article class="bm-contract-shop-card bm-tool-card bm-shop-inventory-card">
+            ${this.createBMAssetImageMarkup(BM_ASSETS.items.instantExpansion, "즉시 확장권")}
+            <div class="bm-contract-product-copy">
+              <strong>즉시 확장</strong>
+              <span>매장 확장 대기 시간을 줄이는 진행 보조 항목</span>
+              <em>매장 확장 구역 팝오버에서 사용합니다.</em>
+              <small>상점에서는 보유/안내만 표시합니다.</small>
+            </div>
+          </article>
+        </div>
+      </section>
+    `;
+  },
+
+  createBMGrowthContractTabMarkup() {
+    const bmState = BMSystem.getBMState();
     const contractProducts = BMSystem.getContractUnlockQueue();
     const warehouseState = BMSystem.getWarehouseUpgradeState();
     const shelfGroups = BMSystem.getShelfGroups();
     const productUpgradeProducts = PRODUCTS.filter((product) => BMSystem.canSellProduct(product.id));
 
     return `
-      <section class="bm-shop-section bm-convenience-tools-section">
-        <h3>편의 상품</h3>
+      <section class="bm-shop-section bm-growth-overview-section">
+        <h3>성장 바로가기</h3>
         <div class="bm-tool-grid">
-          ${this.createBMContractSkipPanelMarkup(bmState.contractUnlockSkip)}
-          ${this.createBMPeakCouponPanelMarkup(bmState.peakCoupon)}
           ${this.createBMWarehouseUpgradeMarkup(warehouseState)}
           ${this.createBMStaffUpgradeMarkup(bmState.staffAbilityUpgrade)}
+        </div>
+      </section>
+
+      <section class="bm-shop-section">
+        <h3>상품 계약</h3>
+        <p class="bm-shop-section-note">판매권을 보유한 상품만 발주/판매할 수 있습니다. 대기 중인 상품은 편의상품 탭의 스킵권으로 앞당길 수 있습니다.</p>
+        <div class="bm-shop-card-list">
+          ${contractProducts.map((product) => this.createBMContractProductCardMarkup(product)).join("")}
+        </div>
+      </section>
+
+      <section class="bm-shop-section bm-premium-shop-section">
+        <h3>프리미엄 상품</h3>
+        <p class="bm-shop-section-note">프리미엄 BM 상품도 해당 구역이 열려 있어야 판매할 수 있습니다.</p>
+        <div class="bm-shop-card-list">
+          ${BMSystem.getPremiumProducts().map((product) => this.createBMPremiumProductCardMarkup(product)).join("")}
         </div>
       </section>
 
@@ -5691,7 +5932,8 @@ export const UIManager = {
         <h3>진열대 강화</h3>
         <div class="bm-shop-card-list bm-shop-card-list-compact">
           ${shelfGroups.map((group) => `
-            <article class="bm-contract-shop-card bm-upgrade-card">
+            <article class="bm-contract-shop-card bm-shop-action-card bm-upgrade-card">
+              ${this.createBMAssetImageMarkup(BM_ASSETS.statusIcons.unlockable, `${group.name} 강화`)}
               <div class="bm-contract-product-copy">
                 <strong>${group.name}</strong>
                 <span>Lv.${group.current.level} · 상품별 ${group.current.capacity}개 진열 가능</span>
@@ -5727,13 +5969,23 @@ export const UIManager = {
           }).join("")}
         </div>
       </section>
+    `;
+  },
 
-      <section class="bm-shop-section">
-        <h3>일반 상품 판매권</h3>
-        <div class="bm-shop-card-list">
-          ${contractProducts.map((product) => this.createBMContractProductCardMarkup(product)).join("")}
+  createBMContractPreviewMarkup(product) {
+    const displayName = BMSystem.getProductDisplayName(product);
+    return `
+      <article class="bm-contract-shop-card bm-shop-action-card bm-contract-preview-card">
+        <span class="bm-contract-product-image-box">
+          <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="eager" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
+          <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
+        </span>
+        <div class="bm-contract-product-copy">
+          <strong>${displayName}</strong>
+          <span>${this.getDisplayCategoryLabel(product.displayCategory)}</span>
+          <em>Day ${product.unlockDay} 판매권 해금 예정</em>
         </div>
-      </section>
+      </article>
     `;
   },
 
@@ -5758,7 +6010,8 @@ export const UIManager = {
     const nextText = nextNames.length > 0 ? nextNames.join(", ") : "해금 대기 상품 없음";
 
     return `
-      <article class="bm-contract-shop-card bm-tool-card">
+      <article class="bm-contract-shop-card bm-tool-card bm-skip-ticket-card">
+        ${this.createBMAssetImageMarkup(BM_ASSETS.items.skip3Day, "3일 해금 대기 스킵권")}
         <div class="bm-contract-product-copy">
           <strong>판매권 해금 대기일 스킵권</strong>
           <span>다음 판매권 2종을 상점에 즉시 해금합니다.</span>
@@ -5776,7 +6029,8 @@ export const UIManager = {
     const discountText = peakState.discountActive ? "광고 할인 적용 중: 10다이아" : "기본 가격 20다이아";
 
     return `
-      <article class="bm-contract-shop-card bm-tool-card">
+      <article class="bm-contract-shop-card bm-tool-card bm-peak-coupon-card">
+        ${this.createBMAssetImageMarkup(BM_ASSETS.coupons.peakTime, "피크타임 쿠폰")}
         <div class="bm-contract-product-copy">
           <strong>피크타임 쿠폰</strong>
           <span>보유 ${owned}장 · 60초 동안 매출 1.5배 · 하루 1회</span>
@@ -5798,7 +6052,8 @@ export const UIManager = {
     const buttonDisabled = !next || pending || !warehouseState.canUpgrade;
 
     return `
-      <article class="bm-contract-shop-card bm-tool-card">
+      <article class="bm-contract-shop-card bm-tool-card bm-storage-upgrade-card">
+        ${this.createBMAssetImageMarkup(BM_ASSETS.items.instantExpansion, "창고 확장")}
         <div class="bm-contract-product-copy">
           <strong>창고 확장</strong>
           <span>Lv.${current.level} · 보관 가능 수량 ${current.capacity}개</span>
@@ -5820,6 +6075,7 @@ export const UIManager = {
 
     return `
       <article class="bm-contract-shop-card bm-tool-card bm-staff-upgrade-card">
+        ${this.createBMAssetImageMarkup(BM_ASSETS.statusIcons.contractable, "알바 강화")}
         <div class="bm-contract-product-copy">
           <strong>알바 강화권</strong>
           <span>80다이아 · 원하는 분야 1칸 강화 · 총 ${state.totalCount ?? 0}/${state.maxTotal ?? 5}</span>
@@ -5843,7 +6099,7 @@ export const UIManager = {
       <article class="bm-contract-shop-card ${status.className}" data-product-id="${product.id}">
         <div class="bm-contract-product-main">
           <span class="bm-contract-product-image-box">
-            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
+            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="eager" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
             <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
           </span>
           <div class="bm-contract-product-copy">
@@ -5871,7 +6127,7 @@ export const UIManager = {
       <article class="bm-contract-shop-card bm-premium-product-card ${status.className}" data-product-id="${product.id}">
         <div class="bm-contract-product-main">
           <span class="bm-contract-product-image-box">
-            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
+            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="eager" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
             <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
           </span>
           <div class="bm-contract-product-copy">
@@ -5927,7 +6183,17 @@ export const UIManager = {
       button.onclick = () => {
         if (button.disabled) return;
         const product = BMSystem.getDiamondProducts().find((item) => item.id === button.dataset.productId);
-        this.showBMShopPurchaseConfirm({ product: { name: product?.name ?? "다이아", imagePath: "", id: product?.id }, priceText: `${product?.priceWon?.toLocaleString("ko-KR") ?? 0}원 테스트 구매`, description: "실제 결제 SDK 없이 테스트로 다이아를 지급합니다." }, () => {
+        if (!product) {
+          this.showMessage("존재하지 않는 다이아 상품입니다.");
+          return;
+        }
+
+        this.showBMShopPurchaseConfirm({
+          product: { ...product, imagePath: this.getBMDiamondProductImagePath(product) },
+          priceText: `${product.priceWon.toLocaleString("ko-KR")}원 테스트 구매`,
+          description: "실제 결제 SDK 없이 테스트로 다이아를 지급합니다.",
+          confirmMessage: "해당 다이아 상품을 구매하시겠습니까?"
+        }, () => {
           EventBus.emit(BM_EVENTS.DIAMOND_PRODUCT_PURCHASE_REQUESTED, { productId: button.dataset.productId });
         });
       };
@@ -5937,7 +6203,17 @@ export const UIManager = {
       button.onclick = () => {
         if (button.disabled) return;
         const product = BMSystem.getGoldProducts().find((item) => item.id === button.dataset.productId);
-        this.showBMShopPurchaseConfirm({ product: { name: product?.name ?? "골드", imagePath: "", id: product?.id }, priceText: `${product?.diamondPrice ?? 0}다이아`, description: "다이아를 사용해 골드를 충전합니다." }, () => {
+        if (!product) {
+          this.showMessage("존재하지 않는 골드 상품입니다.");
+          return;
+        }
+
+        this.showBMShopPurchaseConfirm({
+          product: { ...product, imagePath: this.getBMGoldProductImagePath(product) },
+          priceText: `${product.diamondPrice.toLocaleString("ko-KR")}다이아`,
+          description: `${product.goldAmount.toLocaleString("ko-KR")}골드를 충전합니다.`,
+          confirmMessage: "해당 골드 상품을 구매하시겠습니까?"
+        }, () => {
           EventBus.emit(BM_EVENTS.GOLD_PRODUCT_PURCHASE_REQUESTED, { productId: button.dataset.productId });
         });
       };
@@ -5962,7 +6238,17 @@ export const UIManager = {
         if (button.disabled) return;
         const productId = button.dataset.productId;
         const product = BMSystem.getContractUnlockQueue().find((item) => item.id === productId);
-        this.showBMShopPurchaseConfirm({ product, priceText: `${(Number(product?.contractCost) || 0).toLocaleString("ko-KR")}골드`, description: "판매권을 구매하면 해당 상품을 발주/판매할 수 있습니다. 구역 해금 조건은 별도로 필요합니다." }, () => {
+        if (!product) {
+          this.showMessage("존재하지 않는 판매권 상품입니다.");
+          return;
+        }
+
+        this.showBMShopPurchaseConfirm({
+          product,
+          priceText: `${(Number(product.contractCost) || 0).toLocaleString("ko-KR")}골드`,
+          description: "판매권을 구매하면 해당 상품을 발주/판매할 수 있습니다. 구역 해금 조건은 별도로 필요합니다.",
+          confirmMessage: "해당 상품 판매권을 구매하시겠습니까?"
+        }, () => {
           EventBus.emit(BM_EVENTS.CONTRACT_PURCHASE_REQUESTED, { day: GameState.day, productId });
         });
       };
@@ -5988,7 +6274,17 @@ export const UIManager = {
         if (button.disabled) return;
         const productId = button.dataset.productId;
         const product = BMSystem.getPremiumProducts().find((item) => item.id === productId);
-        this.showBMShopPurchaseConfirm({ product, priceText: `${(Number(product?.diamondPrice) || 0).toLocaleString("ko-KR")}다이아`, description: "프리미엄 상품을 구매하면 해당 상품의 판매 조건을 보유합니다." }, () => {
+        if (!product) {
+          this.showMessage("존재하지 않는 프리미엄 상품입니다.");
+          return;
+        }
+
+        this.showBMShopPurchaseConfirm({
+          product,
+          priceText: `${(Number(product.diamondPrice) || 0).toLocaleString("ko-KR")}다이아`,
+          description: "프리미엄 상품을 구매하면 해당 상품의 판매 조건을 보유합니다.",
+          confirmMessage: "해당 프리미엄 상품을 구매하시겠습니까?"
+        }, () => {
           EventBus.emit(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_REQUESTED, { day: GameState.day, productId });
         });
       };
@@ -6000,7 +6296,17 @@ export const UIManager = {
     if (!button) return;
     button.onclick = () => {
       if (button.disabled) return;
-      EventBus.emit(BM_EVENTS.CONTRACT_UNLOCK_SKIP_REQUESTED, { day: GameState.day });
+      const skipState = BMSystem.getBMState().contractUnlockSkip ?? {};
+      const price = Number(skipState.priceDiamond ?? 50);
+      this.showBMShopPurchaseConfirm({
+        title: "스킵권 사용 확인",
+        product: { id: "contract_unlock_skip", name: "판매권 해금 대기일 스킵권", imagePath: BM_ASSETS.items.skip3Day },
+        priceText: `${price.toLocaleString("ko-KR")}다이아`,
+        description: "다음 판매권 2종을 상점에 즉시 해금합니다.",
+        confirmMessage: "판매권 해금 대기일 스킵권을 사용하시겠습니까?"
+      }, () => {
+        EventBus.emit(BM_EVENTS.CONTRACT_UNLOCK_SKIP_REQUESTED, { day: GameState.day });
+      });
     };
   },
 
@@ -6010,13 +6316,31 @@ export const UIManager = {
     if (purchaseButton) {
       purchaseButton.onclick = () => {
         if (purchaseButton.disabled) return;
-        EventBus.emit(BM_EVENTS.PEAK_COUPON_PURCHASE_REQUESTED, { day: GameState.day });
+        const peakState = BMSystem.getBMState().peakCoupon ?? {};
+        const price = Number(peakState.purchasePriceDiamond ?? 20);
+        this.showBMShopPurchaseConfirm({
+          title: "쿠폰 구매 확인",
+          product: { id: "peak_time_coupon", name: "피크타임 쿠폰", imagePath: BM_ASSETS.coupons.peakTime },
+          priceText: `${price.toLocaleString("ko-KR")}다이아`,
+          description: "구매하면 피크타임 쿠폰 1장을 보유합니다.",
+          confirmMessage: "피크타임 쿠폰을 구매하시겠습니까?"
+        }, () => {
+          EventBus.emit(BM_EVENTS.PEAK_COUPON_PURCHASE_REQUESTED, { day: GameState.day });
+        });
       };
     }
     if (useButton) {
       useButton.onclick = () => {
         if (useButton.disabled) return;
-        EventBus.emit(BM_EVENTS.PEAK_COUPON_USE_REQUESTED, { day: GameState.day });
+        this.showBMShopPurchaseConfirm({
+          title: "쿠폰 사용 확인",
+          product: { id: "peak_time_coupon_use", name: "피크타임 쿠폰 사용", imagePath: BM_ASSETS.coupons.peakTime },
+          priceText: "보유 쿠폰 1장 사용",
+          description: "60초 동안 매출 1.5배 효과가 적용됩니다.",
+          confirmMessage: "피크타임 쿠폰을 사용하시겠습니까?"
+        }, () => {
+          EventBus.emit(BM_EVENTS.PEAK_COUPON_USE_REQUESTED, { day: GameState.day });
+        });
       };
     }
   },
@@ -6026,7 +6350,17 @@ export const UIManager = {
     if (!button) return;
     button.onclick = () => {
       if (button.disabled) return;
-      EventBus.emit(BM_EVENTS.WAREHOUSE_UPGRADE_REQUESTED, { day: GameState.day });
+      const warehouseState = BMSystem.getWarehouseUpgradeState();
+      const next = warehouseState.next ?? null;
+      this.showBMShopPurchaseConfirm({
+        title: "창고 확장 확인",
+        product: { id: "warehouse_upgrade", name: "창고 확장", imagePath: BM_ASSETS.items.instantExpansion },
+        priceText: next ? `${next.costGold.toLocaleString("ko-KR")}골드` : "최대 확장",
+        description: next ? `창고 용량을 ${next.capacity}개까지 확장합니다.` : "창고가 이미 최대 레벨입니다.",
+        confirmMessage: "창고를 확장하시겠습니까?"
+      }, () => {
+        EventBus.emit(BM_EVENTS.WAREHOUSE_UPGRADE_REQUESTED, { day: GameState.day });
+      });
     };
   },
 
@@ -6034,7 +6368,19 @@ export const UIManager = {
     document.querySelectorAll(".bm-shelf-upgrade-button").forEach((button) => {
       button.onclick = () => {
         if (button.disabled) return;
-        EventBus.emit(BM_EVENTS.SHELF_UPGRADE_REQUESTED, { day: GameState.day, shelfGroupId: button.dataset.shelfGroupId, shelfId: button.dataset.shelfId });
+        const shelfGroupId = button.dataset.shelfGroupId;
+        const shelfId = button.dataset.shelfId;
+        const group = BMSystem.getShelfGroups().find((item) => item.id === shelfGroupId || item.shelfId === shelfId);
+        const next = group?.next ?? null;
+        this.showBMShopPurchaseConfirm({
+          title: "진열대 강화 확인",
+          product: { id: `shelf_upgrade_${shelfGroupId ?? shelfId ?? "unknown"}`, name: `${group?.name ?? "진열대"} 강화`, imagePath: BM_ASSETS.statusIcons.unlockable },
+          priceText: next ? `${next.costGold.toLocaleString("ko-KR")}골드` : "최대 강화",
+          description: next ? `상품별 진열 가능 수량을 ${next.capacity}개로 늘립니다.` : "이미 최대 강화 상태입니다.",
+          confirmMessage: "진열대를 강화하시겠습니까?"
+        }, () => {
+          EventBus.emit(BM_EVENTS.SHELF_UPGRADE_REQUESTED, { day: GameState.day, shelfGroupId, shelfId });
+        });
       };
     });
   },
@@ -6043,7 +6389,23 @@ export const UIManager = {
     document.querySelectorAll(".bm-product-upgrade-button").forEach((button) => {
       button.onclick = () => {
         if (button.disabled) return;
-        EventBus.emit(BM_EVENTS.PRODUCT_UPGRADE_REQUESTED, { day: GameState.day, productId: button.dataset.productId });
+        const productId = button.dataset.productId;
+        const product = PRODUCTS.find((item) => item.id === productId);
+        const state = BMSystem.getProductUpgradeState(productId);
+        if (!product || !state) {
+          this.showMessage("존재하지 않는 상품 강화 항목입니다.");
+          return;
+        }
+
+        this.showBMShopPurchaseConfirm({
+          title: "상품 강화 확인",
+          product,
+          priceText: `${state.nextCost.toLocaleString("ko-KR")}골드`,
+          description: `${state.displayName} 판매가를 ${state.currentPrice.toLocaleString("ko-KR")}골드에서 ${state.nextPrice.toLocaleString("ko-KR")}골드로 올립니다.`,
+          confirmMessage: "해당 상품을 강화하시겠습니까?"
+        }, () => {
+          EventBus.emit(BM_EVENTS.PRODUCT_UPGRADE_REQUESTED, { day: GameState.day, productId });
+        });
       };
     });
   },
@@ -6052,7 +6414,18 @@ export const UIManager = {
     document.querySelectorAll(".bm-staff-upgrade-button").forEach((button) => {
       button.onclick = () => {
         if (button.disabled) return;
-        EventBus.emit(BM_EVENTS.STAFF_ABILITY_UPGRADE_REQUESTED, { day: GameState.day, abilityKey: button.dataset.abilityKey });
+        const abilityKey = button.dataset.abilityKey;
+        const state = BMSystem.getStaffAbilityUpgradeState();
+        const label = BMSystem.getStaffAbilityLabel(abilityKey);
+        this.showBMShopPurchaseConfirm({
+          title: "알바 강화 확인",
+          product: { id: `staff_upgrade_${abilityKey}`, name: `알바 ${label} 강화`, imagePath: BM_ASSETS.statusIcons.contractable },
+          priceText: `${Number(state.priceDiamond ?? 80).toLocaleString("ko-KR")}다이아`,
+          description: `알바 ${label} 능력을 1칸 강화합니다.`,
+          confirmMessage: "알바 능력을 강화하시겠습니까?"
+        }, () => {
+          EventBus.emit(BM_EVENTS.STAFF_ABILITY_UPGRADE_REQUESTED, { day: GameState.day, abilityKey });
+        });
       };
     });
   },

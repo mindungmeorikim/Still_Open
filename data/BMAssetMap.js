@@ -39,6 +39,16 @@ export const BM_ASSETS = Object.freeze({
     adSkip: "./assets/images/bm/coupons/coupon_ad_skip.png",
     peakTime: "./assets/images/bm/coupons/coupon_peak_time.png"
   }),
+  packs: Object.freeze({
+    goldSmall: "./assets/images/bm/packs/gold/pack_gold_small.png",
+    goldMedium: "./assets/images/bm/packs/gold/pack_gold_medium.png",
+    goldLarge: "./assets/images/bm/packs/gold/pack_gold_large.png",
+    diamond01: "./assets/images/bm/packs/diamond/pack_diamond_01.png",
+    diamond02: "./assets/images/bm/packs/diamond/pack_diamond_02.png",
+    diamond03: "./assets/images/bm/packs/diamond/pack_diamond_03.png",
+    diamond04: "./assets/images/bm/packs/diamond/pack_diamond_04.png",
+    diamond05: "./assets/images/bm/packs/diamond/pack_diamond_05.png"
+  }),
   labels: Object.freeze({
     priceBase: "./assets/images/bm/labels/label_price_base.png",
     priceGold: "./assets/images/bm/labels/label_price_gold.png",
