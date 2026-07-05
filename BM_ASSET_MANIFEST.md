@@ -141,3 +141,30 @@
 - `assets/images/bm/shop/ui_shop_card_locked.png` — 433×577, 투명, 상점 기본 UI 구성요소
 - `assets/images/bm/shop/ui_shop_card_premium.png` — 433×577, 투명, 상점 기본 UI 구성요소
 - `assets/images/bm/shop/ui_shop_top_bar.png` — 1000×250, 투명, 상점 기본 UI 구성요소
+
+## 추가 BM 전용 에셋 적용분 v7.6.11
+
+### 알바/직원 보조
+- `assets/images/bm/staff/staff_card_frame.png` : 알바 카드 프레임
+- `assets/images/bm/staff/icon_staff_hire.png` : 알바 고용 아이콘
+- `assets/images/bm/staff/icon_staff_upgrade.png` : 알바 강화 아이콘
+
+### 멘탈 회복
+- `assets/images/bm/mental/icon_mental_recovery.png` : 공용 멘탈 회복 아이콘
+- `assets/images/bm/mental/icon_mental_free_recovery.png` : 무료 멘탈 회복
+- `assets/images/bm/mental/icon_mental_gold_recovery.png` : 골드 멘탈 회복
+- `assets/images/bm/mental/icon_mental_diamond_recovery.png` : 다이아 멘탈 회복
+
+### 상품 판매권/계약
+- `assets/images/bm/product_license/item_product_license.png` : 상품 판매권
+- `assets/images/bm/product_license/icon_product_contract.png` : 상품 계약 확인
+- `assets/images/bm/product_license/icon_product_license_wait.png` : 판매권 대기
+
+### 진열대/창고 성장
+- `assets/images/bm/upgrades/shelf/icon_shelf_upgrade.png` : 진열대 강화
+- `assets/images/bm/upgrades/shelf/icon_shelf_capacity.png` : 진열대 수용량 증가
+- `assets/images/bm/upgrades/shelf/icon_shelf_speed.png` : 진열대 속도 강화
+- `assets/images/bm/upgrades/storage/icon_storage_expansion.png` : 창고 확장
+- `assets/images/bm/upgrades/storage/icon_storage_capacity.png` : 창고 수용량 증가
+
+알바생 캐릭터 본체 3종은 품질 재제작 대상으로 보류하고 이번 적용본에는 포함하지 않았습니다.

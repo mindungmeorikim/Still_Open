@@ -20,6 +20,7 @@ import {
   DAILY_REWARD_CYCLE_DAYS,
   getDailyRewardByDay
 } from "../data/DailyRewardData.js";
+import { EconomySystem } from "./EconomySystem.js";
 
 const ATTENDANCE_STORAGE_KEY = "today_normal_open_daily_reward_v1";
 const BM_WALLET_STORAGE_KEY = "today_normal_open_bm_wallet_v1";
@@ -84,6 +85,19 @@ export const DailyRewardSystem = {
     }
 
     const rewardResult = this.applyReward(claimInfo.reward);
+
+    if (!rewardResult.success) {
+      return {
+        success: false,
+        reason: rewardResult.reason ?? "reward_failed",
+        message: rewardResult.message ?? "출석 보상 지급에 실패했습니다.",
+        attendanceDay: claimInfo.attendanceDay,
+        reward: claimInfo.reward,
+        rewardResult,
+        state: claimInfo.state
+      };
+    }
+
     const previousState = claimInfo.state;
     const isNewCycle = previousState.cycleClaimCount >= DAILY_REWARD_CYCLE_DAYS;
     const nextCycleClaimCount = claimInfo.attendanceDay;
@@ -123,21 +137,40 @@ export const DailyRewardSystem = {
     }
 
     if (reward.type === "gold") {
-      GameState.money = Math.max(0, Math.floor(Number(GameState.money) || 0)) + amount;
+      const currencyResult = EconomySystem.addGold(amount, "daily_attendance_reward", {
+        source: "daily_attendance",
+        rewardId: reward.id ?? null,
+        attendanceDay: reward.day ?? null
+      });
+
+      if (!currencyResult.success) {
+        return currencyResult;
+      }
+
       return {
         success: true,
         type: reward.type,
         amount,
-        money: GameState.money
+        money: GameState.money,
+        currencyResult
       };
     }
 
     const wallet = this.readWallet();
+    let currencyResult = null;
 
     if (reward.type === "diamond") {
-      const bm = this.ensureGameStateBM();
-      bm.diamond += amount;
-      wallet.diamonds = bm.diamond;
+      currencyResult = EconomySystem.addDiamond(amount, "daily_attendance_reward", {
+        source: "daily_attendance",
+        rewardId: reward.id ?? null,
+        attendanceDay: reward.day ?? null
+      });
+
+      if (!currencyResult.success) {
+        return currencyResult;
+      }
+
+      wallet.diamonds = Math.max(0, Math.floor(Number(GameState.bm?.diamond) || 0));
     } else if (reward.type === "coffeeTicket") {
       wallet.coffeeTickets += amount;
       const bm = this.ensureGameStateBM();
@@ -166,7 +199,8 @@ export const DailyRewardSystem = {
       type: reward.type,
       amount,
       wallet,
-      bm: GameState.bm ?? null
+      bm: GameState.bm ?? null,
+      currencyResult
     };
   },
 
@@ -234,16 +268,7 @@ export const DailyRewardSystem = {
   },
 
   ensureGameStateBM() {
-    if (!GameState.bm || typeof GameState.bm !== "object") {
-      GameState.bm = {};
-    }
-
-    GameState.bm.diamond = Math.max(
-      0,
-      Math.floor(Number(GameState.bm.diamond) || 0)
-    );
-
-    return GameState.bm;
+    return EconomySystem.ensurePremiumWallet();
   },
 
   readJson(key, fallback) {

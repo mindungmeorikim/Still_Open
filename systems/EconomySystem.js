@@ -22,6 +22,16 @@ import { EVENTS } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
 import { BMSystem } from "./BMSystem.js";
 
+export const CURRENCY_EVENTS = Object.freeze({
+  CHANGED: "CURRENCY_CHANGED",
+  PREMIUM_GRANTED: "PREMIUM_CURRENCY_GRANTED"
+});
+
+const CURRENCY_TYPES = Object.freeze({
+  GOLD: "gold",
+  DIAMOND: "diamond"
+});
+
 export const EconomySystem = {
   processedCheckoutKeys: new Set(),
   activeDay: null,
@@ -40,6 +50,188 @@ export const EconomySystem = {
     EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data) => {
       this.handleCheckoutCompleted(data);
     });
+  },
+
+  addCurrency(type, amount, reason = "currency_added", meta = {}) {
+    return this.changeCurrency({
+      type,
+      amount,
+      direction: "add",
+      reason,
+      meta
+    });
+  },
+
+  spendCurrency(type, amount, reason = "currency_spent", meta = {}) {
+    return this.changeCurrency({
+      type,
+      amount,
+      direction: "spend",
+      reason,
+      meta
+    });
+  },
+
+  addDiamond(amount, reason = "diamond_added", meta = {}) {
+    return this.addCurrency(CURRENCY_TYPES.DIAMOND, amount, reason, meta);
+  },
+
+  spendDiamond(amount, reason = "diamond_spent", meta = {}) {
+    return this.spendCurrency(CURRENCY_TYPES.DIAMOND, amount, reason, meta);
+  },
+
+  addGold(amount, reason = "gold_added", meta = {}) {
+    return this.addCurrency(CURRENCY_TYPES.GOLD, amount, reason, meta);
+  },
+
+  spendGold(amount, reason = "gold_spent", meta = {}) {
+    return this.spendCurrency(CURRENCY_TYPES.GOLD, amount, reason, meta);
+  },
+
+  changeCurrency({ type, amount, direction, reason, meta = {} } = {}) {
+    const currencyType = this.normalizeCurrencyType(type);
+    const normalizedAmount = this.toPositiveInteger(amount);
+    const normalizedDirection = direction === "spend" ? "spend" : "add";
+
+    if (!currencyType) {
+      return this.currencyFailure("invalid_currency_type", "지원하지 않는 재화 타입입니다.", {
+        type,
+        amount,
+        direction: normalizedDirection,
+        reason,
+        meta
+      });
+    }
+
+    if (normalizedAmount <= 0) {
+      return this.currencyFailure("invalid_currency_amount", "재화 수량은 1 이상이어야 합니다.", {
+        type: currencyType,
+        amount,
+        direction: normalizedDirection,
+        reason,
+        meta
+      });
+    }
+
+    const previousBalances = this.getCurrencyBalances();
+    const previousBalance = previousBalances[currencyType] ?? 0;
+
+    if (normalizedDirection === "spend" && previousBalance < normalizedAmount) {
+      return this.currencyFailure(`not_enough_${currencyType}`, "보유 재화가 부족합니다.", {
+        type: currencyType,
+        amount: normalizedAmount,
+        balance: previousBalance,
+        direction: normalizedDirection,
+        reason,
+        meta
+      });
+    }
+
+    const delta = normalizedDirection === "spend" ? -normalizedAmount : normalizedAmount;
+
+    if (currencyType === CURRENCY_TYPES.GOLD) {
+      GameState.money = Math.max(0, previousBalance + delta);
+    } else if (currencyType === CURRENCY_TYPES.DIAMOND) {
+      const bm = this.ensurePremiumWallet();
+      bm.diamond = Math.max(0, previousBalance + delta);
+      GameState.bmWallet.diamonds = bm.diamond;
+
+      if (normalizedDirection === "add" && meta?.walletBucket === "paid") {
+        bm.paidWallet = bm.paidWallet && typeof bm.paidWallet === "object" ? bm.paidWallet : {};
+        bm.paidWallet.diamond = this.toNonNegativeInteger(bm.paidWallet.diamond) + normalizedAmount;
+      }
+    }
+
+    const balances = this.getCurrencyBalances();
+    const result = {
+      success: true,
+      type: currencyType,
+      amount: normalizedAmount,
+      delta,
+      direction: normalizedDirection,
+      reason: reason || (normalizedDirection === "spend" ? "currency_spent" : "currency_added"),
+      meta: this.cloneMeta(meta),
+      previousBalances,
+      balances,
+      day: GameState.day
+    };
+
+    this.emitCurrencyChanged(result);
+
+    return result;
+  },
+
+  emitCurrencyChanged(payload = {}) {
+    EventBus.emit(CURRENCY_EVENTS.CHANGED, payload);
+
+    if (payload.direction === "add" && payload.type === CURRENCY_TYPES.DIAMOND) {
+      EventBus.emit(CURRENCY_EVENTS.PREMIUM_GRANTED, payload);
+    }
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  currencyFailure(reason, message, details = {}) {
+    return {
+      success: false,
+      reason,
+      message,
+      day: GameState.day,
+      ...details
+    };
+  },
+
+  getCurrencyBalance(type) {
+    const currencyType = this.normalizeCurrencyType(type);
+    if (!currencyType) return 0;
+    return this.getCurrencyBalances()[currencyType] ?? 0;
+  },
+
+  getCurrencyBalances() {
+    const bm = this.ensurePremiumWallet();
+
+    return {
+      gold: this.toNonNegativeInteger(GameState.money),
+      diamond: this.toNonNegativeInteger(bm.diamond)
+    };
+  },
+
+  ensurePremiumWallet() {
+    if (!GameState.bm || typeof GameState.bm !== "object") {
+      GameState.bm = {};
+    }
+
+    GameState.bm.diamond = this.toNonNegativeInteger(GameState.bm.diamond);
+
+    if (!GameState.bmWallet || typeof GameState.bmWallet !== "object") {
+      GameState.bmWallet = {};
+    }
+
+    GameState.bmWallet.diamonds = GameState.bm.diamond;
+
+    return GameState.bm;
+  },
+
+  normalizeCurrencyType(type) {
+    const normalizedType = String(type ?? "").trim().toLowerCase();
+
+    if (["gold", "money", "cash"].includes(normalizedType)) {
+      return CURRENCY_TYPES.GOLD;
+    }
+
+    if (["diamond", "diamonds", "dia"].includes(normalizedType)) {
+      return CURRENCY_TYPES.DIAMOND;
+    }
+
+    return null;
+  },
+
+  cloneMeta(meta = {}) {
+    if (!meta || typeof meta !== "object" || Array.isArray(meta)) {
+      return {};
+    }
+
+    return { ...meta };
   },
 
   handleDayStarted(data = {}) {
@@ -255,6 +447,16 @@ export const EconomySystem = {
 
   toNonNegativeNumber(value) {
     const numberValue = Number(value);
+
+    if (!Number.isFinite(numberValue) || numberValue <= 0) {
+      return 0;
+    }
+
+    return numberValue;
+  },
+
+  toNonNegativeInteger(value) {
+    const numberValue = Math.floor(Number(value));
 
     if (!Number.isFinite(numberValue) || numberValue <= 0) {
       return 0;

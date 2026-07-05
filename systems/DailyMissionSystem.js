@@ -9,6 +9,7 @@ import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { DAILY_MISSIONS, DAILY_MISSION_REWARDS } from "../data/DailyMissionData.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
+import { EconomySystem } from "./EconomySystem.js";
 
 export const DAILY_MISSION_EVENTS = Object.freeze({
   STATE_CHANGED: "DAILY_MISSION_STATE_CHANGED",
@@ -195,11 +196,24 @@ export const DailyMissionSystem = {
       return this.emitRewardFailed("not_enough_completed", `${rewardCount}개 미션 완료가 필요합니다.`);
     }
 
+    let currencyResult = null;
+
     if (reward.type === "gold") {
-      GameState.money = Math.max(0, Math.floor(Number(GameState.money) || 0)) + reward.amount;
+      currencyResult = EconomySystem.addGold(reward.amount, "daily_mission_reward", {
+        source: "daily_mission",
+        rewardCount,
+        day: GameState.day
+      });
     } else if (reward.type === "diamond") {
-      if (!GameState.bm || typeof GameState.bm !== "object") GameState.bm = {};
-      GameState.bm.diamond = Math.max(0, Math.floor(Number(GameState.bm.diamond) || 0)) + reward.amount;
+      currencyResult = EconomySystem.addDiamond(reward.amount, "daily_mission_reward", {
+        source: "daily_mission",
+        rewardCount,
+        day: GameState.day
+      });
+    }
+
+    if (currencyResult && !currencyResult.success) {
+      return this.emitRewardFailed(currencyResult.reason ?? "currency_failed", currencyResult.message ?? "일일 미션 보상 지급에 실패했습니다.");
     }
 
     state.claimedRewardCounts.push(rewardCount);
@@ -209,6 +223,7 @@ export const DailyMissionSystem = {
       success: true,
       day: GameState.day,
       reward,
+      currencyResult,
       message: `일일 미션 ${rewardCount}개 완료 보상 ${reward.label}을 받았습니다.`,
       dailyMissionState: this.getState()
     };

@@ -40,6 +40,7 @@ const SANITATION_CLEANING_STARTED = "SANITATION_CLEANING_STARTED";
 const SANITATION_CLEANING_COMPLETED = "SANITATION_CLEANING_COMPLETED";
 const SANITATION_CLEANING_FAILED = "SANITATION_CLEANING_FAILED";
 const NUISANCE_CHECKOUT_DELAY_MS = 5000;
+const PLAYER_CHECKOUT_DELAY_MS = 3000;
 const VALID_CARRYING_BOX_TYPES = new Set([
   "arrive",
   "basic",
@@ -138,7 +139,7 @@ export const PlayerActionSystem = {
     this.bindCounterCheckoutAction();
     this.bindPointerActions();
     this.bindKeyboardActions();
-    this.bindStaffAutoCheckoutEvents();
+    // BM 최종본 기준 알바는 계산 담당이 아니므로 자동 계산 이벤트 바인딩을 하지 않는다.
     this.bindDeliveryBoxEvents();
     this.bindSanitationEvents();
   },
@@ -154,9 +155,8 @@ export const PlayerActionSystem = {
   },
 
   bindStaffAutoCheckoutEvents() {
-    EventBus.on(STAFF_EVENTS.AUTO_CHECKOUT_REQUESTED, (data = {}) => {
-      this.handleStaffAutoCheckoutRequest(data);
-    });
+    // Deprecated: 알바 자동 계산은 최종 BM/기획에서 제거됨.
+    // 알바 역할은 창고/진열대/청소 보조만 담당한다.
   },
 
   bindDeliveryBoxEvents() {
@@ -992,37 +992,9 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   },
 
   handleStaffAutoCheckoutRequest(data = {}) {
-    if (
-      GameState.phase !== GAME_PHASE.STORE_RUNNING ||
-      data.day !== GameState.day
-    ) {
-      this.emitStaffAutoCheckoutResult(false, data, "invalid_phase_or_day");
-      return;
-    }
-
-    const staff = data.staff ?? GameState.staff?.hired ?? null;
-
-    if (!staff) {
-      this.emitStaffAutoCheckoutResult(false, data, "no_staff");
-      return;
-    }
-
-    const checkoutPayload = this.performCheckout({
-      source: "staff_auto_checkout",
-      actorType: "staff",
-      actorId: staff.id,
-      actorName: staff.name,
-      checkoutIdPrefix: "staff-checkout",
-      onlyWaitingCustomer: true,
-      suppressNoCustomerMessage: true,
-      successMessage: (payload) => {
-        return `${staff.name} 알바가 ${payload.productName} 계산을 도왔습니다.`;
-      }
-    });
-
-    if (!checkoutPayload) {
-      this.emitStaffAutoCheckoutResult(false, data, "no_waiting_customer");
-    }
+    // Deprecated: 알바는 자동 계산을 수행하지 않는다.
+    // 외부에서 구버전 STAFF_AUTO_CHECKOUT_REQUESTED가 들어와도 계산 처리를 진행하지 않는다.
+    this.emitStaffAutoCheckoutResult(false, data, "staff_checkout_disabled");
   },
 
   performCheckout(options = {}) {
@@ -1034,6 +1006,11 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
 
     if (this.shouldDelayCheckout(checkoutPayload, options)) {
       this.scheduleDelayedCheckout(checkoutPayload, options);
+      return checkoutPayload;
+    }
+
+    if (this.shouldUsePlayerCheckoutDelay(checkoutPayload, options)) {
+      this.schedulePlayerCheckout(checkoutPayload, options);
       return checkoutPayload;
     }
 
@@ -1053,6 +1030,33 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       Boolean(checkoutPayload.nuisanceProfileId) ||
       Number(checkoutPayload.nuisanceCheckoutDelayMs) > 0
     );
+  },
+
+  shouldUsePlayerCheckoutDelay(checkoutPayload = {}, options = {}) {
+    if (options.skipPlayerCheckoutDelay === true) {
+      return false;
+    }
+
+    return (options.actorType ?? checkoutPayload.actorType ?? "player") === "player";
+  },
+
+  schedulePlayerCheckout(checkoutPayload = {}, options = {}) {
+    if (options.actorType !== "staff") {
+      this.isPlayerBusy = true;
+    }
+
+    const delayMs = PLAYER_CHECKOUT_DELAY_MS;
+    const delaySeconds = Math.max(1, Math.ceil(delayMs / 1000));
+
+    this.showActionMessage(`계산 중입니다... ${delaySeconds}초`);
+
+    setTimeout(() => {
+      if (options.actorType !== "staff") {
+        this.isPlayerBusy = false;
+      }
+
+      this.completeCheckout(checkoutPayload, options);
+    }, delayMs);
   },
 
   scheduleDelayedCheckout(checkoutPayload = {}, options = {}) {

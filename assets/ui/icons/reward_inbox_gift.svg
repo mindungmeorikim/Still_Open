@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="보상함 선물 아이콘">
+  <defs>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5bd4ff"/>
+      <stop offset="1" stop-color="#3d8cf2"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff3a8"/>
+      <stop offset="1" stop-color="#ffc95b"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="145%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#25517f" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+  <ellipse cx="48" cy="81" rx="31" ry="7" fill="#2d5b8f" opacity="0.16"/>
+  <g filter="url(#shadow)">
+    <rect x="20" y="38" width="56" height="39" rx="10" fill="url(#box)"/>
+    <rect x="17" y="30" width="62" height="18" rx="9" fill="url(#lid)"/>
+    <rect x="43" y="30" width="10" height="47" rx="4" fill="#ff6a7a"/>
+    <rect x="17" y="38" width="62" height="7" fill="#ffffff" opacity="0.18"/>
+    <path d="M47 30c-11-2-21-9-17-17 3-6 12-4 18 10 6-14 15-16 18-10 4 8-6 15-17 17Z" fill="#ff6a7a"/>
+    <path d="M39 21c-5-6-6-9-3-10 4-1 8 5 11 14-4-1-6-2-8-4Zm18 0c5-6 6-9 3-10-4-1-8 5-11 14 4-1 6-2 8-4Z" fill="#ffdbe0" opacity="0.9"/>
+    <circle cx="30" cy="56" r="4" fill="#fff" opacity="0.75"/>
+    <circle cx="65" cy="62" r="3" fill="#fff" opacity="0.55"/>
+  </g>
+</svg>

@@ -18,6 +18,9 @@ import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { PRODUCTS } from "../data/ProductData.js";
 import { InventorySystem } from "./InventorySystem.js";
 import { ExpansionSystem } from "./ExpansionSystem.js";
+import { DailyRewardSystem } from "./DailyRewardSystem.js";
+import { RewardCodeSystem, REWARD_CODE_EVENTS } from "./RewardCodeSystem.js";
+import { RewardInboxSystem, REWARD_INBOX_EVENTS } from "./RewardInboxSystem.js";
 
 const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
@@ -71,6 +74,14 @@ export const SaveSystem = {
 
     EventBus.on(EVENTS.UPGRADE_SELECTED, () => {
       this.requestAutosave("upgrade_selected");
+    });
+
+    EventBus.on(REWARD_CODE_EVENTS.REDEEM_SUCCEEDED, () => {
+      this.requestAutosave("reward_code_redeemed");
+    });
+
+    EventBus.on(REWARD_INBOX_EVENTS.UPDATED, () => {
+      this.requestAutosave("reward_inbox_updated");
     });
   },
 
@@ -230,6 +241,7 @@ export const SaveSystem = {
     this.applyGameStateSnapshot(saveData.gameState);
     this.applyInventorySnapshot(saveData.inventory);
     this.applyExpansionSnapshot(saveData.expansion);
+    this.applyExternalProgressSnapshots(saveData.gameState);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
@@ -371,6 +383,9 @@ export const SaveSystem = {
       dayScenario: GameState.dayScenario ?? null,
       bm: this.normalizeBMSnapshot(GameState.bm),
       dailyMissions: GameState.dailyMissions ?? null,
+      dailyReward: this.createDailyRewardSnapshot(),
+      rewardClaims: this.normalizeRewardClaimsSnapshot(RewardCodeSystem.getState()),
+      rewardInbox: this.normalizeRewardInboxSnapshot(RewardInboxSystem.getState()),
       sanitation: this.normalizeSanitationSnapshot(GameState.sanitation),
       staff: GameState.staff ?? null,
       player: GameState.player ?? null,
@@ -408,6 +423,10 @@ export const SaveSystem = {
       },
       dayScenario: null,
       bm: this.createDefaultBMSnapshot(),
+      dailyMissions: null,
+      dailyReward: this.createDefaultDailyRewardSnapshot(),
+      rewardClaims: this.createDefaultRewardClaimsSnapshot(),
+      rewardInbox: this.createDefaultRewardInboxSnapshot(),
       sanitation: this.createDefaultSanitationSnapshot(),
       staff: null,
       player: {
@@ -567,6 +586,12 @@ export const SaveSystem = {
     GameState.bm = this.normalizeBMSnapshot(nextState.bm ?? defaultSnapshot.bm);
     this.syncBMWalletFromBMSnapshot(GameState.bm);
     GameState.dailyMissions = nextState.dailyMissions ?? null;
+    RewardInboxSystem.writeState(
+      RewardInboxSystem.mergeDefaultRewards(
+        this.normalizeRewardInboxSnapshot(nextState.rewardInbox ?? defaultSnapshot.rewardInbox)
+      ),
+      { emit: false }
+    );
     GameState.sanitation = this.normalizeSanitationSnapshot(
       nextState.sanitation ?? defaultSnapshot.sanitation
     );
@@ -621,6 +646,28 @@ export const SaveSystem = {
     if (typeof ExpansionSystem.syncExpansionStateToGameState === "function") {
       ExpansionSystem.syncExpansionStateToGameState();
     }
+  },
+
+  applyExternalProgressSnapshots(gameStateSnapshot = {}) {
+    if (!gameStateSnapshot || typeof gameStateSnapshot !== "object") {
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(gameStateSnapshot, "dailyReward")) {
+      this.applyDailyRewardSnapshot(gameStateSnapshot.dailyReward);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(gameStateSnapshot, "rewardClaims")) {
+      RewardCodeSystem.writeClaims(this.normalizeRewardClaimsSnapshot(gameStateSnapshot.rewardClaims));
+    }
+  },
+
+  applyDailyRewardSnapshot(snapshot = {}) {
+    const dailyReward = this.normalizeDailyRewardSnapshot(snapshot);
+
+    DailyRewardSystem.writeAttendanceState(dailyReward.attendance);
+    const syncedWallet = DailyRewardSystem.syncGameStateWallet(dailyReward.wallet);
+    DailyRewardSystem.writeWallet(syncedWallet);
   },
 
   normalizeLoadedPhase(phase) {
@@ -678,6 +725,81 @@ export const SaveSystem = {
       coffeeTickets: this.toNonNegativeInteger(carryover.coffeeTickets)
     };
     this.syncBMWalletFromBMSnapshot(GameState.bm);
+  },
+
+  createDailyRewardSnapshot() {
+    return this.normalizeDailyRewardSnapshot({
+      attendance: DailyRewardSystem.readAttendanceState(),
+      wallet: DailyRewardSystem.readWallet()
+    });
+  },
+
+  createDefaultDailyRewardSnapshot() {
+    return this.normalizeDailyRewardSnapshot({});
+  },
+
+  normalizeDailyRewardSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const attendanceSource = source.attendance && typeof source.attendance === "object"
+      ? source.attendance
+      : source;
+
+    return {
+      attendance: {
+        lastClaimedDateKey: typeof attendanceSource.lastClaimedDateKey === "string" && attendanceSource.lastClaimedDateKey.trim()
+          ? attendanceSource.lastClaimedDateKey.trim()
+          : null,
+        cycleClaimCount: Math.min(7, this.toNonNegativeInteger(attendanceSource.cycleClaimCount)),
+        totalClaimCount: this.toNonNegativeInteger(attendanceSource.totalClaimCount),
+        cycleNumber: this.toPositiveInteger(attendanceSource.cycleNumber, 1)
+      },
+      wallet: this.normalizeDailyRewardWalletSnapshot(source.wallet ?? source.bmWallet ?? {})
+    };
+  },
+
+  normalizeDailyRewardWalletSnapshot(wallet = {}) {
+    const source = wallet && typeof wallet === "object" ? wallet : {};
+
+    return {
+      diamonds: this.toNonNegativeInteger(source.diamonds),
+      coffeeTickets: this.toNonNegativeInteger(source.coffeeTickets),
+      adSkipTickets: this.toNonNegativeInteger(source.adSkipTickets),
+      peakTimeCoupons: this.toNonNegativeInteger(source.peakTimeCoupons)
+    };
+  },
+
+  createDefaultRewardClaimsSnapshot() {
+    return {
+      usedCodes: [],
+      claimedCampaigns: {}
+    };
+  },
+
+  normalizeRewardClaimsSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const claimedCampaigns = source.claimedCampaigns && typeof source.claimedCampaigns === "object"
+      ? source.claimedCampaigns
+      : {};
+
+    return {
+      usedCodes: this.createUniqueStringArray(source.usedCodes).map((code) => code.toUpperCase()),
+      claimedCampaigns: Object.fromEntries(
+        Object.entries(claimedCampaigns)
+          .map(([campaignId, count]) => [
+            String(campaignId ?? "").trim(),
+            this.toNonNegativeInteger(count)
+          ])
+          .filter(([campaignId, count]) => campaignId && count > 0)
+      )
+    };
+  },
+
+  createDefaultRewardInboxSnapshot() {
+    return RewardInboxSystem.createDefaultState();
+  },
+
+  normalizeRewardInboxSnapshot(snapshot = {}) {
+    return RewardInboxSystem.normalizeState(snapshot);
   },
 
   createDefaultBMSnapshot() {
@@ -871,6 +993,9 @@ export const SaveSystem = {
     const hasUpgrades = Array.isArray(gameState.upgrades) && gameState.upgrades.length > 0;
     const hasExpandedStore = unlockedZoneIds.some((zoneId) => zoneId && zoneId !== "zone_basic");
     const hasBMProgress = this.hasBMProgress(bm);
+    const hasDailyRewardProgress = this.hasDailyRewardProgress(gameState.dailyReward);
+    const hasRewardClaimsProgress = this.hasRewardClaimsProgress(gameState.rewardClaims);
+    const hasRewardInboxProgress = this.hasRewardInboxProgress(gameState.rewardInbox);
     const hasTodayProgress = Object.values(todayStats).some((value) => {
       return Number.isFinite(Number(value)) && Number(value) !== 0;
     });
@@ -887,6 +1012,9 @@ export const SaveSystem = {
       hasUpgrades ||
       hasExpandedStore ||
       hasBMProgress ||
+      hasDailyRewardProgress ||
+      hasRewardClaimsProgress ||
+      hasRewardInboxProgress ||
       hasSanitationProgress ||
       hasTodayProgress
     );
@@ -916,6 +1044,38 @@ export const SaveSystem = {
       Object.keys(bm.productUpgradeLevels).length > 0 ||
       bm.staffAbilityUpgrade.totalCount > 0 ||
       Object.values(bm.paidWallet).some((value) => this.toNonNegativeInteger(value) > 0)
+    );
+  },
+
+  hasDailyRewardProgress(snapshot = {}) {
+    const dailyReward = this.normalizeDailyRewardSnapshot(snapshot);
+    const attendance = dailyReward.attendance;
+    const wallet = dailyReward.wallet;
+
+    return (
+      attendance.lastClaimedDateKey !== null ||
+      attendance.cycleClaimCount > 0 ||
+      attendance.totalClaimCount > 0 ||
+      attendance.cycleNumber > 1 ||
+      Object.values(wallet).some((value) => this.toNonNegativeInteger(value) > 0)
+    );
+  },
+
+  hasRewardClaimsProgress(snapshot = {}) {
+    const claims = this.normalizeRewardClaimsSnapshot(snapshot);
+
+    return (
+      claims.usedCodes.length > 0 ||
+      Object.keys(claims.claimedCampaigns).length > 0
+    );
+  },
+
+  hasRewardInboxProgress(snapshot = {}) {
+    const inbox = this.normalizeRewardInboxSnapshot(snapshot);
+
+    return (
+      inbox.rewards.length > 0 ||
+      Object.keys(inbox.items).length > 0
     );
   },
 

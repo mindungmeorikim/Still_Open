@@ -49,6 +49,22 @@ export const CUSTOMER_ASSET_DIRECTIONS = Object.freeze([
   "up_right"
 ]);
 
+
+export const STAFF_ASSET_DIRECTIONS = CUSTOMER_ASSET_DIRECTIONS;
+
+function createStaffDirectionalAssetSet(folderName, filePrefix) {
+  return STAFF_ASSET_DIRECTIONS.reduce((assets, direction) => {
+    assets[direction] = `./assets/images/staff/${folderName}/${filePrefix}_${direction}.png`;
+    return assets;
+  }, {});
+}
+
+export const STAFF_ASSET_VARIANTS = deepFreeze({
+  staff_male_cashier: createStaffDirectionalAssetSet("staff_male_cashier", "staff_male_cashier"),
+  staff_female_glasses: createStaffDirectionalAssetSet("staff_female_glasses", "staff_female_glasses"),
+  staff_female_friendly: createStaffDirectionalAssetSet("staff_female_friendly", "staff_female_friendly")
+});
+
 function createCustomerDirectionalAssetSet(folderName, filePrefix) {
   return CUSTOMER_ASSET_DIRECTIONS.reduce((assets, direction) => {
     assets[direction] = `./assets/images/customers/${folderName}/${filePrefix}_${direction}.png`;
@@ -192,9 +208,22 @@ export function getCustomerAssetPath(customer = {}, direction = null) {
   return variantAssets?.[directionId] ?? variantAssets?.down ?? null;
 }
 
+
+
+export function getStaffAssetPath(staff = {}, direction = "down") {
+  const variantId = String(staff.assetVariant ?? staff.variantId ?? staff.id ?? "staff_male_cashier").trim();
+  const variantAssets = STAFF_ASSET_VARIANTS[variantId] ?? STAFF_ASSET_VARIANTS.staff_male_cashier;
+  const normalizedDirection = normalizeCustomerAssetDirection(direction);
+
+  return variantAssets?.[normalizedDirection] ?? variantAssets?.down ?? null;
+}
+
 export const ASSET_PATHS = deepFreeze({
   customers: {
     variants: CUSTOMER_ASSET_VARIANTS
+  },
+  staff: {
+    variants: STAFF_ASSET_VARIANTS
   },
   objects: {
     displayStand: {

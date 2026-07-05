@@ -123,6 +123,33 @@ export const BM_ASSETS = Object.freeze({
     diamondRewardIcon: "./assets/images/bm/free_charge/icon_ad_diamond_reward.png",
     goldRewardIcon: "./assets/images/bm/free_charge/icon_ad_gold_reward.png",
     peakCouponDiscountIcon: "./assets/images/bm/free_charge/icon_ad_peak_coupon_discount.png"
+  }),
+  staff: Object.freeze({
+    cardFrame: "./assets/images/bm/staff/staff_card_frame.png",
+    hire: "./assets/images/bm/staff/icon_staff_hire.png",
+    upgrade: "./assets/images/bm/staff/icon_staff_upgrade.png"
+  }),
+  mental: Object.freeze({
+    recovery: "./assets/images/bm/mental/icon_mental_recovery.png",
+    freeRecovery: "./assets/images/bm/mental/icon_mental_free_recovery.png",
+    goldRecovery: "./assets/images/bm/mental/icon_mental_gold_recovery.png",
+    diamondRecovery: "./assets/images/bm/mental/icon_mental_diamond_recovery.png"
+  }),
+  productLicense: Object.freeze({
+    license: "./assets/images/bm/product_license/item_product_license.png",
+    contract: "./assets/images/bm/product_license/icon_product_contract.png",
+    wait: "./assets/images/bm/product_license/icon_product_license_wait.png"
+  }),
+  upgrades: Object.freeze({
+    shelf: Object.freeze({
+      upgrade: "./assets/images/bm/upgrades/shelf/icon_shelf_upgrade.png",
+      capacity: "./assets/images/bm/upgrades/shelf/icon_shelf_capacity.png",
+      speed: "./assets/images/bm/upgrades/shelf/icon_shelf_speed.png"
+    }),
+    storage: Object.freeze({
+      expansion: "./assets/images/bm/upgrades/storage/icon_storage_expansion.png",
+      capacity: "./assets/images/bm/upgrades/storage/icon_storage_capacity.png"
+    })
   })
 });
 

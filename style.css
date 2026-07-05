@@ -4712,6 +4712,16 @@ button:active {
   line-height: 1;
 }
 
+.staff-character-sprite {
+  position: relative;
+  z-index: 1;
+  width: 54px;
+  height: 54px;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 3px 4px rgba(91, 66, 39, 0.16));
+}
+
 .staff-character-label {
   display: grid;
   width: max-content;
@@ -19710,5 +19720,2221 @@ body.is-title-screen-active #game-root {
 
   #bm-contract-shop-modal .bm-tool-actions button {
     flex: 1 1 120px !important;
+  }
+}
+
+/* [v7.6.8] BM additional asset integration */
+.staff-candidate-visual {
+  position: relative;
+  width: 88px;
+  height: 102px;
+  margin: -2px auto 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.staff-candidate-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0.92;
+}
+
+.staff-candidate-sprite {
+  position: relative;
+  z-index: 1;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 8px rgba(91, 66, 39, 0.16));
+}
+
+.staff-candidate-hire-icon {
+  position: relative;
+  z-index: 1;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 5px rgba(91, 66, 39, 0.14));
+}
+
+.bm-contract-product-license-box {
+  position: relative;
+  overflow: visible;
+}
+
+.bm-contract-license-badge {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 4px rgba(91, 66, 39, 0.18));
+  pointer-events: none;
+}
+
+#upgrade-modal .mental-recovery-card {
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  align-items: center !important;
+  column-gap: 12px !important;
+}
+
+#upgrade-modal .mental-recovery-card .mental-recovery-icon {
+  grid-row: 1 / span 4;
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(91, 66, 39, 0.16));
+}
+
+#upgrade-modal .mental-recovery-card strong,
+#upgrade-modal .mental-recovery-card span,
+#upgrade-modal .mental-recovery-card .upgrade-price,
+#upgrade-modal .mental-recovery-card .upgrade-disabled-reason {
+  grid-column: 2;
+}
+
+@media (max-width: 980px), (max-height: 560px) {
+  .staff-candidate-visual {
+    width: 72px;
+    height: 84px;
+  }
+
+  .staff-candidate-sprite {
+    width: 58px;
+    height: 58px;
+  }
+
+  .staff-candidate-hire-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  #upgrade-modal .mental-recovery-card {
+    grid-template-columns: 52px minmax(0, 1fr) !important;
+  }
+
+  #upgrade-modal .mental-recovery-card .mental-recovery-icon {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* [v7.9.4] daily mission moved out of BM shop */
+#top-icon-menu {
+  min-width: 142px !important;
+  max-width: calc(100vw - 12px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+}
+
+#daily-mission-shortcut-button.daily-mission-shortcut-button {
+  display: inline-grid !important;
+  place-items: center !important;
+  padding: 4px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(255, 248, 224, .96), rgba(230, 255, 237, .94)) !important;
+  border: 2px solid rgba(244, 188, 78, .74) !important;
+  box-shadow: 0 4px 0 rgba(111, 82, 34, .18), inset 0 1px 0 rgba(255,255,255,.75) !important;
+  cursor: pointer !important;
+}
+
+#daily-mission-shortcut-button.daily-mission-shortcut-button img {
+  width: 28px !important;
+  height: 28px !important;
+  object-fit: contain !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 2px 1px rgba(74, 52, 16, .18)) !important;
+}
+
+#daily-mission-shortcut-button.daily-mission-shortcut-button:hover,
+#daily-mission-shortcut-button.daily-mission-shortcut-button:focus-visible {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 5px 0 rgba(111, 82, 34, .18), 0 0 0 3px rgba(255, 202, 91, .24), inset 0 1px 0 rgba(255,255,255,.82) !important;
+}
+
+#daily-mission-shortcut-button.daily-mission-shortcut-button:active {
+  transform: translateY(1px) !important;
+  box-shadow: 0 2px 0 rgba(111, 82, 34, .18), inset 0 1px 0 rgba(255,255,255,.65) !important;
+}
+
+#reward-inbox-button.reward-inbox-button {
+  position: relative !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  padding: 4px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(255, 248, 224, .96), rgba(230, 255, 237, .94)) !important;
+  border: 2px solid rgba(244, 188, 78, .74) !important;
+  box-shadow: 0 4px 0 rgba(111, 82, 34, .18), inset 0 1px 0 rgba(255,255,255,.75) !important;
+  cursor: pointer !important;
+}
+
+#reward-inbox-button.reward-inbox-button img {
+  width: 28px !important;
+  height: 28px !important;
+  object-fit: contain !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 2px 1px rgba(74, 52, 16, .18)) !important;
+}
+
+#reward-inbox-button.reward-inbox-button:hover,
+#reward-inbox-button.reward-inbox-button:focus-visible {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 5px 0 rgba(111, 82, 34, .18), 0 0 0 3px rgba(255, 202, 91, .24), inset 0 1px 0 rgba(255,255,255,.82) !important;
+}
+
+#reward-inbox-button.reward-inbox-button:active {
+  transform: translateY(1px) !important;
+  box-shadow: 0 2px 0 rgba(111, 82, 34, .18), inset 0 1px 0 rgba(255,255,255,.65) !important;
+}
+
+.reward-inbox-badge {
+  position: absolute !important;
+  top: -6px !important;
+  right: -6px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  background: #f05245 !important;
+  color: #fff !important;
+  border: 2px solid #fff9e6 !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  box-shadow: 0 2px 4px rgba(79, 43, 24, .24) !important;
+}
+
+.reward-inbox-badge[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 420px) {
+  #top-icon-menu {
+    min-width: 128px !important;
+    gap: 5px !important;
+  }
+
+  #daily-mission-shortcut-button.daily-mission-shortcut-button img,
+  #reward-inbox-button.reward-inbox-button img {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .reward-inbox-badge {
+    top: -5px !important;
+    right: -5px !important;
+    min-width: 16px !important;
+    height: 16px !important;
+    font-size: 9px !important;
+  }
+}
+
+/* [v7.9.5] reward inbox entry and coupon panel */
+#top-icon-menu {
+  min-width: 178px !important;
+  gap: 7px !important;
+}
+
+#daily-mission-shortcut-button.daily-mission-shortcut-button,
+#reward-inbox-button.reward-inbox-button {
+  position: relative !important;
+  width: 58px !important;
+  min-width: 58px !important;
+  height: 56px !important;
+  min-height: 56px !important;
+  display: inline-grid !important;
+  grid-template-rows: 29px auto !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 1px !important;
+  padding: 5px 4px 4px !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(255, 248, 224, .98), rgba(232, 255, 237, .96)) !important;
+  border: 2px solid rgba(244, 188, 78, .78) !important;
+  box-shadow: 0 4px 0 rgba(111, 82, 34, .18), inset 0 1px 0 rgba(255,255,255,.78) !important;
+  overflow: visible !important;
+}
+
+#daily-mission-shortcut-button.daily-mission-shortcut-button img,
+#reward-inbox-button.reward-inbox-button img {
+  width: 27px !important;
+  height: 27px !important;
+  object-fit: contain !important;
+}
+
+.top-icon-button-label {
+  display: block !important;
+  max-width: 100% !important;
+  color: #5d3f12 !important;
+  font-size: 9.5px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 420px) {
+  #top-icon-menu {
+    min-width: 154px !important;
+    gap: 5px !important;
+  }
+
+  #daily-mission-shortcut-button.daily-mission-shortcut-button,
+  #reward-inbox-button.reward-inbox-button {
+    width: 52px !important;
+    min-width: 52px !important;
+    height: 50px !important;
+    min-height: 50px !important;
+    grid-template-rows: 24px auto !important;
+    padding: 4px 3px 3px !important;
+  }
+
+  #daily-mission-shortcut-button.daily-mission-shortcut-button img,
+  #reward-inbox-button.reward-inbox-button img {
+    width: 23px !important;
+    height: 23px !important;
+  }
+
+  .top-icon-button-label {
+    font-size: 9px !important;
+  }
+}
+
+.reward-inbox-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9650 !important;
+  display: grid !important;
+  place-items: center !important;
+  background: rgba(21, 24, 28, .44) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+.reward-inbox-modal.hidden {
+  display: none !important;
+}
+
+.reward-inbox-modal-content {
+  width: min(780px, calc(100vw - 32px)) !important;
+  max-height: min(680px, calc(100svh - 32px)) !important;
+  min-height: min(460px, calc(100svh - 32px)) !important;
+  overflow: hidden !important;
+  padding: 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 24px !important;
+  border: 3px solid rgba(93, 162, 216, .86) !important;
+  background: linear-gradient(180deg, #fff9e8 0%, #eef8ff 52%, #f3fff3 100%) !important;
+  box-shadow: 0 18px 44px rgba(28, 42, 58, .3), inset 0 1px 0 rgba(255,255,255,.8) !important;
+}
+
+.reward-inbox-modal-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-bottom: 12px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid rgba(93, 162, 216, .3) !important;
+}
+
+.reward-inbox-modal-header h2 {
+  margin: 2px 0 0 !important;
+  color: #203f55 !important;
+  font-size: 24px !important;
+  font-weight: 950 !important;
+}
+
+.reward-inbox-eyebrow {
+  display: inline-flex !important;
+  width: fit-content !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  background: #62a7e4 !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: 0 !important;
+}
+
+.reward-inbox-close-button {
+  width: 42px !important;
+  height: 42px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(180deg, #fffae9 0%, #ffd977 100%) !important;
+  color: #6e4010 !important;
+  font-size: 24px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  box-shadow: 0 4px 0 rgba(130, 84, 28, .2), inset 0 1px 0 rgba(255,255,255,.8) !important;
+  cursor: pointer !important;
+}
+
+.reward-inbox-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+.reward-inbox-message {
+  min-height: 20px !important;
+  margin: 0 !important;
+  color: #5c6970 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.reward-inbox-message.is-success {
+  color: #267a45 !important;
+}
+
+.reward-inbox-message.is-error {
+  color: #b84a3f !important;
+}
+
+.reward-inbox-claim-all-button,
+.reward-inbox-claim-button {
+  min-height: 36px !important;
+  padding: 9px 14px !important;
+  border: 0 !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #67bf83 0%, #2c9655 100%) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  box-shadow: 0 4px 0 rgba(25, 99, 55, .22), inset 0 1px 0 rgba(255,255,255,.55) !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+}
+
+.reward-inbox-claim-all-button:disabled,
+.reward-inbox-claim-button:disabled {
+  background: linear-gradient(180deg, #d9ddd8 0%, #aeb5ae 100%) !important;
+  color: #69716b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 3px 0 rgba(110, 117, 111, .18) !important;
+  cursor: not-allowed !important;
+}
+
+.reward-inbox-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding-right: 4px !important;
+}
+
+.reward-inbox-card,
+.reward-inbox-empty {
+  border-radius: 18px !important;
+  border: 2px solid rgba(93, 162, 216, .38) !important;
+  background: rgba(255,255,255,.76) !important;
+  box-shadow: 0 8px 18px rgba(41, 73, 96, .1) !important;
+}
+
+.reward-inbox-card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: center !important;
+  padding: 13px !important;
+}
+
+.reward-inbox-card.is-claimed,
+.reward-inbox-card.is-expired {
+  background: rgba(238, 242, 241, .78) !important;
+  border-color: rgba(160, 171, 173, .42) !important;
+}
+
+.reward-inbox-card-main {
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+.reward-inbox-state {
+  width: fit-content !important;
+  padding: 3px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(98, 167, 228, .16) !important;
+  color: #275c7c !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+}
+
+.reward-inbox-card.is-claimed .reward-inbox-state,
+.reward-inbox-card.is-expired .reward-inbox-state {
+  background: rgba(139, 150, 150, .16) !important;
+  color: #69716b !important;
+}
+
+.reward-inbox-card strong,
+.reward-inbox-empty strong {
+  color: #263f4c !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+}
+
+.reward-inbox-card p {
+  margin: 0 !important;
+  color: #637078 !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+.reward-inbox-reward-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+}
+
+.reward-inbox-reward-list span {
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 183, 70, .18) !important;
+  color: #674612 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.reward-inbox-empty {
+  min-height: 220px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 20px !important;
+  text-align: center !important;
+}
+
+.reward-inbox-empty span {
+  color: #69747a !important;
+  font-size: 13px !important;
+}
+
+.reward-inbox-coupon-area {
+  flex: 0 0 auto !important;
+  margin-top: 12px !important;
+}
+
+.reward-inbox-coupon-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 12px !important;
+  border-radius: 16px !important;
+  border: 2px solid rgba(244, 188, 78, .45) !important;
+  background: rgba(255, 250, 232, .82) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75) !important;
+}
+
+.reward-inbox-coupon-intro {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.reward-inbox-coupon-intro strong {
+  color: #263f4c !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-form {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-input {
+  min-width: 0 !important;
+  min-height: 38px !important;
+  padding: 9px 12px !important;
+  border-radius: 13px !important;
+  border: 1px solid rgba(218, 196, 151, .96) !important;
+  background: rgba(255, 255, 247, .98) !important;
+  color: #314331 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  outline: none !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-input:focus {
+  border-color: rgba(244, 161, 52, .98) !important;
+  box-shadow: 0 0 0 3px rgba(244, 161, 52, .18) !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-submit-button {
+  min-height: 38px !important;
+  padding: 9px 14px !important;
+  border: 0 !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #62c77c 0%, #2c9d55 100%) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  box-shadow: 0 4px 0 rgba(25, 99, 55, .25), inset 0 1px 0 rgba(255,255,255,.55) !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-submit-button:disabled {
+  background: linear-gradient(180deg, #d9ddd8 0%, #aeb5ae 100%) !important;
+  color: #69716b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 3px 0 rgba(110, 117, 111, .18) !important;
+  cursor: not-allowed !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-message {
+  min-height: 16px !important;
+  margin: 0 !important;
+  color: #78684d !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+  line-height: 1.35 !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-message.is-success {
+  color: #267944 !important;
+}
+
+.reward-inbox-coupon-panel .reward-code-message.is-error {
+  color: #a14f22 !important;
+}
+
+@media (max-width: 640px) {
+  .reward-inbox-modal-content {
+    width: calc(100vw - 20px) !important;
+    min-height: min(460px, calc(100svh - 20px)) !important;
+    max-height: calc(100svh - 20px) !important;
+    padding: 14px !important;
+  }
+
+  .reward-inbox-toolbar {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  .reward-inbox-claim-all-button {
+    width: 100% !important;
+  }
+
+  .reward-inbox-card {
+    grid-template-columns: 1fr !important;
+  }
+
+  .reward-inbox-claim-button {
+    width: 100% !important;
+  }
+
+  .reward-inbox-coupon-panel .reward-code-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  .reward-inbox-coupon-panel .reward-code-submit-button {
+    width: 100% !important;
+  }
+}
+
+.daily-mission-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9600 !important;
+  display: grid !important;
+  place-items: center !important;
+  background: rgba(23, 20, 16, .42) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+.daily-mission-modal.hidden {
+  display: none !important;
+}
+
+.daily-mission-modal-content {
+  width: min(760px, calc(100vw - 32px)) !important;
+  min-height: min(452px, calc(100svh - 32px)) !important;
+  max-height: min(620px, calc(100svh - 32px)) !important;
+  overflow: auto !important;
+  padding: 18px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  border-radius: 26px !important;
+  border: 3px solid rgba(244, 191, 85, .9) !important;
+  background: linear-gradient(180deg, rgba(255, 250, 232, .99), rgba(239, 255, 242, .98)) !important;
+  box-shadow: 0 16px 40px rgba(50, 37, 18, .28), inset 0 1px 0 rgba(255,255,255,.82) !important;
+}
+
+.daily-mission-modal-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-bottom: 14px !important;
+  padding-bottom: 10px !important;
+  border-bottom: 1px solid rgba(218, 174, 87, .35) !important;
+}
+
+.daily-mission-modal-header h2 {
+  margin: 2px 0 0 !important;
+  color: #244531 !important;
+  font-size: 24px !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.daily-mission-eyebrow {
+  display: inline-flex !important;
+  width: fit-content !important;
+  padding: 4px 9px !important;
+  border-radius: 999px !important;
+  background: #ffb33f !important;
+  color: #5a310b !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  letter-spacing: .04em !important;
+}
+
+.daily-mission-close-button {
+  width: 42px !important;
+  height: 42px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(180deg, #fffae9 0%, #ffd977 100%) !important;
+  color: #6e4010 !important;
+  font-size: 24px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  box-shadow: 0 4px 0 rgba(130, 84, 28, .2), inset 0 1px 0 rgba(255,255,255,.8) !important;
+  cursor: pointer !important;
+}
+
+.daily-mission-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-panel {
+  margin: 0 !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 12px !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-panel h3 {
+  margin: 0 !important;
+  color: #304938 !important;
+  font-size: 15px !important;
+  font-weight: 950 !important;
+  line-height: 1.25 !important;
+}
+
+.daily-mission-modal-body .bm-shop-section-note {
+  margin: 0 !important;
+  color: #667261 !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-list {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-card {
+  border-radius: 18px !important;
+  background: rgba(255, 248, 224, .98) !important;
+  border: 2px solid rgba(228, 190, 93, .62) !important;
+  padding: 12px !important;
+  min-height: 108px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 5px !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-card.is-complete {
+  background: rgba(232, 255, 241, .98) !important;
+  border-color: rgba(42, 190, 96, .45) !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-card strong,
+.daily-mission-modal-body .bm-daily-mission-card em {
+  color: #304938 !important;
+  font-weight: 950 !important;
+  font-style: normal !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-card span {
+  color: #697463 !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-rewards {
+  margin-top: 0 !important;
+  display: flex !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-reward-button {
+  min-height: 36px !important;
+  padding: 9px 13px !important;
+  border: 0 !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #62c77c 0%, #2c9d55 100%) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  box-shadow: 0 4px 0 rgba(25, 99, 55, .25), inset 0 1px 0 rgba(255,255,255,.55) !important;
+  cursor: pointer !important;
+}
+
+.daily-mission-modal-body .bm-daily-mission-reward-button:disabled {
+  background: linear-gradient(180deg, #d9ddd8 0%, #aeb5ae 100%) !important;
+  color: #69716b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 3px 0 rgba(110, 117, 111, .18) !important;
+  cursor: not-allowed !important;
+}
+
+@media (max-width: 780px) {
+  .daily-mission-modal-content {
+    width: calc(100vw - 20px) !important;
+    min-height: min(452px, calc(100svh - 20px)) !important;
+    padding: 14px !important;
+  }
+
+  .daily-mission-modal-body .bm-daily-mission-panel {
+    justify-content: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .daily-mission-modal-body .bm-daily-mission-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  .daily-mission-modal-body .bm-daily-mission-card {
+    min-height: 88px !important;
+    padding: 10px !important;
+  }
+
+  .daily-mission-modal-body .bm-daily-mission-reward-button {
+    flex: 1 1 136px !important;
+  }
+}
+
+@media (max-height: 560px) {
+  .daily-mission-modal-content {
+    min-height: 0 !important;
+  }
+
+  .daily-mission-modal-body .bm-daily-mission-panel {
+    justify-content: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .daily-mission-modal-body .bm-daily-mission-card {
+    min-height: 88px !important;
+    padding: 10px !important;
+  }
+}
+
+/* [v7.6.12] BM 상점 접근성/세부 분류/카드형 UX 개선 */
+#bm-contract-shop-modal .bm-shop-modern-content {
+  width: min(96vw, 1200px) !important;
+  max-width: min(96vw, 1200px) !important;
+  height: min(90svh, 748px) !important;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 236, 174, 0.32) 0, transparent 28%),
+    linear-gradient(180deg, #fff8e8 0%, #f6f4e4 48%, #eff8ed 100%) !important;
+  border: 3px solid rgba(229, 183, 91, 0.9) !important;
+  box-shadow: 0 20px 48px rgba(48, 35, 18, 0.32) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-topbar {
+  min-height: 50px !important;
+  padding: 7px 12px 7px 16px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-wallet {
+  min-height: 34px !important;
+  padding: 0 4px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-body {
+  grid-template-columns: minmax(0, 1fr) 218px !important;
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-contract-shop-list {
+  padding: 1px 4px 10px 1px !important;
+  gap: 10px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+#bm-contract-shop-modal .bm-shop-modern-guide {
+  padding: 14px 12px !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg, rgba(255, 252, 242, .97) 0%, rgba(242, 255, 241, .95) 100%) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-section {
+  gap: 10px !important;
+  min-height: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtabs {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)) !important;
+  gap: 8px !important;
+  padding: 8px !important;
+  border-radius: 18px !important;
+  background: rgba(255, 251, 235, 0.86) !important;
+  border: 1px solid rgba(223, 194, 132, 0.72) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .74) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 34px !important;
+  padding: 6px 10px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(219, 196, 146, 0.95) !important;
+  background: rgba(255, 255, 247, 0.96) !important;
+  color: #486549 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 2px 0 rgba(132, 89, 32, .09) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-button strong {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 20px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  border-radius: 999px !important;
+  background: rgba(229, 241, 217, 0.95) !important;
+  color: #426543 !important;
+  font-size: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-button.is-active {
+  border-color: rgba(244, 161, 52, 0.98) !important;
+  background: linear-gradient(180deg, #ffc969 0%, #ffa43d 100%) !important;
+  color: #4f2b09 !important;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.45), 0 3px 0 rgba(174, 94, 26, .2) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-button.is-active strong {
+  background: rgba(255, 248, 226, 0.95) !important;
+  color: #5b3610 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-intro {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-height: 38px !important;
+  padding: 9px 12px !important;
+  border-radius: 15px !important;
+  background: rgba(255, 249, 226, 0.95) !important;
+  border: 1px solid rgba(222, 189, 121, .66) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-intro strong {
+  color: #523715 !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-subtab-intro span {
+  color: #78684d !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  line-height: 1.35 !important;
+  text-align: right !important;
+}
+
+#bm-contract-shop-modal .reward-code-panel {
+  gap: 8px !important;
+}
+
+#bm-contract-shop-modal .reward-code-form {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 8px !important;
+  align-items: center !important;
+}
+
+#bm-contract-shop-modal .reward-code-input {
+  min-width: 0 !important;
+  min-height: 36px !important;
+  padding: 8px 11px !important;
+  border-radius: 13px !important;
+  border: 1px solid rgba(218, 196, 151, 0.96) !important;
+  background: rgba(255, 255, 247, 0.98) !important;
+  color: #314331 !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+  outline: none !important;
+}
+
+#bm-contract-shop-modal .reward-code-input:focus {
+  border-color: rgba(244, 161, 52, 0.98) !important;
+  box-shadow: 0 0 0 3px rgba(244, 161, 52, 0.18) !important;
+}
+
+#bm-contract-shop-modal .reward-code-submit-button {
+  min-height: 36px !important;
+  padding: 8px 14px !important;
+  border: 0 !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #62c77c 0%, #2c9d55 100%) !important;
+  color: #fff !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  box-shadow: 0 4px 0 rgba(25, 99, 55, .25), inset 0 1px 0 rgba(255,255,255,.55) !important;
+}
+
+#bm-contract-shop-modal .reward-code-submit-button:disabled {
+  background: linear-gradient(180deg, #d9ddd8 0%, #aeb5ae 100%) !important;
+  color: #69716b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 3px 0 rgba(110, 117, 111, .18) !important;
+}
+
+#bm-contract-shop-modal .reward-code-message {
+  min-height: 16px !important;
+  margin: 0 !important;
+  color: #78684d !important;
+  font-size: 11px !important;
+  font-weight: 850 !important;
+  line-height: 1.35 !important;
+}
+
+#bm-contract-shop-modal .reward-code-message.is-success {
+  color: #267944 !important;
+}
+
+#bm-contract-shop-modal .reward-code-message.is-error {
+  color: #a14f22 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid,
+#bm-contract-shop-modal .bm-shop-card-list.bm-shop-card-grid,
+#bm-contract-shop-modal .bm-tool-grid.bm-shop-card-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(154px, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-shop-card,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-shop-action-card,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-tool-card,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-product-upgrade-card {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  grid-auto-rows: auto !important;
+  align-items: stretch !important;
+  justify-items: center !important;
+  gap: 8px !important;
+  min-height: 180px !important;
+  padding: 12px !important;
+  text-align: center !important;
+  border-radius: 20px !important;
+  background: rgba(255, 253, 244, 0.99) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-shop-card-icon {
+  width: 68px !important;
+  height: 68px !important;
+  margin: 0 auto !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-main {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-image-box {
+  width: 66px !important;
+  height: 66px !important;
+  border-radius: 18px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-image {
+  width: 58px !important;
+  height: 58px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-copy {
+  justify-items: center !important;
+  width: 100% !important;
+  gap: 3px !important;
+  min-height: 64px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-copy strong {
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  font-size: 13px !important;
+  line-height: 1.18 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-copy small {
+  max-width: 100% !important;
+  font-size: 10.5px !important;
+  line-height: 1.25 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-meta {
+  justify-content: center !important;
+  gap: 4px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-product-meta span {
+  min-height: 20px !important;
+  padding: 3px 6px !important;
+  font-size: 9.5px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-shop-card button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-tool-actions,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-product-upgrade-button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-shelf-upgrade-button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-ad-reward-button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-diamond-product-button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-gold-product-button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-contract-purchase-button,
+#bm-contract-shop-modal .bm-shop-card-grid .bm-premium-purchase-button,
+#bm-contract-shop-modal .bm-shop-card-grid #bm-warehouse-upgrade-button,
+#bm-contract-shop-modal .bm-shop-card-grid #bm-contract-skip-button,
+#bm-contract-shop-modal .bm-shop-card-grid #bm-peak-coupon-purchase-button,
+#bm-contract-shop-modal .bm-shop-card-grid #bm-peak-coupon-use-button {
+  justify-self: stretch !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 32px !important;
+  padding: 7px 9px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-tool-actions {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)) !important;
+  gap: 6px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-staff-upgrade-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-shop-card-label {
+  width: 48px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-card-grid .bm-shop-empty-card {
+  min-height: 126px !important;
+  place-content: center !important;
+}
+
+#bm-contract-shop-modal .bm-recommend-main-card {
+  min-height: 92px !important;
+  padding: 14px !important;
+}
+
+#bm-contract-shop-modal .bm-recommend-quick-grid,
+#bm-contract-shop-modal .bm-shop-recommend-grid,
+#bm-contract-shop-modal .bm-shop-preview-grid {
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+}
+
+#bm-contract-shop-modal .bm-product-upgrade-grid,
+#bm-contract-shop-modal .bm-contract-product-grid,
+#bm-contract-shop-modal .bm-premium-product-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+}
+
+#bm-contract-shop-modal .bm-growth-overview-grid,
+#bm-contract-shop-modal .bm-convenience-item-grid,
+#bm-contract-shop-modal .bm-currency-product-grid,
+#bm-contract-shop-modal .bm-shop-free-grid {
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)) !important;
+}
+
+@media (max-width: 980px) {
+  #bm-contract-shop-modal .bm-shop-modern-content {
+    height: calc(100svh - 14px) !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-modern-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-subtabs {
+    grid-template-columns: repeat(auto-fit, minmax(98px, 1fr)) !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #bm-contract-shop-modal .bm-shop-subtab-intro {
+    display: grid !important;
+    justify-items: start !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-subtab-intro span {
+    text-align: left !important;
+  }
+
+  #bm-contract-shop-modal .reward-code-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-card-grid .bm-contract-shop-card,
+  #bm-contract-shop-modal .bm-shop-card-grid .bm-shop-action-card,
+  #bm-contract-shop-modal .bm-shop-card-grid .bm-tool-card,
+  #bm-contract-shop-modal .bm-shop-card-grid .bm-product-upgrade-card {
+    min-height: 166px !important;
+  }
+}
+
+/* [v7.6.13] daily mission close button position hotfix
+   - 기본 button flex 상속으로 닫기 버튼이 헤더 중앙의 큰 버튼처럼 보이던 문제 수정
+   - 다른 팝업처럼 우측 상단의 작은 닫기 버튼으로 고정
+*/
+.daily-mission-modal-content {
+  position: relative !important;
+}
+
+.daily-mission-modal-header {
+  padding-right: 40px !important;
+}
+
+#daily-mission-close-button.daily-mission-close-button {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  z-index: 3 !important;
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  background: rgba(255, 246, 213, .96) !important;
+  border: 2px solid rgba(221, 171, 74, .82) !important;
+  color: #6e4010 !important;
+  font-size: 18px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  box-shadow: 0 3px 0 rgba(130, 84, 28, .16), inset 0 1px 0 rgba(255,255,255,.86) !important;
+}
+
+/* [v7.9.6] reward inbox unique UI / close button / icon button polish */
+#reward-inbox-button.reward-inbox-button {
+  background: linear-gradient(180deg, rgba(234, 248, 255, .99) 0%, rgba(198, 229, 255, .97) 100%) !important;
+  border-color: rgba(89, 161, 222, .88) !important;
+  box-shadow: 0 4px 0 rgba(45, 99, 146, .24), inset 0 1px 0 rgba(255,255,255,.88) !important;
+}
+
+#reward-inbox-button.reward-inbox-button .reward-inbox-button-icon {
+  width: 30px !important;
+  height: 30px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border-radius: 12px !important;
+  background: radial-gradient(circle at 35% 25%, rgba(255,255,255,.9) 0 18%, rgba(255,255,255,0) 38%), linear-gradient(180deg, rgba(255,255,255,.42), rgba(117, 188, 245, .18)) !important;
+}
+
+#reward-inbox-button.reward-inbox-button .reward-inbox-button-icon img,
+#reward-inbox-button.reward-inbox-button > img {
+  width: 28px !important;
+  height: 28px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 2px 2px rgba(34, 84, 128, .22)) !important;
+}
+
+#reward-inbox-button.reward-inbox-button .top-icon-button-label {
+  color: #244e78 !important;
+}
+
+.reward-inbox-modal-content {
+  position: relative !important;
+  padding: 18px 18px 20px !important;
+  border: 3px solid rgba(72, 149, 223, .92) !important;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(255,255,255,.96) 0 13%, transparent 31%),
+    radial-gradient(circle at 92% 4%, rgba(177, 229, 255, .62) 0 16%, transparent 36%),
+    linear-gradient(180deg, #f3fbff 0%, #e9f5ff 46%, #f7fbff 100%) !important;
+  box-shadow: 0 18px 44px rgba(23, 55, 89, .34), inset 0 1px 0 rgba(255,255,255,.92) !important;
+}
+
+.reward-inbox-modal-header {
+  position: relative !important;
+  min-height: 86px !important;
+  padding: 16px 58px 14px 16px !important;
+  margin-bottom: 12px !important;
+  align-items: center !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 22px !important;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.92) 0%, rgba(222,244,255,.86) 47%, rgba(190,224,255,.86) 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 6px 16px rgba(47, 102, 151, .12) !important;
+}
+
+.reward-inbox-title-block {
+  position: relative !important;
+  z-index: 2 !important;
+  display: grid !important;
+  justify-items: start !important;
+  gap: 2px !important;
+}
+
+.reward-inbox-modal-header h2 {
+  margin: 0 !important;
+  color: #153c5f !important;
+  font-size: 25px !important;
+  font-weight: 950 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.reward-inbox-title-block p {
+  margin: 0 !important;
+  color: #52728a !important;
+  font-size: 12px !important;
+  font-weight: 850 !important;
+}
+
+.reward-inbox-eyebrow {
+  background: linear-gradient(180deg, #68bbff 0%, #458eea 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 0 rgba(49, 105, 164, .16) !important;
+}
+
+.reward-inbox-header-gift {
+  position: absolute !important;
+  right: 62px !important;
+  bottom: -8px !important;
+  width: 92px !important;
+  height: 92px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  opacity: .96 !important;
+  transform: rotate(-6deg) !important;
+}
+
+.reward-inbox-header-gift img {
+  width: 86px !important;
+  height: 86px !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 8px 10px rgba(33, 91, 143, .2)) !important;
+}
+
+#reward-inbox-close-button.reward-inbox-close-button {
+  position: absolute !important;
+  top: 14px !important;
+  right: 14px !important;
+  z-index: 4 !important;
+  flex: 0 0 28px !important;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  background: rgba(255, 246, 213, .96) !important;
+  border: 2px solid rgba(221, 171, 74, .82) !important;
+  color: #6e4010 !important;
+  font-size: 18px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  box-shadow: 0 3px 0 rgba(130, 84, 28, .16), inset 0 1px 0 rgba(255,255,255,.86) !important;
+  cursor: pointer !important;
+}
+
+.reward-inbox-toolbar {
+  padding: 0 2px !important;
+}
+
+.reward-inbox-list {
+  gap: 12px !important;
+  padding: 2px 6px 2px 2px !important;
+}
+
+.reward-inbox-card,
+.reward-inbox-empty {
+  border: 2px solid rgba(112, 185, 239, .45) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(240, 250, 255, .9)) !important;
+  box-shadow: 0 8px 18px rgba(41, 85, 122, .12), inset 0 1px 0 rgba(255,255,255,.8) !important;
+}
+
+.reward-inbox-card {
+  grid-template-columns: 46px minmax(0, 1fr) auto !important;
+  border-radius: 20px !important;
+  padding: 13px 14px !important;
+}
+
+.reward-inbox-card-icon {
+  width: 40px !important;
+  height: 40px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  border-radius: 16px !important;
+  background: linear-gradient(180deg, #fff2c2 0%, #ffe09a 100%) !important;
+  font-size: 21px !important;
+  box-shadow: 0 3px 0 rgba(187, 138, 48, .16), inset 0 1px 0 rgba(255,255,255,.86) !important;
+}
+
+.reward-inbox-state {
+  background: rgba(82, 160, 230, .14) !important;
+  color: #245d8e !important;
+}
+
+.reward-inbox-reward-list span {
+  background: rgba(255, 222, 122, .46) !important;
+  color: #674612 !important;
+}
+
+.reward-inbox-coupon-panel {
+  border-color: rgba(97, 166, 225, .36) !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.88), rgba(232, 246, 255, .84)) !important;
+}
+
+@media (max-width: 640px) {
+  .reward-inbox-modal-header {
+    min-height: 78px !important;
+    padding-right: 48px !important;
+  }
+
+  .reward-inbox-header-gift {
+    display: none !important;
+  }
+
+  .reward-inbox-card {
+    grid-template-columns: 42px minmax(0, 1fr) !important;
+  }
+
+  .reward-inbox-claim-button {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* [v8.0.1] BM shop recommend tab large-screen cleanup */
+#bm-contract-shop-modal .bm-shop-recommend-landing {
+  gap: 12px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section {
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section-head {
+  display: grid !important;
+  gap: 4px !important;
+  padding: 10px 12px !important;
+  border-radius: 14px !important;
+  background: rgba(251, 247, 230, 0.92) !important;
+  border: 1px solid rgba(223, 193, 137, 0.78) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section-head strong {
+  color: #4a3113 !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  line-height: 1.2 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section-head span {
+  color: #736042 !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card {
+  min-height: 172px !important;
+  align-content: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-shop-shortcut-banner .bm-contract-product-copy strong {
+  white-space: normal !important;
+  text-overflow: initial !important;
+  overflow: visible !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-copy {
+  align-content: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-preview-card {
+  grid-template-columns: 62px minmax(0, 1fr) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-preview-card .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-preview-card .bm-contract-product-copy em {
+  font-size: 12px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-shortcut-banner {
+  grid-template-columns: 62px minmax(0, 1fr) auto !important;
+  min-height: 118px !important;
+  padding: 15px !important;
+  background: linear-gradient(135deg, rgba(236, 255, 241, .98) 0%, rgba(255, 247, 218, .98) 100%) !important;
+  border: 1px solid rgba(166, 194, 126, 0.92) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-shortcut-banner .bm-shop-route-button {
+  justify-self: end !important;
+  align-self: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 140px !important;
+  min-height: 36px !important;
+  padding: 8px 12px !important;
+  border: 1px solid rgba(168, 92, 18, 0.45) !important;
+  border-radius: 13px !important;
+  background: linear-gradient(180deg, #ffc85d 0%, #ff9b2d 100%) !important;
+  color: #4f2b09 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  text-shadow: 0 1px 0 rgba(255,255,255,.45) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 3px 0 rgba(166, 88, 24, .22) !important;
+  white-space: normal !important;
+}
+
+#bm-contract-shop-modal .bm-shop-shortcut-banner .bm-contract-product-copy span {
+  font-size: 12px !important;
+  line-height: 1.45 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-shortcut-banner .bm-contract-product-copy em {
+  color: #558341 !important;
+}
+
+@media (max-width: 1220px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 980px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions,
+  #bm-contract-shop-modal .bm-shop-recommend-products {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions,
+  #bm-contract-shop-modal .bm-shop-recommend-products {
+    grid-template-columns: 1fr !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-shortcut-banner {
+    grid-template-columns: 56px minmax(0, 1fr) !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-shortcut-banner .bm-shop-route-button {
+    grid-column: 1 / -1 !important;
+    justify-self: stretch !important;
+    width: 100% !important;
+  }
+}
+
+/* [v8.0.2] BM recommend tab text trim and overlap cleanup */
+#bm-contract-shop-modal .bm-recommend-main-card {
+  min-height: auto !important;
+  gap: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-recommend-main-card p {
+  display: none !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section {
+  overflow: visible !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section-head.is-compact {
+  gap: 0 !important;
+  align-items: center !important;
+  min-height: 52px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-section-head.is-compact span {
+  display: none !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions {
+  margin-top: 2px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card {
+  min-height: 170px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  margin-top: 2px !important;
+  clear: both !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card {
+  position: relative !important;
+  z-index: 0 !important;
+  display: grid !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  align-items: center !important;
+  justify-items: start !important;
+  gap: 10px !important;
+  min-height: 108px !important;
+  padding: 14px !important;
+  text-align: left !important;
+  background: rgba(255, 253, 244, 0.99) !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-image-box {
+  width: 62px !important;
+  height: 62px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-image {
+  width: 54px !important;
+  height: 54px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy {
+  min-height: 0 !important;
+  justify-items: start !important;
+  align-content: center !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy strong {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  line-clamp: unset !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy em {
+  font-size: 11px !important;
+  line-height: 1.32 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-shortcut-section {
+  margin-top: 2px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-shortcut-banner {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 980px) {
+  #bm-contract-shop-modal .bm-shop-recommend-products {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #bm-contract-shop-modal .bm-shop-recommend-products {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* [v8.0.4] BM recommend layout cleanup and shelf object assets */
+#bm-contract-shop-modal .bm-shop-recommend-landing {
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card {
+  min-height: 210px !important;
+  height: auto !important;
+  align-content: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy {
+  min-height: 82px !important;
+  align-content: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy small {
+  display: block !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-tool-actions {
+  width: 100% !important;
+  justify-self: stretch !important;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-next-contract-section {
+  gap: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products {
+  margin-top: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card {
+  min-height: 96px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-shortcut-section {
+  gap: 6px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-shortcut-banner {
+  min-height: 104px !important;
+}
+
+@media (max-width: 1220px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card {
+    min-height: 186px !important;
+  }
+}
+
+/* [v8.0.5] BM recommend left-align cleanup */
+#bm-contract-shop-modal .bm-shop-modern-title-block,
+#bm-contract-shop-modal .bm-shop-modern-title-block h2,
+#bm-contract-shop-modal .bm-shop-modern-title-block p,
+#bm-contract-shop-modal .bm-contract-shop-next,
+#bm-contract-shop-modal .bm-shop-modern-guide,
+#bm-contract-shop-modal .bm-shop-modern-guide strong,
+#bm-contract-shop-modal .bm-shop-modern-guide span {
+  text-align: left !important;
+  justify-items: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-landing,
+#bm-contract-shop-modal .bm-shop-recommend-section,
+#bm-contract-shop-modal .bm-shop-recommend-products,
+#bm-contract-shop-modal .bm-shop-recommend-actions,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card {
+  justify-items: start !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card {
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  grid-auto-rows: auto !important;
+  align-items: start !important;
+  gap: 10px !important;
+  padding: 14px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-shop-card-icon,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-image-box,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-image-box {
+  margin: 0 !important;
+  justify-self: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-copy {
+  width: 100% !important;
+  min-height: 0 !important;
+  justify-items: start !important;
+  align-content: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy small,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card .bm-contract-product-copy em {
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card > button,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-tool-actions {
+  grid-column: 1 / -1 !important;
+  justify-self: stretch !important;
+  width: 100% !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-tool-actions {
+  justify-content: stretch !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card {
+  justify-items: start !important;
+  text-align: left !important;
+}
+
+/* [v8.0.6] growth subtabs sticky + contract/premium card alignment */
+#bm-contract-shop-modal .bm-shop-subtabs {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 12 !important;
+  background: rgba(255, 251, 235, 0.96) !important;
+  box-shadow: 0 4px 10px rgba(101, 76, 31, 0.08) !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-shop-card,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-shop-card {
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  grid-auto-rows: auto !important;
+  align-items: start !important;
+  justify-items: start !important;
+  gap: 10px !important;
+  min-height: 220px !important;
+  padding: 14px !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-main,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-main {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-image-box,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-image-box {
+  width: 64px !important;
+  height: 64px !important;
+  margin: 0 !important;
+  justify-self: start !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-image,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-image {
+  width: 56px !important;
+  height: 56px !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-copy,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy {
+  justify-items: start !important;
+  align-content: start !important;
+  width: 100% !important;
+  min-height: 74px !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy em {
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-meta,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-meta {
+  grid-column: 1 / -1 !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  justify-content: start !important;
+  align-content: start !important;
+  gap: 6px !important;
+  width: 100% !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-product-meta span,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-meta span {
+  justify-self: start !important;
+  min-height: 22px !important;
+  padding: 4px 8px !important;
+  font-size: 10.5px !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-contract-product-grid .bm-contract-purchase-button,
+#bm-contract-shop-modal .bm-premium-product-grid .bm-premium-purchase-button {
+  grid-column: 1 / -1 !important;
+  justify-self: stretch !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* [v8.0.7] premium tab typography cleanup + recommend tab final tidy */
+#bm-contract-shop-modal .bm-premium-product-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-shop-card {
+  min-height: 278px !important;
+  gap: 12px !important;
+  padding: 14px 14px 16px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-main {
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy {
+  gap: 4px !important;
+  min-height: 102px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy strong {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  font-size: 13px !important;
+  line-height: 1.22 !important;
+  min-height: 32px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy span {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  font-size: 10px !important;
+  line-height: 1.28 !important;
+  min-height: 26px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-copy em {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  white-space: normal !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+  font-size: 10.5px !important;
+  line-height: 1.28 !important;
+  min-height: 26px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-meta {
+  gap: 5px !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-contract-product-meta span {
+  width: 100% !important;
+  min-height: 22px !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-premium-product-grid .bm-premium-purchase-button {
+  min-height: 34px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-landing {
+  gap: 12px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card {
+  min-height: 188px !important;
+  grid-template-columns: 56px minmax(0, 1fr) !important;
+  align-items: start !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  border-radius: 20px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-shop-card-icon,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-image-box {
+  width: 56px !important;
+  height: 56px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-image {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy {
+  gap: 4px !important;
+  min-height: 84px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy strong {
+  font-size: 13px !important;
+  line-height: 1.22 !important;
+  min-height: 32px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy small {
+  font-size: 10.5px !important;
+  line-height: 1.28 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card > button,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-tool-actions {
+  margin-top: auto !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 10px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products > .bm-contract-shop-card {
+  min-height: 92px !important;
+  padding: 12px 14px !important;
+  border-radius: 18px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy {
+  gap: 3px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy strong {
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-products .bm-contract-product-copy em {
+  font-size: 10.5px !important;
+  line-height: 1.25 !important;
+}
+
+@media (max-width: 1180px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  #bm-contract-shop-modal .bm-premium-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  #bm-contract-shop-modal .bm-shop-recommend-actions,
+  #bm-contract-shop-modal .bm-shop-recommend-products {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* [v8.0.8] recommend top cards equal-width alignment */
+#bm-contract-shop-modal .bm-shop-recommend-actions {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-auto-rows: 1fr !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+  justify-items: stretch !important;
+  width: 100% !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card {
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  align-self: stretch !important;
+  justify-self: stretch !important;
+  display: grid !important;
+  grid-template-columns: 58px minmax(0, 1fr) !important;
+  grid-template-rows: auto 1fr auto !important;
+  align-items: start !important;
+  justify-items: start !important;
+  gap: 10px !important;
+  min-height: 190px !important;
+  padding: 14px !important;
+  box-sizing: border-box !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-shop-card-icon {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  width: 54px !important;
+  height: 54px !important;
+  margin: 0 !important;
+  justify-self: start !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy {
+  grid-column: 2 !important;
+  grid-row: 1 / span 2 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 104px !important;
+  align-content: start !important;
+  justify-items: start !important;
+  gap: 4px !important;
+  text-align: left !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy strong,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy small {
+  width: 100% !important;
+  max-width: 100% !important;
+  text-align: left !important;
+  word-break: keep-all !important;
+  overflow-wrap: anywhere !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy strong {
+  font-size: 13px !important;
+  line-height: 1.22 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy span,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy em,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-contract-product-copy small {
+  font-size: 10.5px !important;
+  line-height: 1.28 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card > button,
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-tool-actions {
+  grid-column: 1 / -1 !important;
+  grid-row: 3 !important;
+  align-self: end !important;
+  justify-self: stretch !important;
+  width: 100% !important;
+  margin-top: 0 !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-actions > .bm-contract-shop-card .bm-tool-actions {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 7px !important;
+}
+
+#bm-contract-shop-modal .bm-shop-recommend-products {
+  margin-top: 2px !important;
+}
+
+@media (max-width: 1180px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  #bm-contract-shop-modal .bm-shop-recommend-actions {
+    grid-template-columns: 1fr !important;
   }
 }

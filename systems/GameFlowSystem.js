@@ -42,30 +42,33 @@ const STAFF_SHIFT_HOURS = 3;
 const STAFF_CANDIDATES = Object.freeze([
   Object.freeze({
     id: "kim_minji",
+    assetVariant: "staff_female_glasses",
     name: "김민지",
-    type: "정리형",
+    type: "꼼꼼한 진열/청소 담당",
     hourlyWage: 1200,
     attendance: 95,
     stats: Object.freeze({ warehouse: 1, shelf: 3, cleaning: 1 }),
-    ability: "창고 재고를 가져와 진열대 보충을 우선 도와줍니다."
+    ability: "체크리스트를 보며 진열 정리와 청소 보조를 꼼꼼하게 챙깁니다. 집중력이 좋고 잔소리를 조금 하지만 매장 정리에 강한 타입입니다."
   }),
   Object.freeze({
     id: "park_junho",
+    assetVariant: "staff_male_cashier",
     name: "박준호",
-    type: "창고형",
+    type: "성실한 신입 알바",
     hourlyWage: 1350,
     attendance: 88,
     stats: Object.freeze({ warehouse: 3, shelf: 1, cleaning: 1 }),
-    ability: "창고에서 재고를 가져오는 속도가 빠릅니다."
+    ability: "바코드 스캐너를 들고 늘 긴장한 눈빛이지만, 시키면 착실히 해내는 신입 알바입니다. 창고에서 재고를 가져오는 속도가 빠릅니다."
   }),
   Object.freeze({
     id: "lee_bora",
+    assetVariant: "staff_female_friendly",
     name: "이보라",
-    type: "청소형",
+    type: "밝고 침착한 서비스형",
     hourlyWage: 1300,
     attendance: 90,
     stats: Object.freeze({ warehouse: 1, shelf: 1, cleaning: 3 }),
-    ability: "청소와 위생 유지 보조에 강합니다."
+    ability: "밝고 침착한 미소로 매장을 정돈하는 베테랑 알바입니다. 진상도 웃으면서 넘기는 타입이며 청소와 위생 유지 보조에 강합니다."
   })
 ]);
 

@@ -6,6 +6,7 @@
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
+import { EconomySystem } from "./EconomySystem.js";
 import {
   PRODUCTS,
   getProductById,
@@ -166,9 +167,7 @@ export const BMSystem = {
   },
 
   ensureBMState() {
-    if (!GameState.bm || typeof GameState.bm !== "object") GameState.bm = {};
-    const bm = GameState.bm;
-    bm.diamond = this.toInt(bm.diamond);
+    const bm = EconomySystem.ensurePremiumWallet();
     bm.ownedContractProductIds = unique([...BASIC_PRODUCT_IDS, ...(bm.ownedContractProductIds ?? [])]);
     bm.shopUnlockedContractProductIds = unique(bm.shopUnlockedContractProductIds ?? []);
     bm.purchasedPremiumProductIds = unique(bm.purchasedPremiumProductIds ?? []);
@@ -234,10 +233,14 @@ export const BMSystem = {
     const bm = this.ensureBMState();
     const product = DIAMOND_PRODUCTS.find((item) => item.id === productId);
     if (!product) return this.fail("invalid_product", "존재하지 않는 다이아 상품입니다.");
-    bm.diamond += product.diamondAmount;
-    bm.paidWallet.diamond = this.toInt(bm.paidWallet.diamond) + product.diamondAmount;
+    const currencyResult = EconomySystem.addDiamond(product.diamondAmount, "diamond_product_purchase_test", {
+      source: "bm_shop",
+      productId: product.id,
+      walletBucket: "paid"
+    });
+    if (!currencyResult.success) return this.failCurrency(currencyResult, "다이아 지급에 실패했습니다.", { product });
     bm.purchasedDiamondProductIds.push(product.id);
-    return this.ok("diamond_product_purchased", `${product.name} 테스트 구매 완료`, { product, amount: product.diamondAmount });
+    return this.ok("diamond_product_purchased", `${product.name} 테스트 구매 완료`, { product, amount: product.diamondAmount, currencyResult });
   },
 
   purchaseGoldProduct(productId) {
@@ -245,9 +248,25 @@ export const BMSystem = {
     const product = GOLD_PRODUCTS.find((item) => item.id === productId);
     if (!product) return this.fail("invalid_product", "존재하지 않는 골드 상품입니다.");
     if (bm.diamond < product.diamondPrice) return this.fail("not_enough_diamond", `다이아가 부족합니다. 필요 다이아: ${product.diamondPrice}`);
-    bm.diamond -= product.diamondPrice;
-    GameState.money += product.goldAmount;
-    return this.ok("gold_product_purchased", `${product.name} 구매 완료`, { product, spentDiamond: product.diamondPrice });
+    const spendResult = EconomySystem.spendDiamond(product.diamondPrice, "gold_product_purchase", {
+      source: "bm_shop",
+      productId: product.id,
+      goldAmount: product.goldAmount
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `다이아가 부족합니다. 필요 다이아: ${product.diamondPrice}`, { product });
+    const grantResult = EconomySystem.addGold(product.goldAmount, "gold_product_purchase", {
+      source: "bm_shop",
+      productId: product.id,
+      spentDiamond: product.diamondPrice
+    });
+    if (!grantResult.success) {
+      EconomySystem.addDiamond(product.diamondPrice, "gold_product_purchase_refund", {
+        source: "bm_shop",
+        productId: product.id
+      });
+      return this.failCurrency(grantResult, "골드 지급에 실패했습니다.", { product, spendResult });
+    }
+    return this.ok("gold_product_purchased", `${product.name} 구매 완료`, { product, spentDiamond: product.diamondPrice, currencyResult: grantResult, spendResult });
   },
 
   createAdRewardState(reward) {
@@ -270,14 +289,31 @@ export const BMSystem = {
     const claimKey = this.getAdRewardClaimKey(reward.id);
     if (bm.freeRechargeClaims[claimKey] === true) return this.fail("already_claimed", "오늘 이미 받은 광고 보상입니다.");
     const usedSkipTicket = bm.adSkipTickets > 0;
-    if (usedSkipTicket) bm.adSkipTickets -= 1;
 
-    if (reward.rewardType === "diamond") bm.diamond += reward.amount;
-    if (reward.rewardType === "gold") GameState.money += reward.amount;
+    let currencyResult = null;
+    if (reward.rewardType === "diamond") {
+      currencyResult = EconomySystem.addDiamond(reward.amount, "ad_reward", {
+        source: "ad_reward",
+        rewardId: reward.id,
+        usedSkipTicket
+      });
+    }
+    if (reward.rewardType === "gold") {
+      currencyResult = EconomySystem.addGold(reward.amount, "ad_reward", {
+        source: "ad_reward",
+        rewardId: reward.id,
+        usedSkipTicket
+      });
+    }
+    if (currencyResult && !currencyResult.success) {
+      return this.failCurrency(currencyResult, "광고 보상 지급에 실패했습니다.", { reward, usedSkipTicket });
+    }
+
+    if (usedSkipTicket) bm.adSkipTickets -= 1;
     if (reward.rewardType === "peakCouponDiscount") bm.peakCouponDiscountDay = GameState.day;
 
     bm.freeRechargeClaims[claimKey] = true;
-    return this.ok("ad_reward_claimed", `${reward.label} 보상을 받았습니다.${usedSkipTicket ? " 광고 스킵권 1장을 사용했습니다." : ""}`, { reward, usedSkipTicket });
+    return this.ok("ad_reward_claimed", `${reward.label} 보상을 받았습니다.${usedSkipTicket ? " 광고 스킵권 1장을 사용했습니다." : ""}`, { reward, usedSkipTicket, currencyResult });
   },
 
   getAdRewardClaimKey(rewardId) { return `day${GameState.day}:${rewardId}`; },
@@ -286,10 +322,14 @@ export const BMSystem = {
     const bm = this.ensureBMState();
     const price = this.getPeakCouponPurchasePrice();
     if (bm.diamond < price) return this.fail("not_enough_diamond", `다이아가 부족합니다. 필요 다이아: ${price}`);
-    bm.diamond -= price;
+    const spendResult = EconomySystem.spendDiamond(price, "peak_coupon_purchase", {
+      source: "bm_shop",
+      itemId: "peak_coupon"
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `다이아가 부족합니다. 필요 다이아: ${price}`);
     bm.peakTimeCoupons += 1;
     if (bm.peakCouponDiscountDay === GameState.day) bm.peakCouponDiscountUsedDay = GameState.day;
-    return this.ok("peak_coupon_purchased", `피크타임 쿠폰 1장을 구매했습니다.`, { spentDiamond: price });
+    return this.ok("peak_coupon_purchased", `피크타임 쿠폰 1장을 구매했습니다.`, { spentDiamond: price, currencyResult: spendResult });
   },
 
   usePeakCoupon() {
@@ -345,13 +385,17 @@ export const BMSystem = {
     const next = WAREHOUSE_LEVELS.find((item) => item.level === currentLevel + 1);
     if (!next) return this.fail("max_level", "창고가 이미 최대 레벨입니다.");
     if (GameState.money < next.costGold) return this.fail("not_enough_gold", `골드가 부족합니다. 필요 골드: ${next.costGold.toLocaleString("ko-KR")}`);
-    GameState.money -= next.costGold;
+    const spendResult = EconomySystem.spendGold(next.costGold, "warehouse_upgrade", {
+      source: "bm_shop",
+      targetLevel: next.level
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `골드가 부족합니다. 필요 골드: ${next.costGold.toLocaleString("ko-KR")}`, { next });
     if (next.waitDays > 0) {
       bm.pendingWarehouseUpgrade = { targetLevel: next.level, startDay: GameState.day, completeDay: GameState.day + next.waitDays };
-      return this.ok("warehouse_upgrade_started", `창고 Lv.${next.level} 확장을 시작했습니다. Day ${GameState.day + next.waitDays}에 완료됩니다.`, { next });
+      return this.ok("warehouse_upgrade_started", `창고 Lv.${next.level} 확장을 시작했습니다. Day ${GameState.day + next.waitDays}에 완료됩니다.`, { next, currencyResult: spendResult });
     }
     bm.warehouseLevel = next.level;
-    return this.ok("warehouse_upgraded", `창고가 Lv.${next.level}로 확장되었습니다.`, { next });
+    return this.ok("warehouse_upgraded", `창고가 Lv.${next.level}로 확장되었습니다.`, { next, currencyResult: spendResult });
   },
 
   getWarehouseCapacity() {
@@ -398,9 +442,15 @@ export const BMSystem = {
     const next = SHELF_LEVELS.find((item) => item.level === currentLevel + 1);
     if (!next) return this.fail("max_level", "이미 최대 강화입니다.");
     if (GameState.money < next.costGold) return this.fail("not_enough_gold", `골드가 부족합니다. 필요 골드: ${next.costGold.toLocaleString("ko-KR")}`);
-    GameState.money -= next.costGold;
+    const spendResult = EconomySystem.spendGold(next.costGold, "shelf_upgrade", {
+      source: "bm_shop",
+      shelfGroupId: resolved.groupId,
+      shelfId: resolved.shelfId,
+      targetLevel: next.level
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `골드가 부족합니다. 필요 골드: ${next.costGold.toLocaleString("ko-KR")}`, { group, shelfId: resolved.shelfId, shelfGroupId: resolved.groupId, next });
     bm.shelfUpgradeLevels[resolved.groupId] = next.level;
-    return this.ok("shelf_upgraded", `${group.name}이 Lv.${next.level}로 강화되었습니다.`, { group, shelfId: resolved.shelfId, shelfGroupId: resolved.groupId, next });
+    return this.ok("shelf_upgraded", `${group.name}이 Lv.${next.level}로 강화되었습니다.`, { group, shelfId: resolved.shelfId, shelfGroupId: resolved.groupId, next, currencyResult: spendResult });
   },
 
   getShelfUpgradeState(shelfKey) {
@@ -423,9 +473,14 @@ export const BMSystem = {
     const nextLevel = currentLevel + 1;
     const cost = this.getProductUpgradeCost(product, nextLevel);
     if (GameState.money < cost) return this.fail("not_enough_gold", `골드가 부족합니다. 필요 골드: ${cost.toLocaleString("ko-KR")}`);
-    GameState.money -= cost;
+    const spendResult = EconomySystem.spendGold(cost, "product_upgrade", {
+      source: "bm_shop",
+      productId: product.id,
+      nextLevel
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `골드가 부족합니다. 필요 골드: ${cost.toLocaleString("ko-KR")}`, { productId: product.id, nextLevel, cost });
     bm.productUpgradeLevels[product.id] = nextLevel;
-    return this.ok("product_upgraded", `${product.name}이 ${nextLevel}강이 되었습니다.`, { productId: product.id, nextLevel, cost });
+    return this.ok("product_upgraded", `${product.name}이 ${nextLevel}강이 되었습니다.`, { productId: product.id, nextLevel, cost, currencyResult: spendResult });
   },
 
   getProductUpgradeCost(product, nextLevel) {
@@ -489,11 +544,15 @@ export const BMSystem = {
     if (state.totalCount >= STAFF_ABILITY_MAX_TOTAL_UPGRADES) return this.fail("max_level", "알바 강화 가능 횟수를 모두 사용했습니다.");
     if (state.lastUpgradeDay && GameState.day - state.lastUpgradeDay < STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS) return this.fail("cooldown", `알바 강화권은 Day ${state.lastUpgradeDay + STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS}부터 다시 구매할 수 있습니다.`);
     if (bm.diamond < STAFF_ABILITY_UPGRADE_DIAMOND_PRICE) return this.fail("not_enough_diamond", `다이아가 부족합니다. 필요 다이아: ${STAFF_ABILITY_UPGRADE_DIAMOND_PRICE}`);
-    bm.diamond -= STAFF_ABILITY_UPGRADE_DIAMOND_PRICE;
+    const spendResult = EconomySystem.spendDiamond(STAFF_ABILITY_UPGRADE_DIAMOND_PRICE, "staff_ability_upgrade", {
+      source: "bm_shop",
+      abilityKey: key
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `다이아가 부족합니다. 필요 다이아: ${STAFF_ABILITY_UPGRADE_DIAMOND_PRICE}`, { abilityKey: key });
     state.totalCount += 1;
     state.lastUpgradeDay = GameState.day;
     state.abilities[key] += 1;
-    return this.ok("staff_ability_upgraded", `알바 ${this.getStaffAbilityLabel(key)} 능력이 1칸 강화되었습니다.`, { abilityKey: key });
+    return this.ok("staff_ability_upgraded", `알바 ${this.getStaffAbilityLabel(key)} 능력이 1칸 강화되었습니다.`, { abilityKey: key, currencyResult: spendResult });
   },
 
   getStaffAbilityUpgradeState() {
@@ -529,10 +588,14 @@ export const BMSystem = {
     const product = getProductById(productId);
     const validation = this.validateContractPurchase(product);
     if (!validation.success) return validation;
-    GameState.money -= product.contractCost;
+    const spendResult = EconomySystem.spendGold(product.contractCost, "contract_purchase", {
+      source: "bm_shop",
+      productId: product.id
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `골드가 부족합니다. 필요 골드: ${product.contractCost.toLocaleString("ko-KR")}`, { productId: product.id });
     const bm = this.ensureBMState();
     bm.ownedContractProductIds = unique([...bm.ownedContractProductIds, product.id]);
-    return this.ok("contract_purchased", `${product.name} 판매권을 구매했습니다.`, { productId: product.id });
+    return this.ok("contract_purchased", `${product.name} 판매권을 구매했습니다.`, { productId: product.id, currencyResult: spendResult });
   },
 
   validateContractPurchase(product) {
@@ -550,9 +613,13 @@ export const BMSystem = {
     const validation = this.validatePremiumProductPurchase(product);
     if (!validation.success) return validation;
     const bm = this.ensureBMState();
-    bm.diamond -= product.diamondPrice;
+    const spendResult = EconomySystem.spendDiamond(product.diamondPrice, "premium_product_purchase", {
+      source: "bm_shop",
+      productId: product.id
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `다이아가 부족합니다. 필요 다이아: ${product.diamondPrice}`, { productId: product.id });
     bm.purchasedPremiumProductIds = unique([...bm.purchasedPremiumProductIds, product.id]);
-    return this.ok("premium_product_purchased", `${product.name} 프리미엄 상품을 구매했습니다.`, { productId: product.id });
+    return this.ok("premium_product_purchased", `${product.name} 프리미엄 상품을 구매했습니다.`, { productId: product.id, currencyResult: spendResult });
   },
 
   validatePremiumProductPurchase(product) {
@@ -570,11 +637,15 @@ export const BMSystem = {
     const bm = this.ensureBMState();
     const unlockedProducts = this.getNextContractUnlockProducts();
     const unlockedProductIds = unlockedProducts.map((product) => product.id);
-    bm.diamond -= CONTRACT_UNLOCK_SKIP_DIAMOND_PRICE;
+    const spendResult = EconomySystem.spendDiamond(CONTRACT_UNLOCK_SKIP_DIAMOND_PRICE, "contract_unlock_skip", {
+      source: "bm_shop",
+      unlockedProductIds
+    });
+    if (!spendResult.success) return this.failCurrency(spendResult, `다이아가 부족합니다. 필요 다이아: ${CONTRACT_UNLOCK_SKIP_DIAMOND_PRICE}`, { unlockedProductIds });
     bm.contractSkipUsedDay = GameState.day;
     bm.shopUnlockedContractProductIds = unique([...bm.shopUnlockedContractProductIds, ...unlockedProductIds]);
     bm.lastContractUnlockDay = GameState.day;
-    return this.ok("contract_unlock_skipped", `판매권 ${unlockedProductIds.length}종이 상점에 즉시 해금되었습니다.`, { unlockedProductIds });
+    return this.ok("contract_unlock_skipped", `판매권 ${unlockedProductIds.length}종이 상점에 즉시 해금되었습니다.`, { unlockedProductIds, currencyResult: spendResult });
   },
 
   validateContractUnlockSkip() {
@@ -643,8 +714,22 @@ export const BMSystem = {
   emitStateChanged(reason, details = {}) { EventBus.emit(BM_EVENTS.STATE_CHANGED, { reason, ...details, bmState: this.getBMState() }); },
   ok(reason, message, details = {}) { return { success: true, reason, message, day: GameState.day, ...details, bmState: this.getBMState?.() ?? null }; },
   fail(reason, message, details = {}) { return { success: false, reason, message, day: GameState.day, ...details }; },
+  failCurrency(currencyResult = {}, message = currencyResult.message ?? "재화 처리에 실패했습니다.", details = {}) {
+    return this.fail(currencyResult.reason ?? "currency_failed", message, {
+      ...details,
+      currencyResult
+    });
+  },
   isBasicProduct(productId) { return BASIC_PRODUCT_IDS.includes(productId); },
-  grantDiamond(amount = 10) { const bm = this.ensureBMState(); bm.diamond += this.toInt(amount); this.emitStateChanged("diamond_granted"); EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState); return this.ok("diamond_granted", `다이아 ${amount}개를 받았습니다.`); },
+  grantDiamond(amount = 10) {
+    this.ensureBMState();
+    const currencyResult = EconomySystem.addDiamond(this.toInt(amount), "diamond_granted", {
+      source: "bm_debug_grant"
+    });
+    if (!currencyResult.success) return this.failCurrency(currencyResult, "다이아 지급에 실패했습니다.");
+    this.emitStateChanged("diamond_granted");
+    return this.ok("diamond_granted", `다이아 ${amount}개를 받았습니다.`, { currencyResult });
+  },
   getAdDiamondRewardAmount() { return 10; },
   toInt(value) { return Math.max(0, Math.floor(Number(value) || 0)); },
   toDay(value, fallback = GameState.day) { const day = Math.floor(Number(value)); return Number.isFinite(day) && day >= 1 ? day : fallback; },
