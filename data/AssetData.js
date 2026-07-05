@@ -161,11 +161,6 @@ export const ASSET_PATHS = deepFreeze({
           pressed: "./assets/ui/buttons/special/continue/ui_btn_continue_pressed.png",
           disabled: "./assets/ui/buttons/special/continue/ui_btn_continue_disabled.png"
         },
-        reward2xAd: {
-          normal: "./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_normal.png",
-          pressed: "./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_pressed.png",
-          disabled: "./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_disabled.png"
-        },
         settings: {
           normal: "./assets/ui/buttons/special/settings/ui_icon_settings_normal.png",
           pressed: "./assets/ui/buttons/special/settings/ui_icon_settings_pressed.png",

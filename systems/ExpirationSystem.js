@@ -19,6 +19,7 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
 import { getProductById } from "../data/ProductData.js";
+import { BMSystem } from "./BMSystem.js";
 
 export const ExpirationSystem = {
   inventoryItems: [],
@@ -84,7 +85,7 @@ export const ExpirationSystem = {
         expiredLots.push({
           lotId: lot.lotId,
           productId: product.id,
-          productName: product.name,
+          productName: BMSystem.getProductDisplayName(product),
           quantity,
           receivedDay: lot.receivedDay,
           expireDay,

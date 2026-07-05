@@ -6,7 +6,14 @@
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
-import { PRODUCTS, getProductById, PRODUCT_UPGRADE_TYPES, PRODUCT_DISPLAY_CATEGORIES } from "../data/ProductData.js";
+import {
+  PRODUCTS,
+  getProductById,
+  getDisplayCategoryForShelfId,
+  getShelfIdForDisplayCategory,
+  PRODUCT_UPGRADE_TYPES,
+  PRODUCT_DISPLAY_CATEGORIES
+} from "../data/ProductData.js";
 
 export const BM_EVENTS = Object.freeze({
   STATE_CHANGED: "BM_STATE_CHANGED",
@@ -95,10 +102,10 @@ const SHELF_LEVELS = Object.freeze([
 ]);
 
 const SHELF_GROUPS = Object.freeze([
-  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.BASIC_SHELF, name: "기본 매대" }),
-  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.FRIDGE, name: "냉장고" }),
-  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF, name: "신선 매대" }),
-  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.WARMER, name: "온장고" })
+  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.BASIC_SHELF, shelfId: getShelfIdForDisplayCategory(PRODUCT_DISPLAY_CATEGORIES.BASIC_SHELF), name: "기본 매대" }),
+  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.FRIDGE, shelfId: getShelfIdForDisplayCategory(PRODUCT_DISPLAY_CATEGORIES.FRIDGE), name: "냉장고" }),
+  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF, shelfId: getShelfIdForDisplayCategory(PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF), name: "신선 매대" }),
+  Object.freeze({ id: PRODUCT_DISPLAY_CATEGORIES.WARMER, shelfId: getShelfIdForDisplayCategory(PRODUCT_DISPLAY_CATEGORIES.WARMER), name: "온장고" })
 ]);
 
 const PRODUCT_UPGRADE_CONFIGS = Object.freeze({
@@ -142,7 +149,7 @@ export const BMSystem = {
     EventBus.on(BM_EVENTS.PEAK_COUPON_PURCHASE_REQUESTED, () => this.emitPurchaseResult(this.purchasePeakCoupon(), BM_EVENTS.PEAK_COUPON_PURCHASED, BM_EVENTS.PEAK_COUPON_FAILED));
     EventBus.on(BM_EVENTS.PEAK_COUPON_USE_REQUESTED, () => this.emitPurchaseResult(this.usePeakCoupon(), BM_EVENTS.PEAK_COUPON_ACTIVATED, BM_EVENTS.PEAK_COUPON_FAILED));
     EventBus.on(BM_EVENTS.WAREHOUSE_UPGRADE_REQUESTED, () => this.emitPurchaseResult(this.purchaseWarehouseUpgrade(), BM_EVENTS.WAREHOUSE_UPGRADED, BM_EVENTS.SHOP_PURCHASE_FAILED));
-    EventBus.on(BM_EVENTS.SHELF_UPGRADE_REQUESTED, (data = {}) => this.emitPurchaseResult(this.purchaseShelfUpgrade(data.shelfGroupId), BM_EVENTS.SHELF_UPGRADED, BM_EVENTS.SHOP_PURCHASE_FAILED));
+    EventBus.on(BM_EVENTS.SHELF_UPGRADE_REQUESTED, (data = {}) => this.emitPurchaseResult(this.purchaseShelfUpgrade(data.shelfId ?? data.shelfGroupId), BM_EVENTS.SHELF_UPGRADED, BM_EVENTS.SHOP_PURCHASE_FAILED));
     EventBus.on(BM_EVENTS.PRODUCT_UPGRADE_REQUESTED, (data = {}) => this.emitPurchaseResult(this.purchaseProductUpgrade(data.productId), BM_EVENTS.PRODUCT_UPGRADED, BM_EVENTS.SHOP_PURCHASE_FAILED));
     EventBus.on(BM_EVENTS.STAFF_ABILITY_UPGRADE_REQUESTED, (data = {}) => this.emitPurchaseResult(this.purchaseStaffAbilityUpgrade(data.abilityKey), BM_EVENTS.STAFF_ABILITY_UPGRADED, BM_EVENTS.SHOP_PURCHASE_FAILED));
 
@@ -360,28 +367,51 @@ export const BMSystem = {
     return { current, next, capacity: current.capacity, pending: bm.pendingWarehouseUpgrade, canUpgrade: !!next && !bm.pendingWarehouseUpgrade && GameState.money >= (next?.costGold ?? 0) };
   },
 
-  purchaseShelfUpgrade(shelfGroupId) {
-    const group = SHELF_GROUPS.find((item) => item.id === shelfGroupId);
+  normalizeShelfUpgradeKey(shelfKey) {
+    const key = String(shelfKey ?? "").trim();
+    if (!key) return null;
+    const groupId = getDisplayCategoryForShelfId(key) ?? key;
+    const group = SHELF_GROUPS.find((item) => item.id === groupId);
+    if (!group) return null;
+    return {
+      group,
+      groupId: group.id,
+      shelfId: group.shelfId,
+      aliases: unique([group.id, group.shelfId])
+    };
+  },
+
+  getShelfUpgradeLevelForKey(shelfKey) {
+    const bm = this.ensureBMState();
+    const resolved = this.normalizeShelfUpgradeKey(shelfKey);
+    if (!resolved) return 0;
+    const level = Math.max(...resolved.aliases.map((key) => this.toInt(bm.shelfUpgradeLevels[key])));
+    return Math.min(5, level);
+  },
+
+  purchaseShelfUpgrade(shelfKey) {
+    const resolved = this.normalizeShelfUpgradeKey(shelfKey);
+    const group = resolved?.group;
     if (!group) return this.fail("invalid_shelf_group", "존재하지 않는 진열대입니다.");
     const bm = this.ensureBMState();
-    const currentLevel = this.toInt(bm.shelfUpgradeLevels[shelfGroupId]);
+    const currentLevel = this.getShelfUpgradeLevelForKey(shelfKey);
     const next = SHELF_LEVELS.find((item) => item.level === currentLevel + 1);
     if (!next) return this.fail("max_level", "이미 최대 강화입니다.");
     if (GameState.money < next.costGold) return this.fail("not_enough_gold", `골드가 부족합니다. 필요 골드: ${next.costGold.toLocaleString("ko-KR")}`);
     GameState.money -= next.costGold;
-    bm.shelfUpgradeLevels[shelfGroupId] = next.level;
-    return this.ok("shelf_upgraded", `${group.name}이 Lv.${next.level}로 강화되었습니다.`, { group, next });
+    bm.shelfUpgradeLevels[resolved.groupId] = next.level;
+    return this.ok("shelf_upgraded", `${group.name}이 Lv.${next.level}로 강화되었습니다.`, { group, shelfId: resolved.shelfId, shelfGroupId: resolved.groupId, next });
   },
 
-  getShelfUpgradeState(shelfGroupId) {
-    const bm = this.ensureBMState();
-    const currentLevel = Math.min(5, this.toInt(bm.shelfUpgradeLevels[shelfGroupId]));
+  getShelfUpgradeState(shelfKey) {
+    const resolved = this.normalizeShelfUpgradeKey(shelfKey);
+    const currentLevel = this.getShelfUpgradeLevelForKey(shelfKey);
     const current = SHELF_LEVELS.find((item) => item.level === currentLevel) ?? SHELF_LEVELS[0];
     const next = SHELF_LEVELS.find((item) => item.level === currentLevel + 1) ?? null;
-    return { current, next, currentLevel, capacity: current.capacity, canUpgrade: !!next && GameState.money >= (next?.costGold ?? 0) };
+    return { current, next, currentLevel, capacity: current.capacity, canUpgrade: !!next && GameState.money >= (next?.costGold ?? 0), shelfGroupId: resolved?.groupId ?? null, shelfId: resolved?.shelfId ?? null };
   },
 
-  getShelfCapacity(shelfGroupId) { return this.getShelfUpgradeState(shelfGroupId).capacity; },
+  getShelfCapacity(shelfKey) { return this.getShelfUpgradeState(shelfKey).capacity; },
 
   purchaseProductUpgrade(productId) {
     const product = getProductById(productId);
@@ -403,14 +433,40 @@ export const BMSystem = {
     return Math.floor((Number(product.salePrice) || 0) * (config.costMultipliers[nextLevel] ?? 0));
   },
 
-  getProductUpgradeLevel(productId) { return Math.min(5, this.toInt(this.ensureBMState().productUpgradeLevels[productId])); },
-  getProductSalePrice(productId) {
-    const product = typeof productId === "string" ? getProductById(productId) : productId;
+  resolveProduct(productOrId) {
+    if (typeof productOrId === "string") return getProductById(productOrId);
+    return productOrId && typeof productOrId === "object" && productOrId.id ? productOrId : null;
+  },
+
+  getProductUpgradeLevel(productOrId) {
+    const product = this.resolveProduct(productOrId);
+    const productId = product?.id ?? (typeof productOrId === "string" ? productOrId : null);
+    return Math.min(5, this.toInt(productId ? this.ensureBMState().productUpgradeLevels[productId] : 0));
+  },
+
+  getProductSalePrice(productOrId) {
+    const product = this.resolveProduct(productOrId);
     if (!product) return 0;
-    const level = this.getProductUpgradeLevel(product.id);
+    return this.getProductSalePriceAtLevel(product, this.getProductUpgradeLevel(product));
+  },
+
+  getProductSalePriceAtLevel(productOrId, level = 0) {
+    const product = this.resolveProduct(productOrId);
+    if (!product) return 0;
+    const safeLevel = Math.min(5, this.toInt(level));
+    if (safeLevel >= 5 && Number.isFinite(Number(product.finalSalePrice)) && Number(product.finalSalePrice) > 0) {
+      return Math.floor(Number(product.finalSalePrice));
+    }
     const config = PRODUCT_UPGRADE_CONFIGS[product.upgradeType] ?? PRODUCT_UPGRADE_CONFIGS.normal;
-    const multiplier = config.multipliers[level] ?? 1;
+    const multiplier = config.multipliers[safeLevel] ?? 1;
     return Math.floor((Number(product.salePrice) || 0) * multiplier);
+  },
+
+  getProductDisplayName(productOrId) {
+    const product = this.resolveProduct(productOrId);
+    if (!product) return "";
+    const level = this.getProductUpgradeLevel(product);
+    return level >= 5 && product.finalName ? product.finalName : product.name;
   },
 
   getProductUpgradeState(productId) {
@@ -419,7 +475,9 @@ export const BMSystem = {
     const level = this.getProductUpgradeLevel(product.id);
     const nextLevel = level < 5 ? level + 1 : null;
     const config = PRODUCT_UPGRADE_CONFIGS[product.upgradeType] ?? PRODUCT_UPGRADE_CONFIGS.normal;
-    return { product, level, nextLevel, currentPrice: this.getProductSalePrice(product), nextPrice: nextLevel ? Math.floor(product.salePrice * (config.multipliers[nextLevel] ?? 1)) : this.getProductSalePrice(product), nextCost: nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0, typeLabel: config.name, canUpgrade: !!nextLevel && this.canSellProduct(product.id) && GameState.money >= (nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0) };
+    const currentPrice = this.getProductSalePriceAtLevel(product, level);
+    const nextPrice = nextLevel ? this.getProductSalePriceAtLevel(product, nextLevel) : currentPrice;
+    return { product, level, nextLevel, displayName: this.getProductDisplayName(product), currentPrice, nextPrice, nextCost: nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0, typeLabel: config.name, canUpgrade: !!nextLevel && this.canSellProduct(product.id) && GameState.money >= (nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0) };
   },
 
   purchaseStaffAbilityUpgrade(abilityKey) {
@@ -435,8 +493,6 @@ export const BMSystem = {
     state.totalCount += 1;
     state.lastUpgradeDay = GameState.day;
     state.abilities[key] += 1;
-    if (!GameState.staff.hired.stats) GameState.staff.hired.stats = { warehouse: 0, shelf: 0, cleaning: 0 };
-    GameState.staff.hired.stats[key] = Math.min(5, this.toInt(GameState.staff.hired.stats[key]) + 1);
     return this.ok("staff_ability_upgraded", `알바 ${this.getStaffAbilityLabel(key)} 능력이 1칸 강화되었습니다.`, { abilityKey: key });
   },
 
@@ -582,17 +638,14 @@ export const BMSystem = {
   getContractUnlockSkipState() { const v = this.validateContractUnlockSkip(); return { priceDiamond: CONTRACT_UNLOCK_SKIP_DIAMOND_PRICE, cooldownDays: CONTRACT_UNLOCK_SKIP_COOLDOWN_DAYS, canUse: v.success, reason: v.reason, message: v.message, nextProducts: this.getNextContractUnlockProducts().map((p) => this.createContractProductPayload(p)) }; },
   getPeakCouponState() { const bm = this.ensureBMState(); const v = this.validatePeakCouponUse(); return { priceDiamond: PEAK_COUPON_DIAMOND_PRICE, purchasePriceDiamond: this.getPeakCouponPurchasePrice(), discountActive: bm.peakCouponDiscountDay === GameState.day && bm.peakCouponDiscountUsedDay !== GameState.day, durationSeconds: PEAK_COUPON_DURATION_SECONDS, revenueMultiplier: PEAK_COUPON_REVENUE_MULTIPLIER, ownedCount: bm.peakTimeCoupons, usedDay: bm.peakCouponUsedDay, isActive: bm.peakCouponActive, canUse: v.success, reason: v.reason, message: v.message }; },
 
-  createContractProductPayload(product) { return product ? { productId: product.id, productName: product.name, finalName: product.finalName, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, contractCost: product.contractCost, unlockDay: product.unlockDay, isOwned: this.hasProductContract(product.id), isShopUnlocked: this.isContractShopUnlocked(product.id) } : null; },
-  createPremiumProductPayload(product) { return product ? { productId: product.id, productName: product.name, finalName: product.finalName, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, diamondPrice: product.diamondPrice, isPurchased: this.isPremiumProductPurchased(product.id), isZoneUnlocked: this.isZoneUnlocked(product.requiredZoneId) } : null; },
+  createContractProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, finalName: product.finalName, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, contractCost: product.contractCost, unlockDay: product.unlockDay, isOwned: this.hasProductContract(product.id), isShopUnlocked: this.isContractShopUnlocked(product.id) } : null; },
+  createPremiumProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, finalName: product.finalName, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, diamondPrice: product.diamondPrice, isPurchased: this.isPremiumProductPurchased(product.id), isZoneUnlocked: this.isZoneUnlocked(product.requiredZoneId) } : null; },
   emitStateChanged(reason, details = {}) { EventBus.emit(BM_EVENTS.STATE_CHANGED, { reason, ...details, bmState: this.getBMState() }); },
   ok(reason, message, details = {}) { return { success: true, reason, message, day: GameState.day, ...details, bmState: this.getBMState?.() ?? null }; },
   fail(reason, message, details = {}) { return { success: false, reason, message, day: GameState.day, ...details }; },
   isBasicProduct(productId) { return BASIC_PRODUCT_IDS.includes(productId); },
   grantDiamond(amount = 10) { const bm = this.ensureBMState(); bm.diamond += this.toInt(amount); this.emitStateChanged("diamond_granted"); EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState); return this.ok("diamond_granted", `다이아 ${amount}개를 받았습니다.`); },
   getAdDiamondRewardAmount() { return 10; },
-  getMentalRecoveryAdAmount() { return 0; },
-  isMentalRecoveryAdUsedToday() { return true; },
-  recordMentalRecoveryAdUse() { return GameState.day; },
   toInt(value) { return Math.max(0, Math.floor(Number(value) || 0)); },
   toDay(value, fallback = GameState.day) { const day = Math.floor(Number(value)); return Number.isFinite(day) && day >= 1 ? day : fallback; },
   toNullableDay(value) { if (value === null || value === undefined || value === "") return null; return this.toDay(value, null); }

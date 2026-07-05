@@ -161,7 +161,9 @@ export const RandomEventSystem = {
 
   getScenarioEventRateMultiplier(day = this.getCurrentDay()) {
     const safeDay = Math.max(1, Math.floor(Number(day) || 1));
-    const scenario = getDayScenario(safeDay);
+    const scenario = GameState.dayScenario?.day === safeDay
+      ? GameState.dayScenario
+      : getDayScenario(safeDay);
     const scenarioRate = Number(scenario?.eventRateMultiplier);
 
     return Number.isFinite(scenarioRate) && scenarioRate > 0

@@ -368,6 +368,7 @@ export const SaveSystem = {
       upgradeEffects: GameState.upgradeEffects ?? null,
       difficulty: GameState.difficulty,
       infiniteMode: GameState.infiniteMode ?? null,
+      dayScenario: GameState.dayScenario ?? null,
       bm: this.normalizeBMSnapshot(GameState.bm),
       dailyMissions: GameState.dailyMissions ?? null,
       sanitation: this.normalizeSanitationSnapshot(GameState.sanitation),
@@ -405,6 +406,7 @@ export const SaveSystem = {
         lastGameOverReason: null,
         lastCheckedDay: 1
       },
+      dayScenario: null,
       bm: this.createDefaultBMSnapshot(),
       sanitation: this.createDefaultSanitationSnapshot(),
       staff: null,
@@ -561,7 +563,9 @@ export const SaveSystem = {
     GameState.infiniteMode = this.normalizeInfiniteModeSnapshot(
       nextState.infiniteMode ?? defaultSnapshot.infiniteMode
     );
+    GameState.dayScenario = nextState.dayScenario ?? null;
     GameState.bm = this.normalizeBMSnapshot(nextState.bm ?? defaultSnapshot.bm);
+    this.syncBMWalletFromBMSnapshot(GameState.bm);
     GameState.dailyMissions = nextState.dailyMissions ?? null;
     GameState.sanitation = this.normalizeSanitationSnapshot(
       nextState.sanitation ?? defaultSnapshot.sanitation
@@ -673,6 +677,7 @@ export const SaveSystem = {
       peakTimeCoupons: this.toNonNegativeInteger(carryover.peakTimeCoupons),
       coffeeTickets: this.toNonNegativeInteger(carryover.coffeeTickets)
     };
+    this.syncBMWalletFromBMSnapshot(GameState.bm);
   },
 
   createDefaultBMSnapshot() {
@@ -755,8 +760,8 @@ export const SaveSystem = {
       },
       warehouseLevel: Math.min(5, this.toNonNegativeInteger(source.warehouseLevel)),
       pendingWarehouseUpgrade: source.pendingWarehouseUpgrade && typeof source.pendingWarehouseUpgrade === "object" ? this.deepClone(source.pendingWarehouseUpgrade) : null,
-      shelfUpgradeLevels: source.shelfUpgradeLevels && typeof source.shelfUpgradeLevels === "object" ? this.deepClone(source.shelfUpgradeLevels) : {},
-      productUpgradeLevels: source.productUpgradeLevels && typeof source.productUpgradeLevels === "object" ? this.deepClone(source.productUpgradeLevels) : {},
+      shelfUpgradeLevels: this.normalizeLevelMap(source.shelfUpgradeLevels, 5),
+      productUpgradeLevels: this.normalizeLevelMap(source.productUpgradeLevels, 5),
       staffAbilityUpgrade: {
         totalCount: this.toNonNegativeInteger(staffAbilitySource.totalCount),
         lastUpgradeDay: this.toNullablePositiveInteger(staffAbilitySource.lastUpgradeDay),
@@ -767,6 +772,34 @@ export const SaveSystem = {
         }
       }
     };
+  },
+
+  normalizeLevelMap(source = {}, maxLevel = 5) {
+    if (!source || typeof source !== "object") {
+      return {};
+    }
+
+    return Object.entries(source).reduce((normalized, [rawKey, rawValue]) => {
+      const key = String(rawKey ?? "").trim();
+      const level = Math.min(maxLevel, this.toNonNegativeInteger(rawValue));
+
+      if (key && level > 0) {
+        normalized[key] = level;
+      }
+
+      return normalized;
+    }, {});
+  },
+
+  syncBMWalletFromBMSnapshot(bm = {}) {
+    GameState.bmWallet = {
+      diamonds: this.toNonNegativeInteger(bm.diamond),
+      adSkipTickets: this.toNonNegativeInteger(bm.adSkipTickets),
+      peakTimeCoupons: this.toNonNegativeInteger(bm.peakTimeCoupons),
+      coffeeTickets: this.toNonNegativeInteger(bm.coffeeTickets)
+    };
+
+    return GameState.bmWallet;
   },
 
   createDefaultSanitationSnapshot() {
@@ -867,12 +900,22 @@ export const SaveSystem = {
 
     return (
       bm.diamond > 0 ||
+      bm.adSkipTickets > 0 ||
+      bm.peakTimeCoupons > 0 ||
+      bm.coffeeTickets > 0 ||
       ownedProductIds.length > 0 ||
       bm.purchasedPremiumProductIds.length > 0 ||
+      bm.purchasedDiamondProductIds.length > 0 ||
       bm.contractSkipUsedDay !== null ||
       bm.peakCouponUsedDay !== null ||
-      bm.mentalRecoveryAdUsedDay !== null ||
-      bm.peakCouponActive === true
+      bm.peakCouponActive === true ||
+      bm.peakCouponDiscountDay !== null ||
+      bm.warehouseLevel > 0 ||
+      bm.pendingWarehouseUpgrade !== null ||
+      Object.keys(bm.shelfUpgradeLevels).length > 0 ||
+      Object.keys(bm.productUpgradeLevels).length > 0 ||
+      bm.staffAbilityUpgrade.totalCount > 0 ||
+      Object.values(bm.paidWallet).some((value) => this.toNonNegativeInteger(value) > 0)
     );
   },
 

@@ -14482,6 +14482,21 @@ body {
   --store-object-hitbox-bottom: 6px;
 }
 
+#store-interaction-layer > #fresh-shelf-zone.store-object-zone {
+  left: 650px !important;
+  top: 585px !important;
+  z-index: 86 !important;
+  --store-object-hit-width: 118px;
+  --store-object-hit-height: 56px;
+  --store-object-visual-width: 112px;
+  --store-object-visual-height: 146px;
+  --store-object-visual-bottom: -4px;
+  --store-object-hitbox-left: 22px;
+  --store-object-hitbox-right: 22px;
+  --store-object-hitbox-top: 8px;
+  --store-object-hitbox-bottom: 5px;
+}
+
 #store-interaction-layer > #food-warmer-zone.store-object-zone {
   left: 624px !important;
   top: 540px !important;
@@ -14796,12 +14811,6 @@ body {
   --ui-button-image-disabled: url("./assets/ui/buttons/special/settings/ui_icon_settings_disabled.png");
 }
 
-.ui-special-reward-2x-ad-button {
-  --ui-button-image-normal: url("./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_normal.png");
-  --ui-button-image-pressed: url("./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_pressed.png");
-  --ui-button-image-disabled: url("./assets/ui/buttons/special/reward_2x_ad/ui_btn_reward_2x_ad_disabled.png");
-}
-
 .ui-image-button {
   --ui-button-image-current: var(--ui-button-image-normal, none);
   display: inline-grid !important;
@@ -14876,67 +14885,14 @@ body {
 }
 
 .result-modal-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  grid-template-areas:
-    "reward mental confirm"
-    "reward-status mental-status mental-status";
-  gap: 10px;
+  display: flex;
+  justify-content: flex-end;
   margin-top: 18px;
 }
 
-.result-modal-actions #result-reward-2x-ad-button {
-  grid-area: reward;
-}
-
-.result-modal-actions #result-mental-recovery-ad-button {
-  grid-area: mental;
-}
-
 .result-modal-actions #result-confirm-button {
-  grid-area: confirm;
-}
-
-.result-modal-actions #result-confirm-button,
-.result-modal-actions #result-reward-2x-ad-button,
-.result-modal-actions #result-mental-recovery-ad-button {
-  width: 100% !important;
+  min-width: 160px !important;
   margin-top: 0 !important;
-}
-
-#result-reward-2x-ad-button,
-#result-mental-recovery-ad-button {
-  min-height: 52px !important;
-  font-size: 13px !important;
-}
-
-.result-reward-2x-ad-status {
-  grid-area: reward-status;
-}
-
-.result-mental-recovery-ad-status {
-  grid-area: mental-status;
-}
-
-.result-reward-2x-ad-status,
-.result-mental-recovery-ad-status {
-  min-height: 18px;
-  margin: 0;
-  color: #5f4a22;
-  font-size: 12px;
-  font-weight: 850;
-  line-height: 1.35;
-  text-align: center;
-}
-
-.result-reward-2x-ad-status.is-warning,
-.result-mental-recovery-ad-status.is-warning {
-  color: #8a5a16;
-}
-
-.result-reward-2x-ad-status.is-success,
-.result-mental-recovery-ad-status.is-success {
-  color: #2f7a49;
 }
 
 /* v6.7 title screen and settings entry */

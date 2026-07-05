@@ -152,7 +152,7 @@ export const InventorySystem = {
         this.emitInventoryChanged("sale_product_mismatch", {
           ...saleDetails,
           productId: product.id,
-          productName: product.name,
+          productName: BMSystem.getProductDisplayName(product),
           quantity
         });
         return false;
@@ -501,7 +501,9 @@ export const InventorySystem = {
 
   getSellableProductIdsForCurrentDayRequests(day = GameState.day) {
     const safeDay = Math.max(1, Math.floor(Number(day) || 1));
-    const scenario = getDayScenario(safeDay);
+    const scenario = GameState.dayScenario?.day === safeDay
+      ? GameState.dayScenario
+      : getDayScenario(safeDay);
     const requestIds = Array.isArray(scenario?.wantedProductIds)
       ? scenario.wantedProductIds
       : [];
@@ -544,7 +546,8 @@ export const InventorySystem = {
 
       return {
         productId: product.id,
-        productName: product.name,
+        productName: BMSystem.getProductDisplayName(product),
+        shelfId: product.shelfId,
         category: product.category,
         purchasePrice: product.purchasePrice,
         salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,

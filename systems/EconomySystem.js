@@ -97,7 +97,7 @@ export const EconomySystem = {
       customerId: checkout.customerId,
       wantedProductId: checkout.wantedProductId,
       productId: checkout.product?.id ?? null,
-      productName: checkout.product?.name ?? null,
+      productName: checkout.product ? BMSystem.getProductDisplayName(checkout.product) : null,
       quantity: checkout.quantity,
       unitPrice: checkout.unitPrice,
       baseAmount: checkout.baseAmount,

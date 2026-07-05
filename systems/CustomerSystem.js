@@ -36,13 +36,15 @@ import { getDayScenario } from "../data/DayScenarioData.js";
 import {
   PRODUCTS,
   getProductById,
-  getProductsByCustomerRequestId
+  getProductsByCustomerRequestId,
+  PRODUCT_SHELF_IDS
 } from "../data/ProductData.js";
 import { RandomEventSystem } from "./RandomEventSystem.js";
 import { BMSystem } from "./BMSystem.js";
 
 const NUISANCE_CUSTOMER_MENTAL_PENALTY = 3;
 const NUISANCE_CHECKOUT_DELAY_MS = 5000;
+const CUSTOMER_SHELF_ZONE_IDS = new Set(Object.values(PRODUCT_SHELF_IDS));
 
 export const CustomerSystem = {
   customers: [],
@@ -234,9 +236,10 @@ export const CustomerSystem = {
   createCustomer() {
     const customerType = this.pickCustomerType();
     const wantedProduct = this.decideWantedProduct(customerType);
+    const wantedShelfId = this.getShelfIdForRequest(wantedProduct.id);
     const routeState = this.getRouteStateByStatus(CUSTOMER_STATUS.ENTERING);
     const currentZone = this.getAccessibleCustomerZone(routeState.currentZone);
-    const targetZone = this.getAccessibleCustomerZone(routeState.targetZone, currentZone);
+    const targetZone = this.getAccessibleCustomerZone(wantedShelfId, currentZone);
 
     this.customerIdCounter += 1;
 
@@ -251,10 +254,12 @@ export const CustomerSystem = {
       eventChance: this.getCustomerEventChance(customerType),
 
       wantedProductId: wantedProduct.id,
-      wantedProductName: wantedProduct.name,
+      wantedProductName: BMSystem.getProductDisplayName(wantedProduct),
+      wantedShelfId,
       carriedProductId: null,
       carriedProductName: null,
       carriedProductImagePath: null,
+      carriedShelfId: null,
 
       status: routeState.status,
       currentZone,
@@ -348,6 +353,10 @@ export const CustomerSystem = {
   },
 
   getCurrentDayScenario() {
+    if (GameState.dayScenario?.day === GameState.day) {
+      return GameState.dayScenario;
+    }
+
     return getDayScenario(GameState.day);
   },
 
@@ -493,7 +502,10 @@ export const CustomerSystem = {
 
   transitionCustomerStatus(customer, nextStatus) {
     const routeState = this.getRouteStateByStatus(nextStatus);
-    const currentZone = this.getAccessibleCustomerZone(routeState.currentZone);
+    const preferredShelfId = customer.wantedShelfId ?? routeState.currentZone;
+    const currentZone = this.getAccessibleCustomerZone(
+      nextStatus === CUSTOMER_STATUS.SHOPPING ? preferredShelfId : routeState.currentZone
+    );
     const targetZone = this.getAccessibleCustomerZone(routeState.targetZone, currentZone);
 
     return {
@@ -509,7 +521,11 @@ export const CustomerSystem = {
       ? GameState.expansion.customerAccessibleZones
       : [];
 
-    if (accessibleZones.length === 0 || accessibleZones.includes(zone)) {
+    if (
+      accessibleZones.length === 0 ||
+      accessibleZones.includes(zone) ||
+      (this.isShelfZone(zone) && accessibleZones.includes(CUSTOMER_ZONES.SHELF))
+    ) {
       return zone;
     }
 
@@ -518,6 +534,17 @@ export const CustomerSystem = {
     }
 
     return accessibleZones[0] ?? CUSTOMER_ZONES.DOOR;
+  },
+
+  isShelfZone(zone) {
+    return zone === CUSTOMER_ZONES.SHELF || CUSTOMER_SHELF_ZONE_IDS.has(zone);
+  },
+
+  getShelfIdForRequest(requestId) {
+    const candidates = getProductsByCustomerRequestId(requestId)
+      .filter((product) => BMSystem.canSellProduct(product.id));
+
+    return candidates[0]?.shelfId ?? CUSTOMER_ZONES.SHELF;
   },
 
   getRouteStateByStatus(status) {
@@ -617,8 +644,9 @@ export const CustomerSystem = {
         ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING),
         shoppingTime: 0,
         carriedProductId: carriedProduct.id,
-        carriedProductName: carriedProduct.name,
-        carriedProductImagePath: carriedProduct.imagePath
+        carriedProductName: BMSystem.getProductDisplayName(carriedProduct),
+        carriedProductImagePath: carriedProduct.imagePath,
+        carriedShelfId: carriedProduct.shelfId ?? customer.wantedShelfId ?? null
       };
 
       return this.assignCounterQueueOrder(waitingCustomer);
@@ -862,14 +890,14 @@ export const CustomerSystem = {
       const shouldNormalizeAmount = !data.productId;
 
       data.productId = data.productId ?? carriedProduct.id;
-      data.productName = data.productName ?? carriedProduct.name;
+      data.productName = data.productName ?? BMSystem.getProductDisplayName(carriedProduct);
 
       if (
         shouldNormalizeAmount ||
         !Number.isFinite(Number(data.amount)) ||
         Number(data.amount) <= 0
       ) {
-        data.amount = carriedProduct.salePrice * quantity;
+        data.amount = BMSystem.getProductSalePrice(carriedProduct) * quantity;
       }
     }
 
@@ -957,6 +985,8 @@ export const CustomerSystem = {
       carriedProductId: customer.carriedProductId ?? null,
       carriedProductName: customer.carriedProductName ?? null,
       carriedProductImagePath: customer.carriedProductImagePath ?? null,
+      wantedShelfId: customer.wantedShelfId ?? null,
+      carriedShelfId: customer.carriedShelfId ?? null,
 
       status: customer.status,
       currentZone: customer.currentZone,
@@ -984,6 +1014,8 @@ export const CustomerSystem = {
         customer.carriedProductImagePath ??
         getProductById(customer.carriedProductId)?.imagePath ??
         null,
+      wantedShelfId: customer.wantedShelfId ?? null,
+      carriedShelfId: customer.carriedShelfId ?? null,
       status: customer.status,
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,
@@ -1035,7 +1067,9 @@ export const CustomerSystem = {
   },
 
   getCustomersNearShelf() {
-    return this.getCustomersByZone(CUSTOMER_ZONES.SHELF);
+    return this.customers.filter((customer) => {
+      return this.isShelfZone(customer.currentZone);
+    });
   },
 
   getWaitingCustomers() {

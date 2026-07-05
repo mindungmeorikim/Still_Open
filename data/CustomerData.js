@@ -97,6 +97,78 @@ export const CUSTOMER_WANTED_PRODUCTS = [
   {
     id: "cola",
     name: "콜라"
+  },
+  {
+    id: "cream_bread",
+    name: "크림빵"
+  },
+  {
+    id: "roasted_egg",
+    name: "구운계란"
+  },
+  {
+    id: "golden_cookie",
+    name: "황금쿠키"
+  },
+  {
+    id: "hangover_drink",
+    name: "숙취 음료"
+  },
+  {
+    id: "ice_bar",
+    name: "바 아이스크림"
+  },
+  {
+    id: "cone_ice_cream",
+    name: "콘 아이스크림"
+  },
+  {
+    id: "pudding",
+    name: "푸딩"
+  },
+  {
+    id: "macaron",
+    name: "마카롱"
+  },
+  {
+    id: "tuna_mayo_sandwich",
+    name: "참치마요 샌드"
+  },
+  {
+    id: "healthy_salad",
+    name: "건강샐러드"
+  },
+  {
+    id: "frozen_pizza",
+    name: "냉동피자"
+  },
+  {
+    id: "miracle_tiramisu",
+    name: "티라미수"
+  },
+  {
+    id: "spicy_pork_lunchbox",
+    name: "제육도시락"
+  },
+  {
+    id: "cheese_kimchi_rice",
+    name: "김치볶음밥"
+  },
+  {
+    id: "premium_sandwich",
+    name: "프리미엄 샌드위치"
+  },
+  {
+    id: "tteokbokki",
+    name: "즉석떡볶이"
+  },
+  {
+    id: "roasted_sweet_potato",
+    name: "군고구마"
+  },
+  {
+    id: "hoppang",
+    name: "호빵"
   }
 ];
 

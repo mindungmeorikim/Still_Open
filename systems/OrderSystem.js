@@ -333,7 +333,7 @@ export const OrderSystem = {
       if (!BMSystem.canOrderProduct(product.id)) {
         console.warn("[OrderSystem] BM 조건 미충족 상품 발주 차단:", {
           productId: product.id,
-          productName: product.name,
+          productName: BMSystem.getProductDisplayName(product),
           reason: BMSystem.getProductLockReason(product.id)
         });
         return normalizedItems;
@@ -341,7 +341,8 @@ export const OrderSystem = {
 
       normalizedItems.push({
         productId: product.id,
-        productName: product.name,
+        productName: BMSystem.getProductDisplayName(product),
+        shelfId: product.shelfId,
         imagePath: product.imagePath,
         quantity,
         purchasePrice: product.purchasePrice,

@@ -29,6 +29,27 @@ export const PRODUCT_DISPLAY_CATEGORIES = Object.freeze({
   WARMER: "warmer"
 });
 
+export const PRODUCT_SHELF_IDS = Object.freeze({
+  BASIC: "shelf_basic",
+  FRESH: "shelf_fresh",
+  FRIDGE: "shelf_fridge",
+  WARMER: "shelf_warmer"
+});
+
+export const PRODUCT_SHELF_ID_TO_DISPLAY_CATEGORY = Object.freeze({
+  [PRODUCT_SHELF_IDS.BASIC]: PRODUCT_DISPLAY_CATEGORIES.BASIC_SHELF,
+  [PRODUCT_SHELF_IDS.FRESH]: PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF,
+  [PRODUCT_SHELF_IDS.FRIDGE]: PRODUCT_DISPLAY_CATEGORIES.FRIDGE,
+  [PRODUCT_SHELF_IDS.WARMER]: PRODUCT_DISPLAY_CATEGORIES.WARMER
+});
+
+export const PRODUCT_DISPLAY_CATEGORY_TO_SHELF_ID = Object.freeze({
+  [PRODUCT_DISPLAY_CATEGORIES.BASIC_SHELF]: PRODUCT_SHELF_IDS.BASIC,
+  [PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF]: PRODUCT_SHELF_IDS.FRESH,
+  [PRODUCT_DISPLAY_CATEGORIES.FRIDGE]: PRODUCT_SHELF_IDS.FRIDGE,
+  [PRODUCT_DISPLAY_CATEGORIES.WARMER]: PRODUCT_SHELF_IDS.WARMER
+});
+
 export const PRODUCT_ZONE_IDS = Object.freeze({
   ZONE_1: "zone_basic",
   ZONE_2: "zone_extra_shelf",
@@ -55,6 +76,15 @@ const inferProductUpgradeType = (product) => {
   return PRODUCT_UPGRADE_TYPES.NORMAL;
 };
 
+const inferProductShelfId = (product) => {
+  const displayCategory = product.displayCategory;
+
+  if (displayCategory === PRODUCT_DISPLAY_CATEGORIES.FRIDGE) return PRODUCT_SHELF_IDS.FRIDGE;
+  if (displayCategory === PRODUCT_DISPLAY_CATEGORIES.FRESH_SHELF) return PRODUCT_SHELF_IDS.FRESH;
+  if (displayCategory === PRODUCT_DISPLAY_CATEGORIES.WARMER) return PRODUCT_SHELF_IDS.WARMER;
+  return PRODUCT_SHELF_IDS.BASIC;
+};
+
 const createProduct = (product) => {
   return Object.freeze({
     ...product,
@@ -63,6 +93,7 @@ const createProduct = (product) => {
     contractCost: product.contractCost ?? 0,
     isPremiumBM: product.isPremiumBM === true,
     diamondPrice: product.diamondPrice ?? 0,
+    shelfId: product.shelfId ?? inferProductShelfId(product),
     upgradeType: product.upgradeType ?? inferProductUpgradeType(product),
     customerRequestIds: Object.freeze(product.customerRequestIds ?? [])
   });
@@ -622,6 +653,18 @@ export const PRODUCTS = Object.freeze([
 
 export function getProductById(productId) {
   return PRODUCTS.find((product) => product.id === productId) ?? null;
+}
+
+export function getProductShelfId(productId) {
+  return getProductById(productId)?.shelfId ?? PRODUCT_SHELF_IDS.BASIC;
+}
+
+export function getDisplayCategoryForShelfId(shelfId) {
+  return PRODUCT_SHELF_ID_TO_DISPLAY_CATEGORY[shelfId] ?? null;
+}
+
+export function getShelfIdForDisplayCategory(displayCategory) {
+  return PRODUCT_DISPLAY_CATEGORY_TO_SHELF_ID[displayCategory] ?? null;
 }
 
 export function getProductsByCustomerRequestId(requestId) {

@@ -8,7 +8,7 @@ import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
-import { PRODUCTS } from "../data/ProductData.js";
+import { PRODUCTS, PRODUCT_SHELF_IDS } from "../data/ProductData.js";
 import {
   EXPANSION_ZONES,
   getPreviousExpansionZone
@@ -87,7 +87,6 @@ const UI_IMAGE_BUTTON_VARIANTS = {
   iconConfirm: ASSET_PATHS.ui.buttons.icon.confirm,
   iconWarning: ASSET_PATHS.ui.buttons.icon.warning,
   specialContinue: ASSET_PATHS.ui.buttons.special.continue,
-  specialReward2xAd: ASSET_PATHS.ui.buttons.special.reward2xAd,
   specialSettings: ASSET_PATHS.ui.buttons.special.settings
 };
 
@@ -104,8 +103,6 @@ export const UIManager = {
   settingsEscapeKeyBound: false,
   dailyRewardModal: null,
   resultModal: null,
-  resultReward2xAdTimerId: null,
-  resultMentalRecoveryAdTimerId: null,
   upgradeModal: null,
   endingModal: null,
   infiniteGameOverModal: null,
@@ -1329,13 +1326,22 @@ export const UIManager = {
   },
 
   getCustomerClassName(customer) {
+    const shelfClassName = this.isCustomerShelfZone(customer.currentZone)
+      ? "customer-zone-shelf"
+      : null;
+
     return [
       "customer-npc",
       `customer-type-${customer.typeId}`,
       `customer-status-${customer.status}`,
       `customer-mood-${customer.mood}`,
-      `customer-zone-${customer.currentZone}`
-    ].join(" ");
+      `customer-zone-${customer.currentZone}`,
+      shelfClassName
+    ].filter(Boolean).join(" ");
+  },
+
+  isCustomerShelfZone(zone) {
+    return zone === "shelf" || Object.values(PRODUCT_SHELF_IDS).includes(zone);
   },
 
   getCustomerDisplayText(customer) {
@@ -1498,6 +1504,7 @@ export const UIManager = {
     const objectConfigs = [
       {
         nodeId: "shelf-zone",
+        shelfId: PRODUCT_SHELF_IDS.BASIC,
         objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
         facing: OBJECT_FACINGS.LEFT,
         label: "진열대",
@@ -1505,13 +1512,23 @@ export const UIManager = {
       },
       {
         nodeId: "beverage-fridge-zone",
+        shelfId: PRODUCT_SHELF_IDS.FRIDGE,
         objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
         facing: OBJECT_FACINGS.RIGHT,
         label: "음료 냉장고",
         createIfMissing: true
       },
       {
+        nodeId: "fresh-shelf-zone",
+        shelfId: PRODUCT_SHELF_IDS.FRESH,
+        objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+        facing: OBJECT_FACINGS.RIGHT,
+        label: "신선 매대",
+        createIfMissing: true
+      },
+      {
         nodeId: "food-warmer-zone",
+        shelfId: PRODUCT_SHELF_IDS.WARMER,
         objectType: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
         facing: OBJECT_FACINGS.RIGHT,
         label: "온장고",
@@ -1524,7 +1541,12 @@ export const UIManager = {
 
       if (!node) return;
 
-      const stockData = this.getStoreObjectStockData(config.objectType);
+      node.dataset.playerAction = "shelf_restock";
+      node.dataset.shelfId = config.shelfId;
+      node.setAttribute("role", "button");
+      node.setAttribute("tabindex", "0");
+
+      const stockData = this.getStoreObjectStockData(config.objectType, config.shelfId);
       const visualAsset = getObjectVisualAsset(
         config.objectType,
         stockData.stock,
@@ -1610,14 +1632,17 @@ export const UIManager = {
     return node;
   },
 
-  getStoreObjectStockData(objectType) {
+  getStoreObjectStockData(objectType, shelfId = null) {
     const items = this.getInventoryItemsForObjectVisuals();
     const itemsByProductId = items.reduce((itemMap, item) => {
       itemMap[item.productId] = item;
       return itemMap;
     }, {});
     const matchingProducts = PRODUCTS.filter((product) => {
-      return this.getProductStockVisualObjectType(product) === objectType;
+      const isMatchingObject = this.getProductStockVisualObjectType(product) === objectType;
+      const isMatchingShelf = !shelfId || product.shelfId === shelfId;
+
+      return isMatchingObject && isMatchingShelf;
     });
     const visibleProducts = matchingProducts.filter((product) => {
       const item = itemsByProductId[product.id];
@@ -1808,8 +1833,27 @@ export const UIManager = {
     return [
       {
         nodeId: "shelf-zone",
+        shelfId: PRODUCT_SHELF_IDS.BASIC,
         isInteractable: true,
         fallback: { x: 540, y: 680 }
+      },
+      {
+        nodeId: "beverage-fridge-zone",
+        shelfId: PRODUCT_SHELF_IDS.FRIDGE,
+        isInteractable: true,
+        fallback: { x: 705, y: 492 }
+      },
+      {
+        nodeId: "fresh-shelf-zone",
+        shelfId: PRODUCT_SHELF_IDS.FRESH,
+        isInteractable: true,
+        fallback: { x: 650, y: 585 }
+      },
+      {
+        nodeId: "food-warmer-zone",
+        shelfId: PRODUCT_SHELF_IDS.WARMER,
+        isInteractable: true,
+        fallback: { x: 624, y: 540 }
       },
       {
         nodeId: "counter-zone",
@@ -2075,7 +2119,7 @@ export const UIManager = {
         classNames: ["ui-common-button", "ui-common-button-large"]
       },
       {
-        selector: "#result-confirm-button, #result-mental-recovery-ad-button, #day-scenario-confirm-button, #order-confirm-button, .store-expansion-popover-action, .expansion-action-button, .customer-event-close-button, .staff-hire-skip-button, .bm-contract-purchase-button, .bm-premium-purchase-button, #bm-contract-skip-button",
+        selector: "#result-confirm-button, #day-scenario-confirm-button, #order-confirm-button, .store-expansion-popover-action, .expansion-action-button, .customer-event-close-button, .staff-hire-skip-button, .bm-contract-purchase-button, .bm-premium-purchase-button, #bm-contract-skip-button",
         variant: "commonBase",
         classNames: ["ui-common-button", "ui-common-button-base"]
       },
@@ -2083,11 +2127,6 @@ export const UIManager = {
         selector: "#ending-continue-button",
         variant: "specialContinue",
         classNames: ["ui-special-button", "ui-special-continue-button"]
-      },
-      {
-        selector: "#result-reward-2x-ad-button",
-        variant: "specialReward2xAd",
-        classNames: ["ui-special-button", "ui-special-reward-2x-ad-button"]
       },
       {
         selector: ".store-expansion-popover-close, #settings-close-button, #bm-contract-shop-close-button",
@@ -2463,9 +2502,9 @@ export const UIManager = {
     const staffType = String(hired.type ?? "근무").trim() || "근무";
     const baseStats = hired?.stats || { warehouse: 0, shelf: 0, cleaning: 0 };
     const ability = GameState.bm?.staffAbilityUpgrade?.abilities || {};
-    const warehouseStat = Number(baseStats.warehouse || 0) + Number(ability.warehouse || 0);
-    const shelfStat = Number(baseStats.shelf || 0) + Number(ability.shelf || 0);
-    const cleaningStat = Number(baseStats.cleaning || 0) + Number(ability.cleaning || 0);
+    const warehouseStat = Math.min(5, Number(baseStats.warehouse || 0) + Number(ability.warehouse || 0));
+    const shelfStat = Math.min(5, Number(baseStats.shelf || 0) + Number(ability.shelf || 0));
+    const cleaningStat = Math.min(5, Number(baseStats.cleaning || 0) + Number(ability.cleaning || 0));
     const statSummary = `창고 ${warehouseStat}/5 · 진열대 ${shelfStat}/5 · 청소 ${cleaningStat}/5`;
 
     staffCharacter.hidden = false;
@@ -2561,11 +2600,12 @@ export const UIManager = {
     const items = Array.isArray(snapshot.items)
       ? snapshot.items
       : PRODUCTS.map((product) => {
+          const displayName = BMSystem.getProductDisplayName(product);
           const inventoryItem = this.inventoryByProductId[product.id];
 
           return {
             productId: product.id,
-            productName: product.name,
+            productName: displayName,
             unlockDay: product.unlockDay,
             isUnlocked: product.unlockDay <= GameState.day,
             quantity: Number(inventoryItem?.quantity) || 0
@@ -4489,12 +4529,13 @@ export const UIManager = {
     const orderItems = PRODUCTS.map((product) => {
       return {
         productId: product.id,
-        productName: product.name,
+        productName: BMSystem.getProductDisplayName(product),
         isUnlocked: this.isProductOrderable(product)
       };
     });
 
     productGrid.innerHTML = PRODUCTS.map((product) => {
+      const displayName = BMSystem.getProductDisplayName(product);
       const inventoryItem = this.inventoryByProductId[product.id];
       const isLocked = !this.isProductOrderable(product);
       const lockReason = this.getOrderUnavailableReason(product);
@@ -4520,7 +4561,7 @@ export const UIManager = {
             <img
               class="product-image"
               src="${product.imagePath}"
-              alt="${product.name}"
+              alt="${displayName}"
               loading="lazy"
               decoding="async"
             />
@@ -4537,7 +4578,7 @@ export const UIManager = {
             <span class="product-category">
               ${this.getProductCategoryLabel(product.category)}
             </span>
-            <h3>${product.name}</h3>
+            <h3>${displayName}</h3>
 
             <dl class="product-card-stats">
               <div>
@@ -4811,13 +4852,21 @@ export const UIManager = {
       ? scenarioData.features
       : [];
     const marketInfo = scenarioData.marketInfo ?? {};
+    const marketScenario = scenarioData.marketScenario ?? null;
+    const marketProbability = Number(marketScenario?.probability);
+    const marketProbabilityText = Number.isFinite(marketProbability)
+      ? ` · ${(marketProbability * 100).toFixed(1)}%`
+      : "";
+    const marketLabel = marketScenario?.name
+      ? `${marketInfo.weatherLabel ?? "상권 정보"} · ${marketScenario.name}${marketProbabilityText}`
+      : marketInfo.weatherLabel ?? "상권 정보";
     const recommendedProducts = this.getRecommendedProducts(scenarioData);
 
     title.textContent = scenarioData.title ?? `Day ${GameState.day}. 영업 시작`;
     subtitle.textContent = scenarioData.subtitle ?? "오늘의 편의점 운영을 준비합니다.";
     targetRevenue.textContent = `₩${GameState.dailyGoal.targetRevenue.toLocaleString()}`;
     targetSatisfaction.textContent = `${GameState.dailyGoal.targetSatisfaction}%`;
-    weather.textContent = marketInfo.weatherLabel ?? "상권 정보";
+    weather.textContent = marketLabel;
     marketHeadline.textContent = marketInfo.headline ?? "오늘의 수요 정보를 확인하세요.";
     marketMessage.textContent = marketInfo.message ?? "추천 상품을 참고해서 발주 수량을 정해보세요.";
     story.textContent = scenarioData.story ?? "발주와 재고 정리를 마친 뒤 편의점을 오픈하세요.";
@@ -4827,10 +4876,11 @@ export const UIManager = {
     recommendList.innerHTML = recommendedProducts.length > 0
       ? recommendedProducts.map((product) => {
           const reason = this.getRecommendedProductReason(scenarioData, product.id);
+          const displayName = BMSystem.getProductDisplayName(product);
 
           return `
             <li>
-              <strong>${product.name}</strong>
+              <strong>${displayName}</strong>
               <span>${reason}</span>
             </li>
           `;
@@ -5081,14 +5131,17 @@ export const UIManager = {
 
     const priceText = options.priceText ?? "가격 확인 필요";
     const description = options.description ?? "구매 후 해당 상품을 운영에 사용할 수 있습니다.";
+    const displayName = product.id && BMSystem.getProductDisplayName(product)
+      ? BMSystem.getProductDisplayName(product)
+      : product.name;
 
     body.innerHTML = `
       <article class="bm-purchase-confirm-card">
         <span class="bm-purchase-confirm-image-box">
-          <img src="${product.imagePath}" alt="${product.name}" draggable="false" onerror="this.hidden=true;" />
+          <img src="${product.imagePath}" alt="${displayName}" draggable="false" onerror="this.hidden=true;" />
         </span>
         <div class="bm-purchase-confirm-copy">
-          <strong>${product.name}</strong>
+          <strong>${displayName}</strong>
           <span>${description}</span>
           <em>${priceText}</em>
           <p>해당 상품을 구매하시겠습니까?</p>
@@ -5231,7 +5284,7 @@ export const UIManager = {
 
     if (nextNode) {
       nextNode.textContent = nextProducts.length > 0
-        ? `다음 해금 예정: ${nextProducts.map((product) => product.name).join(", ")}`
+        ? `다음 해금 예정: ${nextProducts.map((product) => BMSystem.getProductDisplayName(product)).join(", ")}`
         : "모든 일반 상품 판매권이 상점에 해금되었습니다.";
     }
 
@@ -5357,7 +5410,7 @@ export const UIManager = {
                 <span>Lv.${group.current.level} · 상품별 ${group.current.capacity}개 진열 가능</span>
                 <em>${group.next ? `다음 Lv.${group.next.level}: ${group.next.capacity}개 / ${group.next.costGold.toLocaleString("ko-KR")}골드` : "최대 강화"}</em>
               </div>
-              <button class="bm-shelf-upgrade-button" type="button" data-shelf-group-id="${group.id}" ${group.next && group.canUpgrade ? "" : "disabled"}>강화</button>
+              <button class="bm-shelf-upgrade-button" type="button" data-shelf-group-id="${group.id}" data-shelf-id="${group.shelfId ?? ""}" ${group.next && group.canUpgrade ? "" : "disabled"}>강화</button>
             </article>
           `).join("")}
         </div>
@@ -5368,12 +5421,13 @@ export const UIManager = {
         <div class="bm-shop-card-list">
           ${productUpgradeProducts.map((product) => {
             const state = BMSystem.getProductUpgradeState(product.id);
+            const displayName = state?.displayName ?? BMSystem.getProductDisplayName(product);
             return `
               <article class="bm-contract-shop-card bm-product-upgrade-card">
                 <div class="bm-contract-product-main">
-                  <span class="bm-contract-product-image-box"><img class="bm-contract-product-image" src="${product.imagePath}" alt="${product.name}" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" /><span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span></span>
+                  <span class="bm-contract-product-image-box"><img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" /><span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span></span>
                   <div class="bm-contract-product-copy">
-                    <strong>${product.name}</strong>
+                    <strong>${displayName}</strong>
                     <span>${state.typeLabel} · 현재 ${state.level}강</span>
                     <em>판매가 ${state.currentPrice.toLocaleString("ko-KR")}골드${state.nextLevel ? ` → ${state.nextPrice.toLocaleString("ko-KR")}골드` : ""}</em>
                   </div>
@@ -5496,16 +5550,17 @@ export const UIManager = {
   createBMContractProductCardMarkup(product) {
     const status = this.getBMContractShopItemStatus(product);
     const contractCost = Number(product.contractCost) || 0;
+    const displayName = BMSystem.getProductDisplayName(product);
 
     return `
       <article class="bm-contract-shop-card ${status.className}" data-product-id="${product.id}">
         <div class="bm-contract-product-main">
           <span class="bm-contract-product-image-box">
-            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${product.name}" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
+            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
             <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
           </span>
           <div class="bm-contract-product-copy">
-            <strong>${product.name}</strong>
+            <strong>${displayName}</strong>
             <span>최종 강화명: ${product.finalName}</span>
             <em>${status.message}</em>
           </div>
@@ -5523,16 +5578,17 @@ export const UIManager = {
   createBMPremiumProductCardMarkup(product) {
     const status = this.getBMPremiumProductStatus(product);
     const diamondPrice = Number(product.diamondPrice) || 0;
+    const displayName = BMSystem.getProductDisplayName(product);
 
     return `
       <article class="bm-contract-shop-card bm-premium-product-card ${status.className}" data-product-id="${product.id}">
         <div class="bm-contract-product-main">
           <span class="bm-contract-product-image-box">
-            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${product.name}" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
+            <img class="bm-contract-product-image" src="${product.imagePath}" alt="${displayName}" loading="lazy" decoding="async" onerror="this.hidden=true;this.nextElementSibling.hidden=false;" />
             <span class="bm-contract-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
           </span>
           <div class="bm-contract-product-copy">
-            <strong>${product.name}</strong>
+            <strong>${displayName}</strong>
             <span>최종 강화명: ${product.finalName}</span>
             <em>${status.message}</em>
           </div>
@@ -5691,7 +5747,7 @@ export const UIManager = {
     document.querySelectorAll(".bm-shelf-upgrade-button").forEach((button) => {
       button.onclick = () => {
         if (button.disabled) return;
-        EventBus.emit(BM_EVENTS.SHELF_UPGRADE_REQUESTED, { day: GameState.day, shelfGroupId: button.dataset.shelfGroupId });
+        EventBus.emit(BM_EVENTS.SHELF_UPGRADE_REQUESTED, { day: GameState.day, shelfGroupId: button.dataset.shelfGroupId, shelfId: button.dataset.shelfId });
       };
     });
   },
@@ -6000,6 +6056,7 @@ export const UIManager = {
 
           <div class="order-product-list order-product-card-grid" data-active-category="${this.orderActiveCategory ?? "all"}">
             ${visibleProducts.map((product) => {
+              const displayName = BMSystem.getProductDisplayName(product);
               const inventoryItem = this.inventoryByProductId[product.id];
               const isOrderable = orderableProductIds.has(product.id);
               const quantity = isOrderable
@@ -6021,7 +6078,7 @@ export const UIManager = {
                     <img
                       class="order-product-thumb"
                       src="${product.imagePath}"
-                      alt="${product.name}"
+                      alt="${displayName}"
                       loading="lazy"
                       decoding="async"
                       onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
@@ -6029,7 +6086,7 @@ export const UIManager = {
                     <span class="order-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
                   </span>
 
-                  <strong class="order-product-title">${product.name}</strong>
+                  <strong class="order-product-title">${displayName}</strong>
                   <span class="order-product-stock">재고 ${stockQuantity}개</span>
                   <em class="order-product-status">${orderStatusText}</em>
 
@@ -6038,7 +6095,7 @@ export const UIManager = {
                     <span><b>판매가</b><strong>₩${salePrice.toLocaleString()}</strong></span>
                   </div>
 
-                  <div class="order-quantity-panel" aria-label="${product.name} 발주 수량">
+                  <div class="order-quantity-panel" aria-label="${displayName} 발주 수량">
                     <div class="order-quantity-controls">
                       <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
                       <strong>${quantity}</strong>
@@ -6103,7 +6160,8 @@ export const UIManager = {
           .map((product) => {
             return {
               productId: product.id,
-              productName: product.name,
+              productName: BMSystem.getProductDisplayName(product),
+              shelfId: product.shelfId,
               quantity: this.orderDraftQuantities[product.id] ?? 0,
               purchasePrice: product.purchasePrice,
               salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,
@@ -6403,10 +6461,6 @@ export const UIManager = {
     const title = document.getElementById("result-modal-title");
     const body = document.getElementById("result-modal-body");
     const confirmButton = document.getElementById("result-confirm-button");
-    const reward2xButton = document.getElementById("result-reward-2x-ad-button");
-    const reward2xStatus = document.getElementById("result-reward-2x-ad-status");
-    const mentalRecoveryButton = document.getElementById("result-mental-recovery-ad-button");
-    const mentalRecoveryStatus = document.getElementById("result-mental-recovery-ad-status");
 
     const isInfiniteGameOver = resultData.infiniteGameOver?.isGameOver === true;
 
@@ -6530,26 +6584,6 @@ export const UIManager = {
         ${mvpText}
       </div>
     `;
-
-    this.configureResultReward2xAdButton({
-      button: reward2xButton,
-      statusNode: reward2xStatus,
-      resultData,
-      onReward2xAdComplete: isInfiniteGameOver
-        ? null
-        : options.onReward2xAdComplete,
-      onReward2xAdFail: options.onReward2xAdFail
-    });
-
-    this.configureResultMentalRecoveryAdButton({
-      button: mentalRecoveryButton,
-      statusNode: mentalRecoveryStatus,
-      resultData,
-      onMentalRecoveryAdComplete: isInfiniteGameOver
-        ? null
-        : options.onMentalRecoveryAdComplete,
-      onMentalRecoveryAdFail: options.onMentalRecoveryAdFail
-    });
 
     confirmButton.onclick = () => {
       this.hideResultModal();

@@ -97,7 +97,9 @@ export const DailyMissionSystem = {
 
   handleRevenueChanged(data = {}) {
     const state = this.ensureState(data.day ?? GameState.day);
-    const scenario = getDayScenario(GameState.day);
+    const scenario = GameState.dayScenario?.day === GameState.day
+      ? GameState.dayScenario
+      : getDayScenario(GameState.day);
     const recommendedIds = new Set(scenario.recommendedProductIds ?? []);
     const productId = data.productId ?? data.wantedProductId;
 

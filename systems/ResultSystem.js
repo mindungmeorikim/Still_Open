@@ -27,8 +27,6 @@ import { InventorySystem } from "./InventorySystem.js";
 export const ResultSystem = {
   calculatedResultDay: null,
   processedCheckoutKeys: new Set(),
-  reward2xAppliedDay: null,
-  mentalRecoveryAdAppliedDay: null,
 
   init() {
     EventBus.on(EVENTS.DAY_ENDED, () => this.calculateResult());
@@ -41,8 +39,6 @@ export const ResultSystem = {
   bindPlayerEvents() {
     EventBus.on(EVENTS.DAY_STARTED, () => {
       this.processedCheckoutKeys.clear();
-      this.reward2xAppliedDay = null;
-      this.mentalRecoveryAdAppliedDay = null;
     });
 
     EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data = {}) => {

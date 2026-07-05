@@ -26,6 +26,7 @@ import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 import { getDayScenario } from "../data/DayScenarioData.js";
+import { PRODUCTS } from "../data/ProductData.js";
 
 const STAFF_EVENTS = {
   HIRE_OFFERED: "STAFF_HIRE_OFFERED",
@@ -191,6 +192,8 @@ export const GameFlowSystem = {
       GameState.staff.hired = null;
     }
 
+    this.normalizeHiredStaffBaseStats(GameState.staff.hired);
+
     if (GameState.staff.workCountDay !== GameState.day) {
       GameState.staff.todayWarehouseHelpCount = 0;
       GameState.staff.todayShelfHelpCount = 0;
@@ -205,6 +208,22 @@ export const GameFlowSystem = {
     });
 
     return GameState.staff;
+  },
+
+  normalizeHiredStaffBaseStats(hired = null) {
+    if (!hired) return null;
+    const candidate = STAFF_CANDIDATES.find((staffCandidate) => staffCandidate.id === hired.id);
+    const sourceStats = candidate?.stats ?? hired.stats ?? {};
+    hired.stats = {
+      warehouse: this.toStaffStat(sourceStats.warehouse),
+      shelf: this.toStaffStat(sourceStats.shelf),
+      cleaning: this.toStaffStat(sourceStats.cleaning)
+    };
+    return hired;
+  },
+
+  toStaffStat(value) {
+    return Math.min(5, Math.max(0, Math.floor(Number(value) || 0)));
   },
 
   getStaffCandidates() {
@@ -365,7 +384,8 @@ export const GameFlowSystem = {
     GameState.phase = GAME_PHASE.ORDER;
 
     const modeText = GameState.isEndlessMode ? "무한모드" : "스토리 모드";
-    const dayScenario = this.getCurrentDayScenario();
+    const dayScenario = this.getCurrentDayScenario({ refresh: true });
+    GameState.dayScenario = dayScenario;
 
     UIManager.showMessage(
       `Day ${GameState.day} 시작! ${modeText}입니다. 발주 → 택배 수령 → 재고 정리까지 마치면 영업을 시작할 수 있습니다.`
@@ -718,8 +738,80 @@ export const GameFlowSystem = {
     };
   },
 
-  getCurrentDayScenario() {
-    return getDayScenario(GameState.day);
+  getCurrentDayScenario(options = {}) {
+    if (
+      options.refresh !== true &&
+      GameState.dayScenario?.day === GameState.day
+    ) {
+      return GameState.dayScenario;
+    }
+
+    const marketAvailability = this.createMarketAvailabilitySnapshot();
+    const scenario = getDayScenario(GameState.day, marketAvailability);
+
+    if (options.refresh === true) {
+      GameState.dayScenario = scenario;
+    }
+
+    return scenario;
+  },
+
+  createMarketAvailabilitySnapshot() {
+    const sellableProducts = PRODUCTS.filter((product) => {
+      return this.isProductAvailableForMarket(product);
+    });
+    const sellableProductIds = sellableProducts.map((product) => product.id);
+    const sellableRequestIds = new Set(sellableProductIds);
+
+    sellableProducts.forEach((product) => {
+      (product.customerRequestIds ?? []).forEach((requestId) => {
+        sellableRequestIds.add(requestId);
+      });
+    });
+
+    return {
+      sellableProductIds,
+      sellableRequestIds: [...sellableRequestIds]
+    };
+  },
+
+  isProductAvailableForMarket(product) {
+    if (!product) return false;
+    if (!this.isProductZoneAvailableForMarket(product.requiredZoneId)) return false;
+
+    const bm = GameState.bm ?? {};
+    const ownedContractProductIds = new Set([
+      "potato_chips",
+      "water",
+      ...(Array.isArray(bm.ownedContractProductIds) ? bm.ownedContractProductIds : [])
+    ]);
+    const purchasedPremiumProductIds = new Set(
+      Array.isArray(bm.purchasedPremiumProductIds) ? bm.purchasedPremiumProductIds : []
+    );
+
+    return product.isPremiumBM
+      ? purchasedPremiumProductIds.has(product.id)
+      : ownedContractProductIds.has(product.id);
+  },
+
+  isProductZoneAvailableForMarket(requiredZoneId) {
+    if (!requiredZoneId) return true;
+
+    const expansion = GameState.expansion ?? {};
+    const unlockedZoneIds = new Set(
+      Array.isArray(expansion.unlockedZoneIds) ? expansion.unlockedZoneIds : ["zone_basic"]
+    );
+
+    if (unlockedZoneIds.has(requiredZoneId)) return true;
+
+    const constructionZoneId = expansion.constructionZoneId ?? null;
+    const completeDay = Math.floor(Number(expansion.constructionCompleteDay));
+
+    return (
+      constructionZoneId === requiredZoneId &&
+      Number.isFinite(completeDay) &&
+      completeDay <= GameState.day
+    );
   },
 
   toNumber(value) {

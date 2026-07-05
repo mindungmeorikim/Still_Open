@@ -29,6 +29,288 @@ const createScenario = (scenario) => {
   });
 };
 
+const unique = (values = []) => [...new Set(values.filter(Boolean))];
+
+const createMarketScenario = (market) => Object.freeze({
+  ...market,
+  targetProductIds: Object.freeze([...(market.targetProductIds ?? [])]),
+  wantedProductIds: Object.freeze([...(market.wantedProductIds ?? market.targetProductIds ?? [])]),
+  recommendedProductIds: Object.freeze([...(market.recommendedProductIds ?? market.targetProductIds ?? [])]),
+  recommendedProductReasons: Object.freeze({ ...(market.recommendedProductReasons ?? {}) }),
+  customerTypeWeights: Object.freeze({ ...(market.customerTypeWeights ?? {}) })
+});
+
+export const MARKET_SCENARIOS = Object.freeze({
+  normal: createMarketScenario({
+    id: "normal",
+    name: "기본 상권",
+    weatherLabel: "기본 상권",
+    headline: "오늘은 특별한 상권 변화가 없습니다.",
+    message: "안정적인 기본 상품 위주로 발주해도 무난한 하루입니다.",
+    targetProductIds: [],
+    minAvailableProductCount: 0,
+    recommendedProductIds: ["potato_chips", "water"],
+    recommendedProductReasons: {
+      potato_chips: "초반부터 안정적인 간식 수요",
+      water: "모든 상권에서 꾸준히 팔리는 기본 음료"
+    }
+  }),
+  starter_basics: createMarketScenario({
+    id: "starter_basics",
+    name: "동네 기본 수요",
+    weatherLabel: "기본 수요",
+    headline: "동네 기본 장보기 수요가 늘었습니다.",
+    message: "아직 상권이 크게 갈리지 않은 시기입니다. 감자칩, 생수, 컵면, 콜라처럼 초반 상품을 중심으로 준비하세요.",
+    targetProductIds: ["potato_chips", "water", "ramen", "cola"],
+    minAvailableProductCount: 1,
+    recommendedProductIds: ["potato_chips", "water", "ramen", "cola"],
+    recommendedProductReasons: {
+      potato_chips: "가볍게 집어가는 기본 간식",
+      water: "초반 안정 수요 음료",
+      ramen: "해금 후 기본 식사 수요",
+      cola: "해금 후 간식 동반 구매 수요"
+    },
+    customerTypeWeights: {
+      normal: 62,
+      student: 22,
+      office_worker: 12,
+      hurried: 4,
+      difficult: 0
+    }
+  }),
+  school_peak: createMarketScenario({
+    id: "school_peak",
+    name: "등교길 피크",
+    weatherLabel: "등교길",
+    headline: "등교길 학생 손님이 늘어나는 날입니다.",
+    message: "간편식과 달콤한 음료 수요가 강합니다. 학생 손님이 빠르게 집어갈 상품을 준비하세요.",
+    targetProductIds: ["triangle_kimbap", "banana_milk", "egg_sandwich", "tuna_mayo_sandwich", "premium_sandwich"],
+    minAvailableProductCount: 2,
+    recommendedProductIds: ["triangle_kimbap", "banana_milk", "egg_sandwich", "tuna_mayo_sandwich", "premium_sandwich"],
+    recommendedProductReasons: {
+      triangle_kimbap: "등교길 대표 간편식",
+      banana_milk: "학생 손님 선호 음료",
+      egg_sandwich: "아침 대용 신선식품",
+      tuna_mayo_sandwich: "점심 전후 간편식 수요",
+      premium_sandwich: "프리미엄 간편식 수요"
+    },
+    customerTypeWeights: {
+      normal: 30,
+      student: 44,
+      office_worker: 12,
+      hurried: 12,
+      difficult: 2
+    }
+  }),
+  rainy_day: createMarketScenario({
+    id: "rainy_day",
+    name: "비 오는 날",
+    weatherLabel: "비",
+    headline: "비 오는 날에는 따뜻한 상품 수요가 올라갑니다.",
+    message: "컵면, 우동, 온장고 상품처럼 몸을 데워주는 상품을 우선 확인하세요.",
+    targetProductIds: ["ramen", "udon", "sausage_hotbar", "tteokbokki", "roasted_sweet_potato", "hoppang", "microwave_hotbar"],
+    minAvailableProductCount: 2,
+    recommendedProductIds: ["ramen", "udon", "sausage_hotbar", "tteokbokki", "roasted_sweet_potato", "hoppang", "microwave_hotbar"],
+    recommendedProductReasons: {
+      ramen: "비 오는 날 따뜻한 컵면 수요",
+      udon: "쌀쌀한 날씨에 맞는 간편식",
+      sausage_hotbar: "따뜻한 간식 수요",
+      tteokbokki: "매콤한 즉석식 수요",
+      roasted_sweet_potato: "비 오는 날 온장고 간식",
+      hoppang: "쌀쌀한 날씨 대표 상품",
+      microwave_hotbar: "프리미엄 온장고 상품 수요"
+    },
+    customerTypeWeights: {
+      normal: 44,
+      student: 18,
+      office_worker: 24,
+      hurried: 10,
+      difficult: 4
+    }
+  }),
+  exam_period: createMarketScenario({
+    id: "exam_period",
+    name: "시험 기간",
+    weatherLabel: "시험 기간",
+    headline: "시험 기간 각성 음료와 간식 수요가 늘었습니다.",
+    message: "커피류와 달콤한 간식을 넉넉히 준비하면 추천 상품 판매 미션에도 유리합니다.",
+    targetProductIds: ["coffee", "iced_americano", "chocolate_bar", "macaron", "golden_cookie", "cola"],
+    minAvailableProductCount: 2,
+    recommendedProductIds: ["coffee", "iced_americano", "chocolate_bar", "macaron", "golden_cookie", "cola"],
+    recommendedProductReasons: {
+      coffee: "집중을 위한 캔커피 수요",
+      iced_americano: "각성 음료 수요",
+      chocolate_bar: "시험 기간 당 충전 간식",
+      macaron: "고가 디저트 간식 수요",
+      golden_cookie: "프리미엄 간식 수요",
+      cola: "간식 동반 음료 수요"
+    },
+    customerTypeWeights: {
+      normal: 30,
+      student: 34,
+      office_worker: 18,
+      hurried: 14,
+      difficult: 4
+    }
+  }),
+  friday_night: createMarketScenario({
+    id: "friday_night",
+    name: "불금 밤",
+    weatherLabel: "불금",
+    headline: "불금 밤 식사류와 고가 상품 수요가 강해졌습니다.",
+    message: "도시락, 숙취 음료, 프리미엄 상품처럼 객단가가 높은 상품을 확인하세요.",
+    targetProductIds: ["hangover_drink", "frozen_pizza", "spicy_pork_lunchbox", "cheese_kimchi_rice", "pork_cutlet_lunchbox", "miracle_tiramisu", "premium_sandwich"],
+    wantedProductIds: ["hangover_drink", "frozen_pizza", "lunch_box", "miracle_tiramisu", "premium_sandwich"],
+    minAvailableProductCount: 2,
+    recommendedProductIds: ["hangover_drink", "frozen_pizza", "spicy_pork_lunchbox", "cheese_kimchi_rice", "pork_cutlet_lunchbox", "miracle_tiramisu", "premium_sandwich"],
+    recommendedProductReasons: {
+      hangover_drink: "불금 밤 숙취 대비 수요",
+      frozen_pizza: "야식 대체 고가 상품",
+      spicy_pork_lunchbox: "늦은 식사류 수요",
+      cheese_kimchi_rice: "야식형 식사 수요",
+      pork_cutlet_lunchbox: "높은 객단가 식사류",
+      miracle_tiramisu: "프리미엄 디저트 수요",
+      premium_sandwich: "프리미엄 간편식 수요"
+    },
+    customerTypeWeights: {
+      normal: 24,
+      student: 12,
+      office_worker: 32,
+      hurried: 20,
+      difficult: 12
+    }
+  })
+});
+
+const SPECIAL_MARKET_IDS = Object.freeze([
+  "school_peak",
+  "rainy_day",
+  "exam_period",
+  "friday_night"
+]);
+
+const MARKET_STAGE_WEIGHTS = Object.freeze({
+  0: Object.freeze({ normal: 80, starter: 20, special: 0 }),
+  1: Object.freeze({ normal: 70, starter: 15, special: 15 }),
+  2: Object.freeze({ normal: 60, starter: 15, special: 12.5 }),
+  3: Object.freeze({ normal: 55, starter: 7.5, special: 12.5 }),
+  4: Object.freeze({ normal: 50, starter: 0, special: 12.5 })
+});
+
+const seededRatio = (day, salt = 0) => {
+  let seed = Math.max(1, Math.floor(Number(day) || 1)) * 9301 + 49297 + salt;
+  seed = (seed * 233280 + 12345) % 2147483647;
+  return (seed % 100000) / 100000;
+};
+
+const getAvailableIds = (ids = [], availableSet = new Set()) => {
+  return ids.filter((id) => availableSet.has(id));
+};
+
+const canUseMarket = (market, availableProductIds = new Set()) => {
+  if (!market || market.id === "normal") return true;
+  const availableTargets = getAvailableIds(market.targetProductIds, availableProductIds);
+  return availableTargets.length >= (market.minAvailableProductCount ?? 1);
+};
+
+export function selectMarketScenario(day, options = {}) {
+  const availableProductIds = new Set(options.sellableProductIds ?? []);
+  const starter = MARKET_SCENARIOS.starter_basics;
+  const starterAvailable = canUseMarket(starter, availableProductIds);
+  const availableSpecialIds = SPECIAL_MARKET_IDS.filter((marketId) => {
+    return canUseMarket(MARKET_SCENARIOS[marketId], availableProductIds);
+  });
+  const specialCount = Math.min(4, availableSpecialIds.length);
+  const stageWeights = MARKET_STAGE_WEIGHTS[specialCount] ?? MARKET_STAGE_WEIGHTS[0];
+  const entries = [];
+
+  entries.push({ id: "normal", weight: stageWeights.normal });
+
+  if (stageWeights.starter > 0) {
+    entries.push({
+      id: starterAvailable ? "starter_basics" : "normal",
+      weight: stageWeights.starter
+    });
+  }
+
+  availableSpecialIds.forEach((marketId) => {
+    entries.push({ id: marketId, weight: stageWeights.special });
+  });
+
+  const mergedEntries = Object.values(entries.reduce((map, entry) => {
+    if (!entry.id || entry.weight <= 0) return map;
+    map[entry.id] = map[entry.id] ?? { id: entry.id, weight: 0 };
+    map[entry.id].weight += entry.weight;
+    return map;
+  }, {}));
+  const totalWeight = mergedEntries.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = seededRatio(day, [...availableProductIds].join("").length) * totalWeight;
+  const selectedEntry = mergedEntries.find((entry) => {
+    roll -= entry.weight;
+    return roll <= 0;
+  }) ?? mergedEntries[0] ?? { id: "normal", weight: 100 };
+  const market = MARKET_SCENARIOS[selectedEntry.id] ?? MARKET_SCENARIOS.normal;
+
+  return {
+    ...market,
+    weight: selectedEntry.weight,
+    totalWeight,
+    probability: totalWeight > 0 ? selectedEntry.weight / totalWeight : 1,
+    availableSpecialMarketIds: availableSpecialIds,
+    availableTargetProductIds: getAvailableIds(market.targetProductIds, availableProductIds)
+  };
+}
+
+export function applyMarketScenarioToDayScenario(scenario, marketScenario, options = {}) {
+  const availableProductIds = new Set(options.sellableProductIds ?? []);
+  const availableRequestIds = new Set(options.sellableRequestIds ?? options.sellableProductIds ?? []);
+  const market = marketScenario ?? MARKET_SCENARIOS.normal;
+  const baseRecommendedIds = (scenario.recommendedProductIds ?? []).filter((productId) => {
+    return availableProductIds.has(productId);
+  });
+  const marketRecommendedIds = (market.recommendedProductIds ?? []).filter((productId) => {
+    return availableProductIds.has(productId);
+  });
+  const fallbackRecommendedIds = [...availableProductIds].slice(0, 4);
+  const recommendedProductIds = unique([
+    ...marketRecommendedIds,
+    ...baseRecommendedIds,
+    ...fallbackRecommendedIds
+  ]).slice(0, 5);
+  const baseWantedIds = (scenario.wantedProductIds ?? []).filter((requestId) => {
+    return availableRequestIds.has(requestId);
+  });
+  const marketWantedIds = (market.wantedProductIds ?? []).filter((requestId) => {
+    return availableRequestIds.has(requestId);
+  });
+  const wantedProductIds = unique([
+    ...marketWantedIds,
+    ...baseWantedIds,
+    ...availableRequestIds
+  ]);
+
+  return {
+    ...scenario,
+    marketScenario: market,
+    marketInfo: {
+      ...(scenario.marketInfo ?? {}),
+      weatherLabel: market.weatherLabel ?? scenario.marketInfo?.weatherLabel,
+      headline: market.headline ?? scenario.marketInfo?.headline,
+      message: market.message ?? scenario.marketInfo?.message
+    },
+    recommendedProductIds,
+    recommendedProductReasons: {
+      ...(scenario.recommendedProductReasons ?? {}),
+      ...(market.recommendedProductReasons ?? {})
+    },
+    wantedProductIds,
+    customerTypeWeights: {
+      ...(scenario.customerTypeWeights ?? {}),
+      ...(market.customerTypeWeights ?? {})
+    }
+  };
+}
+
 export const DAY_SCENARIOS = Object.freeze({
   1: createScenario({
     day: 1,
@@ -306,17 +588,25 @@ export const DAY_SCENARIOS = Object.freeze({
   })
 });
 
-export function getDayScenario(day) {
+export function getDayScenario(day, options = {}) {
   const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+  const hasMarketOptions =
+    Array.isArray(options.sellableProductIds) ||
+    Array.isArray(options.sellableRequestIds);
+  const applyMarket = (scenario) => {
+    if (!hasMarketOptions) return scenario;
+    const marketScenario = selectMarketScenario(safeDay, options);
+    return applyMarketScenarioToDayScenario(scenario, marketScenario, options);
+  };
 
   if (DAY_SCENARIOS[safeDay]) {
-    return DAY_SCENARIOS[safeDay];
+    return applyMarket(DAY_SCENARIOS[safeDay]);
   }
 
   const endlessScenario = DAY_SCENARIOS[6];
   const extraDay = safeDay - 6;
 
-  return {
+  return applyMarket({
     ...endlessScenario,
     day: safeDay,
     title: `Day ${safeDay}. 무한 영업`,
@@ -325,5 +615,5 @@ export function getDayScenario(day) {
     eventRateMultiplier:
       endlessScenario.eventRateMultiplier + Math.min(1, extraDay * 0.04),
     isEndlessScenario: true
-  };
+  });
 }

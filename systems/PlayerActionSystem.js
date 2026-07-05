@@ -20,10 +20,12 @@ import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import {
   PRODUCT_CATEGORIES,
   PRODUCT_DISPLAY_CATEGORIES,
+  PRODUCT_SHELF_IDS,
   getProductById
 } from "../data/ProductData.js";
 import { CustomerSystem } from "./CustomerSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
+import { BMSystem } from "./BMSystem.js";
 
 const STAFF_EVENTS = {
   AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
@@ -57,12 +59,46 @@ export const PlayerActionSystem = {
   cleaningCountdownTimerId: null,
 
   shelf: {
+    shelfId: PRODUCT_SHELF_IDS.BASIC,
+    nodeId: "shelf-zone",
     x: 540,
     y: 680,
     productId: "potato_chips",
     currentStock: 0,
     maxStock: 3
   },
+
+  shelves: {
+    [PRODUCT_SHELF_IDS.FRIDGE]: {
+      shelfId: PRODUCT_SHELF_IDS.FRIDGE,
+      nodeId: "beverage-fridge-zone",
+      x: 705,
+      y: 492,
+      productId: "water",
+      currentStock: 0,
+      maxStock: 3
+    },
+    [PRODUCT_SHELF_IDS.FRESH]: {
+      shelfId: PRODUCT_SHELF_IDS.FRESH,
+      nodeId: "fresh-shelf-zone",
+      x: 650,
+      y: 585,
+      productId: "triangle_kimbap",
+      currentStock: 0,
+      maxStock: 3
+    },
+    [PRODUCT_SHELF_IDS.WARMER]: {
+      shelfId: PRODUCT_SHELF_IDS.WARMER,
+      nodeId: "food-warmer-zone",
+      x: 624,
+      y: 540,
+      productId: "sausage_hotbar",
+      currentStock: 0,
+      maxStock: 3
+    }
+  },
+
+  activeShelfId: PRODUCT_SHELF_IDS.BASIC,
 
   warehouse: {
     stock: 0
@@ -243,7 +279,7 @@ export const PlayerActionSystem = {
     }
 
     if (target.type === "shelf") {
-      this.handleShelfRestockAction();
+      this.handleShelfRestockAction({ shelfId: target.shelfId });
       return;
     }
 
@@ -272,7 +308,7 @@ export const PlayerActionSystem = {
     }
   },
 
-  handleShelfRestockAction() {
+  handleShelfRestockAction(options = {}) {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
@@ -280,30 +316,35 @@ export const PlayerActionSystem = {
 
     if (!GameState.player) return;
 
-    if (!this.isNearShelf()) {
+    const shelf = this.getShelfSlot(options.shelfId);
+
+    if (!this.isNearShelf(shelf)) {
       this.showActionMessage("진열대에 더 가까이 가야 합니다.");
       return;
     }
 
-    if (this.shelf.currentStock > 0) {
+    const capacity = this.getShelfCapacityForSlot(shelf);
+
+    if (shelf.currentStock > 0) {
       this.showActionMessage(
-        `아직 상품이 남아 있습니다. (${this.shelf.currentStock}/${this.shelf.maxStock})`
+        `아직 상품이 남아 있습니다. (${shelf.currentStock}/${capacity})`
       );
       return;
     }
 
-    const availableWarehouseStock = this.getAvailableWarehouseStock(this.shelf.productId);
+    const availableWarehouseStock = this.getAvailableWarehouseStock(shelf.productId);
 
     if (availableWarehouseStock <= 0) {
       this.showActionMessage("창고에 입고된 재고가 없습니다. 먼저 발주 물류를 정리해주세요.");
       return;
     }
 
-    this.startShelfRestock();
+    this.startShelfRestock(shelf);
   },
 
-  isNearShelf() {
-    const distance = this.getDistanceToZone("shelf-zone", this.shelf);
+  isNearShelf(shelf = this.shelf) {
+    const targetShelf = this.getShelfSlot(shelf?.shelfId ?? shelf);
+    const distance = this.getDistanceToZone(targetShelf.nodeId, targetShelf);
 
     return distance !== null && distance <= this.interactionDistance;
   },
@@ -322,10 +363,11 @@ export const PlayerActionSystem = {
 
   getPrimaryInteractionTarget() {
     const targets = [
-      {
+      ...this.getShelfSlots().map((shelf) => ({
         type: "shelf",
-        distance: this.getDistanceToZone("shelf-zone", this.shelf)
-      },
+        shelfId: shelf.shelfId,
+        distance: this.getDistanceToZone(shelf.nodeId, shelf)
+      })),
       {
         type: "cleaning",
         distance: this.getDistanceToZone("cleaning-zone", this.cleaningZone)
@@ -344,6 +386,34 @@ export const PlayerActionSystem = {
       .sort((first, second) => first.distance - second.distance);
 
     return targets[0] ?? null;
+  },
+
+  getShelfSlots() {
+    return [
+      this.shelf,
+      ...Object.values(this.shelves ?? {})
+    ];
+  },
+
+  getShelfSlot(shelfId = PRODUCT_SHELF_IDS.BASIC) {
+    if (shelfId && typeof shelfId === "object") {
+      return shelfId;
+    }
+
+    if (shelfId === this.shelf.shelfId || !shelfId) {
+      return this.shelf;
+    }
+
+    return this.shelves?.[shelfId] ?? this.shelf;
+  },
+
+  getShelfCapacityForSlot(shelf = this.shelf) {
+    const product = getProductById(shelf.productId);
+    const capacity = product?.shelfId
+      ? BMSystem.getShelfCapacity(product.shelfId)
+      : 0;
+
+    return Math.max(1, Math.floor(Number(capacity || shelf.maxStock) || 1));
   },
 
   getDistanceToZone(zoneId, fallback = null) {
@@ -586,7 +656,9 @@ export const PlayerActionSystem = {
     ) || 0));
   },
 
-  startShelfRestock() {
+  startShelfRestock(shelf = this.shelf) {
+  const targetShelf = this.getShelfSlot(shelf.shelfId);
+  this.activeShelfId = targetShelf.shelfId;
   this.isPlayerBusy = true;
   this.setCarryingBoxType(null);
 
@@ -597,15 +669,15 @@ export const PlayerActionSystem = {
       phase: "warehouse",
       message: "창고에서 상품을 꺼내는 중입니다",
       onComplete: () => {
-        this.setCarryingBoxType(this.getCarryingBoxTypeForProduct(this.shelf.productId));
+        this.setCarryingBoxType(this.getCarryingBoxTypeForProduct(targetShelf.productId));
         this.showActionMessage("진열대로 이동 중입니다.");
 
-        this.movePlayerToShelf(() => {
+        this.movePlayerToShelf(targetShelf, () => {
           this.startTimedRestockPhase({
             phase: "shelf",
             message: "진열대에 상품을 채우는 중입니다",
             onComplete: () => {
-              this.completeShelfRestock();
+              this.completeShelfRestock(targetShelf);
             }
           });
         });
@@ -683,8 +755,12 @@ movePlayerToWarehouse(onComplete) {
   );
 },
 
-movePlayerToShelf(onComplete) {
-  this.movePlayerToPosition(this.shelf, onComplete);
+movePlayerToShelf(shelf = this.shelf, onComplete) {
+  const targetShelf = this.getShelfSlot(shelf.shelfId);
+  this.movePlayerToPosition(
+    this.getPlayerStandPositionForZone(targetShelf.nodeId, targetShelf),
+    onComplete
+  );
 },
 
 movePlayerToDeliveryBox(onComplete) {
@@ -736,9 +812,11 @@ startTimedRestockPhase({ phase, message, onComplete }) {
   }, this.restockDuration);
 },
 
-completeShelfRestock() {
-  const needStock = this.shelf.maxStock - this.shelf.currentStock;
-  const availableWarehouseStock = this.getAvailableWarehouseStock(this.shelf.productId);
+completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
+  const targetShelf = this.getShelfSlot(shelf.shelfId);
+  const capacity = this.getShelfCapacityForSlot(targetShelf);
+  const needStock = capacity - targetShelf.currentStock;
+  const availableWarehouseStock = this.getAvailableWarehouseStock(targetShelf.productId);
   const restockAmount = Math.min(needStock, availableWarehouseStock);
 
   if (restockAmount <= 0) {
@@ -750,12 +828,13 @@ completeShelfRestock() {
     return;
   }
 
-  this.shelf.currentStock += restockAmount;
+  targetShelf.currentStock += restockAmount;
   this.warehouse.stock = availableWarehouseStock;
 
   EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
     day: GameState.day,
-    productId: this.getResolvedProductId(this.shelf.productId),
+    productId: this.getResolvedProductId(targetShelf.productId),
+    shelfId: targetShelf.shelfId,
     quantity: restockAmount,
     source: "player_shelf_restock"
   });
@@ -766,11 +845,12 @@ completeShelfRestock() {
   this.setWarehouseBoxState("closed");
 
   this.showActionMessage(
-    `진열대 보충 완료! 상품 ${restockAmount}개를 채웠습니다. 진열대: ${this.shelf.currentStock}/${this.shelf.maxStock}, 창고 재고: ${availableWarehouseStock}개`
+    `진열대 보충 완료! 상품 ${restockAmount}개를 채웠습니다. 진열대: ${targetShelf.currentStock}/${capacity}, 창고 재고: ${availableWarehouseStock}개`
   );
 
   console.log("[PlayerActionSystem] 진열대 보충 완료:", {
-    shelfStock: this.shelf.currentStock,
+    shelfId: targetShelf.shelfId,
+    shelfStock: targetShelf.currentStock,
     warehouseStock: availableWarehouseStock
   });
 },
@@ -867,6 +947,11 @@ completeShelfRestock() {
 
     if (actionType === "cleaning") {
       this.handleCleaningAction({ source: "player_action_system_pointer" });
+      return;
+    }
+
+    if (actionType === "shelf_restock" || actionType === "shelf") {
+      this.handleShelfRestockAction({ shelfId: actionNode.dataset.shelfId });
       return;
     }
 
@@ -1114,9 +1199,9 @@ completeShelfRestock() {
       nuisanceCheckoutDelayMs: Number(customer.nuisanceCheckoutDelayMs) || 0,
       wantedProductId,
       productId: product.id,
-      productName: product.name,
+      productName: BMSystem.getProductDisplayName(product),
       quantity,
-      amount: product.salePrice * quantity,
+      amount: BMSystem.getProductSalePrice(product) * quantity,
       source: options.source ?? "player_action_system",
       actorType,
       actorId: options.actorId ?? null,
