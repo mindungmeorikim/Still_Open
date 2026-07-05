@@ -1025,7 +1025,9 @@ export const CustomerSystem = {
       isSatisfied: customer.isSatisfied,
       leaveReason: customer.leaveReason ?? null,
       leavingRenderTime: customer.leavingRenderTime ?? 0,
-      bubbleText: customer.bubbleText ?? null
+      bubbleText: customer.bubbleText ?? null,
+      isNuisance: customer.isNuisance === true,
+      nuisanceProfileId: customer.nuisanceProfileId ?? null
     };
   },
 

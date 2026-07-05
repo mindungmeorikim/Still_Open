@@ -15617,13 +15617,14 @@ body.is-title-screen-active #game-root {
 /* v7.0.5.1 image-based player character
    - 기존 텍스트/이모지 플레이어를 업로드된 치비 캐릭터 PNG로 교체한다.
    - 좌표 갱신은 기존 UIManager.renderPlayer()의 inline left/top을 그대로 사용한다.
+   - v7.7.1: 손님 PNG와 비율이 맞도록 플레이어 표시 크기를 58x102px로 축소한다.
 */
 #store-interaction-layer > #player-zone,
 #player-zone.player-character {
-  width: 74px !important;
-  height: 130px !important;
-  min-width: 74px !important;
-  min-height: 130px !important;
+  width: 58px !important;
+  height: 102px !important;
+  min-width: 58px !important;
+  min-height: 102px !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -15680,8 +15681,8 @@ body.is-title-screen-active #game-root {
   position: absolute !important;
   left: 50% !important;
   bottom: 4px !important;
-  width: 58px !important;
-  height: 15px !important;
+  width: 45px !important;
+  height: 12px !important;
   border-radius: 999px !important;
   background: rgba(0, 0, 0, 0.2) !important;
   filter: blur(2px) !important;
@@ -15982,8 +15983,8 @@ body.is-title-screen-active #game-root {
   left: 50% !important;
   top: 58% !important;
   z-index: 8 !important;
-  width: 50px !important;
-  height: 42px !important;
+  width: 39px !important;
+  height: 33px !important;
   transform: translate(-50%, -50%) !important;
   pointer-events: none !important;
   user-select: none !important;
@@ -15991,8 +15992,8 @@ body.is-title-screen-active #game-root {
 
 #store-interaction-layer > #player-zone[data-carrying-box="arrive"] .player-carrying-box,
 #player-zone.player-character[data-carrying-box="arrive"] .player-carrying-box {
-  width: 58px !important;
-  height: 46px !important;
+  width: 45px !important;
+  height: 36px !important;
   top: 56% !important;
 }
 
@@ -16731,7 +16732,7 @@ body.is-title-screen-active #game-root {
 
 #store-interaction-layer > #delivery-box-zone.delivery-box-zone,
 #delivery-box-zone.delivery-box-zone {
-  left: 122px !important;
+  left: 545px !important;
   top: 575px !important;
 }
 
@@ -18838,5 +18839,254 @@ body.is-title-screen-active #game-root {
     min-width: 32px !important;
     min-height: 32px !important;
     height: 32px !important;
+  }
+}
+
+/* v7.7.0 customer PNG asset rendering
+   - 손님 NPC를 텍스트/이모지 박스가 아니라 업로드된 8방향 PNG 캐릭터로 렌더링한다.
+   - 손님 크기는 약 49x87px로 유지하고, 플레이어는 58x102px로 축소해 비율을 맞춘다.
+*/
+#store-interaction-layer .customer-npc,
+.customer-npc {
+  width: 49px !important;
+  height: 87px !important;
+  min-width: 49px !important;
+  min-height: 87px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  transform-origin: center bottom !important;
+}
+
+#store-interaction-layer .customer-npc::before,
+.customer-npc::before {
+  display: none !important;
+  content: none !important;
+}
+
+#store-interaction-layer .customer-npc::after,
+.customer-npc::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 1px !important;
+  width: 36px !important;
+  height: 10px !important;
+  border-radius: 999px !important;
+  background: rgba(0, 0, 0, 0.18) !important;
+  filter: blur(2px) !important;
+  transform: translateX(-50%) !important;
+  pointer-events: none !important;
+  z-index: -1 !important;
+}
+
+.customer-sprite {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center bottom !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 4px 3px rgba(0, 0, 0, 0.2));
+}
+
+.customer-label[hidden] {
+  display: none !important;
+}
+
+.customer-sprite-missing .customer-label {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 48px !important;
+  min-height: 28px !important;
+  padding: 4px 6px !important;
+  transform: translateX(-50%) !important;
+  border: 2px solid #222 !important;
+  border-radius: 999px !important;
+  background: #fff8e8 !important;
+  color: #222 !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1.1 !important;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.16) !important;
+}
+
+.customer-status-angry .customer-sprite,
+.customer-mood-angry .customer-sprite {
+  filter: drop-shadow(0 0 5px rgba(255, 50, 50, 0.55)) drop-shadow(0 4px 3px rgba(0, 0, 0, 0.22));
+}
+
+.customer-mood-impatient .customer-sprite {
+  animation: customer-impatient-shake 520ms ease-in-out infinite alternate;
+}
+
+@keyframes customer-impatient-shake {
+  from { transform: translateX(-1px); }
+  to { transform: translateX(1px); }
+}
+
+/* v7.7.3 customer render stability hotfix
+   - 손님 PNG는 DOM을 재사용하므로 이미지가 매 렌더마다 사라졌다 나타나지 않게 한다.
+   - 말풍선만 별도 레이어에서 필요할 때 갱신한다.
+*/
+#store-interaction-layer .customer-npc,
+.customer-npc {
+  contain: layout style !important;
+  backface-visibility: hidden !important;
+  transform: translateZ(0) !important;
+  will-change: left, top, transform !important;
+}
+
+.customer-bubble-layer {
+  display: contents !important;
+  pointer-events: none !important;
+}
+
+.customer-sprite {
+  backface-visibility: hidden !important;
+  transform: translateZ(0) !important;
+}
+
+/* [v7.7.5-delivery-box-size-balance-260705]
+   - 플레이어 축소 크기(58x102)에 맞춰 발주 도착 박스가 과하게 커 보이지 않도록 축소
+   - 이전 위치의 중심/바닥 기준을 유지해 입구 오른쪽 배치감은 유지
+*/
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone {
+  left: 568px !important;
+  top: 615px !important;
+  width: 84px !important;
+  height: 72px !important;
+  min-width: 84px !important;
+  max-width: 84px !important;
+  min-height: 72px !important;
+  max-height: 72px !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual img {
+  filter: drop-shadow(0 6px 5px rgba(0, 0, 0, 0.22)) !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-hitbox {
+  left: 14% !important;
+  top: 16% !important;
+  width: 72% !important;
+  height: 70% !important;
+  border-radius: 10px !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-count {
+  bottom: -8px !important;
+  min-width: 34px !important;
+  padding: 3px 6px !important;
+  font-size: 10px !important;
+}
+
+/* v6.2.7 order modal close + confirm state sync hotfix */
+#order-modal .order-computer-topbar-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  margin-left: auto !important;
+}
+
+#order-modal #order-modal-close-button.order-modal-close-button {
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: #ffffff !important;
+  font-size: 16px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  text-indent: -9999px !important;
+  overflow: hidden !important;
+}
+
+#order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"]) {
+  cursor: pointer !important;
+}
+
+#order-modal #order-confirm-button.ui-image-button:not(:disabled):not([aria-disabled="true"]) {
+  --ui-button-image-current: var(--ui-button-image-normal, none) !important;
+}
+
+/* [v-order-category-thin-260705]
+   - 발주창 카테고리 탭 세로 높이 축소
+   - 숫자 배지도 함께 줄여 납작한 탭으로 정리
+*/
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-tabs {
+  gap: 12px !important;
+  padding: 0 0 4px !important;
+  align-items: center !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-tab {
+  min-height: 36px !important;
+  height: 36px !important;
+  padding: 6px 12px !important;
+  gap: 6px !important;
+  font-size: 13px !important;
+  line-height: 1 !important;
+  border-radius: 999px !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-tab span {
+  line-height: 1 !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-tab strong {
+  min-width: 20px !important;
+  height: 20px !important;
+  padding: 0 6px !important;
+  font-size: 11px !important;
+  line-height: 20px !important;
+  display: inline-grid !important;
+  place-items: center !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-summary {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+}
+
+@media (max-width: 1100px) {
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-category-tabs {
+    gap: 7px !important;
+    padding-bottom: 3px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-category-tab {
+    min-height: 34px !important;
+    height: 34px !important;
+    padding: 5px 8px !important;
+    font-size: 11px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-category-tab strong {
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 5px !important;
+    font-size: 10px !important;
+    line-height: 18px !important;
   }
 }

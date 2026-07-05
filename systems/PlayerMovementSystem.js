@@ -16,6 +16,8 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
 
+const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
+
 export const PlayerMovementSystem = {
   keys: {
     up: false,
@@ -32,8 +34,8 @@ export const PlayerMovementSystem = {
   },
 
   defaultPlayerSize: {
-    width: 74,
-    height: 130
+    width: 58,
+    height: 102
   },
 
   isInitialized: false,
@@ -121,7 +123,7 @@ export const PlayerMovementSystem = {
     player.y += moveY * moveSpeed;
     this.clampPlayerToAllowedMovement(player);
 
-    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+    EventBus.emit(PLAYER_POSITION_CHANGED, GameState);
   },
 
   getDirectionFromMovement(moveX, moveY, fallbackDirection = "down") {

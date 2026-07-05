@@ -37,7 +37,165 @@ export const UI_BUTTON_STATES = Object.freeze({
   DISABLED: "disabled"
 });
 
+
+export const CUSTOMER_ASSET_DIRECTIONS = Object.freeze([
+  "down",
+  "down_left",
+  "down_right",
+  "left",
+  "right",
+  "up",
+  "up_left",
+  "up_right"
+]);
+
+function createCustomerDirectionalAssetSet(folderName, filePrefix) {
+  return CUSTOMER_ASSET_DIRECTIONS.reduce((assets, direction) => {
+    assets[direction] = `./assets/images/customers/${folderName}/${filePrefix}_${direction}.png`;
+    return assets;
+  }, {});
+}
+
+export const CUSTOMER_ASSET_VARIANTS = deepFreeze({
+  normal_v2: createCustomerDirectionalAssetSet("normal_v2", "customer_normal_v2"),
+  student_male: createCustomerDirectionalAssetSet("student_male", "customer_student_male"),
+  student_female: createCustomerDirectionalAssetSet("student_female", "customer_student_female"),
+  student_male_variant: createCustomerDirectionalAssetSet("student_male_variant", "customer_student_male_variant"),
+  office_male: createCustomerDirectionalAssetSet("office_male", "customer_office_male"),
+  office_female: createCustomerDirectionalAssetSet("office_female", "customer_office_female"),
+  trouble_sharp_auntie: createCustomerDirectionalAssetSet("trouble_sharp_auntie", "customer_trouble_sharp_auntie"),
+  trouble_bulky_sleeve: createCustomerDirectionalAssetSet("trouble_bulky_sleeve", "customer_trouble_bulky_sleeve"),
+  trouble_bargain_perm: createCustomerDirectionalAssetSet("trouble_bargain_perm", "customer_trouble_bargain_perm"),
+  trouble_coin_bomber: createCustomerDirectionalAssetSet("trouble_coin_bomber", "customer_trouble_coin_bomber"),
+  trouble_command_uncle: createCustomerDirectionalAssetSet("trouble_command_uncle", "customer_trouble_command_uncle"),
+  trouble_drunk: createCustomerDirectionalAssetSet("trouble_drunk", "customer_trouble_drunk"),
+  trouble_influencer: createCustomerDirectionalAssetSet("trouble_influencer", "customer_trouble_influencer"),
+  trouble_mischief_kid: createCustomerDirectionalAssetSet("trouble_mischief_kid", "customer_trouble_mischief_kid"),
+  trouble_return_refund: createCustomerDirectionalAssetSet("trouble_return_refund", "customer_trouble_return_refund"),
+  trouble_sleazy_rose: createCustomerDirectionalAssetSet("trouble_sleazy_rose", "customer_trouble_sleazy_rose")
+});
+
+export const CUSTOMER_TYPE_ASSET_VARIANTS = deepFreeze({
+  normal: ["normal_v2"],
+  student: ["student_male", "student_female", "student_male_variant"],
+  office_worker: ["office_male", "office_female"],
+  hurried: ["office_male", "office_female", "normal_v2"],
+  difficult: [
+    "trouble_command_uncle",
+    "trouble_bargain_perm",
+    "trouble_bulky_sleeve",
+    "trouble_sharp_auntie"
+  ]
+});
+
+export const NUISANCE_CUSTOMER_ASSET_VARIANTS = deepFreeze({
+  CUSTOMER_DONT_ORDER_ME: ["trouble_command_uncle"],
+  CUSTOMER_DISCOUNT_APPEAL: ["trouble_bargain_perm"],
+  CUSTOMER_EXTRA_BAG: ["trouble_bulky_sleeve"],
+  CUSTOMER_BRAG_BULK: ["trouble_bulky_sleeve"],
+  CUSTOMER_MICROWAVE_TROUBLE: ["trouble_bargain_perm"],
+  CUSTOMER_COIN_BOMB: ["trouble_coin_bomber"],
+  CUSTOMER_COMPLAINT_AUNT: ["trouble_sharp_auntie"],
+  CUSTOMER_DRUNK: ["trouble_drunk"],
+  CUSTOMER_INFLUENCER: ["trouble_influencer"],
+  CUSTOMER_JAMMIN_RIOT: ["trouble_mischief_kid"],
+  CUSTOMER_ROSE_FLIRT: ["trouble_sleazy_rose"],
+  CUSTOMER_REFUND_VILLAIN: ["trouble_return_refund"]
+});
+
+function getStableIndex(seedSource, length) {
+  const safeLength = Math.max(0, Number(length) || 0);
+
+  if (safeLength <= 1) {
+    return 0;
+  }
+
+  const seed = String(seedSource ?? "customer");
+  let hash = 0;
+
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+
+  return hash % safeLength;
+}
+
+function getCustomerAssetSeed(customer = {}) {
+  return [
+    customer.customerId,
+    customer.id,
+    customer.typeId,
+    customer.customerTypeId,
+    customer.wantedProductId
+  ].filter(Boolean).join("|") || "customer";
+}
+
+export function normalizeCustomerAssetDirection(direction = "down") {
+  const normalizedDirection = String(direction ?? "down")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+
+  return CUSTOMER_ASSET_DIRECTIONS.includes(normalizedDirection)
+    ? normalizedDirection
+    : "down";
+}
+
+export function getCustomerAssetDirection(customer = {}) {
+  if (customer.direction) {
+    return normalizeCustomerAssetDirection(customer.direction);
+  }
+
+  const status = customer.status ?? "";
+  const currentZone = customer.currentZone ?? "";
+  const targetZone = customer.targetZone ?? "";
+
+  if (status === "leaving" || currentZone === "exit") {
+    return "down_left";
+  }
+
+  if (currentZone === "counter") {
+    return "down_left";
+  }
+
+  if (currentZone === "door") {
+    return targetZone === "shelf" ? "up_right" : "down_right";
+  }
+
+  if (currentZone === "shelf" || String(currentZone).includes("shelf")) {
+    return targetZone === "counter" ? "down_right" : "right";
+  }
+
+  return "down";
+}
+
+export function getCustomerAssetVariantId(customer = {}) {
+  const nuisanceProfileId = customer.nuisanceProfileId ?? null;
+  const nuisanceVariants = nuisanceProfileId
+    ? NUISANCE_CUSTOMER_ASSET_VARIANTS[nuisanceProfileId]
+    : null;
+  const typeId = customer.typeId ?? customer.customerTypeId ?? "normal";
+  const typeVariants = CUSTOMER_TYPE_ASSET_VARIANTS[typeId] ?? CUSTOMER_TYPE_ASSET_VARIANTS.normal;
+  const variants = nuisanceVariants?.length ? nuisanceVariants : typeVariants;
+  const index = getStableIndex(getCustomerAssetSeed(customer), variants.length);
+
+  return variants[index] ?? "normal_v2";
+}
+
+export function getCustomerAssetPath(customer = {}, direction = null) {
+  const variantId = getCustomerAssetVariantId(customer);
+  const directionId = normalizeCustomerAssetDirection(
+    direction ?? getCustomerAssetDirection(customer)
+  );
+  const variantAssets = CUSTOMER_ASSET_VARIANTS[variantId] ?? CUSTOMER_ASSET_VARIANTS.normal_v2;
+
+  return variantAssets?.[directionId] ?? variantAssets?.down ?? null;
+}
+
 export const ASSET_PATHS = deepFreeze({
+  customers: {
+    variants: CUSTOMER_ASSET_VARIANTS
+  },
   objects: {
     displayStand: {
       full: {

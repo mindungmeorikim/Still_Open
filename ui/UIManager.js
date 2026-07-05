@@ -17,6 +17,8 @@ import {
   ASSET_PATHS,
   OBJECT_FACINGS,
   STOCK_VISUAL_OBJECT_TYPES,
+  getCustomerAssetPath,
+  getCustomerAssetVariantId,
   getObjectVisualAsset,
   getWarehouseBoxAsset
 } from "../data/AssetData.js";
@@ -28,6 +30,8 @@ import { DailyMissionSystem, DAILY_MISSION_EVENTS } from "../systems/DailyMissio
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
+const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
+const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const CLEANING_ZONE_POSITION = Object.freeze({ x: 870, y: 650 });
 const SANITATION_EVENTS = Object.freeze({
@@ -128,6 +132,10 @@ export const UIManager = {
   orderModalMode: "closed",
   orderListScrollTop: 0,
   orderActiveCategory: "all",
+  lastProductGridSignature: "",
+  lastDeliveredGridSignature: "",
+  lastExpansionPanelSignature: "",
+  lastStoreExpansionTilesSignature: "",
   expansionCarouselIndex: 0,
   selectedExpansionZoneId: null,
   currentFocusedZoneId: "zone_basic",
@@ -741,13 +749,18 @@ export const UIManager = {
       playerNode.appendChild(carryingBox);
     }
 
-    carryingBox.innerHTML = `
-      <img
-        src="${imagePath}"
-        alt=""
-        draggable="false"
-      />
-    `;
+    let imageNode = carryingBox.querySelector("img");
+
+    if (!imageNode) {
+      imageNode = document.createElement("img");
+      imageNode.alt = "";
+      imageNode.draggable = false;
+      carryingBox.appendChild(imageNode);
+    }
+
+    if (imageNode.getAttribute("src") !== imagePath) {
+      imageNode.src = imagePath;
+    }
   },
 
   bindButtons() {
@@ -781,6 +794,11 @@ export const UIManager = {
     EventBus.on(EVENTS.GAME_STATE_CHANGED, () => {
       this.render();
       this.renderCustomers();
+    });
+
+    EventBus.on(PLAYER_POSITION_CHANGED, () => {
+      this.renderPlayer();
+      this.renderInteractionFeedback();
     });
 
     EventBus.on(PLAYER_DIALOGUE_REQUESTED, (data = {}) => {
@@ -854,6 +872,10 @@ export const UIManager = {
   bindOrderEvents() {
     EventBus.on(EVENTS.ORDER_DELIVERED, (data) => {
       this.handleOrderDelivered(data);
+    });
+
+    EventBus.on(ORDER_CONFIRMATION_FAILED, (data = {}) => {
+      this.handleOrderConfirmationFailed(data);
     });
 
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
@@ -1168,7 +1190,12 @@ export const UIManager = {
         customerLayer.appendChild(customerNode);
       }
 
-      customerNode.className = this.getCustomerClassName(customer);
+      const nextClassName = this.getCustomerClassName(customer);
+
+      if (customerNode.className !== nextClassName) {
+        customerNode.className = nextClassName;
+      }
+
       customerNode.style.setProperty("--customer-offset", `${(index % 4) * 16}px`);
       this.applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes);
       this.renderCustomerNodeContent(customerNode, customer);
@@ -1177,30 +1204,127 @@ export const UIManager = {
   },
 
   renderCustomerNodeContent(customerNode, customer) {
-    customerNode.innerHTML = "";
+    const assetPath = getCustomerAssetPath(customer);
+    const assetVariantId = getCustomerAssetVariantId(customer);
+    const displayText = this.getCustomerDisplayText(customer);
 
-    const label = document.createElement("span");
-    label.className = "customer-label";
-    label.textContent = this.getCustomerDisplayText(customer);
-    customerNode.appendChild(label);
+    customerNode.dataset.customerAsset = assetVariantId;
+    customerNode.dataset.nuisanceProfileId = customer.nuisanceProfileId ?? "";
 
-    if (customer.bubbleText) {
-      const leavingBubble = this.createCustomerDialogueBubble(
+    this.syncCustomerSprite(customerNode, customer, assetPath, displayText);
+    this.syncCustomerLabel(customerNode, displayText, Boolean(assetPath));
+    this.syncCustomerBubbleLayer(customerNode, customer);
+  },
+
+  syncCustomerSprite(customerNode, customer, assetPath, displayText) {
+    let sprite = customerNode.querySelector(":scope > .customer-sprite");
+
+    if (!assetPath) {
+      sprite?.remove();
+      customerNode.classList.add("customer-sprite-missing");
+      return;
+    }
+
+    if (!sprite) {
+      sprite = document.createElement("img");
+      sprite.className = "customer-sprite";
+      sprite.loading = "eager";
+      sprite.decoding = "async";
+      sprite.draggable = false;
+      customerNode.insertBefore(sprite, customerNode.firstChild);
+    }
+
+    sprite.alt = customer.typeName ?? displayText;
+    sprite.hidden = false;
+    customerNode.classList.remove("customer-sprite-missing");
+
+    if (sprite.getAttribute("src") !== assetPath) {
+      sprite.src = assetPath;
+    }
+
+    sprite.onerror = () => {
+      sprite.hidden = true;
+      customerNode.classList.add("customer-sprite-missing");
+
+      const fallbackLabel = customerNode.querySelector(":scope > .customer-label");
+
+      if (fallbackLabel) {
+        fallbackLabel.hidden = false;
+      }
+    };
+  },
+
+  syncCustomerLabel(customerNode, displayText, hasAsset) {
+    let label = customerNode.querySelector(":scope > .customer-label");
+
+    if (!label) {
+      label = document.createElement("span");
+      label.className = "customer-label";
+      customerNode.appendChild(label);
+    }
+
+    if (label.textContent !== displayText) {
+      label.textContent = displayText;
+    }
+
+    label.hidden = hasAsset && !customerNode.classList.contains("customer-sprite-missing");
+  },
+
+  syncCustomerBubbleLayer(customerNode, customer) {
+    let bubbleLayer = customerNode.querySelector(":scope > .customer-bubble-layer");
+
+    if (!bubbleLayer) {
+      bubbleLayer = document.createElement("span");
+      bubbleLayer.className = "customer-bubble-layer";
+      customerNode.appendChild(bubbleLayer);
+    }
+
+    [...customerNode.children].forEach((child) => {
+      if (
+        child !== bubbleLayer &&
+        child.classList.contains("customer-wanted-bubble")
+      ) {
+        child.remove();
+      }
+    });
+
+    const bubbleSpec = this.getCustomerBubbleSpec(customer);
+    const nextSignature = JSON.stringify(bubbleSpec ?? null);
+
+    if (bubbleLayer.dataset.bubbleSignature === nextSignature) {
+      return;
+    }
+
+    bubbleLayer.dataset.bubbleSignature = nextSignature;
+    bubbleLayer.innerHTML = "";
+
+    if (!bubbleSpec) {
+      return;
+    }
+
+    bubbleLayer.appendChild(
+      this.createCustomerDialogueBubble(
         customer,
-        customer.bubbleText,
-        {
+        bubbleSpec.dialogueText,
+        bubbleSpec.options
+      )
+    );
+  },
+
+  getCustomerBubbleSpec(customer) {
+    if (customer.bubbleText) {
+      return {
+        dialogueText: customer.bubbleText,
+        options: {
           productName: customer.carriedProductName ?? customer.wantedProductName,
           productImagePath: customer.carriedProductImagePath ?? null,
           context: "leaving"
         }
-      );
-
-      customerNode.appendChild(leavingBubble);
-      return;
+      };
     }
 
     if (customer.currentZone !== "counter" || !customer.wantedProductName) {
-      return;
+      return null;
     }
 
     const productName =
@@ -1209,17 +1333,15 @@ export const UIManager = {
       productName,
       context: "checkout"
     });
-    const wantedBubble = this.createCustomerDialogueBubble(
-      customer,
+
+    return {
       dialogueText,
-      {
+      options: {
         productName,
         productImagePath: customer.carriedProductImagePath,
         context: "checkout"
       }
-    );
-
-    customerNode.appendChild(wantedBubble);
+    };
   },
 
   createCustomerDialogueBubble(customer, dialogueText, options = {}) {
@@ -1452,14 +1574,47 @@ export const UIManager = {
     cleaningZone.classList.toggle("is-cleaning", state.isCleaning === true);
     cleaningZone.classList.toggle("is-warning", state.status === "warning" || state.status === "critical");
     cleaningZone.disabled = state.isCleaning === true;
-    cleaningZone.innerHTML = `
-      <span class="cleaning-zone-glow" aria-hidden="true"></span>
-      <img class="cleaning-tools-image" src="${SANITATION_ASSETS.tools}" alt="" draggable="false" />
-      ${showStain ? `<img class="cleaning-stain-image" src="${SANITATION_ASSETS.stain}" alt="" draggable="false" />` : ""}
-      ${showTrash ? `<img class="cleaning-trash-image" src="${SANITATION_ASSETS.trash}" alt="" draggable="false" />` : ""}
-      <img class="cleaning-sparkle-image" src="${SANITATION_ASSETS.sparkle}" alt="" draggable="false" />
-      <span class="cleaning-zone-label">청소</span>
-    `;
+    this.ensureCleaningZoneVisuals(cleaningZone, { showStain, showTrash });
+  },
+
+  ensureCleaningZoneVisuals(cleaningZone, options = {}) {
+    const ensureChild = (className, tagName = "span") => {
+      let child = cleaningZone.querySelector(`.${className}`);
+
+      if (!child) {
+        child = document.createElement(tagName);
+        child.className = className;
+        cleaningZone.appendChild(child);
+      }
+
+      return child;
+    };
+
+    const setImage = (className, src, isVisible = true) => {
+      const imageNode = ensureChild(className, "img");
+
+      imageNode.alt = "";
+      imageNode.draggable = false;
+      imageNode.hidden = !isVisible;
+      imageNode.style.setProperty("display", isVisible ? "block" : "none", "important");
+
+      if (imageNode.getAttribute("src") !== src) {
+        imageNode.src = src;
+      }
+
+      return imageNode;
+    };
+
+    const glowNode = ensureChild("cleaning-zone-glow");
+    glowNode.setAttribute("aria-hidden", "true");
+
+    setImage("cleaning-tools-image", SANITATION_ASSETS.tools, true);
+    setImage("cleaning-stain-image", SANITATION_ASSETS.stain, options.showStain === true);
+    setImage("cleaning-trash-image", SANITATION_ASSETS.trash, options.showTrash === true);
+    setImage("cleaning-sparkle-image", SANITATION_ASSETS.sparkle, true);
+
+    const labelNode = ensureChild("cleaning-zone-label");
+    labelNode.textContent = "청소";
   },
 
   render() {
@@ -1599,16 +1754,40 @@ export const UIManager = {
       "important"
     );
     warehouseBox.dataset.boxState = isOpen ? "open" : "closed";
-    warehouseBox.innerHTML = `
-      <span class="warehouse-box-visual" aria-hidden="true">
-        <img
-          src="${imagePath}"
-          alt=""
-          draggable="false"
-        />
-      </span>
-      <span class="warehouse-box-hitbox" aria-hidden="true"></span>
-    `;
+    this.ensureWarehouseBoxVisuals(warehouseBox, imagePath);
+  },
+
+  ensureWarehouseBoxVisuals(warehouseBox, imagePath) {
+    let visualNode = warehouseBox.querySelector(".warehouse-box-visual");
+
+    if (!visualNode) {
+      visualNode = document.createElement("span");
+      visualNode.className = "warehouse-box-visual";
+      visualNode.setAttribute("aria-hidden", "true");
+      warehouseBox.appendChild(visualNode);
+    }
+
+    let imageNode = visualNode.querySelector("img");
+
+    if (!imageNode) {
+      imageNode = document.createElement("img");
+      imageNode.alt = "";
+      imageNode.draggable = false;
+      visualNode.appendChild(imageNode);
+    }
+
+    if (imageNode.getAttribute("src") !== imagePath) {
+      imageNode.src = imagePath;
+    }
+
+    let hitboxNode = warehouseBox.querySelector(".warehouse-box-hitbox");
+
+    if (!hitboxNode) {
+      hitboxNode = document.createElement("span");
+      hitboxNode.className = "warehouse-box-hitbox";
+      hitboxNode.setAttribute("aria-hidden", "true");
+      warehouseBox.appendChild(hitboxNode);
+    }
   },
 
   getStoreObjectNode(config, interactionLayer) {
@@ -1868,8 +2047,8 @@ export const UIManager = {
     }
 
     const playerNode = document.getElementById("player-zone");
-    const playerWidth = Number(playerNode?.offsetWidth) || 42;
-    const playerHeight = Number(playerNode?.offsetHeight) || 58;
+    const playerWidth = Number(playerNode?.offsetWidth) || 58;
+    const playerHeight = Number(playerNode?.offsetHeight) || 102;
 
     return {
       x: (Number(GameState.player.x) || 0) + playerWidth / 2,
@@ -2129,7 +2308,7 @@ export const UIManager = {
         classNames: ["ui-special-button", "ui-special-continue-button"]
       },
       {
-        selector: ".store-expansion-popover-close, #settings-close-button, #bm-contract-shop-close-button",
+        selector: ".store-expansion-popover-close, #settings-close-button, #bm-contract-shop-close-button, #order-modal-close-button",
         variant: "iconClose",
         classNames: ["ui-icon-image-button", "ui-icon-button-close"]
       },
@@ -3607,6 +3786,28 @@ export const UIManager = {
     this.updateStoreWorldArtLayers(visualZones);
     this.renderStoreCameraControls(visualZones);
 
+    const tilesSignature = visualZones.map((zone) => {
+      const scene = this.getSpaceSceneViewModel(zone);
+      return [
+        zone.id,
+        zone.status,
+        zone.isUnlocked ? "1" : "0",
+        zone.isConstructing ? "1" : "0",
+        zone.isAvailable ? "1" : "0",
+        this.isStoreExpansionPopoverVisible && zone.id === this.selectedExpansionZoneId ? "selected" : "idle",
+        this.getStoreSpaceImageSrc(zone),
+        scene.cloudAsset ?? "",
+        scene.lockAsset ?? ""
+      ].join(":");
+    }).join("|");
+
+    if (this.lastStoreExpansionTilesSignature === tilesSignature && tilesNode.children.length > 0) {
+      this.renderStoreInteractionHotspots(visualZones);
+      this.renderStoreExpansionPopover(zonesById[this.selectedExpansionZoneId]);
+      return;
+    }
+
+    this.lastStoreExpansionTilesSignature = tilesSignature;
     tilesNode.innerHTML = visualZones.map((zone) => {
       const scene = this.getSpaceSceneViewModel(zone);
       const imageSrc = this.getStoreSpaceImageSrc(zone);
@@ -3770,11 +3971,15 @@ export const UIManager = {
 
     if (!overlaySrc) {
       stageOverlay.classList.add("hidden");
-      stageOverlayImage.setAttribute("src", "");
+      if (stageOverlayImage.getAttribute("src") !== "") {
+        stageOverlayImage.setAttribute("src", "");
+      }
       return;
     }
 
-    stageOverlayImage.setAttribute("src", overlaySrc);
+    if (stageOverlayImage.getAttribute("src") !== overlaySrc) {
+      stageOverlayImage.setAttribute("src", overlaySrc);
+    }
     stageOverlay.classList.remove("hidden");
   },
 
@@ -4533,7 +4738,19 @@ export const UIManager = {
         isUnlocked: this.isProductOrderable(product)
       };
     });
+    const gridSignature = PRODUCTS.map((product) => `${product.id}:${product.imagePath}`).join("|");
+    const existingCards = [...productGrid.querySelectorAll(".product-card")];
+    const canReuseGrid =
+      existingCards.length === PRODUCTS.length &&
+      this.lastProductGridSignature === gridSignature &&
+      existingCards.every((card, index) => card.dataset.productId === PRODUCTS[index].id);
 
+    if (canReuseGrid) {
+      this.syncProductCardGrid(orderItems);
+      return;
+    }
+
+    this.lastProductGridSignature = gridSignature;
     productGrid.innerHTML = PRODUCTS.map((product) => {
       const displayName = BMSystem.getProductDisplayName(product);
       const inventoryItem = this.inventoryByProductId[product.id];
@@ -4551,6 +4768,16 @@ export const UIManager = {
         : !isLocked && safeQuantity <= 2
           ? " is-low-stock"
           : "";
+      const badgeText = isLocked
+        ? lockReason
+        : safeQuantity <= 0
+          ? "재고 없음"
+          : "";
+      const badgeClass = isLocked
+        ? "product-lock-badge"
+        : safeQuantity <= 0
+          ? "product-lock-badge product-stock-badge"
+          : "product-lock-badge";
 
       return `
         <article
@@ -4562,36 +4789,30 @@ export const UIManager = {
               class="product-image"
               src="${product.imagePath}"
               alt="${displayName}"
-              loading="lazy"
+              loading="eager"
               decoding="async"
             />
-            ${
-              isLocked
-                ? `<span class="product-lock-badge">${lockReason}</span>`
-                : safeQuantity <= 0
-                  ? `<span class="product-lock-badge product-stock-badge">재고 없음</span>`
-                : ""
-            }
+            <span class="${badgeClass}" ${badgeText ? "" : "hidden"}>${badgeText}</span>
           </div>
 
           <div class="product-card-content">
             <span class="product-category">
               ${this.getProductCategoryLabel(product.category)}
             </span>
-            <h3>${displayName}</h3>
+            <h3 class="product-card-name">${displayName}</h3>
 
             <dl class="product-card-stats">
               <div>
                 <dt>판매가</dt>
-                <dd>₩${(BMSystem.getProductSalePrice(product.id) || product.salePrice).toLocaleString()}</dd>
+                <dd class="product-card-sale-price">₩${(BMSystem.getProductSalePrice(product.id) || product.salePrice).toLocaleString()}</dd>
               </div>
               <div>
                 <dt>재고</dt>
-                <dd>${stockText}</dd>
+                <dd class="product-card-stock">${stockText}</dd>
               </div>
               <div>
                 <dt>다음 폐기</dt>
-                <dd>${expireText}</dd>
+                <dd class="product-card-expire">${expireText}</dd>
               </div>
             </dl>
 
@@ -4607,6 +4828,72 @@ export const UIManager = {
         </article>
       `;
     }).join("");
+
+    this.bindProductOrderButtons(orderItems);
+  },
+
+  syncProductCardGrid(orderItems = []) {
+    const setText = (root, selector, value) => {
+      const node = root.querySelector(selector);
+      if (node && node.textContent !== value) {
+        node.textContent = value;
+      }
+    };
+
+    PRODUCTS.forEach((product) => {
+      const card = document.querySelector(`.product-card[data-product-id="${product.id}"]`);
+      if (!card) return;
+
+      const displayName = BMSystem.getProductDisplayName(product);
+      const inventoryItem = this.inventoryByProductId[product.id];
+      const isLocked = !this.isProductOrderable(product);
+      const lockReason = this.getOrderUnavailableReason(product);
+      const quantity = inventoryItem?.quantity;
+      const safeQuantity = Number.isFinite(quantity) ? quantity : 0;
+      const stockText = Number.isFinite(quantity) ? `${quantity}개` : "-";
+      const nextExpireDay = inventoryItem?.nextExpireDay;
+      const expireText = Number.isFinite(nextExpireDay) ? `Day ${nextExpireDay}` : "-";
+      const salePriceText = `₩${(BMSystem.getProductSalePrice(product.id) || product.salePrice).toLocaleString()}`;
+      const stockStatusClass = !isLocked && safeQuantity <= 0
+        ? "is-out-of-stock"
+        : !isLocked && safeQuantity <= 2
+          ? "is-low-stock"
+          : "";
+
+      card.classList.toggle("is-locked", isLocked);
+      card.classList.toggle("is-out-of-stock", stockStatusClass === "is-out-of-stock");
+      card.classList.toggle("is-low-stock", stockStatusClass === "is-low-stock");
+
+      const imageNode = card.querySelector(".product-image");
+      if (imageNode) {
+        if (imageNode.getAttribute("src") !== product.imagePath) {
+          imageNode.src = product.imagePath;
+        }
+        imageNode.alt = displayName;
+      }
+
+      const badge = card.querySelector(".product-lock-badge");
+      if (badge) {
+        const badgeText = isLocked ? lockReason : safeQuantity <= 0 ? "재고 없음" : "";
+        badge.className = `product-lock-badge${!isLocked && safeQuantity <= 0 ? " product-stock-badge" : ""}`;
+        badge.hidden = !badgeText;
+        if (badge.textContent !== badgeText) {
+          badge.textContent = badgeText;
+        }
+      }
+
+      setText(card, ".product-category", this.getProductCategoryLabel(product.category));
+      setText(card, ".product-card-name", displayName);
+      setText(card, ".product-card-sale-price", salePriceText);
+      setText(card, ".product-card-stock", stockText);
+      setText(card, ".product-card-expire", expireText);
+
+      const orderButton = card.querySelector(".product-order-button");
+      if (orderButton) {
+        orderButton.disabled = isLocked;
+        orderButton.dataset.productId = product.id;
+      }
+    });
 
     this.bindProductOrderButtons(orderItems);
   },
@@ -5876,6 +6163,7 @@ export const UIManager = {
   createOrderModal() {
     if (document.getElementById("order-modal")) {
       this.orderModal = document.getElementById("order-modal");
+      this.bindOrderModalCloseButton();
       return;
     }
 
@@ -5888,7 +6176,10 @@ export const UIManager = {
         <div class="order-computer-frame">
           <div class="order-computer-topbar">
             <span>STORE-ORDER</span>
-            <span id="order-modal-day-label">Day ${GameState.day}</span>
+            <div class="order-computer-topbar-actions">
+              <span id="order-modal-day-label">Day ${GameState.day}</span>
+              <button id="order-modal-close-button" class="order-modal-close-button" type="button" aria-label="발주창 닫기">×</button>
+            </div>
           </div>
           <div id="order-modal-body"></div>
         </div>
@@ -5898,6 +6189,23 @@ export const UIManager = {
     document.body.appendChild(modal);
 
     this.orderModal = modal;
+    this.bindOrderModalCloseButton();
+    this.prepareUiImageButtons(modal);
+  },
+
+  bindOrderModalCloseButton() {
+    const closeButton = document.getElementById("order-modal-close-button");
+
+    if (!closeButton || closeButton.dataset.orderModalCloseBound === "true") {
+      return;
+    }
+
+    closeButton.dataset.orderModalCloseBound = "true";
+    closeButton.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.hideOrderModal();
+    };
   },
 
   showOrderModal(orderData = {}) {
@@ -5995,7 +6303,8 @@ export const UIManager = {
     const activeCategoryQuantity = visibleProducts.reduce((quantityTotal, product) => {
       return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
     }, 0);
-    const isOverBudget = totalCost > GameState.money;
+    const spendableMoney = this.getOrderSpendableMoney();
+    const isOverBudget = totalCost > spendableMoney;
     const warehouseCapacity = BMSystem.getWarehouseCapacity();
     const currentWarehouseStock = Math.max(0, Math.floor(Number(this.inventorySnapshot?.totalQuantity) || 0));
     const isOverWarehouseCapacity = currentWarehouseStock + totalQuantity > warehouseCapacity;
@@ -6016,28 +6325,27 @@ export const UIManager = {
           <div class="order-total-box">
             <div>
               <span>예상 발주 비용</span>
-              <strong>₩${totalCost.toLocaleString()}</strong>
+              <strong id="order-total-cost-value">₩${totalCost.toLocaleString()}</strong>
             </div>
             <div>
-              <span>보유금</span>
-              <strong>₩${GameState.money.toLocaleString()}</strong>
+              <span>발주 가능 금액</span>
+              <strong id="order-player-money-value">₩${spendableMoney.toLocaleString()}</strong>
             </div>
             <div>
               <span>발주 수량</span>
-              <strong>${totalQuantity}개</strong>
+              <strong id="order-total-quantity-value">${totalQuantity}개</strong>
             </div>
           </div>
 
-          <p class="order-budget-message${isOverBudget || isZeroOrderBlocked || isOverWarehouseCapacity ? " is-warning" : ""}">
-            ${
-              isOverBudget
-                ? "보유금보다 발주 비용이 큽니다."
-                : isOverWarehouseCapacity
-                  ? `창고 용량 초과: 현재 ${currentWarehouseStock}개 + 발주 ${totalQuantity}개 / 한도 ${warehouseCapacity}개`
-                  : isZeroOrderBlocked
-                    ? "Day 1에는 기본 상품을 1개 이상 발주해야 영업을 시작할 수 있습니다."
-                    : `창고 ${currentWarehouseStock + totalQuantity}/${warehouseCapacity}개 · Day 2부터는 수량 0으로도 발주 확정이 가능합니다.`
-            }
+          <p id="order-budget-message" class="order-budget-message${isOverBudget || isZeroOrderBlocked || isOverWarehouseCapacity ? " is-warning" : ""}">
+            ${this.getOrderBudgetMessage({
+              isOverBudget,
+              isOverWarehouseCapacity,
+              isZeroOrderBlocked,
+              currentWarehouseStock,
+              totalQuantity,
+              warehouseCapacity
+            })}
           </p>
 
           <button id="order-confirm-button" class="order-confirm-button" type="button" ${isOverBudget || isZeroOrderBlocked || isOverWarehouseCapacity ? "disabled" : ""}>
@@ -6049,8 +6357,8 @@ export const UIManager = {
           <div class="order-list-toolbar">
             ${this.renderOrderCategoryTabs(categoryTabs)}
             <p class="order-category-summary">
-              <strong>${activeCategoryLabel}</strong>
-              <span>${visibleProducts.length}개 상품 · 선택 ${activeCategoryQuantity}개</span>
+              <strong id="order-active-category-label">${activeCategoryLabel}</strong>
+              <span id="order-active-category-stats">${visibleProducts.length}개 상품 · 선택 ${activeCategoryQuantity}개</span>
             </p>
           </div>
 
@@ -6079,7 +6387,7 @@ export const UIManager = {
                       class="order-product-thumb"
                       src="${product.imagePath}"
                       alt="${displayName}"
-                      loading="lazy"
+                      loading="eager"
                       decoding="async"
                       onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
                     />
@@ -6098,7 +6406,7 @@ export const UIManager = {
                   <div class="order-quantity-panel" aria-label="${displayName} 발주 수량">
                     <div class="order-quantity-controls">
                       <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
-                      <strong>${quantity}</strong>
+                      <strong class="order-quantity-value" data-product-id="${product.id}">${quantity}</strong>
                       <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>+</button>
                     </div>
                   </div>
@@ -6123,6 +6431,100 @@ export const UIManager = {
     }
   },
 
+  getOrderSpendableMoney() {
+    const money = Math.max(0, Math.floor(Number(GameState.money) || 0));
+    const recordedCost = Math.max(0, Math.floor(Number(GameState.todayStats?.cost) || 0));
+
+    return Math.max(0, money - recordedCost);
+  },
+
+  getOrderBudgetMessage({
+    isOverBudget = false,
+    isOverWarehouseCapacity = false,
+    isZeroOrderBlocked = false,
+    currentWarehouseStock = 0,
+    totalQuantity = 0,
+    warehouseCapacity = 0
+  } = {}) {
+    if (isOverBudget) {
+      return "보유금보다 발주 비용이 큽니다.";
+    }
+
+    if (isOverWarehouseCapacity) {
+      return `창고 용량 초과: 현재 ${currentWarehouseStock}개 + 발주 ${totalQuantity}개 / 한도 ${warehouseCapacity}개`;
+    }
+
+    if (isZeroOrderBlocked) {
+      return "Day 1에는 기본 상품을 1개 이상 발주해야 영업을 시작할 수 있습니다.";
+    }
+
+    return `창고 ${currentWarehouseStock + totalQuantity}/${warehouseCapacity}개 · Day 2부터는 수량 0으로도 발주 확정이 가능합니다.`;
+  },
+
+  refreshOrderDraftDynamicState() {
+    const orderableProducts = this.getOrderableProducts();
+    const visibleProducts = this.getOrderVisibleProducts(PRODUCTS);
+    const totalCost = this.getOrderTotalCost(orderableProducts);
+    const totalQuantity = orderableProducts.reduce((quantityTotal, product) => {
+      return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
+    }, 0);
+    const activeCategoryQuantity = visibleProducts.reduce((quantityTotal, product) => {
+      return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
+    }, 0);
+    const warehouseCapacity = BMSystem.getWarehouseCapacity();
+    const currentWarehouseStock = Math.max(0, Math.floor(Number(this.inventorySnapshot?.totalQuantity) || 0));
+    const spendableMoney = this.getOrderSpendableMoney();
+    const isOverBudget = totalCost > spendableMoney;
+    const isOverWarehouseCapacity = currentWarehouseStock + totalQuantity > warehouseCapacity;
+    const isZeroOrderBlocked = GameState.day === 1 && totalQuantity <= 0;
+    const shouldDisableConfirm = isOverBudget || isZeroOrderBlocked || isOverWarehouseCapacity;
+
+    const setText = (selector, value) => {
+      const node = document.querySelector(selector);
+      if (node && node.textContent !== value) {
+        node.textContent = value;
+      }
+    };
+
+    setText("#order-total-cost-value", `₩${totalCost.toLocaleString()}`);
+    setText("#order-player-money-value", `₩${spendableMoney.toLocaleString()}`);
+    setText("#order-total-quantity-value", `${totalQuantity}개`);
+    setText("#order-active-category-stats", `${visibleProducts.length}개 상품 · 선택 ${activeCategoryQuantity}개`);
+
+    Object.entries(this.orderDraftQuantities).forEach(([productId, quantity]) => {
+      setText(`.order-quantity-value[data-product-id="${productId}"]`, `${Number(quantity) || 0}`);
+    });
+
+    const budgetMessage = document.getElementById("order-budget-message");
+    const budgetText = this.getOrderBudgetMessage({
+      isOverBudget,
+      isOverWarehouseCapacity,
+      isZeroOrderBlocked,
+      currentWarehouseStock,
+      totalQuantity,
+      warehouseCapacity
+    });
+
+    if (budgetMessage) {
+      budgetMessage.classList.toggle("is-warning", shouldDisableConfirm);
+      if (budgetMessage.textContent.trim() !== budgetText) {
+        budgetMessage.textContent = budgetText;
+      }
+    }
+
+    const confirmButton = document.getElementById("order-confirm-button");
+    if (confirmButton) {
+      confirmButton.disabled = shouldDisableConfirm;
+      if (shouldDisableConfirm) {
+        confirmButton.setAttribute("aria-disabled", "true");
+      } else {
+        confirmButton.removeAttribute("disabled");
+        confirmButton.removeAttribute("aria-disabled");
+      }
+      this.syncUiImageButtonState(confirmButton);
+    }
+  },
+
   bindOrderDraftControls(products = []) {
     document.querySelectorAll(".order-qty-button").forEach((button) => {
       button.onclick = () => {
@@ -6141,7 +6543,7 @@ export const UIManager = {
         const orderList = document.querySelector(".order-product-list");
         this.orderListScrollTop = orderList?.scrollTop ?? this.orderListScrollTop;
         this.orderDraftQuantities[productId] = nextQuantity;
-        this.renderOrderDraft({ preserveScroll: true });
+        this.refreshOrderDraftDynamicState();
       };
     });
 
@@ -6150,28 +6552,94 @@ export const UIManager = {
     if (!confirmButton) return;
 
     confirmButton.onclick = () => {
+      this.refreshOrderDraftDynamicState();
+
       if (confirmButton.disabled) return;
+
+      const items = products
+        .map((product) => {
+          return {
+            productId: product.id,
+            productName: BMSystem.getProductDisplayName(product),
+            shelfId: product.shelfId,
+            quantity: this.orderDraftQuantities[product.id] ?? 0,
+            purchasePrice: product.purchasePrice,
+            salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,
+            imagePath: product.imagePath
+          };
+        })
+        .filter((item) => item.quantity > 0);
+      const validation = this.validateOrderDraftBeforeConfirm(products, items);
+
+      if (!validation.isAvailable) {
+        this.showMessage(validation.message);
+        this.refreshOrderDraftDynamicState();
+        return;
+      }
 
       this.showOrderWaiting();
 
       EventBus.emit(EVENTS.ORDER_CONFIRMED, {
         day: GameState.day,
-        items: products
-          .map((product) => {
-            return {
-              productId: product.id,
-              productName: BMSystem.getProductDisplayName(product),
-              shelfId: product.shelfId,
-              quantity: this.orderDraftQuantities[product.id] ?? 0,
-              purchasePrice: product.purchasePrice,
-              salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,
-              imagePath: product.imagePath
-            };
-          })
-          .filter((item) => item.quantity > 0),
+        items,
         totalCost: this.getOrderTotalCost(products)
       });
     };
+  },
+
+  validateOrderDraftBeforeConfirm(products = [], items = []) {
+    const totalCost = this.getOrderTotalCost(products);
+    const totalQuantity = items.reduce((total, item) => total + (Number(item.quantity) || 0), 0);
+    const spendableMoney = this.getOrderSpendableMoney();
+    const warehouseCapacity = BMSystem.getWarehouseCapacity();
+    const currentWarehouseStock = Math.max(0, Math.floor(Number(this.inventorySnapshot?.totalQuantity) || 0));
+    const isOrderPhase =
+      GameState.phase === GAME_PHASE.DAY_START ||
+      GameState.phase === GAME_PHASE.ORDER;
+
+    if (!isOrderPhase) {
+      return {
+        isAvailable: false,
+        message: "발주는 Day 시작 후 영업 시작 전까지만 가능합니다."
+      };
+    }
+
+    if (GameState.day === 1 && totalQuantity <= 0) {
+      return {
+        isAvailable: false,
+        message: "Day 1에는 기본 상품을 1개 이상 발주해야 합니다."
+      };
+    }
+
+    if (totalCost > spendableMoney) {
+      return {
+        isAvailable: false,
+        message: `발주 가능 금액이 부족합니다. 필요 ₩${totalCost.toLocaleString()} / 가능 ₩${spendableMoney.toLocaleString()}`
+      };
+    }
+
+    if (currentWarehouseStock + totalQuantity > warehouseCapacity) {
+      return {
+        isAvailable: false,
+        message: `창고 용량을 초과했습니다. 현재 ${currentWarehouseStock}개 + 발주 ${totalQuantity}개 / 한도 ${warehouseCapacity}개`
+      };
+    }
+
+    return {
+      isAvailable: true,
+      message: "발주 가능합니다."
+    };
+  },
+
+  handleOrderConfirmationFailed(data = {}) {
+    if (this.orderModalMode === "waiting") {
+      this.orderModalMode = "draft";
+      this.renderOrderDraft({ preserveScroll: true });
+      this.orderModal?.classList.remove("hidden");
+    }
+
+    this.showMessage(data.message ?? data.reason ?? "발주를 진행할 수 없습니다.");
+    this.refreshOrderDraftDynamicState();
   },
 
   showOrderWaiting() {
@@ -6246,17 +6714,7 @@ export const UIManager = {
     }
 
     deliveryBox.classList.remove("interaction-feedback-target", "is-interactable", "is-interaction-ready", "is-click-sparkling");
-    deliveryBox.innerHTML = `
-      <span class="delivery-box-visual" aria-hidden="true">
-        <img
-          src="${getWarehouseBoxAsset("arrive")}"
-          alt=""
-          draggable="false"
-        />
-      </span>
-      <span class="delivery-box-hitbox" aria-hidden="true"></span>
-      <strong class="delivery-box-count">${remainingCount}종</strong>
-    `;
+    this.ensureDeliveryBoxVisuals(deliveryBox, remainingCount);
 
     deliveryBox.onpointerdown = (event) => {
       event.preventDefault();
@@ -6274,6 +6732,51 @@ export const UIManager = {
         source: "delivery_box_zone"
       });
     };
+  },
+
+  ensureDeliveryBoxVisuals(deliveryBox, remainingCount) {
+    let visualNode = deliveryBox.querySelector(".delivery-box-visual");
+
+    if (!visualNode) {
+      visualNode = document.createElement("span");
+      visualNode.className = "delivery-box-visual";
+      visualNode.setAttribute("aria-hidden", "true");
+      deliveryBox.appendChild(visualNode);
+    }
+
+    let imageNode = visualNode.querySelector("img");
+
+    if (!imageNode) {
+      imageNode = document.createElement("img");
+      imageNode.alt = "";
+      imageNode.draggable = false;
+      visualNode.appendChild(imageNode);
+    }
+
+    const imagePath = getWarehouseBoxAsset("arrive");
+
+    if (imageNode.getAttribute("src") !== imagePath) {
+      imageNode.src = imagePath;
+    }
+
+    let hitboxNode = deliveryBox.querySelector(".delivery-box-hitbox");
+
+    if (!hitboxNode) {
+      hitboxNode = document.createElement("span");
+      hitboxNode.className = "delivery-box-hitbox";
+      hitboxNode.setAttribute("aria-hidden", "true");
+      deliveryBox.appendChild(hitboxNode);
+    }
+
+    let countNode = deliveryBox.querySelector(".delivery-box-count");
+
+    if (!countNode) {
+      countNode = document.createElement("strong");
+      countNode.className = "delivery-box-count";
+      deliveryBox.appendChild(countNode);
+    }
+
+    countNode.textContent = `${remainingCount}종`;
   },
 
   clearDeliveryBox() {
@@ -6305,12 +6808,27 @@ export const UIManager = {
       dayLabel.textContent = `Day ${orderData.day ?? GameState.day}`;
     }
 
+    const gridSignature = deliveredItems.map((item) => `${item.productId}:${item.imagePath ?? ""}`).join("|");
+    const existingGrid = body.querySelector(".order-delivered-grid");
+    const existingButtons = existingGrid ? [...existingGrid.querySelectorAll(".delivered-product-button")] : [];
+    const canReuseGrid =
+      existingGrid &&
+      this.lastDeliveredGridSignature === gridSignature &&
+      existingButtons.length === deliveredItems.length &&
+      existingButtons.every((button, index) => button.dataset.productId === deliveredItems[index].productId);
+
+    if (canReuseGrid) {
+      this.syncOrderDeliveredState(orderData);
+      return;
+    }
+
+    this.lastDeliveredGridSignature = gridSignature;
     body.innerHTML = `
       <div class="order-delivery-state">
         <h2>택배 박스 열기</h2>
         <p>
           상품 이미지를 누르면 해당 상품이 재고로 정리됩니다.
-          남은 상품 ${remainingCount}종을 모두 정리해야 편의점을 오픈할 수 있습니다.
+          남은 상품 <strong id="order-delivery-remaining-count">${remainingCount}</strong>종을 모두 정리해야 편의점을 오픈할 수 있습니다.
         </p>
         <div class="order-delivered-grid">
           ${
@@ -6336,25 +6854,70 @@ export const UIManager = {
                           class="delivered-product-image"
                           src="${imagePath}"
                           alt="${item.productName}"
-                          loading="lazy"
+                          loading="eager"
                           decoding="async"
                           onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
                         />
                         <span class="delivered-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
                       </span>
-                      <span>${item.productName}</span>
-                      <strong>${item.quantity}개</strong>
-                      <em>${isSorted ? "정리 완료" : "클릭해서 정리"}</em>
+                      <span class="delivered-product-name">${item.productName}</span>
+                      <strong class="delivered-product-quantity">${item.quantity}개</strong>
+                      <em class="delivered-product-status">${isSorted ? "정리 완료" : "클릭해서 정리"}</em>
                     </button>
                   `;
                 }).join("")
-              : "<div class=\"order-empty-delivery\">정리할 상품이 없습니다.</div>"
+              : `<div class="order-empty-delivery">정리할 상품이 없습니다.</div>`
           }
         </div>
       </div>
     `;
 
     this.bindDeliveredProductButtons(orderData);
+  },
+
+  syncOrderDeliveredState(orderData = {}) {
+    const deliveredItems = this.getDeliveredItems(orderData);
+    const remainingCount = deliveredItems.filter((item) => !item.isSorted).length;
+    const remainingCountNode = document.getElementById("order-delivery-remaining-count");
+
+    if (remainingCountNode && remainingCountNode.textContent !== String(remainingCount)) {
+      remainingCountNode.textContent = String(remainingCount);
+    }
+
+    deliveredItems.forEach((item) => {
+      const button = document.querySelector(`.delivered-product-button[data-product-id="${item.productId}"]`);
+      if (!button) return;
+
+      const isSorted = Boolean(item.isSorted);
+      const product = PRODUCTS.find((candidate) => candidate.id === item.productId) ?? {
+        id: item.productId,
+        name: item.productName,
+        imagePath: item.imagePath
+      };
+      const imagePath = item.imagePath ?? product.imagePath ?? "";
+
+      button.classList.toggle("is-sorted", isSorted);
+      button.disabled = isSorted;
+
+      const imageNode = button.querySelector(".delivered-product-image");
+      if (imageNode) {
+        if (imageNode.getAttribute("src") !== imagePath) {
+          imageNode.src = imagePath;
+        }
+        imageNode.alt = item.productName;
+      }
+
+      const setText = (selector, value) => {
+        const node = button.querySelector(selector);
+        if (node && node.textContent !== value) {
+          node.textContent = value;
+        }
+      };
+
+      setText(".delivered-product-name", item.productName);
+      setText(".delivered-product-quantity", `${item.quantity}개`);
+      setText(".delivered-product-status", isSorted ? "정리 완료" : "클릭해서 정리");
+    });
   },
 
   bindDeliveredProductButtons(orderData = {}) {

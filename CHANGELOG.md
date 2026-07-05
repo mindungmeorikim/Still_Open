@@ -1,3 +1,92 @@
+# CHANGELOG
+
+## [v7.6.7] 2026-07-05 - 발주 카테고리 탭 높이 축소
+
+### Changed
+- 발주창 카테고리 탭의 세로 높이와 상하 패딩을 줄여 상품 영역이 더 넓어 보이도록 조정했습니다.
+- 카테고리 숫자 배지 크기를 함께 줄여 탭 내부 정렬이 깨지지 않도록 정리했습니다.
+- 작은 화면용 카테고리 탭 높이도 별도 보정했습니다.
+
+## [v6.2.7] 발주 확정 버튼/닫기 버튼 핫픽스
+- Fixed: 발주 수량을 0에서 1 이상으로 바꾼 뒤에도 이미지 버튼 상태 클래스가 disabled로 남아 발주 확정 버튼이 회색으로 보이던 문제 수정.
+- Fixed: UI 발주 가능 금액 계산과 OrderSystem 검증 금액을 일치시켜, 화면에서는 가능해 보이는데 실제 발주가 거부되는 상황을 방지.
+- Fixed: OrderSystem에서 발주 거부 시 UI가 접수 대기 화면에 갇히지 않도록 실패 이벤트를 반환하고 발주 화면으로 복구.
+- Added: 발주창 우측 상단 닫기 버튼 추가.
+
+## [v7.7.5] 발주 박스 크기 밸런스 조정
+- Changed: 발주 도착 박스를 플레이어 축소 크기 기준에 맞춰 `131px × 112px`에서 `84px × 72px`로 줄였다.
+- Changed: 박스가 입구 오른쪽에 유지되도록 기존 배치의 중심/바닥 기준을 맞춰 위치를 `568px, 615px`로 보정했다.
+- Changed: 박스 클릭 영역, 그림자, 남은 상품 수량 배지도 축소된 박스 크기에 맞게 조정했다.
+- Verified: JS 문법 검사 및 zip 무결성 검사를 통과했다.
+
+## [v7.6.5] 발주 박스 위치 조정
+- Changed: 발주 도착 박스를 외부 도로 왼쪽이 아니라 기본 매장 입구 오른쪽 근처로 이동했다.
+- Changed: 발주 박스 자동 이동 기준 좌표도 화면 표시 좌표와 동일하게 맞춰, 박스 클릭 시 플레이어가 새 위치로 이동하도록 정렬했다.
+- Verified: JS 문법 검사 및 zip 무결성 검사를 통과했다.
+
+## [v7.7.4] 상품 이미지 렌더링 안정화
+- Fixed: 발주 모달에서 수량 `+/-` 버튼을 누를 때 `order-modal-body` 전체를 다시 그리면서 상품 이미지가 깜빡이던 문제를 수정했습니다.
+- Changed: 발주 수량 변경 시 상품 카드 DOM은 유지하고 수량, 예상 비용, 보유금, 발주 수량, 창고 용량 경고, 발주 확정 버튼 상태만 부분 갱신하도록 변경했습니다.
+- Fixed: 택배 박스 정리 화면에서도 상품 정리 상태 변경 시 상품 이미지 DOM을 재생성하지 않고 정리 완료 상태/남은 수량만 갱신하도록 보완했습니다.
+- Changed: 상품 진열대 패널도 재고/가격/잠금 상태 변경 시 기존 카드와 이미지를 재사용하고 텍스트/클래스만 갱신하도록 안정화했습니다.
+- Changed: 발주/입고/진열대 상품 이미지는 즉시 표시가 필요한 UI라 `loading="eager"` 기준으로 맞췄습니다.
+- Changed: 매장 확장 타일 이미지도 상태가 바뀌지 않으면 DOM을 다시 만들지 않도록 시그니처 캐시를 추가했습니다.
+- Changed: 공사 오버레이 이미지도 같은 경로로 반복 지정하지 않도록 `src` 변경 여부를 확인하게 했습니다.
+
+## [v7.7.3] 손님 PNG 렌더링 안정화
+- Fixed: 손님 렌더링 시 `.customer-npc` 내부를 매번 `innerHTML`로 비워 손님 PNG가 사라졌다 나타나는 문제를 수정했습니다.
+- Changed: 손님 sprite/라벨/말풍선 DOM을 재사용하고, 이미지 경로가 바뀔 때만 `src`를 갱신하도록 변경했습니다.
+- Fixed: 진상 이벤트 발생 후 `nuisanceProfileId`가 렌더링 payload에도 전달되도록 보완해 진상별 전용 에셋 교체가 안정적으로 작동하게 했습니다.
+- Changed: 손님 이미지 로딩은 `eager`로 전환하고, 렌더 안정화용 CSS를 추가했습니다.
+
+## [v7.7.2] 플레이어 이동 렌더링 최적화 및 아이콘 깜빡임 수정
+- Fixed: 플레이어 이동 중 `GAME_STATE_CHANGED` 전체 렌더가 매 프레임 발생해 이동 속도가 느려 보이던 문제를 수정했습니다.
+- Fixed: 이동/자동 이동 중 플레이어 박스, 창고 박스, 청소 아이콘 이미지가 매 프레임 재생성되어 덜덜 떨리거나 깜빡이던 문제를 수정했습니다.
+- Changed: 플레이어 위치 변경은 전용 `PLAYER_POSITION_CHANGED` 이벤트로 플레이어와 상호작용 하이라이트만 갱신하도록 분리했습니다.
+
+## [v7.7.2-order-inventory-import-fix-260705]
+### Fixed
+- 발주 확정 시 창고 용량 검사를 위해 `OrderSystem.js`에서 사용하는 `InventorySystem` import 누락을 복구했습니다.
+- `ORDER_CONFIRMED` 처리 중 `InventorySystem is not defined` 오류가 발생하지 않도록 수정했습니다.
+
+### Notes
+- 수정 파일: `systems/OrderSystem.js`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.7.1-player-size-balance-260705]
+### Changed
+- 플레이어 PNG 표시 크기를 `74px × 130px`에서 `58px × 102px`로 줄여 손님 캐릭터와 화면 비율을 맞췄습니다.
+- 손님 PNG 크기는 기존 `49px × 87px`로 유지해 플레이어가 손님보다 약간만 크게 보이도록 조정했습니다.
+- 플레이어 그림자와 들고 있는 박스 표시 크기를 축소된 플레이어 크기에 맞게 줄였습니다.
+
+### Fixed
+- 플레이어 크기 변경 후 상호작용 중심점/자동 이동 위치 계산의 fallback 크기도 `58px × 102px` 기준으로 맞췄습니다.
+
+### Notes
+- 수정 파일: `style.css`, `systems/PlayerMovementSystem.js`, `systems/PlayerActionSystem.js`, `ui/UIManager.js`, `CHANGELOG.md`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.7.0-customer-assets-260705]
+### Added
+- 업로드된 손님 PNG 128개를 `assets/images/customers/` 하위 캐릭터별 폴더로 정리했습니다.
+- `AssetData.js`에 기본 손님 타입과 진상 `nuisanceProfileId`를 PNG 에셋으로 연결하는 매핑 테이블을 추가했습니다.
+- 일반/학생/회사원/급한 손님/진상 손님별 8방향 이미지 경로 선택 헬퍼를 추가했습니다.
+
+### Changed
+- 손님 렌더링을 기존 텍스트/이모지 박스에서 `<img class="customer-sprite">` 기반 PNG 캐릭터 렌더링으로 교체했습니다.
+- 손님 크기를 플레이어 74x130 기준 1.5배 작은 약 49x87px로 맞췄습니다.
+- 급한 손님은 회사원/일반 손님 에셋을 재사용하도록 연결했습니다.
+- 봉투 추가 손님은 `customer_trouble_bulky_sleeve_*`, 전자레인지 진상은 `customer_trouble_bargain_perm_*` 에셋을 재사용하도록 연결했습니다.
+
+### Fixed
+- 진상 이벤트 발생 후 `nuisanceProfileId`가 붙으면 해당 진상 전용 PNG로 화면 표시가 바뀌도록 보완했습니다.
+- 손님 PNG 로딩 실패 시 기존 텍스트 라벨이 fallback으로 보이도록 처리했습니다.
+
+### Notes
+- 수정 파일: `data/AssetData.js`, `ui/UIManager.js`, `style.css`, `CHANGELOG.md`
+- 추가 폴더: `assets/images/customers/`
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
 ## [v-bm-staff-upgrade-merge-260705]
 ### Added
 - BM 담당자 최신본의 상품별 shelfId/매대 분리 로직을 최신 작업본에 병합했습니다.

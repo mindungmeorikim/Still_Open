@@ -33,6 +33,7 @@ const STAFF_EVENTS = {
 };
 
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
+const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
 const SANITATION_CLEANING_REQUESTED = "SANITATION_CLEANING_REQUESTED";
 const SANITATION_CLEANING_STARTED = "SANITATION_CLEANING_STARTED";
@@ -120,8 +121,8 @@ export const PlayerActionSystem = {
   },
 
   deliveryBoxZone: {
-    x: 122,
-    y: 575,
+    x: 568,
+    y: 615,
   },
 
   cleaningZone: {
@@ -437,8 +438,8 @@ export const PlayerActionSystem = {
   getPlayerCenter() {
     const player = GameState.player ?? { x: 0, y: 0 };
     const playerNode = document.getElementById("player-zone");
-    const playerWidth = Number(playerNode?.offsetWidth) || 42;
-    const playerHeight = Number(playerNode?.offsetHeight) || 58;
+    const playerWidth = Number(playerNode?.offsetWidth) || 58;
+    const playerHeight = Number(playerNode?.offsetHeight) || 102;
 
     return {
       x: (Number(player.x) || 0) + playerWidth / 2,
@@ -478,8 +479,8 @@ export const PlayerActionSystem = {
     }
 
     const playerNode = document.getElementById("player-zone");
-    const playerWidth = Number(playerNode?.offsetWidth) || 74;
-    const playerHeight = Number(playerNode?.offsetHeight) || 130;
+    const playerWidth = Number(playerNode?.offsetWidth) || 58;
+    const playerHeight = Number(playerNode?.offsetHeight) || 102;
 
     return {
       x: zoneCenter.x - playerWidth / 2,
@@ -723,7 +724,7 @@ movePlayerToPosition(targetPosition, onComplete) {
     GameState.player.x += (dx / distance) * this.autoMoveSpeed;
     GameState.player.y += (dy / distance) * this.autoMoveSpeed;
 
-    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+    EventBus.emit(PLAYER_POSITION_CHANGED, GameState);
   }, 16);
 },
 
