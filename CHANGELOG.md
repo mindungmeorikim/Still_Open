@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [v7.6.9] BM 에셋 폴더 정리
+- Added: BM 에셋을 `assets/images/bm/` 하위 용도별 폴더로 정리
+- Added: `BM_ASSET_MANIFEST.md`와 `assets/images/bm/BM_ASSET_MANIFEST.json` 추가
+- Added: 향후 상점 UI 리뉴얼용 `data/BMAssetMap.js` 경로 맵 추가
+- Changed: `gold.png`/`diamond.png`를 `currency_gold.png`/`currency_diamond.png`로 정규화
+- Changed: `icon_requirements_missing.png`를 `icon_not_ready.png`로 정규화
+- Note: 기존 상점 UI 구조와 렌더링 로직은 아직 수정하지 않음
+
 ## [v7.6.7] 2026-07-05 - 발주 카테고리 탭 높이 축소
 
 ### Changed
