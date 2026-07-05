@@ -25,8 +25,8 @@ export const PlayerMovementSystem = {
   },
 
   defaultPlayer: {
-    x: 600,
-    y: 705,
+    x: 610,
+    y: 548,
     speed: 4,
     direction: "down"
   },

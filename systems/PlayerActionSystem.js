@@ -79,13 +79,13 @@ export const PlayerActionSystem = {
   autoMoveSpeed: 4,
 
   warehouseZone: {
-    x: 300,
-    y: 470,
+    x: 210,
+    y: 575,
   },
 
   deliveryBoxZone: {
-    x: 560,
-    y: 560,
+    x: 122,
+    y: 575,
   },
 
   cleaningZone: {

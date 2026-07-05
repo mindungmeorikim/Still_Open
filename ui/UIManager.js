@@ -28,7 +28,7 @@ import { DailyMissionSystem, DAILY_MISSION_EVENTS } from "../systems/DailyMissio
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
-const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 300, y: 470 });
+const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const CLEANING_ZONE_POSITION = Object.freeze({ x: 870, y: 650 });
 const SANITATION_EVENTS = Object.freeze({
   CHANGED: "SANITATION_CHANGED",
@@ -1482,7 +1482,7 @@ export const UIManager = {
     if (diamondInfoNode) {
       const diamond = BMSystem.getBMState().diamond;
 
-      diamondInfoNode.textContent = `다이아 ${diamond.toLocaleString("ko-KR")}`;
+      diamondInfoNode.textContent = diamond.toLocaleString("ko-KR");
     }
 
     document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
@@ -2848,25 +2848,6 @@ export const UIManager = {
       worldMap.appendChild(background);
     }
 
-    let sharedFloor = document.getElementById("store-world-shared-floor");
-
-    if (!sharedFloor) {
-      sharedFloor = document.createElement("div");
-      sharedFloor.id = "store-world-shared-floor";
-      sharedFloor.className = "store-world-shared-floor";
-      sharedFloor.setAttribute("aria-hidden", "true");
-      sharedFloor.innerHTML = `
-        <img
-          src="./assets/images/world/map/map2_floor_clean.png"
-          alt=""
-          draggable="false"
-        />
-      `;
-      worldMap.appendChild(sharedFloor);
-    } else if (sharedFloor.parentElement !== worldMap) {
-      worldMap.appendChild(sharedFloor);
-    }
-
     let unifiedBase = document.getElementById("store-unified-base");
 
     if (!unifiedBase) {
@@ -3362,8 +3343,8 @@ export const UIManager = {
       Math.min(this.worldCamera.maxZoom, viewportWidth / 1260, viewportHeight / 760)
     );
     const zoom = this.setStoreCameraZoom(unifiedStoreZoom, false);
-    const storeCenterX = 845;
-    const storeCenterY = 505;
+    const storeCenterX = 839;
+    const storeCenterY = 463;
 
     this.worldCamera.x = Math.round(viewportWidth / 2 - storeCenterX * zoom);
     this.worldCamera.y = Math.round(viewportHeight / 2 - storeCenterY * zoom);

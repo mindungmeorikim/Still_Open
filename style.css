@@ -11515,24 +11515,6 @@ body {
   z-index: 0 !important;
 }
 
-.store-world-shared-floor {
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 8 !important;
-  width: 1672px !important;
-  height: 941px !important;
-  pointer-events: none !important;
-  user-select: none !important;
-}
-
-.store-world-shared-floor img {
-  display: block !important;
-  width: 100% !important;
-  height: 100% !important;
-  object-fit: cover !important;
-  object-position: center center !important;
-}
-
 #store-expansion-tiles.store-space-layer {
   z-index: 24 !important;
 }
@@ -11636,18 +11618,18 @@ body {
 }
 
 
-/* v6.1.1 unified store base / zone overlay pass
+/* v6.1.3 full-canvas map alignment pass
    목적:
-   - 개별 4개 공간 이미지를 겉보기 레이어로 쓰지 않고, 사용자가 제공한 full_empty_space를 통합 매장 베이스로 사용한다.
-   - 기능은 기존 4개 zone hitbox로 유지하고, 잠긴 구역만 어두운 overlay + cloud + lock으로 표현한다.
-   - 벽과 바닥이 한 장의 이미지로 이어져 맵 위에 더 자연스럽게 얹히도록 한다.
+   - background/unified/state/fixing/bright 레이어를 모두 1672x941 월드 전체 캔버스에 맞춰 겹친다.
+   - 2752x1536 기준으로 제작된 최신 맵 에셋을 같은 object-fit: cover 기준으로 렌더링해 레이어 밀림을 막는다.
+   - 이전 공통 바닥 잔여 레이어 없이 background + unified + 상태 오버레이 구조로 정리한다.
 */
 
 #store-world-map.is-unified-store-layout {
-  --unified-store-x: 390px;
-  --unified-store-y: 215px;
-  --unified-store-width: 900px;
-  --unified-store-height: 506px;
+  --unified-store-x: 0px;
+  --unified-store-y: 0px;
+  --unified-store-width: 1672px;
+  --unified-store-height: 941px;
 }
 
 #store-unified-base {
@@ -11665,9 +11647,9 @@ body {
   display: block !important;
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain !important;
+  object-fit: cover !important;
   object-position: center center !important;
-  filter: drop-shadow(0 32px 38px rgba(12, 21, 17, 0.22)) !important;
+  filter: drop-shadow(0 20px 30px rgba(12, 21, 17, 0.16)) !important;
   -webkit-user-drag: none !important;
 }
 
@@ -11697,15 +11679,9 @@ body {
   display: block !important;
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain !important;
+  object-fit: cover !important;
   object-position: center center !important;
   -webkit-user-drag: none !important;
-}
-
-#store-world-map.is-unified-store-layout .store-world-shared-floor {
-  display: none !important;
-  opacity: 0 !important;
-  z-index: 7 !important;
 }
 
 #store-world-map.is-unified-store-layout #store-expansion-tiles.store-space-layer {
@@ -11731,7 +11707,6 @@ body {
 }
 
 /* 구역별 overlay를 외곽 벽 안쪽으로 조금씩 다르게 넣어 직사각형 티를 줄인다. */
-
 
 
 #store-world-map.is-unified-store-layout .store-space-cloud,
@@ -16694,4 +16669,362 @@ body.is-title-screen-active #game-root {
 
 .bm-product-upgrade-card .bm-contract-product-main {
   align-items: center;
+}
+
+
+/* [v-map-focus-feedback-260705] compact top HUD + outside box positions + camera feedback tuning */
+#top-ui {
+  grid-template-columns: 122px minmax(0, 1fr) auto !important;
+  grid-template-rows: auto !important;
+  align-items: start !important;
+  gap: 8px !important;
+  padding: 14px 16px 0 !important;
+}
+
+#day-card {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  grid-template-columns: 38px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  gap: 3px 8px !important;
+  padding: 10px 10px 9px !important;
+  border-radius: 18px !important;
+}
+
+.day-card-icon {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 11px !important;
+  font-size: 20px !important;
+}
+
+#day-info {
+  font-size: 16px !important;
+  line-height: 1.05 !important;
+}
+
+#time-info {
+  font-size: 13px !important;
+}
+
+#phase-chip {
+  grid-column: 1 / -1 !important;
+  min-height: 26px !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+}
+
+#status-panel {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  min-height: 44px !important;
+  overflow: hidden !important;
+  border-radius: 24px !important;
+}
+
+#status-panel p {
+  flex: 0 0 auto !important;
+  min-height: 44px !important;
+  padding: 0 11px !important;
+  gap: 6px !important;
+  font-size: 13px !important;
+}
+
+#money-info::after,
+#diamond-info::after,
+#satisfaction-info::after,
+#mental-info::after,
+#sanitation-info::after,
+#stock-info::after {
+  transform: scale(0.85) !important;
+}
+
+#top-icon-menu {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  gap: 8px !important;
+}
+
+.hud-icon-button,
+#top-icon-menu .hud-icon-button {
+  width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  font-size: 18px !important;
+}
+
+#inventory-summary,
+.expansion-effect-summary,
+#staff-summary {
+  display: none !important;
+}
+
+#message-panel {
+  top: 66px !important;
+}
+
+#store-interaction-layer > #warehouse-box-zone.warehouse-box-zone,
+#warehouse-box-zone.warehouse-box-zone {
+  left: 210px !important;
+  top: 455px !important;
+}
+
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone {
+  left: 122px !important;
+  top: 575px !important;
+}
+
+@media (max-width: 1280px) {
+  #top-ui {
+    grid-template-columns: 112px minmax(0, 1fr) auto !important;
+    gap: 6px !important;
+    padding: 12px 12px 0 !important;
+  }
+
+  #status-panel p {
+    padding: 0 9px !important;
+    font-size: 12px !important;
+  }
+
+  #message-panel {
+    top: 62px !important;
+  }
+}
+
+
+/* [v-map-feedback-ui-fix-260705] top HUD width restore + diamond label cleanup + box lower placement */
+#top-ui {
+  grid-template-columns: 142px minmax(760px, 1fr) auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 14px 14px 0 !important;
+  box-sizing: border-box !important;
+  align-items: start !important;
+}
+
+#day-card {
+  grid-template-columns: 38px minmax(74px, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  width: 142px !important;
+  min-width: 142px !important;
+  padding: 10px 10px 9px !important;
+  align-items: center !important;
+}
+
+#day-card > div {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+#day-info {
+  display: block !important;
+  width: 100% !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  overflow: visible !important;
+  text-align: left !important;
+  font-size: 17px !important;
+  line-height: 1.05 !important;
+}
+
+#time-info {
+  display: block !important;
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  font-size: 13px !important;
+  line-height: 1.1 !important;
+}
+
+#phase-chip {
+  grid-column: 1 / -1 !important;
+  min-height: 28px !important;
+  padding: 5px 10px !important;
+  font-size: 11px !important;
+}
+
+#status-panel {
+  width: min(930px, calc(100vw - 215px)) !important;
+  max-width: 930px !important;
+  min-width: 760px !important;
+  overflow: visible !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+}
+
+#status-panel p {
+  flex: 1 1 0 !important;
+  min-width: max-content !important;
+  padding: 0 12px !important;
+  font-size: 12.5px !important;
+  letter-spacing: -0.02em !important;
+  white-space: nowrap !important;
+}
+
+#diamond-info {
+  flex: 0.75 0 auto !important;
+  min-width: 56px !important;
+}
+
+#stock-info,
+#status-panel #stock-info {
+  flex: 1.05 0 auto !important;
+  min-width: 86px !important;
+  padding-right: 14px !important;
+}
+
+#money-info::after,
+#diamond-info::after,
+#satisfaction-info::after,
+#mental-info::after,
+#sanitation-info::after,
+#stock-info::after {
+  transform: scale(0.86) !important;
+}
+
+#top-icon-menu {
+  min-width: 42px !important;
+}
+
+#message-panel {
+  top: 68px !important;
+}
+
+#store-interaction-layer > #warehouse-box-zone.warehouse-box-zone,
+#warehouse-box-zone.warehouse-box-zone {
+  left: 210px !important;
+  top: 575px !important;
+}
+
+@media (max-width: 1280px) {
+  #top-ui {
+    grid-template-columns: 136px minmax(720px, 1fr) auto !important;
+    gap: 8px !important;
+  }
+
+  #day-card {
+    width: 136px !important;
+    min-width: 136px !important;
+  }
+
+  #status-panel {
+    width: min(890px, calc(100vw - 205px)) !important;
+    min-width: 720px !important;
+  }
+
+  #status-panel p {
+    padding: 0 10px !important;
+    font-size: 12px !important;
+  }
+
+  #message-panel {
+    top: 64px !important;
+  }
+}
+
+
+/* [v-map-topbar-left-auto-260705] compact natural-width status bar */
+#top-ui {
+  grid-template-columns: 142px auto auto !important;
+  justify-content: start !important;
+  align-items: start !important;
+  column-gap: 10px !important;
+  width: 100% !important;
+  max-width: none !important;
+  padding: 14px 14px 0 !important;
+}
+
+#status-panel {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: inline-flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: fit-content !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 225px) !important;
+  min-height: 44px !important;
+  overflow: visible !important;
+  border-radius: 24px !important;
+}
+
+#status-panel p,
+#status-panel #diamond-info,
+#status-panel #stock-info,
+#status-panel #sanitation-info {
+  flex: 0 0 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding: 0 13px !important;
+  font-size: 12.5px !important;
+  letter-spacing: -0.02em !important;
+  white-space: nowrap !important;
+}
+
+#status-panel p:first-child {
+  padding-left: 16px !important;
+}
+
+#status-panel p:last-child {
+  padding-right: 16px !important;
+}
+
+#diamond-info {
+  min-width: 42px !important;
+}
+
+#stock-info,
+#status-panel #stock-info {
+  min-width: 72px !important;
+}
+
+#top-icon-menu {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  justify-self: start !important;
+  margin-left: 0 !important;
+}
+
+@media (max-width: 1280px) {
+  #top-ui {
+    grid-template-columns: 136px auto auto !important;
+    column-gap: 8px !important;
+  }
+
+  #status-panel {
+    width: fit-content !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 210px) !important;
+  }
+
+  #status-panel p,
+  #status-panel #diamond-info,
+  #status-panel #stock-info,
+  #status-panel #sanitation-info {
+    flex: 0 0 auto !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+  }
+
+  #status-panel p:first-child {
+    padding-left: 14px !important;
+  }
+
+  #status-panel p:last-child {
+    padding-right: 14px !important;
+  }
 }

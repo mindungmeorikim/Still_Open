@@ -1,3 +1,65 @@
+## [v-map-topbar-left-auto-260705]
+### Changed
+- 상단 상태바의 강제 넓은 가로폭을 제거하고, 현재 표시 내용만큼만 자연스럽게 잡히도록 수정했습니다.
+- 상태바 항목을 모두 왼쪽 정렬로 통일했습니다.
+- 다이아/재고 항목의 별도 flex 폭 설정을 제거해 가운데 떠 보이는 문제를 보정했습니다.
+- 향후 숫자가 길어질 때 상태바가 필요한 만큼 늘어나도록 `fit-content` 기반으로 정리했습니다.
+
+### Notes
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-map-feedback-ui-fix-260705]
+### Changed
+- 상단 상태바의 가로 폭을 다시 확보해 `재고` 항목이 잘리지 않도록 수정했습니다.
+- `Day 1` 텍스트가 줄바꿈되지 않도록 Day 카드 내부 정렬을 보정했습니다.
+- 다이아 HUD 문구를 `다이아 0`에서 숫자만 표시하는 방식으로 변경해 긴 숫자에서 넘침 가능성을 줄였습니다.
+- 창고/박스 기본 위치를 현재 x축 기준으로 아래로 내려 매장 벽 바로 옆에 붙도록 조정했습니다.
+
+### Notes
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+
+## [v-map-focus-feedback-260705]
+### Changed
+- 상단 HUD를 한 줄형 콤팩트 레이아웃으로 축소해 화면 가림을 줄였습니다.
+- 상태 바(`money/diamond/satisfaction/mental/sanitation/stock`)를 2줄 그리드 대신 1줄 플렉스 구조로 보이도록 스타일을 조정했습니다.
+- 재고 요약 보조 패널은 숨기고 상단 상태 바만 보이도록 정리했습니다.
+- 창고 박스 기본 위치를 매장 바깥 왼쪽 구역으로 이동했습니다.
+- 택배 박스 도착 위치를 매장 바깥 하단 왼쪽 구역으로 이동했습니다.
+- 확대 보기 포커스를 사용자 피드백 기준으로 재조정했습니다.
+
+### Focus Tuning
+- Lv.1 기본 매장: 화면 중심을 약간 오른쪽/위쪽으로 이동
+- Lv.2 추가 진열 구역: 포커스를 위쪽으로 이동
+- Lv.3 냉장·도시락 구역: 포커스를 위쪽으로 이동
+- Lv.4 프리미엄 매장 구역: 포커스를 왼쪽/위쪽으로 이동
+
+## [v-map-position-260705-1215]
+### Changed
+- 최신 `world (2).zip` 맵 에셋 기준으로 `background`, `unified`, `state`, `bright`, `fixing` 레이어를 월드 전체 캔버스에 맞춰 정렬했습니다.
+- `#store-world-map.is-unified-store-layout`의 통합 매장 기준 좌표를 `0,0 / 1672x941`로 변경해 전체 캔버스형 에셋이 배경과 같은 위치에 겹치도록 수정했습니다.
+- `data/ExpansionData.js`의 4개 확장 구역 `worldX/worldY/worldWidth/worldHeight`, 포커스 좌표, 이동 가능 영역을 새 맵 이미지 기준으로 재조정했습니다.
+- 월드 전체보기 카메라 중심을 새 통합 매장 중심에 맞게 보정했습니다.
+- 플레이어 기본 시작 좌표를 새 기본 매장 바닥 영역 안쪽으로 조정했습니다.
+
+### Removed
+- 남아 있던 `store-world-shared-floor` DOM 생성 코드와 CSS를 제거했습니다.
+
+### Notes
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v-map-cleanup-260705-1202]
+### Changed
+- `assets/images/world/` 맵 에셋을 최신 `world (2).zip` 기준으로 교체했습니다.
+- `map/background.png`, `unified/unified_store_stage1.png`, 확장 구역, 잠금 상태, 공사 상태, 아이콘 에셋을 최신본으로 맞췄습니다.
+
+### Removed
+- 더 이상 사용하지 않는 `assets/images/world/map/map2_floor_clean.png` 에셋을 제거했습니다.
+- `ui/UIManager.js`의 `store-map-shared-floor` 이미지 레이어 생성을 제거해 404 가능성과 중복 바닥 레이어 구조를 정리했습니다.
+
+### Notes
+- 공통 파일 `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
 ## [v7.6.0] BM final full alignment pass
 
 ### Added
