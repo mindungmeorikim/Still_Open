@@ -1,16 +1,9 @@
 /*
   ExpansionSystem.js
-
-  역할:
-  - 매장 확장 구역 상태 관리
-  - 확장 요청 이벤트를 받아 조건 확인
-  - 조건 충족 시 확장 비용 차감 및 구역 해금
-
-  규칙:
-  - 다른 시스템 직접 호출 금지
-  - GameState.todayStats 직접 수정 금지
-  - 재고 증가, 비용 정산, 상품 슬롯 확장 효과 구현 금지
-  - 날짜는 실제 Date가 아니라 GameState.day 기준 사용
+  BM 최종본 기준 구역 확장:
+  - 골드 확장 비용은 즉시 지불
+  - 24시간 대기 = 게임 내 1 Day 대기
+  - 다이아 즉시 완료권은 대기 시간만 제거
 */
 
 import { GameState } from "../core/GameState.js";
@@ -28,33 +21,43 @@ export const ExpansionSystem = {
   unlockedZoneIds: new Set(),
   isInitialized: false,
   finalEndingMinDay: 6,
-  constructionDurationMs: 3000,
   constructionZoneId: null,
-  constructionTimerId: null,
+  constructionStartDay: null,
+  constructionCompleteDay: null,
 
   init() {
     if (this.isInitialized) return;
-
     this.isInitialized = true;
-    this.initializeDefaultZones();
+    this.initializeFromGameState();
     this.syncExpansionStateToGameState();
 
-    EventBus.on(EVENTS.EXPANSION_REQUESTED, (data) => {
-      this.handleExpansionRequested(data);
+    EventBus.on(EVENTS.EXPANSION_REQUESTED, (data) => this.handleExpansionRequested(data));
+    EventBus.on(EVENTS.DAY_STARTED, (data = {}) => this.handleDayStarted(data));
+  },
+
+  initializeFromGameState() {
+    const savedUnlocked = Array.isArray(GameState.expansion?.unlockedZoneIds)
+      ? GameState.expansion.unlockedZoneIds
+      : EXPANSION_ZONES.filter((zone) => zone.defaultUnlocked).map((zone) => zone.id);
+
+    this.unlockedZoneIds = new Set(savedUnlocked.length > 0 ? savedUnlocked : ["zone_basic"]);
+    this.constructionZoneId = GameState.expansion?.constructionZoneId ?? null;
+    this.constructionStartDay = GameState.expansion?.constructionStartDay ?? null;
+    this.constructionCompleteDay = GameState.expansion?.constructionCompleteDay ?? null;
+
+    EXPANSION_ZONES.forEach((zone) => {
+      if (zone.defaultUnlocked) this.unlockedZoneIds.add(zone.id);
     });
   },
 
-  initializeDefaultZones() {
-    EXPANSION_ZONES.forEach((zone) => {
-      if (zone.defaultUnlocked) {
-        this.unlockedZoneIds.add(zone.id);
-      }
-    });
+  handleDayStarted(data = {}) {
+    const day = this.toDay(data.day, GameState.day);
+    this.completeConstructionIfDue(day);
   },
 
   handleExpansionRequested(data = {}) {
-    const zoneId = data.zoneId;
-    const zone = getExpansionZoneById(zoneId);
+    const zone = getExpansionZoneById(data.zoneId);
+    const instantComplete = data.instantComplete === true;
 
     if (!zone) {
       this.emitExpansionFailed(null, "존재하지 않는 확장 구역입니다.", "invalid_zone");
@@ -66,20 +69,25 @@ export const ExpansionSystem = {
       return;
     }
 
-    const check = this.checkExpansionAvailability(zone);
+    if (instantComplete) {
+      this.handleInstantCompletion(zone);
+      return;
+    }
 
+    this.startConstruction(zone);
+  },
+
+  startConstruction(zone) {
+    const check = this.checkExpansionAvailability(zone);
     if (!check.canExpand) {
       this.emitExpansionFailed(zone, check.message, check.reason);
       return;
     }
 
-    if (this.constructionZoneId) {
-      this.emitExpansionFailed(zone, "다른 구역 공사가 진행 중입니다. 잠시만 기다려주세요.", "construction_in_progress");
-      return;
-    }
-
     GameState.money -= zone.unlockCost;
     this.constructionZoneId = zone.id;
+    this.constructionStartDay = GameState.day;
+    this.constructionCompleteDay = GameState.day + Math.max(1, Math.floor(Number(zone.constructionDays) || 1));
     this.syncExpansionStateToGameState();
 
     EventBus.emit(EXPANSION_CONSTRUCTION_STARTED, {
@@ -87,27 +95,66 @@ export const ExpansionSystem = {
       zoneId: zone.id,
       zoneName: zone.name,
       unlockCost: zone.unlockCost,
+      constructionCompleteDay: this.constructionCompleteDay,
+      instantDiamondPrice: this.getInstantDiamondPrice(zone),
       remainingMoney: GameState.money,
       expansionState: this.getExpansionState(),
-      message: `${zone.name} 공사를 시작합니다. 잠시만 기다려주세요.`
+      message: `${zone.name} 공사를 시작합니다. Day ${this.constructionCompleteDay}에 완료됩니다.`
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
-
-    if (this.constructionTimerId) {
-      clearTimeout(this.constructionTimerId);
-    }
-
-    this.constructionTimerId = setTimeout(() => {
-      this.finishConstruction(zone);
-    }, this.constructionDurationMs);
   },
 
-  finishConstruction(zone) {
-    if (!zone) return;
+  handleInstantCompletion(zone) {
+    const diamondPrice = this.getInstantDiamondPrice(zone);
+    if (!GameState.bm || typeof GameState.bm !== "object") GameState.bm = {};
+    GameState.bm.diamond = Math.max(0, Math.floor(Number(GameState.bm.diamond) || 0));
 
-    this.constructionTimerId = null;
+    const isCurrentConstruction = this.constructionZoneId === zone.id;
+
+    if (!isCurrentConstruction) {
+      const check = this.checkExpansionAvailability(zone, { ignoreConstruction: true });
+      if (!check.canExpand) {
+        this.emitExpansionFailed(zone, check.message, check.reason);
+        return;
+      }
+      if (GameState.money < zone.unlockCost) {
+        this.emitExpansionFailed(zone, `골드가 부족합니다. 필요 골드: ${zone.unlockCost.toLocaleString("ko-KR")}`, "not_enough_gold");
+        return;
+      }
+    }
+
+    if (GameState.bm.diamond < diamondPrice) {
+      this.emitExpansionFailed(zone, `다이아가 부족합니다. 필요 다이아: ${diamondPrice}`, "not_enough_diamond");
+      return;
+    }
+
+    if (!isCurrentConstruction) {
+      GameState.money -= zone.unlockCost;
+    }
+
+    GameState.bm.diamond -= diamondPrice;
+    this.finishConstruction(zone, {
+      instantComplete: true,
+      spentDiamond: diamondPrice,
+      spentGold: isCurrentConstruction ? 0 : zone.unlockCost
+    });
+  },
+
+  completeConstructionIfDue(day = GameState.day) {
+    if (!this.constructionZoneId || !this.constructionCompleteDay) return false;
+    if (day < this.constructionCompleteDay) return false;
+    const zone = getExpansionZoneById(this.constructionZoneId);
+    if (!zone) return false;
+    this.finishConstruction(zone, { autoComplete: true });
+    return true;
+  },
+
+  finishConstruction(zone, options = {}) {
+    if (!zone) return;
     this.constructionZoneId = null;
+    this.constructionStartDay = null;
+    this.constructionCompleteDay = null;
     this.unlockedZoneIds.add(zone.id);
     this.syncExpansionStateToGameState();
 
@@ -122,19 +169,20 @@ export const ExpansionSystem = {
       customerAccessibleZones: this.getUnlockedCustomerZones(),
       effects: this.getCurrentExpansionEffects(),
       expansionState: this.getExpansionState(),
+      instantComplete: options.instantComplete === true,
+      spentDiamond: options.spentDiamond ?? 0,
       animation: {
         type: "expansion_unlock_puff",
         zoneId: zone.id
       },
-      message: `${zone.name} 확장 완료! ${this.getExpansionEffectMessage(zone)} 효과 적용. 남은 돈은 ₩${GameState.money.toLocaleString()}입니다.`
+      message: options.instantComplete
+        ? `${zone.name} 즉시 확장 완료! 대기 시간이 제거되었습니다.`
+        : `${zone.name} 확장 완료! ${this.getExpansionEffectMessage(zone)} 효과 적용.`
     };
 
     EventBus.emit(EVENTS.EXPANSION_COMPLETED, payload);
 
-    const canShowFinalEnding =
-      zone.isFinalGoal === true && GameState.day >= this.finalEndingMinDay;
-
-    if (canShowFinalEnding) {
+    if (zone.isFinalGoal === true && GameState.day >= this.finalEndingMinDay) {
       EventBus.emit(EVENTS.ENDING_ACHIEVED, {
         day: GameState.day,
         zoneId: zone.id,
@@ -149,40 +197,27 @@ export const ExpansionSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
-  checkExpansionAvailability(zone) {
+  checkExpansionAvailability(zone, options = {}) {
     const missingRequirements = [];
     const previousZone = getPreviousExpansionZone(zone);
-    const previousUnlocked =
-      !previousZone || this.unlockedZoneIds.has(previousZone.id);
+    const previousUnlocked = !previousZone || this.unlockedZoneIds.has(previousZone.id);
     const hasEnoughMoney = GameState.money >= zone.unlockCost;
     const hasRequiredDay = GameState.day >= zone.requiredDay;
 
-    if (!previousUnlocked) {
-      missingRequirements.push(`${previousZone.name} 확장 필요`);
-    }
+    if (!previousUnlocked) missingRequirements.push(`${previousZone.name} 확장 필요`);
+    if (!hasRequiredDay) missingRequirements.push(`Day ${zone.requiredDay} 필요`);
+    if (!hasEnoughMoney) missingRequirements.push(`₩${zone.unlockCost.toLocaleString()} 필요`);
 
-    if (!hasRequiredDay) {
-      missingRequirements.push(`Day ${zone.requiredDay} 필요`);
-    }
-
-    if (!hasEnoughMoney) {
-      missingRequirements.push(`₩${zone.unlockCost.toLocaleString()} 필요`);
-    }
-
-    if (this.constructionZoneId) {
+    if (this.constructionZoneId && options.ignoreConstruction !== true) {
       return {
         canExpand: false,
         reason: "construction_in_progress",
-        message: "다른 구역 공사가 진행 중입니다. 잠시만 기다려주세요."
+        message: "다른 구역 공사가 진행 중입니다. 즉시 완료 후 다시 시도해주세요."
       };
     }
 
     if (missingRequirements.length === 0) {
-      return {
-        canExpand: true,
-        reason: "available",
-        message: `${zone.name} 확장이 가능합니다.`
-      };
+      return { canExpand: true, reason: "available", message: `${zone.name} 확장이 가능합니다.` };
     }
 
     return {
@@ -204,42 +239,32 @@ export const ExpansionSystem = {
   },
 
   getExpansionState() {
-    const unlockedZoneIds = [...this.unlockedZoneIds];
-
     return {
       day: GameState.day,
       money: GameState.money,
-      unlockedZoneIds,
+      diamond: Math.max(0, Math.floor(Number(GameState.bm?.diamond) || 0)),
+      unlockedZoneIds: [...this.unlockedZoneIds],
       movementBounds: this.getUnlockedMovementBounds(),
       customerAccessibleZones: this.getUnlockedCustomerZones(),
       effects: this.getCurrentExpansionEffects(),
       constructionZoneId: this.constructionZoneId,
-      zones: EXPANSION_ZONES.map((zone) => {
-        return this.createZoneState(zone);
-      })
+      constructionStartDay: this.constructionStartDay,
+      constructionCompleteDay: this.constructionCompleteDay,
+      zones: EXPANSION_ZONES.map((zone) => this.createZoneState(zone))
     };
   },
 
   getUnlockedZones() {
-    return EXPANSION_ZONES.filter((zone) => {
-      return this.unlockedZoneIds.has(zone.id);
-    });
+    return EXPANSION_ZONES.filter((zone) => this.unlockedZoneIds.has(zone.id));
   },
 
   getCurrentExpansionEffects() {
-    return this.getUnlockedZones().reduce((totalEffects, zone) => {
+    return this.getUnlockedZones().reduce((total, zone) => {
       const effects = zone.effects ?? {};
-
       return {
-        customerSpawnRateBonus:
-          totalEffects.customerSpawnRateBonus +
-          this.toNumber(effects.customerSpawnRateBonus),
-        targetRevenueBonus:
-          totalEffects.targetRevenueBonus +
-          this.toNumber(effects.targetRevenueBonus),
-        storeSizeBonus:
-          totalEffects.storeSizeBonus +
-          this.toNumber(effects.storeSizeBonus)
+        customerSpawnRateBonus: total.customerSpawnRateBonus + this.toNumber(effects.customerSpawnRateBonus),
+        targetRevenueBonus: total.targetRevenueBonus + this.toNumber(effects.targetRevenueBonus),
+        storeSizeBonus: total.storeSizeBonus + this.toNumber(effects.storeSizeBonus)
       };
     }, this.createEmptyExpansionEffects());
   },
@@ -255,98 +280,67 @@ export const ExpansionSystem = {
   },
 
   syncExpansionStateToGameState() {
-    if (!GameState.expansion) {
-      GameState.expansion = {};
-    }
-
+    if (!GameState.expansion) GameState.expansion = {};
     GameState.expansion.unlockedZoneIds = [...this.unlockedZoneIds];
     GameState.expansion.movementBounds = this.getUnlockedMovementBounds();
     GameState.expansion.customerAccessibleZones = this.getUnlockedCustomerZones();
     GameState.expansion.constructionZoneId = this.constructionZoneId;
-    GameState.expansion.lastUpdatedDay = GameState.day;
-  },
-
-  getUnlockedMovementBounds() {
-    return this.getUnlockedZones().flatMap((zone) => {
-      const bounds = Array.isArray(zone.movementBounds)
-        ? zone.movementBounds
-        : [];
-
-      return bounds.map((bound) => {
-        return {
-          ...bound,
-          zoneId: zone.id
-        };
-      });
-    });
-  },
-
-  getUnlockedCustomerZones() {
-    const zones = new Set();
-
-    this.getUnlockedZones().forEach((zone) => {
-      (zone.customerZones ?? []).forEach((customerZone) => {
-        zones.add(customerZone);
-      });
-    });
-
-    return [...zones];
-  },
-
-  createEmptyExpansionEffects() {
-    return {
-      customerSpawnRateBonus: 0,
-      targetRevenueBonus: 0,
-      storeSizeBonus: 0
-    };
-  },
-
-  getExpansionEffectMessage(zone) {
-    const effectLabels = {
-      zone_basic: "기본 매장",
-      zone_extra_shelf: "추가 진열 구역",
-      zone_cold_food: "냉장·도시락 구역",
-      zone_premium_store: "프리미엄 매장 구역"
-    };
-
-    return effectLabels[zone.id] ?? "매장 확장";
-  },
-
-  toNumber(value) {
-    const numberValue = Number(value);
-
-    if (!Number.isFinite(numberValue)) {
-      return 0;
-    }
-
-    return numberValue;
+    GameState.expansion.constructionStartDay = this.constructionStartDay;
+    GameState.expansion.constructionCompleteDay = this.constructionCompleteDay;
   },
 
   createZoneState(zone) {
     const previousZone = getPreviousExpansionZone(zone);
-    const previousUnlocked =
-      !previousZone || this.unlockedZoneIds.has(previousZone.id);
-    const hasEnoughMoney = GameState.money >= zone.unlockCost;
-    const hasRequiredDay = GameState.day >= zone.requiredDay;
+    const previousUnlocked = !previousZone || this.unlockedZoneIds.has(previousZone.id);
     const isUnlocked = this.unlockedZoneIds.has(zone.id);
     const isConstructing = this.constructionZoneId === zone.id;
-    const isAvailable =
-      !this.constructionZoneId &&
-      !isUnlocked &&
-      !isConstructing &&
-      previousUnlocked && hasEnoughMoney && hasRequiredDay;
+    const hasEnoughMoney = GameState.money >= zone.unlockCost;
+    const hasRequiredDay = GameState.day >= zone.requiredDay;
 
     return {
       ...zone,
-      status: isUnlocked ? "unlocked" : isConstructing ? "constructing" : isAvailable ? "available" : "locked",
       isUnlocked,
       isConstructing,
-      isAvailable,
-      conditions: {
-        previousUnlocked,
-        hasEnoughMoney,
-        hasRequiredDay
-      }
+      isAvailable: !isUnlocked && !this.constructionZoneId && previousUnlocked && hasEnoughMoney && hasRequiredDay,
+      previousZoneName: previousZone?.name ?? "없음",
+      constructionCompleteDay: isConstructing ? this.constructionCompleteDay : null,
+      instantDiamondPrice: this.getInstantDiamondPrice(zone),
+      conditions: { previousUnlocked, hasEnoughMoney, hasRequiredDay }
     };
+  },
+
+  getUnlockedMovementBounds() {
+    return this.getUnlockedZones().flatMap((zone) => zone.movementBounds ?? []);
+  },
+
+  getUnlockedCustomerZones() {
+    return [...new Set(this.getUnlockedZones().flatMap((zone) => zone.customerZones ?? []))];
+  },
+
+  getExpansionEffectMessage(zone) {
+    const effects = zone.effects ?? {};
+    const messages = [];
+    if (effects.customerSpawnRateBonus) messages.push(`손님 방문 +${Math.round(effects.customerSpawnRateBonus * 100)}%`);
+    if (effects.targetRevenueBonus) messages.push(`목표 매출 +₩${effects.targetRevenueBonus.toLocaleString()}`);
+    if (effects.storeSizeBonus) messages.push(`매장 규모 +${effects.storeSizeBonus}`);
+    return messages.length > 0 ? messages.join(" / ") : "기본 구역 확장";
+  },
+
+  getInstantDiamondPrice(zone) {
+    return Math.max(0, Math.floor(Number(zone?.instantDiamondPrice) || 0));
+  },
+
+  createEmptyExpansionEffects() {
+    return { customerSpawnRateBonus: 0, targetRevenueBonus: 0, storeSizeBonus: 0 };
+  },
+
+  toNumber(value) {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  },
+
+  toDay(value, fallback = GameState.day) {
+    const day = Math.floor(Number(value));
+    return Number.isFinite(day) && day >= 1 ? day : fallback;
   }
 };

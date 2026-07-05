@@ -140,10 +140,16 @@ export const DailyRewardSystem = {
       wallet.diamonds = bm.diamond;
     } else if (reward.type === "coffeeTicket") {
       wallet.coffeeTickets += amount;
+      const bm = this.ensureGameStateBM();
+      bm.coffeeTickets = Math.max(0, Math.floor(Number(bm.coffeeTickets) || 0)) + amount;
     } else if (reward.type === "adSkipTicket") {
       wallet.adSkipTickets += amount;
+      const bm = this.ensureGameStateBM();
+      bm.adSkipTickets = Math.max(0, Math.floor(Number(bm.adSkipTickets) || 0)) + amount;
     } else if (reward.type === "peakTimeCoupon") {
       wallet.peakTimeCoupons += amount;
+      const bm = this.ensureGameStateBM();
+      bm.peakTimeCoupons = Math.max(0, Math.floor(Number(bm.peakTimeCoupons) || 0)) + amount;
     } else {
       return {
         success: false,
@@ -213,10 +219,13 @@ export const DailyRewardSystem = {
     };
 
     if (GameState.bm && typeof GameState.bm === "object") {
-      normalizedWallet.diamonds = Math.max(
-        0,
-        Math.floor(Number(GameState.bm.diamond) || 0)
-      );
+      normalizedWallet.diamonds = Math.max(0, Math.floor(Number(GameState.bm.diamond) || 0));
+      normalizedWallet.adSkipTickets = Math.max(normalizedWallet.adSkipTickets, Math.floor(Number(GameState.bm.adSkipTickets) || 0));
+      normalizedWallet.peakTimeCoupons = Math.max(normalizedWallet.peakTimeCoupons, Math.floor(Number(GameState.bm.peakTimeCoupons) || 0));
+      normalizedWallet.coffeeTickets = Math.max(normalizedWallet.coffeeTickets, Math.floor(Number(GameState.bm.coffeeTickets) || 0));
+      GameState.bm.adSkipTickets = normalizedWallet.adSkipTickets;
+      GameState.bm.peakTimeCoupons = normalizedWallet.peakTimeCoupons;
+      GameState.bm.coffeeTickets = normalizedWallet.coffeeTickets;
     }
 
     GameState.bmWallet = normalizedWallet;

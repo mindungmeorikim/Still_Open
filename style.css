@@ -16546,3 +16546,152 @@ body.is-title-screen-active #game-root {
     min-width: 15px !important;
   }
 }
+
+/* [v7.6.0] BM 최종본 상점 탭/강화 UI */
+.bm-shop-tabbed-content {
+  max-width: min(1080px, calc(100vw - 28px));
+  max-height: min(86vh, 760px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.bm-shop-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0 12px;
+  flex-wrap: wrap;
+}
+
+.bm-shop-tab-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 800;
+  background: #f1f3f7;
+  color: #38425a;
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,.08);
+}
+
+.bm-shop-tab-button.is-active {
+  background: #ffe08a;
+  color: #5b3a00;
+}
+
+.bm-shop-tab-panel {
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.bm-shop-section-note {
+  margin: -4px 0 10px;
+  font-size: .9rem;
+  color: #6b7280;
+}
+
+.bm-shop-card-list-compact {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.bm-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.bm-tool-card .bm-contract-product-copy,
+.bm-currency-card .bm-contract-product-copy,
+.bm-free-recharge-card .bm-contract-product-copy,
+.bm-upgrade-card .bm-contract-product-copy {
+  gap: 4px;
+}
+
+.bm-tool-actions,
+.bm-staff-upgrade-actions,
+.expansion-action-row,
+.store-expansion-popover-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bm-tool-actions button,
+.bm-daily-mission-reward-button,
+.bm-ad-reward-button,
+.bm-diamond-product-button,
+.bm-gold-product-button,
+.bm-shelf-upgrade-button,
+.bm-product-upgrade-button,
+.bm-staff-upgrade-button,
+#bm-warehouse-upgrade-button,
+#bm-contract-skip-button,
+#bm-peak-coupon-purchase-button,
+#bm-peak-coupon-use-button,
+.expansion-instant-action-button,
+.store-expansion-popover-instant-action {
+  border: 0;
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-weight: 800;
+  background: #5f8cff;
+  color: #fff;
+}
+
+.bm-tool-actions button:disabled,
+.bm-daily-mission-reward-button:disabled,
+.bm-ad-reward-button:disabled,
+.bm-diamond-product-button:disabled,
+.bm-gold-product-button:disabled,
+.bm-shelf-upgrade-button:disabled,
+.bm-product-upgrade-button:disabled,
+.bm-staff-upgrade-button:disabled,
+#bm-warehouse-upgrade-button:disabled,
+#bm-contract-skip-button:disabled,
+#bm-peak-coupon-purchase-button:disabled,
+#bm-peak-coupon-use-button:disabled,
+.expansion-instant-action-button:disabled,
+.store-expansion-popover-instant-action:disabled {
+  background: #c9ced8;
+  color: #6b7280;
+}
+
+.bm-daily-mission-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.bm-daily-mission-card {
+  border-radius: 16px;
+  background: #fff7df;
+  border: 2px solid rgba(255, 192, 68, .45);
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.bm-daily-mission-card.is-complete {
+  background: #e8fff1;
+  border-color: rgba(42, 190, 96, .45);
+}
+
+.bm-daily-mission-card strong,
+.bm-daily-mission-card em {
+  font-weight: 800;
+}
+
+.bm-daily-mission-card span {
+  color: #555f73;
+  font-size: .92rem;
+}
+
+.bm-daily-mission-rewards {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bm-product-upgrade-card .bm-contract-product-main {
+  align-items: center;
+}

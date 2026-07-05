@@ -547,7 +547,7 @@ export const InventorySystem = {
         productName: product.name,
         category: product.category,
         purchasePrice: product.purchasePrice,
-        salePrice: product.salePrice,
+        salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,
         shelfLifeDays: product.shelfLifeDays,
         unlockDay: product.unlockDay,
         isUnlocked: BMSystem.canSellProduct(product.id),

@@ -21,7 +21,7 @@ import { ExpansionSystem } from "./ExpansionSystem.js";
 
 const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
-const SAVE_VERSION = "v7.0.1";
+const SAVE_VERSION = "v7.6.0";
 const INFINITE_MODE_START_DAY = GAME_CONFIG.MAX_STORY_DAY + 1;
 const BASIC_BM_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const SAVEABLE_PHASES = new Set([
@@ -256,10 +256,12 @@ export const SaveSystem = {
   },
 
   resetNewGameState() {
+    const paidCarryover = this.createPaidBMCarryoverSnapshot(GameState.bm);
     this.clearSaveData();
     this.isResettingNewGame = true;
 
     this.applyGameStateSnapshot(this.createDefaultGameStateSnapshot());
+    this.applyPaidBMCarryover(paidCarryover);
     this.applyInventorySnapshot({ lots: [], lotSequence: 0, initializedProductIds: [] });
     this.applyExpansionSnapshot({ unlockedZoneIds: ["zone_basic"], constructionZoneId: null });
 
@@ -279,7 +281,9 @@ export const SaveSystem = {
 
     this.isResettingNewGame = true;
 
+    const paidCarryover = this.createPaidBMCarryoverSnapshot(GameState.bm);
     this.applyGameStateSnapshot(this.createInfiniteModeStartSnapshot());
+    this.applyPaidBMCarryover(paidCarryover);
     this.applyInventorySnapshot(this.createInfiniteModeStartInventorySnapshot());
     this.applyExpansionSnapshot({
       unlockedZoneIds: ["zone_basic"],
@@ -365,6 +369,7 @@ export const SaveSystem = {
       difficulty: GameState.difficulty,
       infiniteMode: GameState.infiniteMode ?? null,
       bm: this.normalizeBMSnapshot(GameState.bm),
+      dailyMissions: GameState.dailyMissions ?? null,
       sanitation: this.normalizeSanitationSnapshot(GameState.sanitation),
       staff: GameState.staff ?? null,
       player: GameState.player ?? null,
@@ -521,7 +526,9 @@ export const SaveSystem = {
 
     return {
       unlockedZoneIds,
-      constructionZoneId: ExpansionSystem.constructionZoneId ?? null
+      constructionZoneId: ExpansionSystem.constructionZoneId ?? null,
+      constructionStartDay: ExpansionSystem.constructionStartDay ?? GameState.expansion?.constructionStartDay ?? null,
+      constructionCompleteDay: ExpansionSystem.constructionCompleteDay ?? GameState.expansion?.constructionCompleteDay ?? null
     };
   },
 
@@ -555,6 +562,7 @@ export const SaveSystem = {
       nextState.infiniteMode ?? defaultSnapshot.infiniteMode
     );
     GameState.bm = this.normalizeBMSnapshot(nextState.bm ?? defaultSnapshot.bm);
+    GameState.dailyMissions = nextState.dailyMissions ?? null;
     GameState.sanitation = this.normalizeSanitationSnapshot(
       nextState.sanitation ?? defaultSnapshot.sanitation
     );
@@ -603,6 +611,8 @@ export const SaveSystem = {
       unlockedZoneIds.length > 0 ? unlockedZoneIds : ["zone_basic"]
     );
     ExpansionSystem.constructionZoneId = snapshot.constructionZoneId ?? null;
+    ExpansionSystem.constructionStartDay = snapshot.constructionStartDay ?? null;
+    ExpansionSystem.constructionCompleteDay = snapshot.constructionCompleteDay ?? null;
 
     if (typeof ExpansionSystem.syncExpansionStateToGameState === "function") {
       ExpansionSystem.syncExpansionStateToGameState();
@@ -633,39 +643,129 @@ export const SaveSystem = {
     };
   },
 
+  createPaidBMCarryoverSnapshot(source = {}) {
+    const paidWallet = source?.paidWallet && typeof source.paidWallet === "object"
+      ? source.paidWallet
+      : {};
+
+    return {
+      diamond: this.toNonNegativeInteger(paidWallet.diamond),
+      adSkipTickets: this.toNonNegativeInteger(paidWallet.adSkipTickets),
+      peakTimeCoupons: this.toNonNegativeInteger(paidWallet.peakTimeCoupons),
+      coffeeTickets: this.toNonNegativeInteger(paidWallet.coffeeTickets),
+      purchasedDiamondProductIds: this.createUniqueStringArray(source?.purchasedDiamondProductIds)
+    };
+  },
+
+  applyPaidBMCarryover(carryover = {}) {
+    if (!GameState.bm || typeof GameState.bm !== "object") {
+      GameState.bm = this.createDefaultBMSnapshot();
+    }
+
+    GameState.bm.diamond = this.toNonNegativeInteger(GameState.bm.diamond) + this.toNonNegativeInteger(carryover.diamond);
+    GameState.bm.adSkipTickets = this.toNonNegativeInteger(GameState.bm.adSkipTickets) + this.toNonNegativeInteger(carryover.adSkipTickets);
+    GameState.bm.peakTimeCoupons = this.toNonNegativeInteger(GameState.bm.peakTimeCoupons) + this.toNonNegativeInteger(carryover.peakTimeCoupons);
+    GameState.bm.coffeeTickets = this.toNonNegativeInteger(GameState.bm.coffeeTickets) + this.toNonNegativeInteger(carryover.coffeeTickets);
+    GameState.bm.purchasedDiamondProductIds = this.createUniqueStringArray(carryover.purchasedDiamondProductIds);
+    GameState.bm.paidWallet = {
+      diamond: this.toNonNegativeInteger(carryover.diamond),
+      adSkipTickets: this.toNonNegativeInteger(carryover.adSkipTickets),
+      peakTimeCoupons: this.toNonNegativeInteger(carryover.peakTimeCoupons),
+      coffeeTickets: this.toNonNegativeInteger(carryover.coffeeTickets)
+    };
+  },
+
   createDefaultBMSnapshot() {
     return {
       diamond: 0,
-      ownedContractProductIds: [],
+      adSkipTickets: 0,
+      peakTimeCoupons: 0,
+      coffeeTickets: 0,
+      ownedContractProductIds: ["potato_chips", "water"],
       shopUnlockedContractProductIds: [],
       purchasedPremiumProductIds: [],
       lastContractUnlockDay: null,
       contractSkipUsedDay: null,
       peakCouponUsedDay: null,
-      mentalRecoveryAdUsedDay: null,
       peakCouponActive: false,
-      peakCouponMultiplier: 1
+      peakCouponMultiplier: 1,
+      freeRechargeClaims: {},
+      peakCouponDiscountDay: null,
+      peakCouponDiscountUsedDay: null,
+      purchasedDiamondProductIds: [],
+      paidWallet: {
+        diamond: 0,
+        adSkipTickets: 0,
+        peakTimeCoupons: 0,
+        coffeeTickets: 0
+      },
+      warehouseLevel: 0,
+      pendingWarehouseUpgrade: null,
+      shelfUpgradeLevels: {},
+      productUpgradeLevels: {},
+      staffAbilityUpgrade: {
+        totalCount: 0,
+        lastUpgradeDay: null,
+        abilities: {
+          warehouse: 0,
+          shelf: 0,
+          cleaning: 0
+        }
+      }
     };
   },
 
   normalizeBMSnapshot(snapshot = {}) {
+    const defaults = this.createDefaultBMSnapshot();
     const source = snapshot && typeof snapshot === "object"
       ? snapshot
       : {};
+    const staffAbilitySource = source.staffAbilityUpgrade && typeof source.staffAbilityUpgrade === "object"
+      ? source.staffAbilityUpgrade
+      : defaults.staffAbilityUpgrade;
+    const abilities = staffAbilitySource.abilities && typeof staffAbilitySource.abilities === "object"
+      ? staffAbilitySource.abilities
+      : defaults.staffAbilityUpgrade.abilities;
 
     return {
+      ...defaults,
       diamond: this.toNonNegativeInteger(source.diamond),
-      ownedContractProductIds: this.createUniqueStringArray(source.ownedContractProductIds),
+      adSkipTickets: this.toNonNegativeInteger(source.adSkipTickets),
+      peakTimeCoupons: this.toNonNegativeInteger(source.peakTimeCoupons),
+      coffeeTickets: this.toNonNegativeInteger(source.coffeeTickets),
+      ownedContractProductIds: this.createUniqueStringArray(source.ownedContractProductIds).length > 0
+        ? this.createUniqueStringArray(source.ownedContractProductIds)
+        : [...defaults.ownedContractProductIds],
       shopUnlockedContractProductIds: this.createUniqueStringArray(source.shopUnlockedContractProductIds),
       purchasedPremiumProductIds: this.createUniqueStringArray(source.purchasedPremiumProductIds),
       lastContractUnlockDay: this.toNullablePositiveInteger(source.lastContractUnlockDay),
       contractSkipUsedDay: this.toNullablePositiveInteger(source.contractSkipUsedDay),
       peakCouponUsedDay: this.toNullablePositiveInteger(source.peakCouponUsedDay),
-      mentalRecoveryAdUsedDay: this.toNullablePositiveInteger(source.mentalRecoveryAdUsedDay),
       peakCouponActive: source.peakCouponActive === true,
-      peakCouponMultiplier: Number(source.peakCouponMultiplier) > 0
-        ? Number(source.peakCouponMultiplier)
-        : 1
+      peakCouponMultiplier: Number(source.peakCouponMultiplier) > 0 ? Number(source.peakCouponMultiplier) : 1,
+      freeRechargeClaims: source.freeRechargeClaims && typeof source.freeRechargeClaims === "object" ? this.deepClone(source.freeRechargeClaims) : {},
+      peakCouponDiscountDay: this.toNullablePositiveInteger(source.peakCouponDiscountDay),
+      peakCouponDiscountUsedDay: this.toNullablePositiveInteger(source.peakCouponDiscountUsedDay),
+      purchasedDiamondProductIds: this.createUniqueStringArray(source.purchasedDiamondProductIds),
+      paidWallet: {
+        diamond: this.toNonNegativeInteger(source.paidWallet?.diamond),
+        adSkipTickets: this.toNonNegativeInteger(source.paidWallet?.adSkipTickets),
+        peakTimeCoupons: this.toNonNegativeInteger(source.paidWallet?.peakTimeCoupons),
+        coffeeTickets: this.toNonNegativeInteger(source.paidWallet?.coffeeTickets)
+      },
+      warehouseLevel: Math.min(5, this.toNonNegativeInteger(source.warehouseLevel)),
+      pendingWarehouseUpgrade: source.pendingWarehouseUpgrade && typeof source.pendingWarehouseUpgrade === "object" ? this.deepClone(source.pendingWarehouseUpgrade) : null,
+      shelfUpgradeLevels: source.shelfUpgradeLevels && typeof source.shelfUpgradeLevels === "object" ? this.deepClone(source.shelfUpgradeLevels) : {},
+      productUpgradeLevels: source.productUpgradeLevels && typeof source.productUpgradeLevels === "object" ? this.deepClone(source.productUpgradeLevels) : {},
+      staffAbilityUpgrade: {
+        totalCount: this.toNonNegativeInteger(staffAbilitySource.totalCount),
+        lastUpgradeDay: this.toNullablePositiveInteger(staffAbilitySource.lastUpgradeDay),
+        abilities: {
+          warehouse: this.toNonNegativeInteger(abilities.warehouse),
+          shelf: this.toNonNegativeInteger(abilities.shelf),
+          cleaning: this.toNonNegativeInteger(abilities.cleaning)
+        }
+      }
     };
   },
 

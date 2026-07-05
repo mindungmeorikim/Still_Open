@@ -38,35 +38,33 @@ const STAFF_EVENTS = {
 
 const STAFF_UNLOCK_DAY = 3;
 const STAFF_SHIFT_HOURS = 3;
-const STAFF_AUTO_CHECKOUT_INTERVALS = Object.freeze({
-  park_junho: 4,
-  kim_minji: 6,
-  lee_bora: 7
-});
 const STAFF_CANDIDATES = Object.freeze([
   Object.freeze({
     id: "kim_minji",
     name: "김민지",
-    type: "성실형",
+    type: "정리형",
     hourlyWage: 1200,
     attendance: 95,
-    ability: "재고 정리 +10%, 멘탈 소모 완화"
+    stats: Object.freeze({ warehouse: 1, shelf: 3, cleaning: 1 }),
+    ability: "창고 재고를 가져와 진열대 보충을 우선 도와줍니다."
   }),
   Object.freeze({
     id: "park_junho",
     name: "박준호",
-    type: "스피드형",
-    hourlyWage: 1500,
-    attendance: 78,
-    ability: "계산 속도 +15%, 지각 가능성 있음"
+    type: "창고형",
+    hourlyWage: 1350,
+    attendance: 88,
+    stats: Object.freeze({ warehouse: 3, shelf: 1, cleaning: 1 }),
+    ability: "창고에서 재고를 가져오는 속도가 빠릅니다."
   }),
   Object.freeze({
     id: "lee_bora",
     name: "이보라",
-    type: "친절형",
-    hourlyWage: 1350,
-    attendance: 88,
-    ability: "만족도 +8, 진상 응대 피해 완화"
+    type: "청소형",
+    hourlyWage: 1300,
+    attendance: 90,
+    stats: Object.freeze({ warehouse: 1, shelf: 1, cleaning: 3 }),
+    ability: "청소와 위생 유지 보조에 강합니다."
   })
 ]);
 
@@ -193,14 +191,18 @@ export const GameFlowSystem = {
       GameState.staff.hired = null;
     }
 
-    if (GameState.staff.checkoutCountDay !== GameState.day) {
-      GameState.staff.todayCheckoutCount = 0;
-      GameState.staff.checkoutCountDay = GameState.day;
+    if (GameState.staff.workCountDay !== GameState.day) {
+      GameState.staff.todayWarehouseHelpCount = 0;
+      GameState.staff.todayShelfHelpCount = 0;
+      GameState.staff.todayCleaningHelpCount = 0;
+      GameState.staff.workCountDay = GameState.day;
     }
 
-    if (!Number.isFinite(Number(GameState.staff.todayCheckoutCount))) {
-      GameState.staff.todayCheckoutCount = 0;
-    }
+    ["todayWarehouseHelpCount", "todayShelfHelpCount", "todayCleaningHelpCount"].forEach((key) => {
+      if (!Number.isFinite(Number(GameState.staff[key]))) {
+        GameState.staff[key] = 0;
+      }
+    });
 
     return GameState.staff;
   },
@@ -267,7 +269,7 @@ export const GameFlowSystem = {
     };
 
     UIManager.showMessage(
-      `${candidate.name} 알바를 고용했습니다. 급여 차감과 능력치 효과는 다음 버전에서 적용됩니다.`
+      `${candidate.name} 알바를 고용했습니다. 창고/진열대/청소 보조가 활성화됩니다.`
     );
 
     EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
@@ -296,69 +298,26 @@ export const GameFlowSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
-  getStaffAutoCheckoutInterval(staff = GameState.staff?.hired) {
-    if (!staff) {
-      return 0;
-    }
-
-    return STAFF_AUTO_CHECKOUT_INTERVALS[staff.id] ?? 6;
+  getStaffAutoCheckoutInterval() {
+    return 0;
   },
 
-  handleStaffAutoCheckoutTick(deltaSeconds = 1) {
-    const staffState = this.ensureStaffState();
-
-    if (
-      GameState.phase !== GAME_PHASE.STORE_RUNNING ||
-      this.isClosing ||
-      !this.isStoreOpen ||
-      !staffState.hired
-    ) {
-      this.staffAutoCheckoutElapsedSeconds = 0;
-      return;
-    }
-
-    const intervalSeconds = this.getStaffAutoCheckoutInterval(staffState.hired);
-
-    if (intervalSeconds <= 0) {
-      return;
-    }
-
-    this.staffAutoCheckoutElapsedSeconds += Math.max(0, Number(deltaSeconds) || 0);
-
-    if (this.staffAutoCheckoutElapsedSeconds < intervalSeconds) {
-      return;
-    }
-
+  handleStaffAutoCheckoutTick() {
+    // BM 최종본 기준 알바는 자동 계산 담당이 아니라 창고/진열대/청소 보조 담당이다.
     this.staffAutoCheckoutElapsedSeconds = 0;
-
-    EventBus.emit(STAFF_EVENTS.AUTO_CHECKOUT_REQUESTED, {
-      day: GameState.day,
-      staff: staffState.hired,
-      intervalSeconds
-    });
   },
 
-  handleStaffAutoCheckoutCompleted(data = {}) {
-    const staffState = this.ensureStaffState();
+  handleStaffAutoCheckoutCompleted() {
+    // 구버전 자동 계산 이벤트 호환용 no-op.
+    this.staffAutoCheckoutElapsedSeconds = 0;
+  },
 
-    if (
-      data.day !== GameState.day ||
-      data.success !== true ||
-      !staffState.hired
-    ) {
-      return;
-    }
-
-    staffState.todayCheckoutCount =
-      (Number(staffState.todayCheckoutCount) || 0) + 1;
-    staffState.checkoutCountDay = GameState.day;
-
-    EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
-      day: GameState.day,
-      staff: staffState,
-      lastCheckout: data
-    });
-    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  getStaffAssistPower(type = "shelf") {
+    const staff = this.ensureStaffState().hired;
+    if (!staff) return 0;
+    const base = Math.max(0, Math.floor(Number(staff.stats?.[type]) || 0));
+    const bonus = Math.max(0, Math.floor(Number(GameState.bm?.staffAbilityUpgrade?.abilities?.[type]) || 0));
+    return Math.min(5, base + bonus);
   },
 
   applyExpansionEffects(data = {}) {
@@ -709,8 +668,10 @@ export const GameFlowSystem = {
   resetStaffDailyStats() {
     const staffState = this.ensureStaffState();
 
-    staffState.todayCheckoutCount = 0;
-    staffState.checkoutCountDay = GameState.day;
+    staffState.todayWarehouseHelpCount = 0;
+    staffState.todayShelfHelpCount = 0;
+    staffState.todayCleaningHelpCount = 0;
+    staffState.workCountDay = GameState.day;
     this.staffAutoCheckoutElapsedSeconds = 0;
   },
 

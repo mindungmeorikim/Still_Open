@@ -22,7 +22,6 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
-import { ResultSystem } from "./ResultSystem.js";
 
 export const UpgradeSystem = {
   availableUpgrades: [
@@ -80,14 +79,7 @@ export const UpgradeSystem = {
 
           EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, resultData);
         },
-        {
-          onReward2xAdComplete: (currentResultData) => {
-            return ResultSystem.applyReward2xAdBonus(currentResultData);
-          },
-          onMentalRecoveryAdComplete: (currentResultData) => {
-            return ResultSystem.applyMentalRecoveryAdBonus(currentResultData);
-          }
-        }
+        {}
       );
     });
 

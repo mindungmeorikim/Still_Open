@@ -38,6 +38,23 @@ export const PRODUCT_ZONE_IDS = Object.freeze({
 
 const PREMIUM_BM_LOCK_DAY = 999;
 
+export const PRODUCT_UPGRADE_TYPES = Object.freeze({
+  NORMAL: "normal",
+  LATE_FREE_HIGH: "late_free_high",
+  PREMIUM_BM: "premium_bm"
+});
+
+const LATE_FREE_HIGH_EFFICIENCY_PRODUCT_IDS = new Set([
+  "pudding",
+  "tuna_mayo_sandwich"
+]);
+
+const inferProductUpgradeType = (product) => {
+  if (product.isPremiumBM === true) return PRODUCT_UPGRADE_TYPES.PREMIUM_BM;
+  if (LATE_FREE_HIGH_EFFICIENCY_PRODUCT_IDS.has(product.id)) return PRODUCT_UPGRADE_TYPES.LATE_FREE_HIGH;
+  return PRODUCT_UPGRADE_TYPES.NORMAL;
+};
+
 const createProduct = (product) => {
   return Object.freeze({
     ...product,
@@ -46,6 +63,7 @@ const createProduct = (product) => {
     contractCost: product.contractCost ?? 0,
     isPremiumBM: product.isPremiumBM === true,
     diamondPrice: product.diamondPrice ?? 0,
+    upgradeType: product.upgradeType ?? inferProductUpgradeType(product),
     customerRequestIds: Object.freeze(product.customerRequestIds ?? [])
   });
 };

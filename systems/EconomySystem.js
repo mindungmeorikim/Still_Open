@@ -188,7 +188,8 @@ export const EconomySystem = {
     }
 
     const revenueMultiplier = BMSystem.getRevenueMultiplier();
-    const baseAmount = product.salePrice * quantity;
+    const unitPrice = BMSystem.getProductSalePrice(product.id) || product.salePrice;
+    const baseAmount = unitPrice * quantity;
     const amount = Math.floor(baseAmount * revenueMultiplier);
     const bonusAmount = Math.max(0, amount - baseAmount);
 
@@ -212,7 +213,7 @@ export const EconomySystem = {
       wantedProductId: data.wantedProductId ?? product.id,
       product,
       quantity,
-      unitPrice: product.salePrice,
+      unitPrice,
       baseAmount,
       revenueMultiplier,
       bonusAmount,

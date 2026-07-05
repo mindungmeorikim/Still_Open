@@ -44,18 +44,51 @@ export const GameState = {
 
   bm: {
     diamond: 0,
+    adSkipTickets: 0,
+    peakTimeCoupons: 0,
+    coffeeTickets: 0,
     ownedContractProductIds: ["potato_chips", "water"],
     shopUnlockedContractProductIds: [],
     purchasedPremiumProductIds: [],
     lastContractUnlockDay: null,
     contractSkipUsedDay: null,
-    peakCouponUsedDay: null
+    peakCouponUsedDay: null,
+    peakCouponActive: false,
+    peakCouponMultiplier: 1,
+    freeRechargeClaims: {},
+    peakCouponDiscountDay: null,
+    peakCouponDiscountUsedDay: null,
+    purchasedDiamondProductIds: [],
+    paidWallet: {
+      diamond: 0,
+      adSkipTickets: 0,
+      peakTimeCoupons: 0,
+      coffeeTickets: 0
+    },
+    warehouseLevel: 0,
+    pendingWarehouseUpgrade: null,
+    shelfUpgradeLevels: {},
+    productUpgradeLevels: {},
+    staffAbilityUpgrade: {
+      totalCount: 0,
+      lastUpgradeDay: null,
+      abilities: {
+        warehouse: 0,
+        shelf: 0,
+        cleaning: 0
+      }
+    }
   },
+
+  dailyMissions: null,
 
   expansion: {
     unlockedZoneIds: ["zone_basic"],
     movementBounds: [],
-    customerAccessibleZones: ["door", "shelf", "counter", "exit"]
+    customerAccessibleZones: ["door", "shelf", "counter", "exit"],
+    constructionZoneId: null,
+    constructionStartDay: null,
+    constructionCompleteDay: null
   },
 
   difficulty: {

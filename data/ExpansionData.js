@@ -89,7 +89,9 @@ export const EXPANSION_ZONES = Object.freeze([
     id: "zone_extra_shelf",
     level: 2,
     name: "Lv.2 추가 진열 구역",
-    unlockCost: 30000,
+    unlockCost: 67500,
+    constructionDays: 1,
+    instantDiamondPrice: 60,
     requiredDay: 2,
     previousZoneId: "zone_basic",
     defaultUnlocked: false,
@@ -121,7 +123,7 @@ export const EXPANSION_ZONES = Object.freeze([
       lockAsset: "./assets/images/world/icon/lock_icon.png",
       displayConditions: [
         "Day 2 달성",
-        "매출 30,000 달성"
+        "67,500골드 필요"
       ]
     },
     movementBounds: [
@@ -144,7 +146,9 @@ export const EXPANSION_ZONES = Object.freeze([
     id: "zone_cold_food",
     level: 3,
     name: "Lv.3 냉장·도시락 구역",
-    unlockCost: 80000,
+    unlockCost: 135000,
+    constructionDays: 1,
+    instantDiamondPrice: 90,
     requiredDay: 3,
     previousZoneId: "zone_extra_shelf",
     defaultUnlocked: false,
@@ -175,7 +179,7 @@ export const EXPANSION_ZONES = Object.freeze([
       lockAsset: "./assets/images/world/icon/lock_icon.png",
       displayConditions: [
         "Day 3 달성",
-        "고객 만족도 120 달성"
+        "135,000골드 필요"
       ]
     },
     movementBounds: [
@@ -198,7 +202,9 @@ export const EXPANSION_ZONES = Object.freeze([
     id: "zone_premium_store",
     level: 4,
     name: "Lv.4 프리미엄 매장 구역",
-    unlockCost: 150000,
+    unlockCost: 270000,
+    constructionDays: 1,
+    instantDiamondPrice: 150,
     requiredDay: 5,
     previousZoneId: "zone_cold_food",
     defaultUnlocked: false,
@@ -232,7 +238,7 @@ export const EXPANSION_ZONES = Object.freeze([
       lockAsset: "./assets/images/world/icon/lock_icon.png",
       displayConditions: [
         "Day 5 달성",
-        "매출 150,000 달성"
+        "270,000골드 필요"
       ]
     },
     movementBounds: [

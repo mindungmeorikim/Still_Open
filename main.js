@@ -23,6 +23,7 @@ import { PlayerMovementSystem } from "./systems/PlayerMovementSystem.js";
 import { PlayerActionSystem } from "./systems/PlayerActionSystem.js";
 import { BMSystem } from "./systems/BMSystem.js";
 import { SanitationSystem } from "./systems/SanitationSystem.js";
+import { DailyMissionSystem } from "./systems/DailyMissionSystem.js";
 
 function isCustomerEventModalOpen() {
   return (
@@ -186,6 +187,7 @@ function initGame() {
   ExpansionSystem.init();
   EconomySystem.init();
   BMSystem.init();
+  DailyMissionSystem.init();
   SanitationSystem.init();
   PlayerMovementSystem.init();
   PlayerActionSystem.init();

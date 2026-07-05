@@ -107,6 +107,19 @@ export const OrderSystem = {
       return;
     }
 
+    const currentWarehouseStock = InventorySystem.getInventorySnapshot?.().totalQuantity ?? 0;
+    const orderQuantity = items.reduce((total, item) => total + item.quantity, 0);
+    const warehouseCapacity = BMSystem.getWarehouseCapacity();
+
+    if (currentWarehouseStock + orderQuantity > warehouseCapacity) {
+      console.warn("[OrderSystem] 창고 용량을 초과하는 발주입니다.", {
+        currentWarehouseStock,
+        orderQuantity,
+        warehouseCapacity
+      });
+      return;
+    }
+
     this.orderSequence += 1;
 
     const orderId = `order-${GameState.day}-${this.orderSequence}`;
@@ -332,7 +345,7 @@ export const OrderSystem = {
         imagePath: product.imagePath,
         quantity,
         purchasePrice: product.purchasePrice,
-        salePrice: product.salePrice,
+        salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,
         lineCost: product.purchasePrice * quantity
       });
 
