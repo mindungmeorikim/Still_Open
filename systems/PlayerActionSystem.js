@@ -36,6 +36,7 @@ const SANITATION_CLEANING_REQUESTED = "SANITATION_CLEANING_REQUESTED";
 const SANITATION_CLEANING_STARTED = "SANITATION_CLEANING_STARTED";
 const SANITATION_CLEANING_COMPLETED = "SANITATION_CLEANING_COMPLETED";
 const SANITATION_CLEANING_FAILED = "SANITATION_CLEANING_FAILED";
+const NUISANCE_CHECKOUT_DELAY_MS = 5000;
 const VALID_CARRYING_BOX_TYPES = new Set([
   "arrive",
   "basic",
@@ -51,6 +52,7 @@ export const PlayerActionSystem = {
   checkoutSequence: 0,
   isCheckoutInputLocked: false,
   isPlayerBusy: false,
+  pendingNuisanceCheckoutCustomerIds: new Set(),
   actionMessageTimerId: null,
   cleaningCountdownTimerId: null,
 
@@ -944,6 +946,62 @@ completeShelfRestock() {
       return null;
     }
 
+    if (this.shouldDelayCheckout(checkoutPayload, options)) {
+      this.scheduleDelayedCheckout(checkoutPayload, options);
+      return checkoutPayload;
+    }
+
+    this.completeCheckout(checkoutPayload, options);
+
+    return checkoutPayload;
+  },
+
+  shouldDelayCheckout(checkoutPayload = {}, options = {}) {
+    if (options.skipNuisanceDelay === true) {
+      return false;
+    }
+
+    return (
+      checkoutPayload.customerTypeId === "difficult" ||
+      checkoutPayload.isNuisance === true ||
+      Boolean(checkoutPayload.nuisanceProfileId) ||
+      Number(checkoutPayload.nuisanceCheckoutDelayMs) > 0
+    );
+  },
+
+  scheduleDelayedCheckout(checkoutPayload = {}, options = {}) {
+    const customerId = checkoutPayload.customerId;
+
+    if (!customerId || this.pendingNuisanceCheckoutCustomerIds.has(customerId)) {
+      return;
+    }
+
+    this.pendingNuisanceCheckoutCustomerIds.add(customerId);
+
+    if (options.actorType !== "staff") {
+      this.isPlayerBusy = true;
+    }
+
+    const delayMs = Math.max(
+      0,
+      Number(checkoutPayload.nuisanceCheckoutDelayMs) || NUISANCE_CHECKOUT_DELAY_MS
+    );
+    const delaySeconds = Math.max(1, Math.ceil(delayMs / 1000));
+
+    this.showActionMessage(`진상 손님 응대 중입니다... ${delaySeconds}초`);
+
+    setTimeout(() => {
+      this.pendingNuisanceCheckoutCustomerIds.delete(customerId);
+
+      if (options.actorType !== "staff") {
+        this.isPlayerBusy = false;
+      }
+
+      this.completeCheckout(checkoutPayload, options);
+    }, delayMs);
+  },
+
+  completeCheckout(checkoutPayload = {}, options = {}) {
     EventBus.emit(EVENTS.CHECKOUT_COMPLETED, checkoutPayload);
 
     if (typeof options.successMessage === "function") {
@@ -953,8 +1011,6 @@ completeShelfRestock() {
     if (options.actorType === "staff") {
       this.emitStaffAutoCheckoutResult(true, options, null, checkoutPayload);
     }
-
-    return checkoutPayload;
   },
 
   emitStaffAutoCheckoutResult(success, request = {}, reason = null, checkoutPayload = null) {
@@ -1051,6 +1107,11 @@ completeShelfRestock() {
       checkoutId: `${checkoutIdPrefix}-${GameState.day}-${customer.customerId}-${this.checkoutSequence}`,
       day: GameState.day,
       customerId: customer.customerId,
+      customerTypeId: customer.customerTypeId ?? null,
+      customerTypeName: customer.customerTypeName ?? "",
+      isNuisance: customer.isNuisance === true,
+      nuisanceProfileId: customer.nuisanceProfileId ?? null,
+      nuisanceCheckoutDelayMs: Number(customer.nuisanceCheckoutDelayMs) || 0,
       wantedProductId,
       productId: product.id,
       productName: product.name,

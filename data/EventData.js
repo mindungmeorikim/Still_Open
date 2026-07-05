@@ -97,11 +97,13 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     type: CUSTOMER_EVENT_TYPES.NEGATIVE,
     title: "명령하지마라 아저씨",
     summary: "라면 물 위치를 안내했을 뿐인데 손님은 명령을 들었다고 주장합니다.",
-    unlockDay: 1,
-    recommendedDay: 1,
+    unlockDay: 3,
+    recommendedDay: 3,
     allowedTypeIds: ["normal", "difficult"],
     dialogue: "나한테 명령하지 마라. 내가 알아서 할 수 있어.",
     priority: 30,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_DONT_ORDER_ME",
     choices: [
       {
         id: "polite_re_guide",
@@ -153,6 +155,8 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     allowedTypeIds: ["normal", "student", "difficult"],
     dialogue: "이거 1+1 아니에요? 제 마음속 행사표에는 적혀 있는데요?",
     priority: 28,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_DISCOUNT_APPEAL",
     choices: [
       {
         id: "explain_promotion_item",
@@ -199,11 +203,13 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     type: CUSTOMER_EVENT_TYPES.NEGATIVE,
     title: "봉투 하나만 더의 무한굴레",
     summary: "결제 후 봉투를 계속 요청하는 손님이 등장했습니다.",
-    unlockDay: 1,
-    recommendedDay: 1,
+    unlockDay: 2,
+    recommendedDay: 2,
     allowedTypeIds: ["normal", "student", "office_worker", "hurried", "difficult"],
     dialogue: "봉투 하나만 더 주세요. 아, 하나만 더요. 진짜 마지막으로 하나만 더요.",
     priority: 22,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_EXTRA_BAG",
     choices: [
       {
         id: "ask_bag_quantity",
@@ -255,6 +261,8 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     allowedTypeIds: ["office_worker", "hurried"],
     dialogue: "저 진짜 급해요! 회사가 저보다 먼저 출근했어요!",
     priority: 35,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_BRAG_BULK",
     choices: [
       {
         id: "fast_checkout_mode",
@@ -313,8 +321,8 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     type: CUSTOMER_EVENT_TYPES.NEGATIVE,
     title: "카드에는 충전, 마음에는 분노",
     summary: "교통카드를 5천 원 충전한 손님이 1만 원을 냈다고 주장합니다.",
-    unlockDay: 2,
-    recommendedDay: 2,
+    unlockDay: 3,
+    recommendedDay: 3,
     allowedTypeIds: ["normal", "student", "difficult"],
     dialogue: "왜 10,000원이 안 들어갔죠? 저는 분명히 그렇게 낸 기분인데요.",
     priority: 26,
@@ -369,6 +377,8 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     allowedTypeIds: ["normal", "office_worker", "difficult"],
     dialogue: "어제까지만 해도 오늘 같았어요. 이 쿠폰 아직 마음은 살아있습니다.",
     priority: 27,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_DISCOUNT_APPEAL",
     choices: [
       {
         id: "normal_ramen_payment",
@@ -415,11 +425,13 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     type: CUSTOMER_EVENT_TYPES.NEGATIVE,
     title: "30초면 되는 걸 7분으로",
     summary: "손님이 삼각김밥을 전자레인지에 7분 돌리려 합니다.",
-    unlockDay: 2,
-    recommendedDay: 2,
+    unlockDay: 4,
+    recommendedDay: 4,
     allowedTypeIds: ["normal", "student", "difficult"],
     dialogue: "삼각김밥은 7분 정도 돌리면 더 깊은 맛이 나지 않나요?",
     priority: 29,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_MICROWAVE_TROUBLE",
     choices: [
       {
         id: "guide_30_seconds",
@@ -466,11 +478,13 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
     type: CUSTOMER_EVENT_TYPES.NEUTRAL,
     title: "짤랑짤랑 최종보스",
     summary: "손님이 4,700원어치 물건을 사고 동전을 한 움큼 쏟아냅니다.",
-    unlockDay: 1,
-    recommendedDay: 1,
+    unlockDay: 2,
+    recommendedDay: 2,
     allowedTypeIds: ["normal", "student", "office_worker", "difficult"],
     dialogue: "동전으로 계산해도 되죠? 오늘 제 지갑이 보스전을 열었어요.",
     priority: 18,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_COIN_BOMB",
     choices: [
       {
         id: "sort_coins_fast",
@@ -519,6 +533,385 @@ export const CUSTOMER_EVENT_DETAILS = Object.freeze([
       }
     ],
     ui: { icon: "coin" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_008",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "끝없는 항의 전화 아줌마",
+    summary: "가격표와 행사 문구를 두고 본사에 전화하겠다며 항의를 시작합니다.",
+    unlockDay: 3,
+    recommendedDay: 3,
+    allowedTypeIds: ["normal", "office_worker", "difficult"],
+    dialogue: "잠깐만요. 이거 가격이 왜 이래요? 제가 지금 본사에 전화해볼까요?",
+    priority: 29,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_COMPLAINT_AUNT",
+    choices: [
+      {
+        id: "check_price_policy",
+        label: "가격표와 행사 조건을 차분히 확인한다",
+        description: "근거를 확인하며 항의를 낮춥니다.",
+        resultTitle: "가격 확인 완료",
+        customerReaction: "흠, 확인은 제대로 하시네요.",
+        playerThought: "가격표가 방패가 되는 순간이다.",
+        resultText: "정확한 안내로 항의를 줄였습니다.",
+        effects: { revenue: 1800, satisfaction: 3, mental: -3 },
+        inventoryChanges: [{ label: "음료", productId: "cola", quantity: -1 }],
+        specialEffect: "멘탈 감소"
+      },
+      {
+        id: "offer_policy_coupon",
+        label: "규정 안에서 대체 상품을 추천한다",
+        description: "행사 대상 상품으로 자연스럽게 유도합니다.",
+        resultTitle: "대체 안내 성공",
+        customerReaction: "그럼 행사 상품으로 가져갈게요.",
+        playerThought: "불만을 장바구니로 바꿨다.",
+        resultText: "대체 상품 안내로 상황을 정리했습니다.",
+        effects: { revenue: 2000, satisfaction: 6, mental: -2 },
+        inventoryChanges: [{ label: "행사음료", productId: "cola", quantity: -2 }],
+        specialEffect: "만족도 회복"
+      },
+      {
+        id: "argue_back",
+        label: "행사표를 잘못 보신 것 같다고 단호히 말한다",
+        description: "원칙은 지키지만 감정이 부딪힙니다.",
+        resultTitle: "항의 확대",
+        customerReaction: "직원 교육을 어떻게 받은 거야?",
+        playerThought: "말은 맞았지만 공기가 틀어졌다.",
+        resultText: "항의가 커지며 만족도와 멘탈이 떨어졌습니다.",
+        effects: { revenue: 0, satisfaction: -7, mental: -6 },
+        inventoryChanges: [],
+        specialEffect: "만족도 감소"
+      }
+    ],
+    ui: { icon: "complaint" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_009",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "비틀비틀 만취 손님",
+    summary: "밤 기운을 가득 안은 손님이 계산대 앞에서 오래 머뭅니다.",
+    unlockDay: 4,
+    recommendedDay: 4,
+    allowedTypeIds: ["normal", "difficult"],
+    dialogue: "여기가... 우리 집 앞 편의점 맞죠? 어? 내가 뭘 들고 왔지?",
+    priority: 31,
+    sanitationPenalty: 8,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_DRUNK",
+    choices: [
+      {
+        id: "calm_drunk_checkout",
+        label: "물과 숙취 음료를 권하며 천천히 계산한다",
+        description: "흔들리는 상황을 안전하게 정리합니다.",
+        resultTitle: "안전 계산 완료",
+        customerReaction: "사장님... 정상영업이네요...",
+        playerThought: "정상영업은 가끔 구조 활동에 가깝다.",
+        resultText: "손님을 진정시키고 계산을 마쳤습니다.",
+        effects: { revenue: 3200, satisfaction: 3, mental: -4 },
+        inventoryChanges: [{ label: "숙취 음료", productId: "hangover_drink", quantity: -1 }],
+        specialEffect: "위생 감소량 증가"
+      },
+      {
+        id: "short_drunk_response",
+        label: "필요한 상품만 빠르게 확인한다",
+        description: "대화를 줄여 계산 시간을 줄입니다.",
+        resultTitle: "최소 응대",
+        customerReaction: "내가 뭘 사려 했더라... 아, 이거요.",
+        playerThought: "대화가 짧을수록 계산대가 안전하다.",
+        resultText: "짧은 응대로 상황을 넘겼습니다.",
+        effects: { revenue: 1500, satisfaction: 1, mental: -3 },
+        inventoryChanges: [{ label: "생수", productId: "water", quantity: -1 }],
+        specialEffect: "멘탈 감소"
+      },
+      {
+        id: "ignore_drunk_mess",
+        label: "계산대 주변을 정리하지 않고 그냥 보낸다",
+        description: "당장은 빠르지만 매장이 어수선해집니다.",
+        resultTitle: "계산대 난장판",
+        customerReaction: "나 오늘 기분이 아주 그냥... 정상영업이야...",
+        playerThought: "정상영업이 바닥에 흘렀다.",
+        resultText: "손님은 갔지만 매장 분위기와 위생이 나빠졌습니다.",
+        effects: { revenue: 1500, satisfaction: -4, mental: -5 },
+        inventoryChanges: [{ label: "생수", productId: "water", quantity: -1 }],
+        specialEffect: "위생 추가 감소 위험"
+      }
+    ],
+    ui: { icon: "night" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_010",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "라이브 방송 중입니다",
+    summary: "민폐 인플루언서가 매장 동선을 막고 신상품을 촬영합니다.",
+    unlockDay: 4,
+    recommendedDay: 4,
+    allowedTypeIds: ["student", "normal", "difficult"],
+    dialogue: "여러분~ 오늘은 편의점 신상 털러 왔습니다! 사장님, 여기 조명 괜찮네요?",
+    priority: 25,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_INFLUENCER",
+    choices: [
+      {
+        id: "guide_filming_spot",
+        label: "촬영 가능한 위치를 안내한다",
+        description: "동선을 열어두고 촬영을 제한합니다.",
+        resultTitle: "촬영 동선 정리",
+        customerReaction: "오, 여기 각도 괜찮네요.",
+        playerThought: "카메라와 계산대 사이에 평화를 세웠다.",
+        resultText: "방송은 이어졌지만 동선 방해를 줄였습니다.",
+        effects: { revenue: 3000, satisfaction: 5, mental: -2 },
+        inventoryChanges: [{ label: "신제품", productId: "udon", quantity: -1 }],
+        specialEffect: "만족도 상승 가능"
+      },
+      {
+        id: "promote_new_product",
+        label: "신제품을 짧게 추천해 방송 흐름에 탄다",
+        description: "민폐를 홍보 기회로 바꿉니다.",
+        resultTitle: "방송 홍보 성공",
+        customerReaction: "이거 먹방각인데요?",
+        playerThought: "소음이 매출로 번역됐다.",
+        resultText: "신제품 노출로 만족도가 올랐습니다.",
+        effects: { revenue: 3600, satisfaction: 8, mental: 1 },
+        inventoryChanges: [
+          { label: "신제품 우동", productId: "udon", quantity: -1 },
+          { label: "콜라", productId: "cola", quantity: -1 }
+        ],
+        specialEffect: "평판 대신 만족도 상승"
+      },
+      {
+        id: "ban_filming_directly",
+        label: "촬영을 바로 중단해달라고 말한다",
+        description: "원칙은 분명하지만 분위기가 날카로워집니다.",
+        resultTitle: "방송 분위기 냉각",
+        customerReaction: "여러분, 여기 조금 엄격하네요.",
+        playerThought: "렌즈 앞에서는 말 한마디도 확대된다.",
+        resultText: "동선은 확보했지만 만족도가 떨어졌습니다.",
+        effects: { revenue: 0, satisfaction: -5, mental: -3 },
+        inventoryChanges: [],
+        specialEffect: "만족도 감소"
+      }
+    ],
+    ui: { icon: "camera" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_013",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "계산대 점령한 허세 손님",
+    summary: "덩치 큰 손님이 계산대 앞을 막고 단골 대우를 요구합니다.",
+    unlockDay: 4,
+    recommendedDay: 4,
+    allowedTypeIds: ["normal", "hurried", "difficult"],
+    dialogue: "야, 이거 빨리 계산해줘. 내가 단골인데 이 정도는 알아서 해줘야지.",
+    priority: 30,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_BRAG_BULK",
+    choices: [
+      {
+        id: "firm_queue_guide",
+        label: "순서대로 계산한다고 단호히 안내한다",
+        description: "대기열 질서를 지킵니다.",
+        resultTitle: "질서 유지",
+        customerReaction: "흠, 단골도 기다릴 줄은 알지.",
+        playerThought: "계산대 앞 질서는 내 마지막 성벽이다.",
+        resultText: "단호한 안내로 대기열을 지켰습니다.",
+        effects: { revenue: 3000, satisfaction: 2, mental: -3 },
+        inventoryChanges: [{ label: "음료", productId: "cola", quantity: -1 }],
+        specialEffect: "멘탈 감소"
+      },
+      {
+        id: "large_bag_service",
+        label: "큰 봉투를 준비하며 빠르게 계산한다",
+        description: "요구를 일부 받아주며 흐름을 정리합니다.",
+        resultTitle: "빠른 수습",
+        customerReaction: "그래, 이 정도는 알아서 해줘야지.",
+        playerThought: "봉투가 크면 자존심도 담길까.",
+        resultText: "계산은 끝났지만 멘탈이 소모됐습니다.",
+        effects: { revenue: 3200, satisfaction: 4, mental: -4 },
+        inventoryChanges: [
+          { label: "음료", productId: "cola", quantity: -1 },
+          { label: "봉투", itemKey: "shopping_bag", quantity: -1 }
+        ],
+        specialEffect: "계산 지연"
+      },
+      {
+        id: "match_brag_energy",
+        label: "단골이면 질서도 단골처럼 지켜달라고 농담한다",
+        description: "허세를 농담으로 흘려보냅니다.",
+        resultTitle: "허세 중화",
+        customerReaction: "하, 말은 잘하네. 계산해줘.",
+        playerThought: "허세를 웃음으로 포장했다.",
+        resultText: "농담으로 분위기를 누그러뜨렸습니다.",
+        effects: { revenue: 3000, satisfaction: 5, mental: 1 },
+        inventoryChanges: [{ label: "음료", productId: "cola", quantity: -1 }],
+        specialEffect: "멘탈 회복"
+      }
+    ],
+    ui: { icon: "queue" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_014",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "난동 피우는 잼민이",
+    summary: "어린 손님이 매장 안을 뛰어다니며 진열대 상품을 계속 만집니다.",
+    unlockDay: 4,
+    recommendedDay: 4,
+    allowedTypeIds: ["student", "normal", "difficult"],
+    dialogue: "이거 안 살 건데 만져봐도 돼요? 엄마가 계산한대요. 엄마는 아직 안 왔어요.",
+    priority: 28,
+    sanitationPenalty: 7,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_JAMMIN_RIOT",
+    choices: [
+      {
+        id: "guide_child_calmly",
+        label: "뛰지 말아달라고 차분히 안내한다",
+        description: "매장 안전을 먼저 챙깁니다.",
+        resultTitle: "매장 질서 회복",
+        customerReaction: "아... 그럼 천천히 볼게요.",
+        playerThought: "오늘의 업무는 계산과 교통정리다.",
+        resultText: "아이를 진정시키고 매장 혼란을 줄였습니다.",
+        effects: { revenue: 1200, satisfaction: 2, mental: -3 },
+        inventoryChanges: [{ label: "과자", productId: "potato_chips", quantity: -1 }],
+        specialEffect: "위생 감소"
+      },
+      {
+        id: "turn_riot_into_game",
+        label: "조용히 고르면 미션 성공이라고 말한다",
+        description: "장난을 규칙 있는 놀이로 바꿉니다.",
+        resultTitle: "미션 성공",
+        customerReaction: "오, 그럼 조용히 고르면 제가 이기는 거죠?",
+        playerThought: "게임 규칙 하나로 매장이 살아났다.",
+        resultText: "분위기를 해치지 않고 구매로 연결했습니다.",
+        effects: { revenue: 1800, satisfaction: 5, mental: 1 },
+        inventoryChanges: [{ label: "초코바", productId: "chocolate_bar", quantity: -1 }],
+        specialEffect: "멘탈 회복"
+      },
+      {
+        id: "ignore_child_riot",
+        label: "잠깐이면 끝나겠지 하고 둔다",
+        description: "진열대 앞 혼란을 방치합니다.",
+        resultTitle: "진열대 혼란",
+        customerReaction: "이것도 만져보고 저것도 만져볼래요!",
+        playerThought: "잠깐이 매장 전체로 번졌다.",
+        resultText: "주변 손님 만족도와 매장 위생이 떨어졌습니다.",
+        effects: { revenue: 0, satisfaction: -6, mental: -4 },
+        inventoryChanges: [],
+        specialEffect: "위생 추가 감소 위험"
+      }
+    ],
+    ui: { icon: "child" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_011",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "장미 한 송이와 느끼한 윙크",
+    summary: "느끼한 장미 손님이 계산대 앞에서 부담스러운 멘트를 이어갑니다.",
+    unlockDay: 5,
+    recommendedDay: 5,
+    allowedTypeIds: ["normal", "office_worker", "difficult"],
+    dialogue: "후후... 오늘도 아름다운 계산대군요. 이 장미... 받아주겠습니까?",
+    priority: 22,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_ROSE_FLIRT",
+    choices: [
+      {
+        id: "polite_boundary",
+        label: "정중히 거리를 두고 계산을 진행한다",
+        description: "웃지 않고 무너지지도 않습니다.",
+        resultTitle: "정중한 거리두기",
+        customerReaction: "차가운 계산도 매력이 있군요.",
+        playerThought: "내 마음은 바코드처럼 선이 많다.",
+        resultText: "부담스러운 대화를 줄이고 계산했습니다.",
+        effects: { revenue: 2200, satisfaction: 2, mental: -3 },
+        inventoryChanges: [{ label: "초코바", productId: "chocolate_bar", quantity: -1 }],
+        specialEffect: "멘탈 감소"
+      },
+      {
+        id: "receipt_rose_joke",
+        label: "영수증 꽃다발로 답한다",
+        description: "농담으로 부담을 가볍게 넘깁니다.",
+        resultTitle: "느끼함 중화",
+        customerReaction: "오... 영수증도 향기가 나는군요.",
+        playerThought: "오늘의 꽃말은 부가세 포함이다.",
+        resultText: "농담으로 상황을 풀었습니다.",
+        effects: { revenue: 2200, satisfaction: 5, mental: 1 },
+        inventoryChanges: [{ label: "초코바", productId: "chocolate_bar", quantity: -1 }],
+        specialEffect: "멘탈 회복"
+      },
+      {
+        id: "accept_rose_awkwarly",
+        label: "어색하게 장미를 받고 계산을 늦춘다",
+        description: "상황은 조용해지지만 멘탈이 소모됩니다.",
+        resultTitle: "장미의 무게",
+        customerReaction: "역시 제 마음이 계산됐군요.",
+        playerThought: "장미 한 송이가 이렇게 무거울 줄이야.",
+        resultText: "계산이 지연되고 멘탈이 떨어졌습니다.",
+        effects: { revenue: 2200, satisfaction: 3, mental: -6 },
+        inventoryChanges: [{ label: "초코바", productId: "chocolate_bar", quantity: -1 }],
+        specialEffect: "멘탈 크게 감소"
+      }
+    ],
+    ui: { icon: "rose" }
+  }),
+
+  createEvent({
+    id: "EVENT_NEG_012",
+    type: CUSTOMER_EVENT_TYPES.NEGATIVE,
+    title: "반품 빌런",
+    summary: "한 입 먹은 상품을 들고 와 원칙적으로 환불해달라고 요구합니다.",
+    unlockDay: 5,
+    recommendedDay: 5,
+    allowedTypeIds: ["normal", "difficult"],
+    dialogue: "이거 환불 좀 해주세요. 조금 먹긴 했는데 맛이 이상해서요.",
+    priority: 27,
+    isNuisance: true,
+    nuisanceProfileId: "CUSTOMER_REFUND_VILLAIN",
+    choices: [
+      {
+        id: "explain_refund_policy",
+        label: "개봉 상품 환불 규정을 안내한다",
+        description: "원칙을 차분히 설명합니다.",
+        resultTitle: "환불 규정 안내",
+        customerReaction: "제가 진상은 아닌데요, 원칙이 그렇다면...",
+        playerThought: "원칙이 계산대 위에 조용히 섰다.",
+        resultText: "환불은 막았지만 멘탈이 소모됐습니다.",
+        effects: { revenue: 0, satisfaction: -2, mental: -4 },
+        inventoryChanges: [],
+        specialEffect: "멘탈 감소"
+      },
+      {
+        id: "small_coupon_compromise",
+        label: "환불 대신 소액 쿠폰을 제공한다",
+        description: "손실을 제한하며 갈등을 낮춥니다.",
+        resultTitle: "쿠폰 타협",
+        customerReaction: "그 정도면 이번엔 넘어갈게요.",
+        playerThought: "평화를 할인권으로 샀다.",
+        resultText: "작은 비용으로 상황을 마무리했습니다.",
+        effects: { revenue: -500, satisfaction: 4, mental: -2 },
+        inventoryChanges: [],
+        specialEffect: "손실 소폭 발생"
+      },
+      {
+        id: "refund_opened_item",
+        label: "그냥 환불해준다",
+        description: "갈등은 끝나지만 매출 손실이 큽니다.",
+        resultTitle: "환불 완료",
+        customerReaction: "역시 원칙적으로 해줘야죠.",
+        playerThought: "원칙이 내 지갑을 지나갔다.",
+        resultText: "손님은 만족했지만 매출 손실이 발생했습니다.",
+        effects: { revenue: -2500, satisfaction: 6, mental: -3 },
+        inventoryChanges: [],
+        specialEffect: "환불 손실 발생"
+      }
+    ],
+    ui: { icon: "refund" }
   }),
 
   createEvent({

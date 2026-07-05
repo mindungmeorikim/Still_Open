@@ -326,11 +326,13 @@ export const SanitationSystem = {
 
     this.processedDisruptionKeys.add(key);
 
-    const result = this.decreaseSanitation(CUSTOMER_MESS_PENALTY, reason);
+    const eventPenalty = Math.floor(Number(data.sanitationPenalty) || 0);
+    const penalty = Math.max(CUSTOMER_MESS_PENALTY, eventPenalty);
+    const result = this.decreaseSanitation(penalty, reason);
 
     if (result.changed) {
       EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
-        message: "진상 손님이 매장을 어지럽혔습니다. 위생 -5",
+        message: `진상 손님이 매장을 어지럽혔습니다. 위생 -${penalty}`,
         duration: 3200
       });
     }

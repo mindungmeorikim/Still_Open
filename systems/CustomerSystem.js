@@ -41,6 +41,9 @@ import {
 import { RandomEventSystem } from "./RandomEventSystem.js";
 import { BMSystem } from "./BMSystem.js";
 
+const NUISANCE_CUSTOMER_MENTAL_PENALTY = 3;
+const NUISANCE_CHECKOUT_DELAY_MS = 5000;
+
 export const CustomerSystem = {
   customers: [],
   customerIdCounter: 0,
@@ -168,7 +171,7 @@ export const CustomerSystem = {
     const safeCount = Math.max(0, Math.floor(count));
 
     for (let i = 0; i < safeCount; i += 1) {
-      const customer = this.createCustomer();
+      const customer = this.applyNuisanceSpawnEffects(this.createCustomer());
 
       this.customers.push(customer);
 
@@ -265,7 +268,25 @@ export const CustomerSystem = {
 
       isSatisfied: false,
       hasReportedAngry: false,
-      hasReportedLeft: false
+      hasReportedLeft: false,
+      nuisanceEffectApplied: false,
+      nuisanceTimeoutApplied: false
+    };
+  },
+
+  applyNuisanceSpawnEffects(customer) {
+    if (!customer || customer.typeId !== "difficult" || customer.nuisanceEffectApplied === true) {
+      return customer;
+    }
+
+    GameState.mental = Math.max(
+      0,
+      Math.min(100, (Number(GameState.mental) || 0) - NUISANCE_CUSTOMER_MENTAL_PENALTY)
+    );
+
+    return {
+      ...customer,
+      nuisanceEffectApplied: true
     };
   },
 
@@ -941,7 +962,12 @@ export const CustomerSystem = {
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,
       waitTime: customer.waitTime,
-      mood: customer.mood
+      mood: customer.mood,
+      nuisanceEffectApplied: customer.nuisanceEffectApplied === true,
+      nuisanceTimeoutApplied: customer.nuisanceTimeoutApplied === true,
+      isNuisance: customer.isNuisance === true,
+      nuisanceProfileId: customer.nuisanceProfileId ?? null,
+      nuisanceCheckoutDelayMs: Number(customer.nuisanceCheckoutDelayMs) || 0
     };
   },
 
@@ -1175,6 +1201,30 @@ export const CustomerSystem = {
     return RandomEventSystem.pickEventForCustomer(customer, randomValue);
   },
 
+  markCustomerNuisanceEvent(customerId, eventDetail = {}) {
+    if (!customerId || eventDetail.isNuisance !== true) {
+      return null;
+    }
+
+    const customer = this.getCustomerById(customerId);
+
+    if (!customer) {
+      return null;
+    }
+
+    const updatedCustomer = {
+      ...customer,
+      isNuisance: true,
+      nuisanceProfileId: eventDetail.nuisanceProfileId ?? customer.nuisanceProfileId ?? null,
+      nuisanceCheckoutDelayMs:
+        Number(eventDetail.nuisanceCheckoutDelayMs) || customer.nuisanceCheckoutDelayMs || NUISANCE_CHECKOUT_DELAY_MS
+    };
+
+    this.replaceCustomer(updatedCustomer);
+
+    return updatedCustomer;
+  },
+
   getRandomEventTargetCustomer() {
     const candidates = this.getWaitingCustomers().filter((customer) => {
       return this.getAvailableEventsForCustomer(customer).length > 0;
@@ -1196,6 +1246,9 @@ export const CustomerSystem = {
       return null;
     }
 
-    return RandomEventSystem.createEventPayload(customer, eventDetail);
+    const eventCustomer =
+      this.markCustomerNuisanceEvent(customer.id, eventDetail) ?? customer;
+
+    return RandomEventSystem.createEventPayload(eventCustomer, eventDetail);
   }
 };

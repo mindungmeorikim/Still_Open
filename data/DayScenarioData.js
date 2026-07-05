@@ -68,9 +68,9 @@ export const DAY_SCENARIOS = Object.freeze({
       student: 24,
       office_worker: 10,
       hurried: 3,
-      difficult: 1
+      difficult: 0
     },
-    eventRateMultiplier: 0.7
+    eventRateMultiplier: 0
   }),
   2: createScenario({
     day: 2,
@@ -110,10 +110,10 @@ export const DAY_SCENARIOS = Object.freeze({
       normal: 48,
       student: 26,
       office_worker: 16,
-      hurried: 7,
-      difficult: 3
+      hurried: 10,
+      difficult: 0
     },
-    eventRateMultiplier: 0.85
+    eventRateMultiplier: 0.55
   }),
   3: createScenario({
     day: 3,

@@ -7062,7 +7062,7 @@ export const UIManager = {
     return wrapper;
   },
 
-  showCustomerEventModal(payload = {}, onClose = null, onChoiceSelected = null) {
+  showCustomerEventModal(payload = {}, onClose = null, onChoiceSelected = null, onResponseTimeout = null) {
     if (!this.eventModal) {
       this.createCustomerEventModal();
     }
@@ -7088,6 +7088,11 @@ export const UIManager = {
       this.eventModalCloseTimerId = null;
     }
 
+    if (this.customerEventResponseTimerId) {
+      clearTimeout(this.customerEventResponseTimerId);
+      this.customerEventResponseTimerId = null;
+    }
+
     const choices = Array.isArray(payload.choices) ? payload.choices : [];
     const metaParts = [
       payload.customerTypeName,
@@ -7096,9 +7101,12 @@ export const UIManager = {
     ].filter(Boolean);
     const choiceSelectedCallback =
       typeof onChoiceSelected === "function" ? onChoiceSelected : null;
+    const responseTimeoutCallback =
+      typeof onResponseTimeout === "function" ? onResponseTimeout : null;
 
     this.eventModalOnClose = typeof onClose === "function" ? onClose : null;
     this.isEventModalClosing = false;
+    this.customerEventResponseTimedOut = false;
     title.textContent = payload.eventTitle || "고객 이벤트";
     meta.textContent = metaParts.join(" / ");
     dialogue.textContent = payload.dialogue || "손님이 말을 걸었습니다.";
@@ -7148,6 +7156,10 @@ export const UIManager = {
         }
 
         this.isEventModalClosing = true;
+        if (this.customerEventResponseTimerId) {
+          clearTimeout(this.customerEventResponseTimerId);
+          this.customerEventResponseTimerId = null;
+        }
         choiceList.querySelectorAll("button").forEach((choiceButton) => {
           choiceButton.disabled = true;
         });
@@ -7184,6 +7196,25 @@ export const UIManager = {
     };
 
     this.eventModal.classList.remove("hidden");
+
+    const responseTimeoutMs = Number(payload.nuisanceTimeoutMs) || 0;
+
+    if (payload.isNuisance === true && responseTimeoutMs > 0 && responseTimeoutCallback) {
+      this.customerEventResponseTimerId = window.setTimeout(() => {
+        this.customerEventResponseTimerId = null;
+
+        if (
+          this.eventModal?.classList.contains("hidden") ||
+          this.isEventModalClosing ||
+          this.customerEventResponseTimedOut === true
+        ) {
+          return;
+        }
+
+        this.customerEventResponseTimedOut = true;
+        responseTimeoutCallback(payload);
+      }, responseTimeoutMs);
+    }
   },
 
   hideCustomerEventModal() {
@@ -7192,6 +7223,11 @@ export const UIManager = {
     if (this.eventModalCloseTimerId) {
       clearTimeout(this.eventModalCloseTimerId);
       this.eventModalCloseTimerId = null;
+    }
+
+    if (this.customerEventResponseTimerId) {
+      clearTimeout(this.customerEventResponseTimerId);
+      this.customerEventResponseTimerId = null;
     }
 
     this.eventModal.classList.add("hidden");

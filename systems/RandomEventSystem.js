@@ -35,10 +35,18 @@ const EVENT_TYPE_LABELS = Object.freeze({
   [CUSTOMER_EVENT_TYPES.NEGATIVE]: "부정"
 });
 
-const SURPRISE_EVENT_CHANCE_MIN = 0.1;
+const SURPRISE_EVENT_CHANCE_MIN = 0;
 const SURPRISE_EVENT_CHANCE_BASE = 0.1;
-const SURPRISE_EVENT_CHANCE_MAX = 0.1;
+const SURPRISE_EVENT_CHANCE_MAX = 0.22;
 const MAX_EVENTS_PER_CUSTOMER_PER_DAY = 1;
+const NUISANCE_RESPONSE_TIMEOUT_MS = 3000;
+const EVENT_CHANCE_CAP_BY_DAY = Object.freeze({
+  1: 0,
+  2: 0.06,
+  3: 0.1,
+  4: 0.14,
+  5: 0.18
+});
 
 export const RandomEventSystem = {
   stateDay: null,
@@ -167,7 +175,7 @@ export const RandomEventSystem = {
     const customerChance = Number(customer?.eventChance);
     let chance = SURPRISE_EVENT_CHANCE_BASE;
 
-    if (Number.isFinite(customerChance) && customerChance >= 0.15 && customerChance <= 0.2) {
+    if (Number.isFinite(customerChance) && customerChance > 0) {
       chance = customerChance;
     }
 
@@ -185,8 +193,26 @@ export const RandomEventSystem = {
     );
   },
 
+  getEventChanceCapByDay(day = this.getCurrentDay()) {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+
+    if (safeDay <= 1) {
+      return EVENT_CHANCE_CAP_BY_DAY[1];
+    }
+
+    if (safeDay <= 5) {
+      return EVENT_CHANCE_CAP_BY_DAY[safeDay] ?? EVENT_CHANCE_CAP_BY_DAY[5];
+    }
+
+    return Math.min(SURPRISE_EVENT_CHANCE_MAX, 0.18 + (safeDay - 5) * 0.01);
+  },
+
   getEventOccurrenceChance(customer, day = this.getCurrentDay()) {
     if (!customer) {
+      return 0;
+    }
+
+    if (day <= 1) {
       return 0;
     }
 
@@ -194,9 +220,10 @@ export const RandomEventSystem = {
     const scenarioRate = this.getScenarioEventRateMultiplier(day);
     const difficultyRate = Number(GameState.difficulty?.eventRate) || 1;
     const scaledChance = baseChance * Math.sqrt(Math.max(0.5, scenarioRate * difficultyRate));
+    const dayCap = this.getEventChanceCapByDay(day);
 
     return Math.min(
-      SURPRISE_EVENT_CHANCE_MAX,
+      dayCap,
       Math.max(SURPRISE_EVENT_CHANCE_MIN, scaledChance)
     );
   },
@@ -531,6 +558,10 @@ export const RandomEventSystem = {
       eventTitle: detail.title,
       eventSummary: detail.summary,
       dialogue: detail.dialogue,
+      isNuisance: detail.isNuisance === true || detail.type === CUSTOMER_EVENT_TYPES.NEGATIVE,
+      nuisanceProfileId: detail.nuisanceProfileId ?? null,
+      nuisanceTimeoutMs: Number(detail.nuisanceTimeoutMs) || NUISANCE_RESPONSE_TIMEOUT_MS,
+      sanitationPenalty: Number(detail.sanitationPenalty) || 0,
       customerId,
       customerTypeId: customer.customerTypeId ?? customer.typeId ?? null,
       customerTypeName: customer.customerTypeName ?? customer.typeName ?? "",

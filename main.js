@@ -57,9 +57,60 @@ function applyCustomerEventChoiceStatEffects(choice = {}) {
 }
 
 const SANITATION_CUSTOMER_EVENT_TRIGGERED = "CUSTOMER_RANDOM_EVENT_TRIGGERED";
+const NUISANCE_EVENT_MENTAL_PENALTY = 3;
+const NUISANCE_RESPONSE_TIMEOUT_SATISFACTION_PENALTY = 5;
+const nuisanceEventEffectKeys = new Set();
+const nuisanceTimeoutEffectKeys = new Set();
+let isCustomerEventFlowStarting = false;
+
+function createCustomerEventEffectKey(payload = {}, suffix = "effect") {
+  return [
+    payload.day ?? GameState.day,
+    payload.customerId ?? "unknown",
+    payload.eventInstanceId ?? payload.eventId ?? "event",
+    suffix
+  ].join(":");
+}
+
+function applyNuisanceEventEntranceEffects(payload = {}) {
+  if (payload.isNuisance !== true) {
+    return;
+  }
+
+  const effectKey = createCustomerEventEffectKey(payload, "entrance");
+
+  if (nuisanceEventEffectKeys.has(effectKey)) {
+    return;
+  }
+
+  nuisanceEventEffectKeys.add(effectKey);
+  GameState.mental = clampPlayerStat(GameState.mental - NUISANCE_EVENT_MENTAL_PENALTY);
+  EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+}
+
+function applyNuisanceResponseTimeout(payload = {}) {
+  if (payload.isNuisance !== true) {
+    return;
+  }
+
+  const effectKey = createCustomerEventEffectKey(payload, "timeout");
+
+  if (nuisanceTimeoutEffectKeys.has(effectKey)) {
+    return;
+  }
+
+  nuisanceTimeoutEffectKeys.add(effectKey);
+  GameState.satisfaction = clampPlayerStat(
+    GameState.satisfaction - NUISANCE_RESPONSE_TIMEOUT_SATISFACTION_PENALTY
+  );
+  UIManager.showMessage("진상 대응이 늦어 손님 만족도가 감소했습니다.", {
+    duration: 3200
+  });
+  EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+}
 
 function showCustomerEventCandidate() {
-  if (isCustomerEventModalOpen()) {
+  if (isCustomerEventFlowStarting || isCustomerEventModalOpen()) {
     return;
   }
 
@@ -69,12 +120,14 @@ function showCustomerEventCandidate() {
     return;
   }
 
-  EventBus.emit(SANITATION_CUSTOMER_EVENT_TRIGGERED, payload);
-
-  CustomerSystem.pauseCustomerWaitTime();
-  GameFlowSystem.pauseDayTimer();
+  isCustomerEventFlowStarting = true;
 
   try {
+    EventBus.emit(SANITATION_CUSTOMER_EVENT_TRIGGERED, payload);
+    applyNuisanceEventEntranceEffects(payload);
+    CustomerSystem.pauseCustomerWaitTime();
+    GameFlowSystem.pauseDayTimer();
+
     UIManager.showCustomerEventModal(
       payload,
       () => {
@@ -92,9 +145,12 @@ function showCustomerEventCandidate() {
         }
 
         return effectResult;
-      }
+      },
+      applyNuisanceResponseTimeout
     );
+    isCustomerEventFlowStarting = false;
   } catch (error) {
+    isCustomerEventFlowStarting = false;
     CustomerSystem.resumeCustomerWaitTime();
     GameFlowSystem.resumeDayTimer();
     throw error;
