@@ -213,13 +213,15 @@ export const ResultSystem = {
       stats.bmBonus;
 
     const bmScore = stats.bmBonus;
+    const sanitationPenalty = this.getSanitationSettlementPenalty();
 
     GameState.money += stats.profit;
 
     const satisfactionChange =
       stats.satisfiedCustomers * 2 -
       stats.angryCustomers * 3 -
-      stats.lostCustomers * 5;
+      stats.lostCustomers * 5 +
+      sanitationPenalty.satisfactionPenalty;
 
     const mentalChange =
       stats.checkoutSuccessCount -
@@ -281,7 +283,8 @@ export const ResultSystem = {
       mentalGap,
       revenueSuccess,
       satisfactionSuccess,
-      mentalSuccess
+      mentalSuccess,
+      sanitationPenalty
     });
     const resultSummaryText = infiniteGameOver.isGameOver
       ? infiniteGameOver.summaryText
@@ -323,6 +326,8 @@ export const ResultSystem = {
       restockCount: stats.restockCount,
       cleaningCount: stats.cleaningCount,
       staff: staffResult,
+      sanitation: sanitationPenalty.sanitation,
+      sanitationPenalty,
 
       revenueSuccess,
       satisfactionSuccess,
@@ -730,6 +735,9 @@ export const ResultSystem = {
     const mvpText = resultData.mvpTestDataApplied
       ? " / 임시 MVP 데이터 적용"
       : "";
+    const sanitationText = resultData.sanitationPenalty?.applies
+      ? ` / 위생 페널티 ${resultData.sanitationPenalty.satisfactionPenalty}`
+      : "";
 
     return (
       `Day ${resultData.day} 정산 완료 | ` +
@@ -739,8 +747,43 @@ export const ResultSystem = {
       `목표 ₩${resultData.targetRevenue.toLocaleString()} | ` +
       `만족도 ${resultData.satisfaction}/${resultData.targetSatisfaction} | ` +
       `멘탈 ${resultData.mental} | ` +
-      `병맛 점수 ${resultData.bmScore.toLocaleString()}${mvpText}`
+      `병맛 점수 ${resultData.bmScore.toLocaleString()}${sanitationText}${mvpText}`
     );
+  },
+
+  getSanitationSettlementPenalty() {
+    const source = GameState.sanitation && typeof GameState.sanitation === "object"
+      ? GameState.sanitation
+      : {};
+    const value = this.clamp(
+      Math.floor(Number(source.value ?? 100) || 0),
+      0,
+      100
+    );
+    const threshold = Math.floor(Number(source.warningThreshold ?? 50) || 50);
+    const penalty = Math.floor(Number(source.settlementPenalty ?? -5) || -5);
+    const applies = value <= threshold;
+    const status = source.status ?? (
+      value === 0
+        ? "critical"
+        : value <= threshold
+          ? "warning"
+          : value <= 79
+            ? "normal"
+            : "clean"
+    );
+
+    return {
+      applies,
+      satisfactionPenalty: applies ? penalty : 0,
+      sanitation: {
+        value,
+        status,
+        isCleaningNeeded: source.isCleaningNeeded === true || value < 100,
+        isCleaning: source.isCleaning === true,
+        warningThreshold: threshold
+      }
+    };
   },
 
   createResultSummaryText(success, checks = {}) {
@@ -795,6 +838,15 @@ export const ResultSystem = {
         detailText: data.mentalSuccess
           ? "오늘도 멘탈을 붙잡고 버텼습니다."
           : "멘탈이 0이 되었습니다. 내일은 더 짧고 정확하게 움직여야 합니다."
+      },
+      {
+        label: "매장 위생",
+        success: data.sanitationPenalty?.applies !== true,
+        statusText: data.sanitationPenalty?.applies ? "관리 필요" : "양호",
+        valueText: `위생 ${data.sanitationPenalty?.sanitation?.value ?? 100} / 100`,
+        detailText: data.sanitationPenalty?.applies
+          ? `위생 관리 미흡으로 만족도 ${data.sanitationPenalty.satisfactionPenalty}가 반영되었습니다.`
+          : "정산 위생 페널티가 없습니다."
       }
     ];
   },

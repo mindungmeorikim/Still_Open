@@ -28,6 +28,35 @@ const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INTERACTION_FEEDBACK_DISTANCE = 120;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 300, y: 470 });
+const CLEANING_ZONE_POSITION = Object.freeze({ x: 870, y: 650 });
+const SANITATION_EVENTS = Object.freeze({
+  CHANGED: "SANITATION_CHANGED",
+  MESSAGE_REQUESTED: "SANITATION_MESSAGE_REQUESTED",
+  CLEANING_STARTED: "SANITATION_CLEANING_STARTED",
+  CLEANING_COMPLETED: "SANITATION_CLEANING_COMPLETED",
+  CLEANING_FAILED: "SANITATION_CLEANING_FAILED"
+});
+const SANITATION_ASSETS = Object.freeze({
+  icon: "./assets/ui/icons/sanitation_check.png",
+  tools: "./assets/objects/cleaning/cleaning_tools.png",
+  stain: "./assets/objects/cleaning/floor_stain.png",
+  trash: "./assets/objects/cleaning/overflowing_trash_can.png",
+  sparkle: "./assets/effects/cleaning/clean_sparkle.png"
+});
+const DEFAULT_SANITATION_STATE = Object.freeze({
+  value: 100,
+  status: "clean",
+  isCleaningNeeded: false,
+  isCleaning: false,
+  cleaningDurationMs: 5000,
+  settlementPenalty: {
+    applies: false,
+    satisfactionPenalty: 0,
+    reason: "",
+    sanitationValue: 100,
+    status: "clean"
+  }
+});
 
 const FOOD_WARMER_PRODUCT_IDS = new Set([
   "sausage_hotbar",
@@ -82,6 +111,7 @@ export const UIManager = {
   dayScenarioModal: null,
   orderModal: null,
   bmContractShopModal: null,
+  bmPurchaseConfirmModal: null,
   staffHireModal: null,
   eventModal: null,
   eventModalOnClose: null,
@@ -105,6 +135,7 @@ export const UIManager = {
   inventoryByProductId: {},
   inventorySnapshot: null,
   pendingStaffHireData: null,
+  sanitationState: { ...DEFAULT_SANITATION_STATE },
   notificationTimerId: null,
   isWorldCameraBound: false,
   sparkleTimeoutIds: {},
@@ -137,12 +168,14 @@ export const UIManager = {
     this.bindInventoryEvents();
     this.bindExpansionEvents();
     this.bindBMEvents();
+    this.bindSanitationEvents();
     this.bindEndingEvents();
     this.bindOrderEvents();
     this.bindStaffEvents();
     this.createDayScenarioModal();
     this.createOrderModal();
     this.createBMContractShopModal();
+    this.createBMShopPurchaseConfirmModal();
     this.createStaffHireModal();
     this.createResultModal();
     this.createUpgradeModal();
@@ -155,6 +188,7 @@ export const UIManager = {
     this.createInventorySummary();
     this.createStaffSummary();
     this.createDailyGoalPanel();
+    this.createSanitationHud();
     this.createFocusedZonePanel();
     this.moveTopIconMenuToRoot();
     this.configureTopSettingsMenu();
@@ -955,6 +989,50 @@ export const UIManager = {
     });
   },
 
+  bindSanitationEvents() {
+    EventBus.on(SANITATION_EVENTS.CHANGED, (data = {}) => {
+      this.sanitationState = this.normalizeSanitationState(data.state);
+      this.renderSanitationHud();
+      this.renderCleaningZone();
+    });
+
+    EventBus.on(SANITATION_EVENTS.MESSAGE_REQUESTED, (data = {}) => {
+      const show = () => {
+        this.showMessage(data.message ?? "위생 상태를 확인해주세요.", {
+          duration: Number(data.duration) || 2600
+        });
+      };
+      const delayMs = Math.max(0, Number(data.delayMs) || 0);
+
+      if (delayMs > 0) {
+        window.setTimeout(show, delayMs);
+        return;
+      }
+
+      show();
+    });
+
+    EventBus.on(SANITATION_EVENTS.CLEANING_STARTED, (data = {}) => {
+      this.sanitationState = this.normalizeSanitationState(data.state);
+      this.renderSanitationHud();
+      this.renderCleaningZone();
+      this.playAssetEffectToast("loading", "청소 중...");
+    });
+
+    EventBus.on(SANITATION_EVENTS.CLEANING_COMPLETED, (data = {}) => {
+      this.sanitationState = this.normalizeSanitationState(data.state);
+      this.renderSanitationHud();
+      this.renderCleaningZone();
+      this.showInteractionSparkle("cleaning-zone");
+    });
+
+    EventBus.on(SANITATION_EVENTS.CLEANING_FAILED, (data = {}) => {
+      this.showMessage(data.message ?? "지금은 청소할 수 없습니다.");
+      this.renderSanitationHud();
+      this.renderCleaningZone();
+    });
+  },
+
   bindEndingEvents() {
     EventBus.on(EVENTS.ENDING_ACHIEVED, (data) => {
       this.showEndingModal(data);
@@ -1229,6 +1307,112 @@ export const UIManager = {
     return typeLabels[customer.typeId] ?? "손님";
   },
 
+  createSanitationHud() {
+    const statusPanel = document.getElementById("status-panel");
+
+    if (!statusPanel) return;
+
+    let sanitationNode = document.getElementById("sanitation-info");
+
+    if (!sanitationNode) {
+      sanitationNode = document.createElement("p");
+      sanitationNode.id = "sanitation-info";
+      sanitationNode.setAttribute("aria-live", "polite");
+
+      const mentalNode = document.getElementById("mental-info");
+
+      if (mentalNode?.parentElement === statusPanel) {
+        mentalNode.insertAdjacentElement("afterend", sanitationNode);
+      } else {
+        statusPanel.appendChild(sanitationNode);
+      }
+    }
+
+    sanitationNode.className = "";
+  },
+
+  normalizeSanitationState(state = null) {
+    const source = state && typeof state === "object"
+      ? state
+      : GameState.sanitation ?? DEFAULT_SANITATION_STATE;
+    const value = Math.max(0, Math.min(100, Math.floor(Number(source.value) || 0)));
+
+    return {
+      ...DEFAULT_SANITATION_STATE,
+      ...source,
+      value,
+      status: source.status ?? this.getSanitationStatus(value),
+      isCleaningNeeded: source.isCleaningNeeded === true || value < 100,
+      isCleaning: source.isCleaning === true,
+      settlementPenalty: source.settlementPenalty ?? DEFAULT_SANITATION_STATE.settlementPenalty
+    };
+  },
+
+  getSanitationStatus(value = 100) {
+    const sanitation = Math.max(0, Math.min(100, Math.floor(Number(value) || 0)));
+
+    if (sanitation === 0) return "critical";
+    if (sanitation <= 50) return "warning";
+    if (sanitation <= 79) return "normal";
+    return "clean";
+  },
+
+  renderSanitationHud() {
+    this.createSanitationHud();
+
+    const sanitationNode = document.getElementById("sanitation-info");
+
+    if (!sanitationNode) return;
+
+    const state = this.normalizeSanitationState(this.sanitationState);
+
+    this.sanitationState = state;
+    sanitationNode.textContent = `위생 ${state.value}`;
+    sanitationNode.dataset.sanitationStatus = state.status;
+    sanitationNode.classList.toggle("is-warning", state.status === "warning" || state.status === "critical");
+    sanitationNode.classList.toggle("is-cleaning", state.isCleaning === true);
+  },
+
+  renderCleaningZone() {
+    const interactionLayer = this.getStoreInteractionLayer();
+
+    if (!interactionLayer) return;
+
+    let cleaningZone = document.getElementById("cleaning-zone");
+
+    if (!cleaningZone) {
+      cleaningZone = document.createElement("button");
+      cleaningZone.id = "cleaning-zone";
+      cleaningZone.className = "cleaning-zone";
+      cleaningZone.type = "button";
+      cleaningZone.dataset.playerAction = "cleaning";
+      cleaningZone.setAttribute("aria-label", "청소 구역");
+      interactionLayer.appendChild(cleaningZone);
+    } else if (cleaningZone.parentElement !== interactionLayer) {
+      interactionLayer.appendChild(cleaningZone);
+    }
+
+    const state = this.normalizeSanitationState(this.sanitationState);
+    const showTrash = state.value <= 50;
+    const showStain = state.isCleaningNeeded || state.value < 100;
+
+    cleaningZone.style.setProperty("left", `${CLEANING_ZONE_POSITION.x}px`, "important");
+    cleaningZone.style.setProperty("top", `${CLEANING_ZONE_POSITION.y}px`, "important");
+    cleaningZone.dataset.sanitationStatus = state.status;
+    cleaningZone.classList.toggle("is-cleaning-needed", showStain);
+    cleaningZone.classList.toggle("is-cleaning", state.isCleaning === true);
+    cleaningZone.classList.toggle("is-warning", state.status === "warning" || state.status === "critical");
+    cleaningZone.disabled = state.isCleaning === true;
+    cleaningZone.innerHTML = `
+      <span class="cleaning-zone-glow" aria-hidden="true"></span>
+      <img class="cleaning-tools-image" src="${SANITATION_ASSETS.tools}" alt="" draggable="false" />
+      ${showStain ? `<img class="cleaning-stain-image" src="${SANITATION_ASSETS.stain}" alt="" draggable="false" />` : ""}
+      ${showTrash ? `<img class="cleaning-trash-image" src="${SANITATION_ASSETS.trash}" alt="" draggable="false" />` : ""}
+      <img class="cleaning-sparkle-image" src="${SANITATION_ASSETS.sparkle}" alt="" draggable="false" />
+      <span class="cleaning-zone-label">청소</span>
+    `;
+  },
+
   render() {
     this.renderInventorySummary();
     this.renderStaffSummary();
@@ -1243,6 +1427,8 @@ export const UIManager = {
     this.configureTopSettingsMenu();
     this.renderStoreObjectVisuals();
     this.renderWarehouseBox();
+    this.renderCleaningZone();
+    this.renderSanitationHud();
     this.renderPlayer();
     this.prepareUiImageButtons();
     this.renderDeliveryBox(this.orderDeliveredData);
@@ -4772,6 +4958,89 @@ export const UIManager = {
     this.staffHireModal.classList.add("hidden");
   },
 
+  createBMShopPurchaseConfirmModal() {
+    if (document.getElementById("bm-purchase-confirm-modal")) {
+      this.bmPurchaseConfirmModal = document.getElementById("bm-purchase-confirm-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+
+    modal.id = "bm-purchase-confirm-modal";
+    modal.className = "modal hidden";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "bm-purchase-confirm-title");
+    modal.innerHTML = `
+      <div class="modal-content bm-purchase-confirm-content">
+        <h2 id="bm-purchase-confirm-title">구매 확인</h2>
+        <div id="bm-purchase-confirm-body" class="bm-purchase-confirm-body"></div>
+        <div class="bm-purchase-confirm-actions">
+          <button id="bm-purchase-confirm-yes" class="bm-purchase-confirm-yes" type="button">예</button>
+          <button id="bm-purchase-confirm-no" class="bm-purchase-confirm-no" type="button">아니요</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    this.bmPurchaseConfirmModal = modal;
+    this.prepareUiImageButtons(modal);
+  },
+
+  showBMShopPurchaseConfirm(options = {}, onConfirm = null) {
+    if (!this.bmPurchaseConfirmModal) {
+      this.createBMShopPurchaseConfirmModal();
+    }
+
+    const modal = this.bmPurchaseConfirmModal;
+    const body = document.getElementById("bm-purchase-confirm-body");
+    const yesButton = document.getElementById("bm-purchase-confirm-yes");
+    const noButton = document.getElementById("bm-purchase-confirm-no");
+    const product = options.product ?? null;
+
+    if (!modal || !body || !yesButton || !noButton || !product) {
+      if (typeof onConfirm === "function") onConfirm();
+      return;
+    }
+
+    const priceText = options.priceText ?? "가격 확인 필요";
+    const description = options.description ?? "구매 후 해당 상품을 운영에 사용할 수 있습니다.";
+
+    body.innerHTML = `
+      <article class="bm-purchase-confirm-card">
+        <span class="bm-purchase-confirm-image-box">
+          <img src="${product.imagePath}" alt="${product.name}" draggable="false" onerror="this.hidden=true;" />
+        </span>
+        <div class="bm-purchase-confirm-copy">
+          <strong>${product.name}</strong>
+          <span>${description}</span>
+          <em>${priceText}</em>
+          <p>해당 상품을 구매하시겠습니까?</p>
+        </div>
+      </article>
+    `;
+
+    yesButton.onclick = () => {
+      this.hideBMShopPurchaseConfirm();
+      if (typeof onConfirm === "function") {
+        onConfirm();
+      }
+    };
+
+    noButton.onclick = () => {
+      this.hideBMShopPurchaseConfirm();
+    };
+
+    modal.classList.remove("hidden");
+    this.focusElementSafely(yesButton);
+  },
+
+  hideBMShopPurchaseConfirm() {
+    if (!this.bmPurchaseConfirmModal) return;
+
+    this.bmPurchaseConfirmModal.classList.add("hidden");
+  },
+
   createBMContractShopModal() {
     if (document.getElementById("bm-contract-shop-modal")) {
       this.bmContractShopModal = document.getElementById("bm-contract-shop-modal");
@@ -5094,11 +5363,25 @@ export const UIManager = {
       button.onclick = () => {
         if (button.disabled) return;
 
-        EventBus.emit(BM_EVENTS.CONTRACT_PURCHASE_REQUESTED, {
-          day: GameState.day,
-          productId: button.dataset.productId,
-          source: "bm_contract_shop_ui"
+        const productId = button.dataset.productId;
+        const product = BMSystem.getContractUnlockQueue().find((item) => {
+          return item.id === productId;
         });
+
+        this.showBMShopPurchaseConfirm(
+          {
+            product,
+            priceText: `판매권 ₩${(Number(product?.contractCost) || 0).toLocaleString("ko-KR")}`,
+            description: "판매권을 구매하면 이 상품을 발주/판매할 수 있습니다. 구역 해금 조건은 별도로 필요합니다."
+          },
+          () => {
+            EventBus.emit(BM_EVENTS.CONTRACT_PURCHASE_REQUESTED, {
+              day: GameState.day,
+              productId,
+              source: "bm_contract_shop_ui"
+            });
+          }
+        );
       };
     });
   },
@@ -5150,11 +5433,25 @@ export const UIManager = {
       button.onclick = () => {
         if (button.disabled) return;
 
-        EventBus.emit(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_REQUESTED, {
-          day: GameState.day,
-          productId: button.dataset.productId,
-          source: "bm_premium_product_shop_ui"
+        const productId = button.dataset.productId;
+        const product = BMSystem.getPremiumProducts().find((item) => {
+          return item.id === productId;
         });
+
+        this.showBMShopPurchaseConfirm(
+          {
+            product,
+            priceText: `${(Number(product?.diamondPrice) || 0).toLocaleString("ko-KR")} 다이아`,
+            description: "프리미엄 상품을 구매하면 해당 상품의 판매 조건을 즉시 보유합니다."
+          },
+          () => {
+            EventBus.emit(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_REQUESTED, {
+              day: GameState.day,
+              productId,
+              source: "bm_premium_product_shop_ui"
+            });
+          }
+        );
       };
     });
   },
@@ -5808,6 +6105,18 @@ export const UIManager = {
         </div>
       `
       : "";
+    const sanitation = resultData.sanitation ?? resultData.sanitationPenalty?.sanitation ?? null;
+    const sanitationPenaltyText = resultData.sanitationPenalty?.applies
+      ? ` / 만족도 ${resultData.sanitationPenalty.satisfactionPenalty}`
+      : "";
+    const sanitationResultRow = sanitation
+      ? `
+        <div class="result-row result-row-sanitation ${resultData.sanitationPenalty?.applies ? "is-warning" : ""}">
+          <span>매장 위생</span>
+          <strong>위생 ${Number(sanitation.value ?? 100)} / 100${sanitationPenaltyText}</strong>
+        </div>
+      `
+      : "";
 
     title.textContent = `Day ${resultData.day} 정산 결과`;
 
@@ -5847,6 +6156,8 @@ export const UIManager = {
             <span>멘탈</span>
             <strong id="result-mental-value">${resultData.mental} / 100</strong>
           </div>
+
+          ${sanitationResultRow}
 
           <div class="result-row">
             <span>손님 수</span>
@@ -6501,29 +6812,35 @@ export const UIManager = {
     const list = document.getElementById("upgrade-modal-list");
 
     const resultText = resultData && resultData.success
-      ? "목표 달성 보상"
-      : "다음 영업 준비";
+      ? "목표 달성 후"
+      : "다음 영업 전";
 
-    title.textContent = "업그레이드 선택";
-    description.textContent = `${resultText}으로 업그레이드 1개를 선택하세요.`;
+    title.textContent = "멘탈 회복 선택";
+    description.textContent = `${resultText} 멘탈 회복 1개를 선택하세요. 무료 1개, 골드 1개, 다이아 1개 중 선택할 수 있습니다.`;
 
     list.innerHTML = "";
 
     let alreadySelected = false;
 
     upgrades.forEach((upgrade) => {
+      const canSelect = upgrade.canSelect !== false;
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "upgrade-card";
+      button.className = "upgrade-card mental-recovery-card";
       button.dataset.upgradeId = upgrade.id;
+      button.disabled = !canSelect;
+      button.setAttribute("aria-disabled", String(!canSelect));
+      button.classList.toggle("is-unavailable", !canSelect);
 
       button.innerHTML = `
         <strong>${upgrade.name}</strong>
         <span>${upgrade.description}</span>
+        <em class="upgrade-price">${upgrade.priceText ?? "무료"}</em>
+        ${upgrade.disabledReason ? `<small class="upgrade-disabled-reason">${upgrade.disabledReason}</small>` : ""}
       `;
 
       button.onclick = () => {
-        if (alreadySelected) return;
+        if (alreadySelected || button.disabled) return;
 
         alreadySelected = true;
 
@@ -6534,7 +6851,7 @@ export const UIManager = {
           upgradeButton.disabled = true;
         });
 
-        this.playAssetEffectToast("upgrade", `${upgrade.name} 적용 완료!`);
+        this.playAssetEffectToast("upgrade", `${upgrade.name} 선택 완료!`);
         window.setTimeout(() => {
           this.hideUpgradeModal();
         }, 280);

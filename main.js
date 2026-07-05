@@ -22,6 +22,7 @@ import { RandomEventSystem } from "./systems/RandomEventSystem.js";
 import { PlayerMovementSystem } from "./systems/PlayerMovementSystem.js";
 import { PlayerActionSystem } from "./systems/PlayerActionSystem.js";
 import { BMSystem } from "./systems/BMSystem.js";
+import { SanitationSystem } from "./systems/SanitationSystem.js";
 
 function isCustomerEventModalOpen() {
   return (
@@ -55,6 +56,8 @@ function applyCustomerEventChoiceStatEffects(choice = {}) {
   }
 }
 
+const SANITATION_CUSTOMER_EVENT_TRIGGERED = "CUSTOMER_RANDOM_EVENT_TRIGGERED";
+
 function showCustomerEventCandidate() {
   if (isCustomerEventModalOpen()) {
     return;
@@ -65,6 +68,8 @@ function showCustomerEventCandidate() {
   if (!payload || !Array.isArray(payload.choices) || payload.choices.length === 0) {
     return;
   }
+
+  EventBus.emit(SANITATION_CUSTOMER_EVENT_TRIGGERED, payload);
 
   CustomerSystem.pauseCustomerWaitTime();
   GameFlowSystem.pauseDayTimer();
@@ -125,6 +130,7 @@ function initGame() {
   ExpansionSystem.init();
   EconomySystem.init();
   BMSystem.init();
+  SanitationSystem.init();
   PlayerMovementSystem.init();
   PlayerActionSystem.init();
   bindCustomerEventModalFlow();

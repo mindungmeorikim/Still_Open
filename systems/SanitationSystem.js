@@ -14,6 +14,7 @@ import { EVENTS } from "../core/Constants.js";
 export const SANITATION_EVENTS = Object.freeze({
   CHANGED: "SANITATION_CHANGED",
   MESSAGE_REQUESTED: "SANITATION_MESSAGE_REQUESTED",
+  CLEANING_REQUESTED: "SANITATION_CLEANING_REQUESTED",
   CLEANING_STARTED: "SANITATION_CLEANING_STARTED",
   CLEANING_COMPLETED: "SANITATION_CLEANING_COMPLETED",
   CLEANING_FAILED: "SANITATION_CLEANING_FAILED",
@@ -42,8 +43,19 @@ export const SanitationSystem = {
     if (this.isInitialized) return;
 
     this.isInitialized = true;
+    this.hydrate(GameState.sanitation);
     this.bindCustomerEvents();
+    this.bindCleaningRequests();
     this.emitChanged("init");
+  },
+
+  bindCleaningRequests() {
+    EventBus.on(SANITATION_EVENTS.CLEANING_REQUESTED, (data = {}) => {
+      this.startCleaning({
+        source: data.source ?? "sanitation_cleaning_request",
+        actorType: data.actorType ?? "player"
+      });
+    });
   },
 
   bindCustomerEvents() {
@@ -201,7 +213,7 @@ export const SanitationSystem = {
     this.clearCleaningTimer();
     this.value = this.clampSanitation(this.value + CLEANING_RECOVERY);
     this.isCleaning = false;
-    this.isCleaningNeeded = false;
+    this.isCleaningNeeded = this.value < DEFAULT_SANITATION;
     this.updateWarningState(previousValue, this.value);
 
     const payload = {
@@ -367,12 +379,31 @@ export const SanitationSystem = {
   },
 
   emitChanged(reason = "unknown", detail = {}) {
+    const state = this.getState();
+
+    this.syncGameStateSanitation(state);
+
     EventBus.emit(SANITATION_EVENTS.CHANGED, {
       day: this.getCurrentDay(),
       reason,
       ...detail,
-      state: this.getState()
+      state
     });
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  syncGameStateSanitation(state = this.getState()) {
+    GameState.sanitation = {
+      value: state.value,
+      status: state.status,
+      isCleaningNeeded: state.isCleaningNeeded,
+      isCleaning: state.isCleaning,
+      warningArmed: state.warningArmed,
+      cleaningDurationMs: state.cleaningDurationMs,
+      settlementPenalty: state.settlementPenalty,
+      processedDisruptionKeys: [...this.processedDisruptionKeys].slice(-30)
+    };
   },
 
   createMutationResult(changed, reason, amount, previousValue) {

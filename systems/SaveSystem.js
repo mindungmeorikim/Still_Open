@@ -365,6 +365,7 @@ export const SaveSystem = {
       difficulty: GameState.difficulty,
       infiniteMode: GameState.infiniteMode ?? null,
       bm: this.normalizeBMSnapshot(GameState.bm),
+      sanitation: this.normalizeSanitationSnapshot(GameState.sanitation),
       staff: GameState.staff ?? null,
       player: GameState.player ?? null,
       expansion: GameState.expansion ?? null
@@ -400,6 +401,7 @@ export const SaveSystem = {
         lastCheckedDay: 1
       },
       bm: this.createDefaultBMSnapshot(),
+      sanitation: this.createDefaultSanitationSnapshot(),
       staff: null,
       player: {
         x: 600,
@@ -553,6 +555,9 @@ export const SaveSystem = {
       nextState.infiniteMode ?? defaultSnapshot.infiniteMode
     );
     GameState.bm = this.normalizeBMSnapshot(nextState.bm ?? defaultSnapshot.bm);
+    GameState.sanitation = this.normalizeSanitationSnapshot(
+      nextState.sanitation ?? defaultSnapshot.sanitation
+    );
     GameState.expansion = this.deepClone(nextState.expansion ?? defaultSnapshot.expansion);
     GameState.player = this.deepClone(nextState.player ?? defaultSnapshot.player);
 
@@ -664,12 +669,59 @@ export const SaveSystem = {
     };
   },
 
+  createDefaultSanitationSnapshot() {
+    return {
+      value: 100,
+      status: "clean",
+      isCleaningNeeded: false,
+      isCleaning: false,
+      warningArmed: false,
+      cleaningDurationMs: 5000,
+      warningThreshold: 50,
+      settlementPenalty: -5,
+      processedDisruptionKeys: []
+    };
+  },
+
+  normalizeSanitationSnapshot(snapshot = {}) {
+    const defaults = this.createDefaultSanitationSnapshot();
+    const source = snapshot && typeof snapshot === "object"
+      ? snapshot
+      : {};
+    const value = this.clampStat(source.value, defaults.value);
+    const warningThreshold = this.clampStat(source.warningThreshold, defaults.warningThreshold);
+    const status = source.status ?? (
+      value === 0
+        ? "critical"
+        : value <= warningThreshold
+          ? "warning"
+          : value <= 79
+            ? "normal"
+            : "clean"
+    );
+
+    return {
+      ...defaults,
+      value,
+      status,
+      isCleaningNeeded: source.isCleaningNeeded === true || value < 100,
+      isCleaning: false,
+      warningArmed: source.warningArmed === true,
+      cleaningDurationMs: this.toPositiveInteger(source.cleaningDurationMs, defaults.cleaningDurationMs),
+      warningThreshold,
+      settlementPenalty: Number.isFinite(Number(source.settlementPenalty))
+        ? Math.floor(Number(source.settlementPenalty))
+        : defaults.settlementPenalty,
+      processedDisruptionKeys: this.createUniqueStringArray(source.processedDisruptionKeys).slice(-30)
+    };
+  },
 
   isMeaningfulSaveData(saveData = {}) {
     const gameState = saveData.gameState ?? {};
     const inventory = saveData.inventory ?? {};
     const expansion = saveData.expansion ?? {};
     const bm = gameState.bm ?? {};
+    const sanitation = this.normalizeSanitationSnapshot(gameState.sanitation);
     const todayStats = gameState.todayStats ?? {};
     const unlockedZoneIds = Array.isArray(expansion.unlockedZoneIds)
       ? expansion.unlockedZoneIds
@@ -689,6 +741,10 @@ export const SaveSystem = {
     const hasTodayProgress = Object.values(todayStats).some((value) => {
       return Number.isFinite(Number(value)) && Number(value) !== 0;
     });
+    const hasSanitationProgress =
+      sanitation.value !== 100 ||
+      sanitation.isCleaningNeeded === true ||
+      sanitation.processedDisruptionKeys.length > 0;
 
     return (
       day > 1 ||
@@ -698,6 +754,7 @@ export const SaveSystem = {
       hasUpgrades ||
       hasExpandedStore ||
       hasBMProgress ||
+      hasSanitationProgress ||
       hasTodayProgress
     );
   },
