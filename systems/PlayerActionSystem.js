@@ -26,6 +26,7 @@ import {
 import { CustomerSystem } from "./CustomerSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
 import { BMSystem } from "./BMSystem.js";
+import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 
 const STAFF_EVENTS = {
   AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
@@ -59,6 +60,7 @@ export const PlayerActionSystem = {
   pendingNuisanceCheckoutCustomerIds: new Set(),
   actionMessageTimerId: null,
   cleaningCountdownTimerId: null,
+  shelfStocks: {},
 
   shelf: {
     shelfId: PRODUCT_SHELF_IDS.BASIC,
@@ -119,11 +121,15 @@ export const PlayerActionSystem = {
   warehouseZone: {
     x: 210,
     y: 575,
+    standX: 250,
+    standY: 580
   },
 
   deliveryBoxZone: {
     x: 568,
     y: 615,
+    standX: 560,
+    standY: 630
   },
 
   cleaningZone: {
@@ -280,7 +286,10 @@ export const PlayerActionSystem = {
     }
 
     if (target.type === "shelf") {
-      this.handleShelfRestockAction({ shelfId: target.shelfId });
+      this.handleShelfRestockAction({
+        shelfId: target.shelfId,
+        shelfInstanceId: target.shelfInstanceId
+      });
       return;
     }
 
@@ -317,7 +326,7 @@ export const PlayerActionSystem = {
 
     if (!GameState.player) return;
 
-    const shelf = this.getShelfSlot(options.shelfId);
+    const shelf = this.getShelfSlot(options.shelfInstanceId ?? options.shelfId);
 
     if (!this.isNearShelf(shelf)) {
       this.showActionMessage("진열대에 더 가까이 가야 합니다.");
@@ -344,10 +353,15 @@ export const PlayerActionSystem = {
   },
 
   isNearShelf(shelf = this.shelf) {
-    const targetShelf = this.getShelfSlot(shelf?.shelfId ?? shelf);
-    const distance = this.getDistanceToZone(targetShelf.nodeId, targetShelf);
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
 
-    return distance !== null && distance <= this.interactionDistance;
+    const distance = this.getDistanceToZone(targetShelf.nodeId, targetShelf);
+    const interactionDistance =
+      Number(targetShelf.interactionDistance) || this.interactionDistance;
+
+    return distance !== null && distance <= interactionDistance;
   },
 
   isNearCounter() {
@@ -363,49 +377,102 @@ export const PlayerActionSystem = {
   },
 
   getPrimaryInteractionTarget() {
-    const targets = [
-      ...this.getShelfSlots().map((shelf) => ({
+    const counterDistance = this.getDistanceToZone("counter-zone", null);
+
+    if (
+      counterDistance !== null &&
+      counterDistance <= this.interactionDistance
+    ) {
+      return {
+        type: "counter",
+        distance: counterDistance
+      };
+    }
+
+    const cleaningDistance = this.getDistanceToZone("cleaning-zone", this.cleaningZone);
+
+    if (
+      cleaningDistance !== null &&
+      cleaningDistance <= this.interactionDistance
+    ) {
+      return {
+        type: "cleaning",
+        distance: cleaningDistance
+      };
+    }
+
+    const shelfTargets = this.getShelfSlots()
+      .map((shelf) => ({
         type: "shelf",
         shelfId: shelf.shelfId,
+        shelfInstanceId: shelf.instanceId,
+        interactionDistance: shelf.interactionDistance,
         distance: this.getDistanceToZone(shelf.nodeId, shelf)
-      })),
-      {
-        type: "cleaning",
-        distance: this.getDistanceToZone("cleaning-zone", this.cleaningZone)
-      },
-      {
-        type: "counter",
-        distance: this.getDistanceToZone("counter-zone", null)
-      }
-    ]
+     }))
       .filter((target) => {
+        const interactionDistance =
+          Number(target.interactionDistance) || this.interactionDistance;
+
         return (
           target.distance !== null &&
-          target.distance <= this.interactionDistance
+          target.distance <= interactionDistance
         );
       })
       .sort((first, second) => first.distance - second.distance);
 
-    return targets[0] ?? null;
+    return shelfTargets[0] ?? null;
   },
 
   getShelfSlots() {
-    return [
-      this.shelf,
-      ...Object.values(this.shelves ?? {})
-    ];
+    return SHELF_INSTANCES.map((shelf) => {
+      const stockKey = shelf.instanceId;
+      const defaultProductId = this.getDefaultProductIdForShelf(shelf.shelfId);
+
+      if (!this.shelfStocks[stockKey]) {
+        this.shelfStocks[stockKey] = {
+          productId: defaultProductId,
+          currentStock: 0
+        };
+      }
+
+      return {
+        ...shelf,
+        productId: this.shelfStocks[stockKey].productId,
+        currentStock: this.shelfStocks[stockKey].currentStock,
+        maxStock: 3
+      };
+    });
   },
 
-  getShelfSlot(shelfId = PRODUCT_SHELF_IDS.BASIC) {
-    if (shelfId && typeof shelfId === "object") {
-      return shelfId;
+  getDefaultProductIdForShelf(shelfId) {
+    if (shelfId === PRODUCT_SHELF_IDS.FRIDGE) {
+      return "water";
     }
 
-    if (shelfId === this.shelf.shelfId || !shelfId) {
-      return this.shelf;
+    if (shelfId === PRODUCT_SHELF_IDS.FRESH) {
+      return "triangle_kimbap";
     }
 
-    return this.shelves?.[shelfId] ?? this.shelf;
+    if (shelfId === PRODUCT_SHELF_IDS.WARMER) {
+      return "sausage_hotbar";
+    }
+
+    return "potato_chips";
+  },
+
+  getShelfSlot(shelfKey = PRODUCT_SHELF_IDS.BASIC) {
+    if (shelfKey && typeof shelfKey === "object") {
+      return shelfKey;
+    }
+
+    const slots = this.getShelfSlots();
+
+    return (
+      slots.find((shelf) => shelf.instanceId === shelfKey) ||
+      slots.find((shelf) => shelf.shelfId === shelfKey) ||
+      slots[0] ||
+      this.shelf
+    );
   },
 
   getShelfCapacityForSlot(shelf = this.shelf) {
@@ -448,14 +515,37 @@ export const PlayerActionSystem = {
   },
 
   getZoneCenter(zoneId, fallback = null) {
+    if (
+      fallback &&
+      Number.isFinite(Number(fallback.x)) &&
+      Number.isFinite(Number(fallback.y))
+    ) {
+      const hasInteractionPosition =
+        Number.isFinite(Number(fallback.interactionX)) &&
+        Number.isFinite(Number(fallback.interactionY));
+
+      if (hasInteractionPosition) {
+        return {
+          x: Number(fallback.interactionX),
+          y: Number(fallback.interactionY)
+        };
+      }
+
+      return {
+        x:
+          Number(fallback.x) +
+          (Number(fallback.width) || 0) / 2 +
+          (Number(fallback.interactionOffsetX) || 0),
+        y:
+          Number(fallback.y) +
+          (Number(fallback.height) || 0) / 2 +
+          (Number(fallback.interactionOffsetY) || 0)
+      };
+    }
+
     const zoneNode = document.getElementById(zoneId);
 
     if (zoneNode) {
-      /*
-        월드맵 카메라가 translate/scale 되는 구조라 getBoundingClientRect()는
-        화면 좌표를 반환한다. 플레이어 좌표는 월드맵 내부 좌표이므로
-        같은 좌표계인 offsetLeft/offsetTop 기준으로 비교해야 한다.
-      */
       return {
         x: (Number(zoneNode.offsetLeft) || 0) + (Number(zoneNode.offsetWidth) || 0) / 2,
         y: (Number(zoneNode.offsetTop) || 0) + (Number(zoneNode.offsetHeight) || 0) / 2
@@ -465,28 +555,34 @@ export const PlayerActionSystem = {
     return fallback;
   },
 
-  getPlayerStandPositionForZone(zoneId, fallbackPosition) {
-    const zoneNode = document.getElementById(zoneId);
-
-    if (!zoneNode) {
-      return fallbackPosition;
-    }
-
-    const zoneCenter = this.getZoneCenter(zoneId, null);
-
-    if (!zoneCenter) {
-      return fallbackPosition;
-    }
-
-    const playerNode = document.getElementById("player-zone");
-    const playerWidth = Number(playerNode?.offsetWidth) || 58;
-    const playerHeight = Number(playerNode?.offsetHeight) || 102;
-
+   
+ getPlayerStandPositionForZone(zoneId, fallbackPosition) {
+  if (
+    fallbackPosition &&
+    Number.isFinite(Number(fallbackPosition.standX)) &&
+    Number.isFinite(Number(fallbackPosition.standY))
+  ) {
     return {
-      x: zoneCenter.x - playerWidth / 2,
-      y: zoneCenter.y - playerHeight / 2
+      x: Number(fallbackPosition.standX),
+      y: Number(fallbackPosition.standY)
     };
-  },
+  }
+
+  const zoneCenter = this.getZoneCenter(zoneId, fallbackPosition);
+
+  if (!zoneCenter) {
+    return fallbackPosition;
+  }
+
+  const playerNode = document.getElementById("player-zone");
+  const playerWidth = Number(playerNode?.offsetWidth) || 58;
+  const playerHeight = Number(playerNode?.offsetHeight) || 102;
+
+  return {
+    x: zoneCenter.x - playerWidth / 2,
+    y: zoneCenter.y - playerHeight + 20
+  };
+},
 
   setCarryingBoxType(boxType) {
     if (!GameState.player) {
@@ -658,7 +754,7 @@ export const PlayerActionSystem = {
   },
 
   startShelfRestock(shelf = this.shelf) {
-  const targetShelf = this.getShelfSlot(shelf.shelfId);
+  const targetShelf = this.getShelfSlot(shelf.instanceId ?? shelf.shelfInstanceId ?? shelf.shelfId);
   this.activeShelfId = targetShelf.shelfId;
   this.isPlayerBusy = true;
   this.setCarryingBoxType(null);
@@ -757,7 +853,9 @@ movePlayerToWarehouse(onComplete) {
 },
 
 movePlayerToShelf(shelf = this.shelf, onComplete) {
-  const targetShelf = this.getShelfSlot(shelf.shelfId);
+  const targetShelf = this.getShelfSlot(
+    shelf.instanceId ?? shelf.shelfInstanceId ?? shelf.shelfId
+  );
   this.movePlayerToPosition(
     this.getPlayerStandPositionForZone(targetShelf.nodeId, targetShelf),
     onComplete
@@ -814,7 +912,9 @@ startTimedRestockPhase({ phase, message, onComplete }) {
 },
 
 completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
-  const targetShelf = this.getShelfSlot(shelf.shelfId);
+  const targetShelf = this.getShelfSlot(
+    shelf.instanceId ?? shelf.shelfInstanceId ?? shelf.shelfId
+  );
   const capacity = this.getShelfCapacityForSlot(targetShelf);
   const needStock = capacity - targetShelf.currentStock;
   const availableWarehouseStock = this.getAvailableWarehouseStock(targetShelf.productId);
@@ -830,6 +930,10 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   }
 
   targetShelf.currentStock += restockAmount;
+  this.shelfStocks[targetShelf.instanceId] = {
+    productId: targetShelf.productId,
+    currentStock: targetShelf.currentStock
+  };
   this.warehouse.stock = availableWarehouseStock;
 
   EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
@@ -952,7 +1056,10 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     }
 
     if (actionType === "shelf_restock" || actionType === "shelf") {
-      this.handleShelfRestockAction({ shelfId: actionNode.dataset.shelfId });
+      this.handleShelfRestockAction({
+        shelfId: actionNode.dataset.shelfId,
+        shelfInstanceId: actionNode.dataset.shelfInstanceId
+      });
       return;
     }
 

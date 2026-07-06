@@ -9,6 +9,7 @@ import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
 import { PRODUCTS, PRODUCT_SHELF_IDS } from "../data/ProductData.js";
+import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import {
   EXPANSION_ZONES,
   getPreviousExpansionZone
@@ -1795,40 +1796,23 @@ export const UIManager = {
 
     if (!interactionLayer) return;
 
-    const objectConfigs = [
-      {
-        nodeId: "shelf-zone",
-        shelfId: PRODUCT_SHELF_IDS.BASIC,
-        objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
-        facing: OBJECT_FACINGS.LEFT,
-        label: "진열대",
-        createIfMissing: false
-      },
-      {
-        nodeId: "beverage-fridge-zone",
-        shelfId: PRODUCT_SHELF_IDS.FRIDGE,
-        objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
-        facing: OBJECT_FACINGS.RIGHT,
-        label: "음료 냉장고",
+    const objectConfigs = SHELF_INSTANCES.map((shelf) => {
+      return {
+        nodeId: shelf.nodeId,
+        instanceId: shelf.instanceId,
+        zoneId: shelf.zoneId,
+        shelfId: shelf.shelfId,
+        objectType: shelf.objectType,
+        facing: shelf.facing,
+        label: shelf.label,
+        x: shelf.x,
+        y: shelf.y,
+        width: shelf.width,
+        height: shelf.height,
         createIfMissing: true
-      },
-      {
-        nodeId: "fresh-shelf-zone",
-        shelfId: PRODUCT_SHELF_IDS.FRESH,
-        objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
-        facing: OBJECT_FACINGS.RIGHT,
-        label: "신선 매대",
-        createIfMissing: true
-      },
-      {
-        nodeId: "food-warmer-zone",
-        shelfId: PRODUCT_SHELF_IDS.WARMER,
-        objectType: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
-        facing: OBJECT_FACINGS.RIGHT,
-        label: "온장고",
-        createIfMissing: true
-      }
-    ];
+      };
+    });
+  
 
     objectConfigs.forEach((config) => {
       const node = this.getStoreObjectNode(config, interactionLayer);
@@ -1836,9 +1820,19 @@ export const UIManager = {
       if (!node) return;
 
       node.dataset.playerAction = "shelf_restock";
-      node.dataset.shelfId = config.shelfId;
       node.setAttribute("role", "button");
       node.setAttribute("tabindex", "0");
+      node.dataset.shelfInstanceId = config.instanceId;
+      node.dataset.zoneId = config.zoneId;
+      node.dataset.shelfId = config.shelfId;
+      node.style.setProperty("left", `${config.x}px`, "important");
+      node.style.setProperty("top", `${config.y}px`, "important");
+      if (config.width) {
+        node.style.setProperty("width", `${config.width}px`, "important");
+      }
+      if (config.height) {
+        node.style.setProperty("height", `${config.height}px`, "important");
+      }
 
       const stockData = this.getStoreObjectStockData(config.objectType, config.shelfId);
       const visualAsset = getObjectVisualAsset(
@@ -2148,37 +2142,24 @@ export const UIManager = {
   },
 
   getInteractionFeedbackTargets() {
-    return [
-      {
-        nodeId: "shelf-zone",
-        shelfId: PRODUCT_SHELF_IDS.BASIC,
-        isInteractable: true,
-        fallback: { x: 540, y: 680 }
-      },
-      {
-        nodeId: "beverage-fridge-zone",
-        shelfId: PRODUCT_SHELF_IDS.FRIDGE,
-        isInteractable: true,
-        fallback: { x: 705, y: 492 }
-      },
-      {
-        nodeId: "fresh-shelf-zone",
-        shelfId: PRODUCT_SHELF_IDS.FRESH,
-        isInteractable: true,
-        fallback: { x: 650, y: 585 }
-      },
-      {
-        nodeId: "food-warmer-zone",
-        shelfId: PRODUCT_SHELF_IDS.WARMER,
-        isInteractable: true,
-        fallback: { x: 624, y: 540 }
-      },
-      {
-        nodeId: "counter-zone",
-        isInteractable: true
-      }
-    ];
-  },
+  const shelfTargets = SHELF_INSTANCES.map((shelf) => {
+    return {
+      nodeId: shelf.nodeId,
+      shelfId: shelf.shelfId,
+      shelfInstanceId: shelf.instanceId,
+      isInteractable: true,
+      fallback: { x: shelf.x, y: shelf.y }
+    };
+  });
+
+  return [
+    ...shelfTargets,
+    {
+      nodeId: "counter-zone",
+      isInteractable: true
+    }
+  ];
+},
 
   getInteractionPlayerCenter() {
     if (!GameState.player) {
@@ -3332,7 +3313,7 @@ export const UIManager = {
 
     [
       "entrance-zone",
-      "shelf-zone",
+      ...SHELF_INSTANCES.map((shelf) => shelf.nodeId),
       "counter-zone",
       "warehouse-box-zone",
       "player-zone",
