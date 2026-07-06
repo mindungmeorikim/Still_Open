@@ -134,8 +134,14 @@ export const StaffAssistSystem = {
         return;
       }
 
-      if (this.state.status === "entering" || this.shiftEntryRequestedForDay === GameState.day) {
-        if (this.hasHiredStaff()) {
+      // 영업 시작 검증 통과 후 입구에서 들어오는 중이면,
+      // 조기 상태 체크를 예약하지 않고 입장 완료 콜백에서만 자동 보조를 시작한다.
+      if (this.state.status === "entering") {
+        return;
+      }
+
+      if (this.shiftEntryRequestedForDay === GameState.day) {
+        if (this.hasHiredStaff() && this.state.status === "idle") {
           this.scheduleNextCheck(900);
         }
         return;
@@ -477,6 +483,8 @@ export const StaffAssistSystem = {
       productId: normalizedShelf.productId,
       currentStock: nextStock
     };
+    PlayerActionSystem.syncShelfStocksToGameState?.("staff_shelf_refill");
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
     this.incrementStaffDailyCount("todayShelfHelpCount");
 
@@ -942,6 +950,13 @@ export const StaffAssistSystem = {
 
     if (!resolvedProductId) {
       return 0;
+    }
+
+    if (typeof PlayerActionSystem.getAvailableWarehouseStock === "function") {
+      return Math.max(
+        0,
+        Math.floor(Number(PlayerActionSystem.getAvailableWarehouseStock(resolvedProductId)) || 0)
+      );
     }
 
     return Math.max(

@@ -1931,7 +1931,11 @@ export const UIManager = {
         node.style.setProperty("height", `${config.height}px`, "important");
       }
 
-      const stockData = this.getStoreObjectStockData(config.objectType, config.shelfId);
+      const stockData = this.getStoreObjectStockData(
+        config.objectType,
+        config.shelfId,
+        config.instanceId
+      );
       const visualAsset = getObjectVisualAsset(
         config.objectType,
         stockData.stock,
@@ -2041,7 +2045,26 @@ export const UIManager = {
     return node;
   },
 
-  getStoreObjectStockData(objectType, shelfId = null) {
+  getStoreObjectStockData(objectType, shelfId = null, shelfInstanceId = null) {
+    const shelfStock = shelfInstanceId
+      ? GameState.shelfStocks?.[shelfInstanceId]
+      : null;
+
+    if (shelfStock) {
+      const product = PRODUCTS.find((item) => item.id === shelfStock.productId) ?? null;
+      const configuredCapacity = Number(product?.initialStock) || 0;
+      const syncedCapacity = Number(shelfStock.maxStock) || 0;
+      const currentStock = Math.max(
+        0,
+        Math.floor(Number(shelfStock.currentStock) || 0)
+      );
+
+      return {
+        stock: currentStock,
+        capacity: Math.max(1, syncedCapacity, configuredCapacity, currentStock)
+      };
+    }
+
     const items = this.getInventoryItemsForObjectVisuals();
     const itemsByProductId = items.reduce((itemMap, item) => {
       itemMap[item.productId] = item;

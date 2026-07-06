@@ -50,6 +50,7 @@ const CUSTOMER_SHELF_ZONE_IDS = new Set(Object.values(PRODUCT_SHELF_IDS));
 
 const STAFF_ENTRY_FIRST_CUSTOMER_DELAY_MS = 2000;
 const STAFF_ATTENDANCE_LATE = "late";
+const SHELF_STOCK_CONSUMED = "SHELF_STOCK_CONSUMED";
 
 export const CustomerSystem = {
   customers: [],
@@ -723,6 +724,11 @@ export const CustomerSystem = {
         }, "wanted_product_out_of_stock");
       }
 
+      this.consumeShelfStockForProduct(carriedProduct.id, 1, {
+        customerId: customer.id,
+        shelfInstanceId: carriedProduct.shelfInstanceId ?? customer.targetShelfInstanceId ?? null
+      });
+
       const waitingCustomer = {
         ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.WAITING),
         shoppingTime: 0,
@@ -730,7 +736,7 @@ export const CustomerSystem = {
         carriedProductName: BMSystem.getProductDisplayName(carriedProduct),
         carriedProductImagePath: carriedProduct.imagePath,
         carriedShelfId: carriedProduct.shelfId ?? customer.wantedShelfId ?? null,
-        targetShelfInstanceId: customer.targetShelfInstanceId ?? null,
+        targetShelfInstanceId: carriedProduct.shelfInstanceId ?? customer.targetShelfInstanceId ?? null,
         targetX: null,
         targetY: null
       };
@@ -785,10 +791,17 @@ export const CustomerSystem = {
           product.id,
           customerId
         );
+        const inventoryAvailableQuantity = Math.max(0, stockQuantity - reservedQuantity);
+        const shelfAvailability = this.getShelfAvailabilityForProduct(product.id);
 
         return {
           ...product,
-          availableQuantity: Math.max(0, stockQuantity - reservedQuantity),
+          shelfInstanceId: shelfAvailability.shelfInstanceId,
+          shelfAvailableQuantity: shelfAvailability.availableQuantity,
+          availableQuantity: Math.min(
+            inventoryAvailableQuantity,
+            shelfAvailability.availableQuantity
+          ),
           nextExpireDay:
             this.inventoryByProductId[product.id]?.nextExpireDay ??
             Number.POSITIVE_INFINITY
@@ -806,6 +819,61 @@ export const CustomerSystem = {
       });
 
     return candidates[0] ?? null;
+  },
+
+  getShelfAvailabilityForProduct(productId) {
+    const resolvedProductId = String(productId ?? "").trim().replace(/-/g, "_");
+
+    if (!resolvedProductId) {
+      return { availableQuantity: 0, shelfInstanceId: null };
+    }
+
+    const shelfStocks = GameState.shelfStocks ?? {};
+    const mappedShelfInstanceId = getShelfInstanceIdByProductId(resolvedProductId);
+    const mappedStock = mappedShelfInstanceId ? shelfStocks[mappedShelfInstanceId] : null;
+
+    if (mappedStock) {
+      const mappedProductId = String(mappedStock.productId ?? "").trim().replace(/-/g, "_");
+
+      return {
+        availableQuantity: mappedProductId === resolvedProductId
+          ? Math.max(0, Math.floor(Number(mappedStock.currentStock) || 0))
+          : 0,
+        shelfInstanceId: mappedShelfInstanceId
+      };
+    }
+
+    const fallbackEntry = Object.entries(shelfStocks).find(([, stock]) => {
+      const stockProductId = String(stock?.productId ?? "").trim().replace(/-/g, "_");
+      return stockProductId === resolvedProductId;
+    });
+
+    if (!fallbackEntry) {
+      return { availableQuantity: 0, shelfInstanceId: mappedShelfInstanceId ?? null };
+    }
+
+    return {
+      availableQuantity: Math.max(0, Math.floor(Number(fallbackEntry[1]?.currentStock) || 0)),
+      shelfInstanceId: fallbackEntry[0]
+    };
+  },
+
+  consumeShelfStockForProduct(productId, quantity = 1, options = {}) {
+    const resolvedProductId = String(productId ?? "").trim().replace(/-/g, "_");
+    const safeQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+
+    if (!resolvedProductId) {
+      return;
+    }
+
+    EventBus.emit(SHELF_STOCK_CONSUMED, {
+      day: GameState.day,
+      productId: resolvedProductId,
+      quantity: safeQuantity,
+      shelfInstanceId: options.shelfInstanceId ?? getShelfInstanceIdByProductId(resolvedProductId),
+      customerId: options.customerId ?? null,
+      source: "customer_pickup"
+    });
   },
 
   getReservedCarriedQuantity(productId, exceptCustomerId = null) {
@@ -1014,6 +1082,7 @@ export const CustomerSystem = {
   },
 
   closeCustomerFlow() {
+    this.stopInitialSpawnTimer();
     this.stopRouteTimer();
     this.stopSpawnTimer();
     this.isCustomerFlowPaused = false;

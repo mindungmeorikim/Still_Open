@@ -37,6 +37,8 @@ const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
 const SANITATION_CLEANING_REQUESTED = "SANITATION_CLEANING_REQUESTED";
+const SHELF_STOCK_CONSUMED = "SHELF_STOCK_CONSUMED";
+const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const SANITATION_CLEANING_STARTED = "SANITATION_CLEANING_STARTED";
 const SANITATION_CLEANING_COMPLETED = "SANITATION_CLEANING_COMPLETED";
 const SANITATION_CLEANING_FAILED = "SANITATION_CLEANING_FAILED";
@@ -148,6 +150,9 @@ export const PlayerActionSystem = {
     // BM 최종본 기준 알바는 자동 계산 전담이 아니므로 자동 계산 이벤트 바인딩을 하지 않는다.
     this.bindDeliveryBoxEvents();
     this.bindSanitationEvents();
+    this.bindShelfStockEvents();
+    this.getShelfSlots();
+    this.syncShelfStocksToGameState("init");
   },
 
   initializeWarehouseBoxState() {
@@ -168,6 +173,12 @@ export const PlayerActionSystem = {
   bindDeliveryBoxEvents() {
     EventBus.on(ORDER_DELIVERY_PICKUP_REQUESTED, (data = {}) => {
       this.handleDeliveryBoxPickupRequested(data);
+    });
+  },
+
+  bindShelfStockEvents() {
+    EventBus.on(SHELF_STOCK_CONSUMED, (data = {}) => {
+      this.handleShelfStockConsumed(data);
     });
   },
 
@@ -424,7 +435,7 @@ export const PlayerActionSystem = {
   },
 
   getShelfSlots() {
-    return SHELF_INSTANCES.map((shelf) => {
+    const slots = SHELF_INSTANCES.map((shelf) => {
       const stockKey = shelf.instanceId;
       const defaultProductId = this.getDefaultProductIdForShelf(shelf.shelfId);
 
@@ -442,6 +453,117 @@ export const PlayerActionSystem = {
         maxStock: 3
       };
     });
+
+    this.syncShelfStocksToGameState("get_shelf_slots");
+
+    return slots;
+  },
+
+  syncShelfStocksToGameState(reason = "shelf_stock_sync") {
+    GameState.shelfStocks = Object.fromEntries(
+      Object.entries(this.shelfStocks).map(([instanceId, stock]) => {
+        const shelfConfig = SHELF_INSTANCES.find((shelf) => shelf.instanceId === instanceId) ?? null;
+        const productId = this.getResolvedProductId(stock.productId);
+        const product = getProductById(productId);
+        const maxStock = this.getShelfCapacityForSlot({
+          ...(shelfConfig ?? {}),
+          productId,
+          maxStock: Number(stock.maxStock) || 3
+        });
+
+        return [
+          instanceId,
+          {
+            productId,
+            currentStock: Math.max(0, Math.floor(Number(stock.currentStock) || 0)),
+            maxStock,
+            shelfId: shelfConfig?.shelfId ?? product?.shelfId ?? null,
+            reason
+          }
+        ];
+      })
+    );
+  },
+
+  getReservedCarriedQuantity(productId, exceptCustomerId = null) {
+    const resolvedProductId = this.getResolvedProductId(productId);
+
+    if (!resolvedProductId || typeof CustomerSystem.getReservedCarriedQuantity !== "function") {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      Math.floor(Number(CustomerSystem.getReservedCarriedQuantity(resolvedProductId, exceptCustomerId)) || 0)
+    );
+  },
+
+  handleShelfStockConsumed(data = {}) {
+    const resolvedProductId = this.getResolvedProductId(data.productId);
+    const quantity = Math.max(1, Math.floor(Number(data.quantity) || 1));
+    const requestedShelfInstanceId = data.shelfInstanceId ?? null;
+
+    if (!resolvedProductId) {
+      return false;
+    }
+
+    const slots = this.getShelfSlots();
+    const candidates = slots
+      .filter((slot) => {
+        if (requestedShelfInstanceId && slot.instanceId !== requestedShelfInstanceId) {
+          return false;
+        }
+
+        return (
+          this.getResolvedProductId(slot.productId) === resolvedProductId &&
+          Math.max(0, Math.floor(Number(slot.currentStock) || 0)) >= quantity
+        );
+      })
+      .sort((first, second) => {
+        return (
+          Math.max(0, Math.floor(Number(first.currentStock) || 0)) -
+          Math.max(0, Math.floor(Number(second.currentStock) || 0))
+        );
+      });
+
+    const targetSlot = candidates[0] ?? null;
+
+    if (!targetSlot) {
+      EventBus.emit(SHELF_STOCK_CHANGED, {
+        day: GameState.day,
+        success: false,
+        reason: "shelf_stock_shortage",
+        productId: resolvedProductId,
+        quantity,
+        shelfInstanceId: requestedShelfInstanceId,
+        source: data.source ?? "customer_pickup"
+      });
+      return false;
+    }
+
+    const previousStock = Math.max(0, Math.floor(Number(targetSlot.currentStock) || 0));
+    const nextStock = Math.max(0, previousStock - quantity);
+
+    this.shelfStocks[targetSlot.instanceId] = {
+      productId: resolvedProductId,
+      currentStock: nextStock
+    };
+    this.syncShelfStocksToGameState("customer_pickup");
+
+    EventBus.emit(SHELF_STOCK_CHANGED, {
+      day: GameState.day,
+      success: true,
+      productId: resolvedProductId,
+      quantity,
+      shelfId: targetSlot.shelfId,
+      shelfInstanceId: targetSlot.instanceId,
+      previousStock,
+      currentStock: nextStock,
+      source: data.source ?? "customer_pickup"
+    });
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    return true;
   },
 
   getDefaultProductIdForShelf(shelfId) {
@@ -748,9 +870,12 @@ export const PlayerActionSystem = {
       return 0;
     }
 
-    return Math.max(0, Math.floor(Number(
+    const totalStock = Math.max(0, Math.floor(Number(
       InventorySystem.getStockQuantity?.(resolvedProductId)
     ) || 0));
+    const reservedCarriedStock = this.getReservedCarriedQuantity(resolvedProductId);
+
+    return Math.max(0, totalStock - reservedCarriedStock);
   },
 
   startShelfRestock(shelf = this.shelf) {
@@ -970,7 +1095,8 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     productId: targetShelf.productId,
     currentStock: targetShelf.currentStock
   };
-  this.warehouse.stock = availableWarehouseStock;
+  this.syncShelfStocksToGameState("player_shelf_restock");
+  this.warehouse.stock = Math.max(0, availableWarehouseStock - restockAmount);
 
   EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
     day: GameState.day,
@@ -999,6 +1125,17 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   handleCleaningAction(options = {}) {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
+      return;
+    }
+
+    const staffAssistState = GameState.staffAssist ?? {};
+    const isStaffCleaningActive = (
+      staffAssistState.taskType === "cleaning" &&
+      ["cleaning", "returning"].includes(staffAssistState.status)
+    );
+
+    if (isStaffCleaningActive) {
+      this.showActionMessage("알바생이 청소 중입니다. 잠시 후 다시 시도해주세요.");
       return;
     }
 
