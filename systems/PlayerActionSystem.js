@@ -18,6 +18,7 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import {
+  PRODUCTS,
   PRODUCT_CATEGORIES,
   PRODUCT_DISPLAY_CATEGORIES,
   PRODUCT_SHELF_IDS,
@@ -71,7 +72,7 @@ export const PlayerActionSystem = {
     y: 680,
     productId: "potato_chips",
     currentStock: 0,
-    maxStock: 3
+    maxStock: 8
   },
 
   shelves: {
@@ -82,7 +83,7 @@ export const PlayerActionSystem = {
       y: 492,
       productId: "water",
       currentStock: 0,
-      maxStock: 3
+      maxStock: 8
     },
     [PRODUCT_SHELF_IDS.FRESH]: {
       shelfId: PRODUCT_SHELF_IDS.FRESH,
@@ -91,7 +92,7 @@ export const PlayerActionSystem = {
       y: 585,
       productId: "triangle_kimbap",
       currentStock: 0,
-      maxStock: 3
+      maxStock: 8
     },
     [PRODUCT_SHELF_IDS.WARMER]: {
       shelfId: PRODUCT_SHELF_IDS.WARMER,
@@ -100,7 +101,7 @@ export const PlayerActionSystem = {
       y: 540,
       productId: "sausage_hotbar",
       currentStock: 0,
-      maxStock: 3
+      maxStock: 8
     }
   },
 
@@ -437,20 +438,33 @@ export const PlayerActionSystem = {
   getShelfSlots() {
     const slots = SHELF_INSTANCES.map((shelf) => {
       const stockKey = shelf.instanceId;
-      const defaultProductId = this.getDefaultProductIdForShelf(shelf.shelfId);
+      const defaultProductId = this.getDefaultProductIdForShelf(shelf);
 
       if (!this.shelfStocks[stockKey]) {
         this.shelfStocks[stockKey] = {
-          productId: defaultProductId,
-          currentStock: 0
+          products: {
+            [defaultProductId]: {
+              currentStock: 0,
+              maxStock: 8
+            }
+          }
         };
       }
 
+      const stockData = this.shelfStocks[stockKey];
+      const productIds = Object.keys(stockData.products ?? {});
+      const primaryProductId = productIds[0] ?? defaultProductId;
+      const primaryStock = stockData.products?.[primaryProductId] ?? {
+        currentStock: 0,
+        maxStock: 8
+      };
+
       return {
         ...shelf,
-        productId: this.shelfStocks[stockKey].productId,
-        currentStock: this.shelfStocks[stockKey].currentStock,
-        maxStock: 3
+        productId: primaryProductId,
+        products: stockData.products,
+        currentStock: primaryStock.currentStock,
+        maxStock: primaryStock.maxStock ?? 8
       };
     });
 
@@ -462,22 +476,36 @@ export const PlayerActionSystem = {
   syncShelfStocksToGameState(reason = "shelf_stock_sync") {
     GameState.shelfStocks = Object.fromEntries(
       Object.entries(this.shelfStocks).map(([instanceId, stock]) => {
-        const shelfConfig = SHELF_INSTANCES.find((shelf) => shelf.instanceId === instanceId) ?? null;
-        const productId = this.getResolvedProductId(stock.productId);
-        const product = getProductById(productId);
-        const maxStock = this.getShelfCapacityForSlot({
-          ...(shelfConfig ?? {}),
-          productId,
-          maxStock: Number(stock.maxStock) || 3
-        });
+        const shelfConfig =
+          SHELF_INSTANCES.find((shelf) => shelf.instanceId === instanceId) ?? null;
+
+        const products = Object.fromEntries(
+          Object.entries(stock.products ?? {}).map(([productId, productStock]) => {
+            const resolvedProductId = this.getResolvedProductId(productId);
+            const maxStock = Math.max(
+              1,
+              Math.floor(Number(productStock.maxStock) || 8)
+            );
+
+            return [
+              resolvedProductId,
+              {
+                productId: resolvedProductId,
+                currentStock: Math.max(
+                  0,
+                  Math.floor(Number(productStock.currentStock) || 0)
+                ),
+                maxStock
+              }
+            ];
+          })
+        );
 
         return [
           instanceId,
           {
-            productId,
-            currentStock: Math.max(0, Math.floor(Number(stock.currentStock) || 0)),
-            maxStock,
-            shelfId: shelfConfig?.shelfId ?? product?.shelfId ?? null,
+            products,
+            shelfId: shelfConfig?.shelfId ?? null,
             reason
           }
         ];
@@ -508,21 +536,24 @@ export const PlayerActionSystem = {
     }
 
     const slots = this.getShelfSlots();
+
     const candidates = slots
+      .map((slot) => {
+        const productStock = slot.products?.[resolvedProductId] ?? null;
+
+        return {
+          ...slot,
+          productStock
+        };
+      })
       .filter((slot) => {
         if (requestedShelfInstanceId && slot.instanceId !== requestedShelfInstanceId) {
           return false;
         }
 
         return (
-          this.getResolvedProductId(slot.productId) === resolvedProductId &&
-          Math.max(0, Math.floor(Number(slot.currentStock) || 0)) >= quantity
-        );
-      })
-      .sort((first, second) => {
-        return (
-          Math.max(0, Math.floor(Number(first.currentStock) || 0)) -
-          Math.max(0, Math.floor(Number(second.currentStock) || 0))
+          slot.productStock &&
+          Math.max(0, Math.floor(Number(slot.productStock.currentStock) || 0)) >= quantity
         );
       });
 
@@ -541,13 +572,20 @@ export const PlayerActionSystem = {
       return false;
     }
 
-    const previousStock = Math.max(0, Math.floor(Number(targetSlot.currentStock) || 0));
+    const previousStock = Math.max(
+      0,
+      Math.floor(Number(targetSlot.productStock.currentStock) || 0)
+    );
+
     const nextStock = Math.max(0, previousStock - quantity);
 
-    this.shelfStocks[targetSlot.instanceId] = {
+    this.shelfStocks[targetSlot.instanceId].products[resolvedProductId] = {
+      ...this.shelfStocks[targetSlot.instanceId].products[resolvedProductId],
       productId: resolvedProductId,
-      currentStock: nextStock
+      currentStock: nextStock,
+      maxStock: targetSlot.productStock.maxStock ?? 8
     };
+
     this.syncShelfStocksToGameState("customer_pickup");
 
     EventBus.emit(SHELF_STOCK_CHANGED, {
@@ -561,12 +599,24 @@ export const PlayerActionSystem = {
       currentStock: nextStock,
       source: data.source ?? "customer_pickup"
     });
+
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
     return true;
   },
 
-  getDefaultProductIdForShelf(shelfId) {
+  getDefaultProductIdForShelf(shelf) {
+    const shelfInstanceId = shelf?.instanceId ?? null;
+    const shelfId = shelf?.shelfId ?? shelf;
+
+    const matchedProduct = PRODUCTS.find((product) => {
+      return product.targetShelfInstanceId === shelfInstanceId;
+    });
+
+    if (matchedProduct?.id) {
+      return matchedProduct.id;
+    }
+
     if (shelfId === PRODUCT_SHELF_IDS.FRIDGE) {
       return "water";
     }
@@ -598,12 +648,13 @@ export const PlayerActionSystem = {
   },
 
   getShelfCapacityForSlot(shelf = this.shelf) {
-    const product = getProductById(shelf.productId);
-    const capacity = product?.shelfId
-      ? BMSystem.getShelfCapacity(product.shelfId)
-      : 0;
+    const shelfMaxStock = Math.floor(Number(shelf.maxStock) || 8);
 
-    return Math.max(1, Math.floor(Number(capacity || shelf.maxStock) || 1));
+    //const capacity = product?.shelfId
+      //? BMSystem.getShelfCapacity(product.shelfId)
+      //: 0;
+
+    return Math.max(1, shelfMaxStock);
   },
 
   getDistanceToZone(zoneId, fallback = null) {
@@ -1076,9 +1127,17 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   const targetShelf = this.getShelfSlot(
     shelf.instanceId ?? shelf.shelfInstanceId ?? shelf.shelfId
   );
-  const capacity = this.getShelfCapacityForSlot(targetShelf);
-  const needStock = capacity - targetShelf.currentStock;
-  const availableWarehouseStock = this.getAvailableWarehouseStock(targetShelf.productId);
+
+  const productId = this.getResolvedProductId(targetShelf.productId);
+  const productStock = targetShelf.products?.[productId] ?? {
+    currentStock: 0,
+    maxStock: 8
+  };
+
+  const capacity = Math.max(1, Math.floor(Number(productStock.maxStock) || 8));
+  const currentStock = Math.max(0, Math.floor(Number(productStock.currentStock) || 0));
+  const needStock = capacity - currentStock;
+  const availableWarehouseStock = this.getAvailableWarehouseStock(productId);
   const restockAmount = Math.min(needStock, availableWarehouseStock);
 
   if (restockAmount <= 0) {
@@ -1090,17 +1149,29 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     return;
   }
 
-  targetShelf.currentStock += restockAmount;
-  this.shelfStocks[targetShelf.instanceId] = {
-    productId: targetShelf.productId,
-    currentStock: targetShelf.currentStock
+  const nextStock = currentStock + restockAmount;
+
+  if (!this.shelfStocks[targetShelf.instanceId]) {
+    this.shelfStocks[targetShelf.instanceId] = {
+      products: {}
+    };
+  }
+
+  if (!this.shelfStocks[targetShelf.instanceId].products) {
+    this.shelfStocks[targetShelf.instanceId].products = {};
+  }
+
+  this.shelfStocks[targetShelf.instanceId].products[productId] = {
+    productId,
+    currentStock: nextStock,
+    maxStock: capacity
   };
+
   this.syncShelfStocksToGameState("player_shelf_restock");
-  this.warehouse.stock = Math.max(0, availableWarehouseStock - restockAmount);
 
   EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
     day: GameState.day,
-    productId: this.getResolvedProductId(targetShelf.productId),
+    productId,
     shelfId: targetShelf.shelfId,
     quantity: restockAmount,
     source: "player_shelf_restock"
@@ -1112,14 +1183,8 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   this.setWarehouseBoxState("closed");
 
   this.showActionMessage(
-    `진열대 보충 완료! 상품 ${restockAmount}개를 채웠습니다. 진열대: ${targetShelf.currentStock}/${capacity}, 창고 재고: ${availableWarehouseStock}개`
+    `진열대 보충 완료! ${restockAmount}개를 채웠습니다. 진열대: ${nextStock}/${capacity}, 창고 재고: ${availableWarehouseStock}개`
   );
-
-  console.log("[PlayerActionSystem] 진열대 보충 완료:", {
-    shelfId: targetShelf.shelfId,
-    shelfStock: targetShelf.currentStock,
-    warehouseStock: availableWarehouseStock
-  });
 },
 
   handleCleaningAction(options = {}) {
@@ -1449,8 +1514,7 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       return null;
     }
 
-    const availableProduct =
-      InventorySystem.getStockQuantity?.(carriedProductId) >= quantity
+    const availableProduct = carriedProductId
         ? { id: carriedProductId }
         : null;
 

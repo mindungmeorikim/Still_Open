@@ -21973,3 +21973,38 @@ body.is-title-screen-active #game-root {
     transform: rotate(1.5deg);
   }
 }
+
+.shelf-warning-icons {
+  position: absolute !important;
+  left: 50% !important;
+  top: 8px !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 3px !important;
+
+  pointer-events: none !important;
+  z-index: 25 !important;
+}
+
+.shelf-warning-icon {
+  width: 8px !important;
+  height: 8px !important;
+
+  display: block !important;
+
+  font-size: 0 !important;
+  line-height: 0 !important;
+
+  border-radius: 999px !important;
+}
+
+.shelf-warning-icon.is-empty {
+  background: #ff3b30 !important;
+}
+
+.shelf-warning-icon.is-warning {
+  background: #ffc107 !important;
+}

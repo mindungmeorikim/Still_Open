@@ -822,41 +822,57 @@ export const CustomerSystem = {
   },
 
   getShelfAvailabilityForProduct(productId) {
-    const resolvedProductId = String(productId ?? "").trim().replace(/-/g, "_");
+  const resolvedProductId = String(productId ?? "")
+    .trim()
+    .replace(/-/g, "_");
 
-    if (!resolvedProductId) {
-      return { availableQuantity: 0, shelfInstanceId: null };
-    }
+  if (!resolvedProductId) {
+    return {
+      availableQuantity: 0,
+      shelfInstanceId: null
+    };
+  }
 
-    const shelfStocks = GameState.shelfStocks ?? {};
-    const mappedShelfInstanceId = getShelfInstanceIdByProductId(resolvedProductId);
-    const mappedStock = mappedShelfInstanceId ? shelfStocks[mappedShelfInstanceId] : null;
+  const shelfStocks = GameState.shelfStocks ?? {};
+  const mappedShelfInstanceId = getShelfInstanceIdByProductId(resolvedProductId);
 
-    if (mappedStock) {
-      const mappedProductId = String(mappedStock.productId ?? "").trim().replace(/-/g, "_");
+  if (mappedShelfInstanceId) {
+    const shelfStock = shelfStocks[mappedShelfInstanceId];
 
+    if (shelfStock?.products?.[resolvedProductId]) {
       return {
-        availableQuantity: mappedProductId === resolvedProductId
-          ? Math.max(0, Math.floor(Number(mappedStock.currentStock) || 0))
-          : 0,
+        availableQuantity: Math.max(
+          0,
+          Math.floor(
+            Number(
+              shelfStock.products[resolvedProductId].currentStock
+            ) || 0
+          )
+        ),
         shelfInstanceId: mappedShelfInstanceId
       };
     }
+  }
 
-    const fallbackEntry = Object.entries(shelfStocks).find(([, stock]) => {
-      const stockProductId = String(stock?.productId ?? "").trim().replace(/-/g, "_");
-      return stockProductId === resolvedProductId;
-    });
+  for (const [instanceId, shelfStock] of Object.entries(shelfStocks)) {
+    const productStock = shelfStock?.products?.[resolvedProductId];
 
-    if (!fallbackEntry) {
-      return { availableQuantity: 0, shelfInstanceId: mappedShelfInstanceId ?? null };
+    if (productStock) {
+      return {
+        availableQuantity: Math.max(
+          0,
+          Math.floor(Number(productStock.currentStock) || 0)
+        ),
+        shelfInstanceId: instanceId
+      };
     }
+  }
 
-    return {
-      availableQuantity: Math.max(0, Math.floor(Number(fallbackEntry[1]?.currentStock) || 0)),
-      shelfInstanceId: fallbackEntry[0]
-    };
-  },
+  return {
+    availableQuantity: 0,
+    shelfInstanceId: mappedShelfInstanceId ?? null
+  };
+},
 
   consumeShelfStockForProduct(productId, quantity = 1, options = {}) {
     const resolvedProductId = String(productId ?? "").trim().replace(/-/g, "_");
