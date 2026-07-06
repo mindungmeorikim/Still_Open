@@ -23,14 +23,18 @@ export const STAFF_ASSIST_EVENTS = Object.freeze({
 
 const STAFF_STATE_CHANGED = "STAFF_STATE_CHANGED";
 const BM_STATE_CHANGED = "BM_STATE_CHANGED";
+const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 
 const POSITIONS = Object.freeze({
+  entry: Object.freeze({ x: 577, y: 612 }),
   idle: Object.freeze({ x: 270, y: 610 }),
   warehouseAssist: Object.freeze({ x: 285, y: 575 }),
   cleaningAssist: Object.freeze({ x: 825, y: 640 })
 });
 
 const STATUS_LABELS = Object.freeze({
+  off_duty: "출근 대기 중",
+  entering: "출근 중",
   idle: "대기 중",
   checking: "매장 상태 확인 중",
   warehouse: "창고 재고 확인 중",
@@ -40,7 +44,6 @@ const STATUS_LABELS = Object.freeze({
 });
 
 const ACTIVE_PHASES = new Set([
-  GAME_PHASE.DAY_START,
   GAME_PHASE.STORE_RUNNING
 ]);
 
@@ -54,22 +57,34 @@ const STAFF_MOVE_FRAME_MS = 16;
 const CLEANING_RECOVERY = 25;
 const PRODUCT_NO_STOCK_MESSAGE_COOLDOWN_MS = 15000;
 const GLOBAL_GUIDE_MESSAGE_COOLDOWN_MS = 5000;
+const STAFF_ATTENDANCE_NORMAL = "normal";
+const STAFF_ATTENDANCE_LATE = "late";
+const STAFF_ATTENDANCE_RULES = Object.freeze({
+  1: Object.freeze({ lateRate: 0.15, minDelayMs: 20000, maxDelayMs: 30000 }),
+  2: Object.freeze({ lateRate: 0.1, minDelayMs: 15000, maxDelayMs: 22000 }),
+  3: Object.freeze({ lateRate: 0.05, minDelayMs: 10000, maxDelayMs: 16000 })
+});
+const STAFF_LATE_COMMUTE_MESSAGE = "알바생이 아직 출근길인 것 같아요.";
+const STAFF_LATE_ARRIVAL_MESSAGE = "알바생이 뒤늦게 출근했습니다!";
 
 export const StaffAssistSystem = {
   isInitialized: false,
   checkTimerId: null,
+  lateEntryTimerId: null,
   taskTimerIds: [],
   moveRafId: null,
   moveSequence: 0,
   isWorking: false,
   cooldownUntilMs: 0,
+  shiftEntryRequestedForDay: null,
+  attendanceDecision: null,
   lastGuideMessageAtMs: 0,
   noStockMessageAtByProductId: {},
   state: {
-    status: "idle",
-    label: STATUS_LABELS.idle,
-    x: POSITIONS.idle.x,
-    y: POSITIONS.idle.y,
+    status: "off_duty",
+    label: STATUS_LABELS.off_duty,
+    x: POSITIONS.entry.x,
+    y: POSITIONS.entry.y,
     direction: "down",
     isMoving: false,
     isWorking: false,
@@ -85,39 +100,65 @@ export const StaffAssistSystem = {
 
     this.isInitialized = true;
     this.bindEvents();
-    this.updateState("idle", { reason: "init" });
-    this.scheduleNextCheck(1000);
+    if (this.canAssistInCurrentPhase()) {
+      this.updateState("idle", { reason: "init_active", position: POSITIONS.idle });
+      this.scheduleNextCheck(1000);
+      return;
+    }
+
+    this.setOffDuty("init");
   },
 
   bindEvents() {
     EventBus.on(EVENTS.GAME_INIT, () => {
-      this.updateState("idle", { reason: "game_init" });
-      this.scheduleNextCheck(1000);
+      if (this.canAssistInCurrentPhase()) {
+        this.updateState("idle", { reason: "game_init_active", position: POSITIONS.idle });
+        this.scheduleNextCheck(1000);
+        return;
+      }
+
+      this.setOffDuty("game_init");
     });
 
     EventBus.on(EVENTS.DAY_STARTED, () => {
-      this.clearTaskTimers();
-      this.isWorking = false;
-      this.cooldownUntilMs = 0;
-      this.updateState("idle", { reason: "day_started" });
-      this.scheduleNextCheck(1200);
+      this.setOffDuty("day_started");
+    });
+
+    EventBus.on(STAFF_SHIFT_ENTRY_REQUESTED, () => {
+      this.handleShiftEntryRequested("store_open_requested");
     });
 
     EventBus.on(EVENTS.STORE_OPENED, () => {
-      this.scheduleNextCheck(900);
+      if (this.isLateAttendancePending()) {
+        this.emitLateCommuteMessageOnce();
+        return;
+      }
+
+      if (this.state.status === "entering" || this.shiftEntryRequestedForDay === GameState.day) {
+        if (this.hasHiredStaff()) {
+          this.scheduleNextCheck(900);
+        }
+        return;
+      }
+
+      this.handleShiftEntryRequested("store_opened");
     });
 
     EventBus.on(EVENTS.STORE_CLOSED, () => {
-      this.returnToIdle("store_closed");
+      this.setOffDuty("store_closed");
     });
 
     EventBus.on(EVENTS.DAY_ENDED, () => {
-      this.returnToIdle("day_ended");
+      this.setOffDuty("day_ended");
     });
 
     EventBus.on(STAFF_STATE_CHANGED, () => {
-      this.updateState("idle", { reason: "staff_state_changed" });
-      this.scheduleNextCheck(900);
+      if (this.canAssistInCurrentPhase()) {
+        this.enterStoreFromEntrance("staff_state_changed");
+        return;
+      }
+
+      this.setOffDuty("staff_state_changed");
     });
 
     EventBus.on(BM_STATE_CHANGED, () => {
@@ -132,6 +173,10 @@ export const StaffAssistSystem = {
 
     if (!this.hasHiredStaff()) {
       this.updateState("idle", { reason: "no_staff" });
+      return;
+    }
+
+    if (this.isLateAttendancePending()) {
       return;
     }
 
@@ -190,6 +235,12 @@ export const StaffAssistSystem = {
   },
 
   createCleaningTask() {
+    const sanitationState = SanitationSystem.getState?.() ?? GameState.sanitation ?? {};
+
+    if (sanitationState.isCleaning === true || GameState.sanitation?.isCleaning === true) {
+      return null;
+    }
+
     const sanitationValue = this.getSanitationValue();
     const cleaningPower = this.getAssistPower("cleaning");
     const cleaningTriggerValue = 35 + cleaningPower * 5;
@@ -469,6 +520,237 @@ export const StaffAssistSystem = {
     });
   },
 
+  setOffDuty(reason = "off_duty") {
+    this.clearCheckTimer();
+    this.clearLateEntryTimer();
+    this.clearTaskTimers();
+    this.cancelStaffMovement();
+    this.isWorking = false;
+    this.cooldownUntilMs = 0;
+    this.shiftEntryRequestedForDay = null;
+    this.attendanceDecision = null;
+    this.updateState("off_duty", {
+      reason,
+      position: POSITIONS.entry,
+      direction: "down_left",
+      isMoving: false,
+      attendanceStatus: null,
+      attendanceLevel: null,
+      attendanceDelayMs: 0,
+      attendanceReadyAtMs: null,
+      attendanceDecidedDay: null,
+      attendanceArrived: false
+    });
+  },
+
+  handleShiftEntryRequested(reason = "store_open_requested") {
+    if (!this.hasHiredStaff()) {
+      this.setOffDuty(`${reason}_no_staff`);
+      return;
+    }
+
+    if (this.shiftEntryRequestedForDay === GameState.day && this.state.status !== "off_duty") {
+      return;
+    }
+
+    const attendance = this.getAttendanceDecisionForDay();
+
+    if (attendance.status === STAFF_ATTENDANCE_LATE) {
+      this.scheduleLateEntry(attendance, reason);
+      return;
+    }
+
+    this.enterStoreFromEntrance(reason);
+  },
+
+  getAttendanceDecisionForDay() {
+    const hired = GameState.staff?.hired ?? null;
+    const staffId = hired?.id ?? "staff";
+
+    if (
+      this.attendanceDecision?.day === GameState.day &&
+      this.attendanceDecision.staffId === staffId
+    ) {
+      return this.attendanceDecision;
+    }
+
+    const level = this.getStaffAttendanceLevel();
+    const rule = this.getAttendanceRuleForLevel(level);
+    const isLate = rule.lateRate > 0 && Math.random() < rule.lateRate;
+    const delayMs = isLate ? this.getRandomDelayMs(rule.minDelayMs, rule.maxDelayMs) : 0;
+
+    this.attendanceDecision = {
+      day: GameState.day,
+      staffId,
+      level,
+      status: isLate ? STAFF_ATTENDANCE_LATE : STAFF_ATTENDANCE_NORMAL,
+      delayMs,
+      readyAtMs: null,
+      arrived: false
+    };
+
+    return this.attendanceDecision;
+  },
+
+  getStaffAttendanceLevel() {
+    const upgradeCount = Math.max(
+      0,
+      Math.floor(Number(GameState.bm?.staffAbilityUpgrade?.totalCount) || 0)
+    );
+
+    return Math.max(1, upgradeCount + 1);
+  },
+
+  getAttendanceRuleForLevel(level = 1) {
+    const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
+
+    if (safeLevel >= 4) {
+      return { lateRate: 0, minDelayMs: 0, maxDelayMs: 0 };
+    }
+
+    return STAFF_ATTENDANCE_RULES[safeLevel] ?? STAFF_ATTENDANCE_RULES[1];
+  },
+
+  getRandomDelayMs(minDelayMs, maxDelayMs) {
+    const min = Math.max(0, Math.floor(Number(minDelayMs) || 0));
+    const max = Math.max(min, Math.floor(Number(maxDelayMs) || min));
+
+    return min + Math.floor(Math.random() * (max - min + 1));
+  },
+
+  scheduleLateEntry(attendance, reason = "late_entry") {
+    if (this.lateEntryTimerId && this.isLateAttendancePending()) {
+      return;
+    }
+
+    this.clearCheckTimer();
+    this.clearTaskTimers();
+    this.cancelStaffMovement();
+    this.isWorking = false;
+    this.cooldownUntilMs = 0;
+    this.shiftEntryRequestedForDay = GameState.day;
+
+    const delayMs = Math.max(0, Math.floor(Number(attendance.delayMs) || 0));
+    const readyAtMs = this.getNowMs() + delayMs;
+
+    this.attendanceDecision = {
+      ...attendance,
+      readyAtMs,
+      arrived: false
+    };
+
+    this.updateState("off_duty", {
+      reason: `${reason}_late`,
+      position: POSITIONS.entry,
+      direction: "down_left",
+      isMoving: false,
+      attendanceStatus: STAFF_ATTENDANCE_LATE,
+      attendanceLevel: attendance.level,
+      attendanceDelayMs: delayMs,
+      attendanceReadyAtMs: readyAtMs,
+      attendanceDecidedDay: GameState.day,
+      attendanceArrived: false
+    });
+
+    if (this.canAssistInCurrentPhase()) {
+      this.emitLateCommuteMessageOnce();
+    }
+
+    this.lateEntryTimerId = window.setTimeout(() => {
+      this.lateEntryTimerId = null;
+
+      if (
+        this.attendanceDecision?.day !== GameState.day ||
+        this.attendanceDecision?.staffId !== attendance.staffId ||
+        !this.hasHiredStaff()
+      ) {
+        return;
+      }
+
+      if (!this.canAssistInCurrentPhase()) {
+        this.attendanceDecision = null;
+        this.setOffDuty("late_entry_cancelled");
+        return;
+      }
+
+      this.attendanceDecision = {
+        ...this.attendanceDecision,
+        arrived: true
+      };
+      this.emitMessage(STAFF_LATE_ARRIVAL_MESSAGE, 2600);
+      this.enterStoreFromEntrance("late_arrival");
+    }, delayMs);
+  },
+
+  isLateAttendancePending() {
+    return (
+      this.attendanceDecision?.day === GameState.day &&
+      this.attendanceDecision.status === STAFF_ATTENDANCE_LATE &&
+      this.attendanceDecision.arrived !== true
+    );
+  },
+
+  emitLateCommuteMessageOnce() {
+    if (!this.isLateAttendancePending() || this.attendanceDecision.commuteMessageShown === true) {
+      return;
+    }
+
+    this.attendanceDecision = {
+      ...this.attendanceDecision,
+      commuteMessageShown: true
+    };
+    this.emitMessage(STAFF_LATE_COMMUTE_MESSAGE, 2600);
+  },
+
+  getAttendanceStateFields(status = null) {
+    const decision = this.attendanceDecision?.day === GameState.day
+      ? this.attendanceDecision
+      : null;
+    const attendanceStatus = status ?? decision?.status ?? STAFF_ATTENDANCE_NORMAL;
+
+    return {
+      attendanceStatus,
+      attendanceLevel: decision?.level ?? this.getStaffAttendanceLevel(),
+      attendanceDelayMs: Math.max(0, Math.floor(Number(decision?.delayMs) || 0)),
+      attendanceReadyAtMs: decision?.readyAtMs ?? null,
+      attendanceDecidedDay: decision?.day ?? GameState.day,
+      attendanceArrived: attendanceStatus !== STAFF_ATTENDANCE_LATE || decision?.arrived === true
+    };
+  },
+
+  enterStoreFromEntrance(reason = "enter_store") {
+    this.clearCheckTimer();
+    this.clearTaskTimers();
+    this.cancelStaffMovement();
+
+    if (!this.hasHiredStaff()) {
+      this.setOffDuty(`${reason}_no_staff`);
+      return;
+    }
+
+    this.shiftEntryRequestedForDay = GameState.day;
+    this.isWorking = false;
+    this.cooldownUntilMs = 0;
+    const attendanceFields = this.getAttendanceStateFields();
+    this.updateState("entering", {
+      reason,
+      position: POSITIONS.entry,
+      direction: "down_left",
+      isMoving: false,
+      ...attendanceFields
+    });
+
+    this.moveStaffToState("idle", {
+      reason: `${reason}_arrive_idle`,
+      position: POSITIONS.idle,
+      label: STATUS_LABELS.idle,
+      ...attendanceFields
+    }, () => {
+      this.cooldownUntilMs = this.getNowMs() + 900;
+      this.scheduleNextCheck(900);
+    });
+  },
+
   returnToIdle(reason = "return_to_idle") {
     this.clearCheckTimer();
     this.clearTaskTimers();
@@ -693,9 +975,16 @@ export const StaffAssistSystem = {
   },
 
   getShelfAssistPosition(shelf = {}) {
+    const baseX = Number.isFinite(Number(shelf.standX))
+      ? Number(shelf.standX)
+      : Number(shelf.x) || POSITIONS.idle.x;
+    const baseY = Number.isFinite(Number(shelf.standY))
+      ? Number(shelf.standY)
+      : Number(shelf.y) || POSITIONS.idle.y;
+
     return {
-      x: Math.round(Number(shelf.standX) + 45),
-      y: Math.round(Number(shelf.standY) + 20)
+      x: Math.round(baseX + 45),
+      y: Math.round(baseY + 20)
     };
   },
 
@@ -737,6 +1026,7 @@ export const StaffAssistSystem = {
     const position = options.position ?? POSITIONS[status] ?? POSITIONS.idle;
     const label = options.label ?? STATUS_LABELS[status] ?? STATUS_LABELS.idle;
     const nowMs = this.getNowMs();
+    const hasOption = (key) => Object.prototype.hasOwnProperty.call(options, key);
     const cooldownRemainingMs = Math.max(
       0,
       Math.ceil(this.cooldownUntilMs - nowMs)
@@ -759,6 +1049,14 @@ export const StaffAssistSystem = {
       cooldownRemainingMs,
       taskDurationMs: Math.max(0, Math.floor(Number(options.taskDurationMs) || 0)),
       cleaningTriggerValue: options.cleaningTriggerValue ?? null,
+      attendanceStatus: hasOption("attendanceStatus") ? options.attendanceStatus : this.state.attendanceStatus ?? null,
+      attendanceLevel: hasOption("attendanceLevel") ? options.attendanceLevel : this.state.attendanceLevel ?? null,
+      attendanceDelayMs: hasOption("attendanceDelayMs")
+        ? Math.max(0, Math.floor(Number(options.attendanceDelayMs) || 0))
+        : Math.max(0, Math.floor(Number(this.state.attendanceDelayMs) || 0)),
+      attendanceReadyAtMs: hasOption("attendanceReadyAtMs") ? options.attendanceReadyAtMs : this.state.attendanceReadyAtMs ?? null,
+      attendanceDecidedDay: hasOption("attendanceDecidedDay") ? options.attendanceDecidedDay : this.state.attendanceDecidedDay ?? null,
+      attendanceArrived: hasOption("attendanceArrived") ? options.attendanceArrived === true : this.state.attendanceArrived === true,
       updatedAtMs: Math.round(nowMs)
     };
 
@@ -785,6 +1083,10 @@ export const StaffAssistSystem = {
       return;
     }
 
+    if (this.isLateAttendancePending()) {
+      return;
+    }
+
     const safeDelayMs = Math.max(500, Math.floor(Number(delayMs) || 0));
 
     this.checkTimerId = window.setTimeout(() => {
@@ -799,6 +1101,15 @@ export const StaffAssistSystem = {
 
     window.clearTimeout(this.checkTimerId);
     this.checkTimerId = null;
+  },
+
+  clearLateEntryTimer() {
+    if (!this.lateEntryTimerId) {
+      return;
+    }
+
+    window.clearTimeout(this.lateEntryTimerId);
+    this.lateEntryTimerId = null;
   },
 
   setTaskTimer(callback, delayMs) {

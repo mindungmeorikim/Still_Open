@@ -39,6 +39,7 @@ const STAFF_EVENTS = {
 
 const STAFF_UNLOCK_DAY = 3;
 const STAFF_SHIFT_HOURS = 3;
+const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 const STAFF_CANDIDATES = Object.freeze([
   Object.freeze({
     id: "kim_minji",
@@ -444,6 +445,12 @@ export const GameFlowSystem = {
     this.isDayTimerPaused = false;
     this.staffAutoCheckoutElapsedSeconds = 0;
     this.startDayTimer();
+
+    EventBus.emit(STAFF_SHIFT_ENTRY_REQUESTED, {
+      day: GameState.day,
+      phase: GameState.phase,
+      source: "store_open_validated"
+    });
 
     UIManager.showMessage(
       `영업 시작! ${GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS}초 동안 손님 응대와 계산을 진행하고, 종료 후 오늘의 정산을 확인합니다.`

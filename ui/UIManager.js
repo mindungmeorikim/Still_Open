@@ -112,17 +112,20 @@ const STAFF_ASSIST_EVENTS = Object.freeze({
   STATE_CHANGED: "STAFF_ASSIST_STATE_CHANGED",
   MESSAGE_REQUESTED: "STAFF_ASSIST_MESSAGE_REQUESTED"
 });
+const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 
 const DEFAULT_STAFF_ASSIST_STATE = Object.freeze({
-  status: "idle",
-  label: "대기 중",
-  x: 270,
-  y: 610,
+  status: "off_duty",
+  label: "출근 대기 중",
+  x: 577,
+  y: 612,
   direction: "down",
   isMoving: false
 });
 
 const STAFF_ASSIST_STATUS_LABELS = Object.freeze({
+  off_duty: "출근 대기 중",
+  entering: "출근 중",
   idle: "대기 중",
   checking: "매장 상태 확인 중",
   warehouse: "창고 재고 확인 중",
@@ -1016,8 +1019,18 @@ export const UIManager = {
     });
 
     EventBus.on(STAFF_ASSIST_EVENTS.STATE_CHANGED, (data = {}) => {
-      this.staffAssistState = this.normalizeStaffAssistState(data.assistState);
-      this.renderStaffSummary(data.staff ?? GameState.staff);
+      const previousAssistState = this.staffAssistState;
+      const nextAssistState = this.normalizeStaffAssistState(data.assistState);
+      const shouldRenderSummary =
+        this.getStaffAssistSummarySignature(previousAssistState) !==
+        this.getStaffAssistSummarySignature(nextAssistState);
+
+      this.staffAssistState = nextAssistState;
+
+      if (shouldRenderSummary) {
+        this.renderStaffSummary(data.staff ?? GameState.staff);
+      }
+
       this.renderStaffCharacter(data.staff ?? GameState.staff);
     });
 
@@ -2826,8 +2839,23 @@ export const UIManager = {
     return this.staffAssistState;
   },
 
+  getStaffAssistSummarySignature(state = this.staffAssistState) {
+    const normalized = this.normalizeStaffAssistState(state);
+
+    return [
+      normalized.status,
+      normalized.label,
+      normalized.taskType ?? "",
+      normalized.productId ?? "",
+      normalized.targetShelfInstanceId ?? "",
+      normalized.isWorking ? "working" : "idle"
+    ].join("|");
+  },
+
   getStaffAssistDirection(status = "idle") {
     const directionMap = {
+      off_duty: "down_left",
+      entering: "down_left",
       idle: "down",
       checking: "down",
       warehouse: "left",
@@ -2863,6 +2891,14 @@ export const UIManager = {
     const stats = hired.stats ?? {};
     const staffUpgrade = GameState.bm?.staffAbilityUpgrade?.abilities ?? {};
     const assistState = this.getStaffAssistState();
+
+    if (assistState.status === "off_duty") {
+      summary.hidden = true;
+      status.textContent = "미고용";
+      body.innerHTML = "";
+      return;
+    }
+
     const statText = [
       `창고 ${Math.min(5, (Number(stats.warehouse) || 0) + (Number(staffUpgrade.warehouse) || 0))}/5`,
       `진열대 ${Math.min(5, (Number(stats.shelf) || 0) + (Number(staffUpgrade.shelf) || 0))}/5`,
@@ -2874,7 +2910,6 @@ export const UIManager = {
     body.innerHTML = `
       <span>${hired.type}</span>
       <span>${assistState.label}</span>
-      <span>위치 x ${assistState.x}, y ${assistState.y}</span>
       <span>${statText}</span>
       <span>시급 ₩${Number(hired.hourlyWage).toLocaleString("ko-KR")}</span>
       <span>예상 일급 ₩${expectedDailyWage.toLocaleString("ko-KR")}</span>
@@ -2953,6 +2988,14 @@ export const UIManager = {
     const baseStats = hired?.stats || { warehouse: 0, shelf: 0, cleaning: 0 };
     const ability = GameState.bm?.staffAbilityUpgrade?.abilities || {};
     const assistState = this.getStaffAssistState();
+    if (assistState.status === "off_duty") {
+      staffCharacter.hidden = true;
+      staffCharacter.dataset.assistStatus = assistState.status;
+      staffCharacter.dataset.staffMoving = "false";
+      staffCharacter.removeAttribute("aria-label");
+      return;
+    }
+
     const assistDirection = assistState.direction || this.getStaffAssistDirection(assistState.status);
     const warehouseStat = Math.min(5, Number(baseStats.warehouse || 0) + Number(ability.warehouse || 0));
     const shelfStat = Math.min(5, Number(baseStats.shelf || 0) + Number(ability.shelf || 0));
@@ -2970,7 +3013,7 @@ export const UIManager = {
     staffCharacter.style.setProperty("bottom", "auto", "important");
     staffCharacter.setAttribute(
       "aria-label",
-      `${staffName} ${staffType}, ${assistState.label}, 위치 x ${assistState.x}, y ${assistState.y}`
+      `${staffName} ${staffType}, ${assistState.label}`
     );
 
     let avatar = staffCharacter.querySelector(":scope > .staff-character-avatar");
@@ -3025,7 +3068,7 @@ export const UIManager = {
       statusNode.textContent = assistState.label;
     }
 
-    const countText = `x ${assistState.x}, y ${assistState.y} · ${statSummary}`;
+    const countText = statSummary;
 
     if (countNode && countNode.textContent !== countText) {
       countNode.textContent = countText;

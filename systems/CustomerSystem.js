@@ -48,11 +48,15 @@ const NUISANCE_CUSTOMER_MENTAL_PENALTY = 3;
 const NUISANCE_CHECKOUT_DELAY_MS = 5000;
 const CUSTOMER_SHELF_ZONE_IDS = new Set(Object.values(PRODUCT_SHELF_IDS));
 
+const STAFF_ENTRY_FIRST_CUSTOMER_DELAY_MS = 2000;
+const STAFF_ATTENDANCE_LATE = "late";
+
 export const CustomerSystem = {
   customers: [],
   customerIdCounter: 0,
   routeTimerId: null,
   spawnTimerId: null,
+  initialSpawnTimerId: null,
   isWaitTimePaused: false,
   isCustomerFlowPaused: false,
   targetSpawnCount: 0,
@@ -88,8 +92,18 @@ export const CustomerSystem = {
     this.isCustomerFlowPaused = false;
     this.isWaitTimePaused = false;
 
-    this.spawnNextCustomer();
-    this.startSpawnTimer();
+    const initialCustomerDelayMs = this.getInitialCustomerDelayMs();
+
+    if (initialCustomerDelayMs > 0) {
+      this.initialSpawnTimerId = setTimeout(() => {
+        this.initialSpawnTimerId = null;
+        this.spawnNextCustomer();
+        this.startSpawnTimer();
+      }, initialCustomerDelayMs);
+    } else {
+      this.spawnNextCustomer();
+      this.startSpawnTimer();
+    }
 
     this.startRouteTimer();
 
@@ -99,6 +113,7 @@ export const CustomerSystem = {
   },
 
   resetCustomersForDay() {
+    this.stopInitialSpawnTimer();
     this.stopRouteTimer();
     this.stopSpawnTimer();
 
@@ -221,11 +236,35 @@ export const CustomerSystem = {
     }, this.getSpawnIntervalMsByDay());
   },
 
+  stopInitialSpawnTimer() {
+    if (!this.initialSpawnTimerId) return;
+
+    clearTimeout(this.initialSpawnTimerId);
+    this.initialSpawnTimerId = null;
+  },
+
   stopSpawnTimer() {
     if (!this.spawnTimerId) return;
 
     clearInterval(this.spawnTimerId);
     this.spawnTimerId = null;
+  },
+
+  shouldDelayFirstCustomerForStaffEntry() {
+    return this.getInitialCustomerDelayMs() > 0;
+  },
+
+  getInitialCustomerDelayMs() {
+    if (!GameState.staff?.hired) {
+      return 0;
+    }
+
+    const attendanceStatus = GameState.staffAssist?.attendanceStatus ?? null;
+    const hasLateArrivalPending =
+      attendanceStatus === STAFF_ATTENDANCE_LATE &&
+      GameState.staffAssist?.attendanceArrived !== true;
+
+    return hasLateArrivalPending ? 0 : STAFF_ENTRY_FIRST_CUSTOMER_DELAY_MS;
   },
 
   getSpawnIntervalMsByDay() {
