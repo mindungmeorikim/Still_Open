@@ -4651,6 +4651,7 @@ button:active {
   flex-direction: column;
   gap: 6px;
   pointer-events: none;
+  transition: left 0.22s ease, top 0.22s ease;
 }
 
 #staff-character[hidden] {
@@ -21936,5 +21937,39 @@ body.is-title-screen-active #game-root {
 @media (max-width: 820px) {
   #bm-contract-shop-modal .bm-shop-recommend-actions {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* v7.2 알바 이동 자연화: StaffAssistSystem이 프레임 단위로 좌표를 갱신하므로 CSS 위치 transition은 제거한다. */
+#store-interaction-layer > #staff-character.staff-character,
+#staff-character.staff-character {
+  transition: none !important;
+  will-change: left, top;
+  pointer-events: none !important;
+}
+
+#staff-character[data-staff-moving="true"] .staff-character-avatar {
+  animation: staffWalkBob 0.42s ease-in-out infinite;
+}
+
+#staff-character[data-staff-moving="true"] .staff-character-sprite {
+  animation: staffWalkStep 0.42s ease-in-out infinite;
+}
+
+@keyframes staffWalkBob {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes staffWalkStep {
+  0%, 100% {
+    transform: rotate(-1.5deg);
+  }
+  50% {
+    transform: rotate(1.5deg);
   }
 }

@@ -108,6 +108,29 @@ const STAFF_EVENTS = {
   STATE_CHANGED: "STAFF_STATE_CHANGED"
 };
 
+const STAFF_ASSIST_EVENTS = Object.freeze({
+  STATE_CHANGED: "STAFF_ASSIST_STATE_CHANGED",
+  MESSAGE_REQUESTED: "STAFF_ASSIST_MESSAGE_REQUESTED"
+});
+
+const DEFAULT_STAFF_ASSIST_STATE = Object.freeze({
+  status: "idle",
+  label: "대기 중",
+  x: 270,
+  y: 610,
+  direction: "down",
+  isMoving: false
+});
+
+const STAFF_ASSIST_STATUS_LABELS = Object.freeze({
+  idle: "대기 중",
+  checking: "매장 상태 확인 중",
+  warehouse: "창고 재고 확인 중",
+  shelf: "진열 보조 중",
+  cleaning: "청소 보조 중",
+  returning: "복귀 중"
+});
+
 export const UIManager = {
   titleScreen: null,
   settingsModal: null,
@@ -152,6 +175,7 @@ export const UIManager = {
   inventoryByProductId: {},
   inventorySnapshot: null,
   pendingStaffHireData: null,
+  staffAssistState: { ...DEFAULT_STAFF_ASSIST_STATE },
   sanitationState: { ...DEFAULT_SANITATION_STATE },
   notificationTimerId: null,
   isWorldCameraBound: false,
@@ -989,6 +1013,18 @@ export const UIManager = {
     EventBus.on(STAFF_EVENTS.STATE_CHANGED, (data = {}) => {
       this.renderStaffSummary(data.staff);
       this.renderStaffCharacter(data.staff);
+    });
+
+    EventBus.on(STAFF_ASSIST_EVENTS.STATE_CHANGED, (data = {}) => {
+      this.staffAssistState = this.normalizeStaffAssistState(data.assistState);
+      this.renderStaffSummary(data.staff ?? GameState.staff);
+      this.renderStaffCharacter(data.staff ?? GameState.staff);
+    });
+
+    EventBus.on(STAFF_ASSIST_EVENTS.MESSAGE_REQUESTED, (data = {}) => {
+      this.showMessage(data.message, {
+        duration: data.duration
+      });
     });
   },
 
@@ -2758,6 +2794,51 @@ export const UIManager = {
     return staffSummary;
   },
 
+  normalizeStaffAssistState(state = GameState.staffAssist) {
+    const source = state && typeof state === "object"
+      ? state
+      : DEFAULT_STAFF_ASSIST_STATE;
+    const status = String(source.status ?? DEFAULT_STAFF_ASSIST_STATE.status);
+    const label = String(
+      source.label ?? STAFF_ASSIST_STATUS_LABELS[status] ?? DEFAULT_STAFF_ASSIST_STATE.label
+    );
+    const x = Number(source.x);
+    const y = Number(source.y);
+    const direction = String(source.direction ?? DEFAULT_STAFF_ASSIST_STATE.direction);
+
+    return {
+      ...DEFAULT_STAFF_ASSIST_STATE,
+      ...source,
+      status,
+      label,
+      x: Number.isFinite(x) ? Math.round(x) : DEFAULT_STAFF_ASSIST_STATE.x,
+      y: Number.isFinite(y) ? Math.round(y) : DEFAULT_STAFF_ASSIST_STATE.y,
+      direction,
+      isMoving: source.isMoving === true
+    };
+  },
+
+  getStaffAssistState() {
+    const source = GameState.staffAssist ?? this.staffAssistState;
+
+    this.staffAssistState = this.normalizeStaffAssistState(source);
+
+    return this.staffAssistState;
+  },
+
+  getStaffAssistDirection(status = "idle") {
+    const directionMap = {
+      idle: "down",
+      checking: "down",
+      warehouse: "left",
+      shelf: "right",
+      cleaning: "down_right",
+      returning: "down_left"
+    };
+
+    return directionMap[status] ?? "down";
+  },
+
   renderStaffSummary(staffState = GameState.staff) {
     this.createStaffSummary();
 
@@ -2781,6 +2862,7 @@ export const UIManager = {
       (Number(hired.hourlyWage) || 0) * (Number(hired.shiftHours) || 3);
     const stats = hired.stats ?? {};
     const staffUpgrade = GameState.bm?.staffAbilityUpgrade?.abilities ?? {};
+    const assistState = this.getStaffAssistState();
     const statText = [
       `창고 ${Math.min(5, (Number(stats.warehouse) || 0) + (Number(staffUpgrade.warehouse) || 0))}/5`,
       `진열대 ${Math.min(5, (Number(stats.shelf) || 0) + (Number(staffUpgrade.shelf) || 0))}/5`,
@@ -2788,10 +2870,11 @@ export const UIManager = {
     ].join(" · ");
 
     summary.hidden = false;
-    status.textContent = `${hired.name} 근무 중`;
+    status.textContent = `${hired.name} ${assistState.label}`;
     body.innerHTML = `
       <span>${hired.type}</span>
-      <span>창고/진열/청소 보조 중</span>
+      <span>${assistState.label}</span>
+      <span>위치 x ${assistState.x}, y ${assistState.y}</span>
       <span>${statText}</span>
       <span>시급 ₩${Number(hired.hourlyWage).toLocaleString("ko-KR")}</span>
       <span>예상 일급 ₩${expectedDailyWage.toLocaleString("ko-KR")}</span>
@@ -2833,8 +2916,8 @@ export const UIManager = {
     return getStaffAssetPath(staff, "down");
   },
 
-  getStaffStageAssetPath(staff = {}) {
-    return getStaffAssetPath(staff, "down_left");
+  getStaffStageAssetPath(staff = {}, direction = "down_left") {
+    return getStaffAssetPath(staff, direction);
   },
 
   createStaffSpriteMarkup(staff = {}, className = "staff-sprite", alt = "") {
@@ -2859,6 +2942,8 @@ export const UIManager = {
       staffCharacter.hidden = true;
       staffCharacter.innerHTML = "";
       staffCharacter.removeAttribute("data-staff-type");
+      staffCharacter.removeAttribute("data-assist-status");
+      staffCharacter.removeAttribute("data-staff-moving");
       staffCharacter.removeAttribute("aria-label");
       return;
     }
@@ -2867,6 +2952,8 @@ export const UIManager = {
     const staffType = String(hired.type ?? "근무").trim() || "근무";
     const baseStats = hired?.stats || { warehouse: 0, shelf: 0, cleaning: 0 };
     const ability = GameState.bm?.staffAbilityUpgrade?.abilities || {};
+    const assistState = this.getStaffAssistState();
+    const assistDirection = assistState.direction || this.getStaffAssistDirection(assistState.status);
     const warehouseStat = Math.min(5, Number(baseStats.warehouse || 0) + Number(ability.warehouse || 0));
     const shelfStat = Math.min(5, Number(baseStats.shelf || 0) + Number(ability.shelf || 0));
     const cleaningStat = Math.min(5, Number(baseStats.cleaning || 0) + Number(ability.cleaning || 0));
@@ -2874,42 +2961,75 @@ export const UIManager = {
 
     staffCharacter.hidden = false;
     staffCharacter.dataset.staffType = String(hired.id ?? "staff");
+    staffCharacter.dataset.assistStatus = assistState.status;
+    staffCharacter.dataset.staffMoving = assistState.isMoving ? "true" : "false";
+    staffCharacter.dataset.staffDirection = assistDirection;
+    staffCharacter.style.setProperty("left", `${assistState.x}px`, "important");
+    staffCharacter.style.setProperty("top", `${assistState.y}px`, "important");
+    staffCharacter.style.setProperty("right", "auto", "important");
+    staffCharacter.style.setProperty("bottom", "auto", "important");
     staffCharacter.setAttribute(
       "aria-label",
-      `${staffName} ${staffType}, 창고/진열/청소 보조 중`
+      `${staffName} ${staffType}, ${assistState.label}, 위치 x ${assistState.x}, y ${assistState.y}`
     );
-    staffCharacter.innerHTML = "";
 
-    const avatar = document.createElement("div");
-    avatar.className = "staff-character-avatar";
-    avatar.setAttribute("aria-hidden", "true");
+    let avatar = staffCharacter.querySelector(":scope > .staff-character-avatar");
 
-    const sprite = document.createElement("img");
-    sprite.className = "staff-character-sprite";
-    sprite.src = this.getStaffStageAssetPath(hired);
-    sprite.alt = "";
-    sprite.loading = "eager";
-    sprite.decoding = "async";
-    avatar.appendChild(sprite);
+    if (!avatar) {
+      avatar = document.createElement("div");
+      avatar.className = "staff-character-avatar";
+      avatar.setAttribute("aria-hidden", "true");
+      staffCharacter.appendChild(avatar);
+    }
 
-    const label = document.createElement("div");
-    label.className = "staff-character-label";
+    let sprite = avatar.querySelector(":scope > .staff-character-sprite");
 
-    const nameNode = document.createElement("strong");
-    nameNode.textContent = staffName;
+    if (!sprite) {
+      sprite = document.createElement("img");
+      sprite.className = "staff-character-sprite";
+      sprite.alt = "";
+      sprite.loading = "eager";
+      sprite.decoding = "async";
+      sprite.draggable = false;
+      avatar.appendChild(sprite);
+    }
 
-    const statusNode = document.createElement("span");
-    statusNode.textContent = "창고/진열/청소 보조";
+    const nextSpriteSrc = this.getStaffStageAssetPath(hired, assistDirection);
 
-    const countNode = document.createElement("em");
-    countNode.textContent = statSummary;
+    if (sprite.getAttribute("src") !== nextSpriteSrc) {
+      sprite.src = nextSpriteSrc;
+    }
 
-    label.appendChild(nameNode);
-    label.appendChild(statusNode);
-    label.appendChild(countNode);
+    let label = staffCharacter.querySelector(":scope > .staff-character-label");
 
-    staffCharacter.appendChild(avatar);
-    staffCharacter.appendChild(label);
+    if (!label) {
+      label = document.createElement("div");
+      label.className = "staff-character-label";
+      label.innerHTML = `
+        <strong></strong>
+        <span></span>
+        <em></em>
+      `;
+      staffCharacter.appendChild(label);
+    }
+
+    const nameNode = label.querySelector("strong");
+    const statusNode = label.querySelector("span");
+    const countNode = label.querySelector("em");
+
+    if (nameNode && nameNode.textContent !== staffName) {
+      nameNode.textContent = staffName;
+    }
+
+    if (statusNode && statusNode.textContent !== assistState.label) {
+      statusNode.textContent = assistState.label;
+    }
+
+    const countText = `x ${assistState.x}, y ${assistState.y} · ${statSummary}`;
+
+    if (countNode && countNode.textContent !== countText) {
+      countNode.textContent = countText;
+    }
   },
 
   getStaffCharacterMark(staff = {}) {

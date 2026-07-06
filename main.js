@@ -24,6 +24,7 @@ import { PlayerActionSystem } from "./systems/PlayerActionSystem.js";
 import { BMSystem } from "./systems/BMSystem.js";
 import { SanitationSystem } from "./systems/SanitationSystem.js";
 import { DailyMissionSystem } from "./systems/DailyMissionSystem.js";
+import { StaffAssistSystem } from "./systems/StaffAssistSystem.js";
 
 function isCustomerEventModalOpen() {
   return (
@@ -191,6 +192,7 @@ function initGame() {
   SanitationSystem.init();
   PlayerMovementSystem.init();
   PlayerActionSystem.init();
+  StaffAssistSystem.init();
   bindCustomerEventModalFlow();
   bindCustomerStockShortagePenalty();
   EventBus.emit(EVENTS.GAME_INIT);
