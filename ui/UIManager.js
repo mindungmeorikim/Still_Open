@@ -1337,10 +1337,58 @@ export const UIManager = {
       }
 
       customerNode.style.setProperty("--customer-offset", `${(index % 4) * 16}px`);
+      this.applyCustomerTargetPosition(customerNode, customer, index);
       this.applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes);
       this.renderCustomerNodeContent(customerNode, customer);
       customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
     });
+  },
+
+  applyCustomerTargetPosition(customerNode, customer, index = 0) {
+    const position = this.getCustomerTargetPosition(customer);
+
+    if (!position) {
+      customerNode.style.removeProperty("left");
+      customerNode.style.removeProperty("top");
+      return;
+    }
+
+    const offsetX = (index % 3) * 12;
+    customerNode.style.setProperty("left", `${position.x + offsetX}px`, "important");
+    customerNode.style.setProperty("top", `${position.y}px`, "important");
+  },
+
+  getCustomerTargetPosition(customer) {
+    if (!this.isCustomerShelfZone(customer.currentZone)) {
+      return null;
+    }
+
+    const targetX = Number(customer.targetX);
+    const targetY = Number(customer.targetY);
+
+    if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
+      return {
+        x: targetX,
+        y: targetY
+      };
+    }
+
+    const shelfInstance = SHELF_INSTANCES.find((shelf) => {
+      return shelf.instanceId === customer.targetShelfInstanceId;
+    });
+
+    if (
+      shelfInstance &&
+      Number.isFinite(Number(shelfInstance.standX)) &&
+      Number.isFinite(Number(shelfInstance.standY))
+    ) {
+      return {
+        x: Number(shelfInstance.standX),
+        y: Number(shelfInstance.standY)
+      };
+    }
+
+    return null;
   },
 
   renderCustomerNodeContent(customerNode, customer) {

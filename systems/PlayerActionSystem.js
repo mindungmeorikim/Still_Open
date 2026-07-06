@@ -1291,19 +1291,31 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     const carriedProductId = customer.carriedProductId ?? null;
     const quantity = 1;
 
+    if (
+      customer.status !== "waiting" ||
+      customer.currentZone !== "counter"
+    ) {
+      this.showActionMessage("계산대에서 상품을 든 손님만 계산할 수 있습니다.");
+      console.warn("[PlayerActionSystem] 계산 준비가 되지 않은 손님입니다.", customer);
+      return null;
+    }
+
+    if (!carriedProductId) {
+      this.showActionMessage("손님이 아직 상품을 고르지 않았습니다.");
+      console.warn("[PlayerActionSystem] 상품을 들지 않은 손님은 계산할 수 없습니다.", customer);
+      return null;
+    }
+
     if (!wantedProductId) {
       this.showActionMessage("손님의 요청 상품 정보가 없습니다.");
       console.warn("[PlayerActionSystem] 손님의 요청 상품 정보가 없습니다.", customer);
       return null;
     }
 
-    const availableProduct = carriedProductId
-      ? (
-          InventorySystem.getStockQuantity?.(carriedProductId) >= quantity
-            ? { id: carriedProductId }
-            : null
-        )
-      : InventorySystem.findAvailableProductForRequest?.(wantedProductId, quantity);
+    const availableProduct =
+      InventorySystem.getStockQuantity?.(carriedProductId) >= quantity
+        ? { id: carriedProductId }
+        : null;
 
     if (!availableProduct) {
       CustomerSystem.handleStockShortageForCustomer?.(

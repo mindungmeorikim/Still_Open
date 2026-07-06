@@ -39,6 +39,8 @@ import {
   getProductsByCustomerRequestId,
   PRODUCT_SHELF_IDS
 } from "../data/ProductData.js";
+import { getShelfInstanceIdByProductId } from "../data/ProductShelfMapData.js";
+import { getShelfInstanceById } from "../data/ShelfPlacementData.js";
 import { RandomEventSystem } from "./RandomEventSystem.js";
 import { BMSystem } from "./BMSystem.js";
 
@@ -236,7 +238,8 @@ export const CustomerSystem = {
   createCustomer() {
     const customerType = this.pickCustomerType();
     const wantedProduct = this.decideWantedProduct(customerType);
-    const wantedShelfId = this.getShelfIdForRequest(wantedProduct.id);
+    const wantedShelfInstance = this.getShelfInstanceForRequest(wantedProduct.id);
+    const wantedShelfId = wantedShelfInstance?.shelfId ?? this.getShelfIdForRequest(wantedProduct.id);
     const routeState = this.getRouteStateByStatus(CUSTOMER_STATUS.ENTERING);
     const currentZone = this.getAccessibleCustomerZone(routeState.currentZone);
     const targetZone = this.getAccessibleCustomerZone(wantedShelfId, currentZone);
@@ -256,6 +259,9 @@ export const CustomerSystem = {
       wantedProductId: wantedProduct.id,
       wantedProductName: BMSystem.getProductDisplayName(wantedProduct),
       wantedShelfId,
+      targetShelfInstanceId: wantedShelfInstance?.instanceId ?? null,
+      targetX: wantedShelfInstance?.standX ?? null,
+      targetY: wantedShelfInstance?.standY ?? null,
       carriedProductId: null,
       carriedProductName: null,
       carriedProductImagePath: null,
@@ -386,7 +392,7 @@ export const CustomerSystem = {
     const scenario = this.getCurrentDayScenario();
     const scenarioWantedProductIds = new Set(scenario.wantedProductIds ?? []);
     const unlockedProducts = PRODUCTS.filter((product) => {
-      return BMSystem.canSellProduct(product.id);
+      return this.canCustomerChooseProduct(product);
     });
     const unlockedRequestIds = new Set();
 
@@ -541,10 +547,48 @@ export const CustomerSystem = {
   },
 
   getShelfIdForRequest(requestId) {
-    const candidates = getProductsByCustomerRequestId(requestId)
-      .filter((product) => BMSystem.canSellProduct(product.id));
+    const candidates = this.getPlacedSellableProductsForRequest(requestId);
 
     return candidates[0]?.shelfId ?? CUSTOMER_ZONES.SHELF;
+  },
+
+  getShelfInstanceForRequest(requestId) {
+    const candidates = this.getPlacedSellableProductsForRequest(requestId);
+
+    for (const product of candidates) {
+      const shelfInstance = this.getShelfInstanceForProduct(product.id);
+
+      if (shelfInstance) {
+        return shelfInstance;
+      }
+    }
+
+    return null;
+  },
+
+  getShelfInstanceForProduct(productId) {
+    const shelfInstanceId = getShelfInstanceIdByProductId(productId);
+
+    if (!shelfInstanceId) {
+      return null;
+    }
+
+    return getShelfInstanceById(shelfInstanceId);
+  },
+
+  canCustomerChooseProduct(product) {
+    return (
+      Boolean(product?.id) &&
+      BMSystem.canSellProduct(product.id) &&
+      Boolean(this.getShelfInstanceForProduct(product.id))
+    );
+  },
+
+  getPlacedSellableProductsForRequest(requestId) {
+    return getProductsByCustomerRequestId(requestId)
+      .filter((product) => {
+        return this.canCustomerChooseProduct(product);
+      });
   },
 
   getRouteStateByStatus(status) {
@@ -646,7 +690,10 @@ export const CustomerSystem = {
         carriedProductId: carriedProduct.id,
         carriedProductName: BMSystem.getProductDisplayName(carriedProduct),
         carriedProductImagePath: carriedProduct.imagePath,
-        carriedShelfId: carriedProduct.shelfId ?? customer.wantedShelfId ?? null
+        carriedShelfId: carriedProduct.shelfId ?? customer.wantedShelfId ?? null,
+        targetShelfInstanceId: customer.targetShelfInstanceId ?? null,
+        targetX: null,
+        targetY: null
       };
 
       return this.assignCounterQueueOrder(waitingCustomer);
@@ -690,10 +737,7 @@ export const CustomerSystem = {
 
   findStockedProductForRequest(requestId, quantity = 1, customerId = null) {
     const safeQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
-    const candidates = getProductsByCustomerRequestId(requestId)
-      .filter((product) => {
-        return BMSystem.canSellProduct(product.id);
-      })
+    const candidates = this.getPlacedSellableProductsForRequest(requestId)
       .map((product) => {
         const stockQuantity = Number(
           this.inventoryByProductId[product.id]?.quantity
@@ -987,6 +1031,9 @@ export const CustomerSystem = {
       carriedProductImagePath: customer.carriedProductImagePath ?? null,
       wantedShelfId: customer.wantedShelfId ?? null,
       carriedShelfId: customer.carriedShelfId ?? null,
+      targetShelfInstanceId: customer.targetShelfInstanceId ?? null,
+      targetX: customer.targetX ?? null,
+      targetY: customer.targetY ?? null,
 
       status: customer.status,
       currentZone: customer.currentZone,
@@ -1016,6 +1063,9 @@ export const CustomerSystem = {
         null,
       wantedShelfId: customer.wantedShelfId ?? null,
       carriedShelfId: customer.carriedShelfId ?? null,
+      targetShelfInstanceId: customer.targetShelfInstanceId ?? null,
+      targetX: customer.targetX ?? null,
+      targetY: customer.targetY ?? null,
       status: customer.status,
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,
@@ -1076,13 +1126,28 @@ export const CustomerSystem = {
 
   getWaitingCustomers() {
     return this.customers.filter((customer) => {
-      return (
-        customer.status === CUSTOMER_STATUS.WAITING &&
-        customer.currentZone === CUSTOMER_ZONES.COUNTER &&
-        !customer.isSatisfied &&
-        !customer.hasReportedLeft
-      );
+      return this.isCheckoutReadyCustomer(customer);
     });
+  },
+
+  isCheckoutReadyCustomer(customer) {
+    if (!this.isCheckoutCandidate(customer)) {
+      return false;
+    }
+
+    if (
+      customer.status !== CUSTOMER_STATUS.WAITING ||
+      customer.currentZone !== CUSTOMER_ZONES.COUNTER ||
+      !customer.carriedProductId
+    ) {
+      return false;
+    }
+
+    const stockQuantity = Number(
+      this.inventoryByProductId[customer.carriedProductId]?.quantity
+    ) || 0;
+
+    return stockQuantity > 0;
   },
 
   /*
@@ -1101,7 +1166,7 @@ export const CustomerSystem = {
   */
   getCheckoutCandidates() {
     return this.customers.filter((customer) => {
-      return this.isCheckoutCandidate(customer);
+      return this.isCheckoutReadyCustomer(customer);
     });
   },
 
@@ -1122,32 +1187,6 @@ export const CustomerSystem = {
 
     if (waitingCustomer) {
       return waitingCustomer;
-    }
-
-    const candidates = this.getCheckoutCandidates();
-
-    const counterCustomer = candidates.find((customer) => {
-      return customer.currentZone === CUSTOMER_ZONES.COUNTER;
-    });
-
-    if (counterCustomer) {
-      return counterCustomer;
-    }
-
-    const shoppingCustomer = candidates.find((customer) => {
-      return customer.status === CUSTOMER_STATUS.SHOPPING;
-    });
-
-    if (shoppingCustomer) {
-      return shoppingCustomer;
-    }
-
-    const enteringCustomer = candidates.find((customer) => {
-      return customer.status === CUSTOMER_STATUS.ENTERING;
-    });
-
-    if (enteringCustomer) {
-      return enteringCustomer;
     }
 
     return null;
