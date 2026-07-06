@@ -145,7 +145,7 @@ export const PlayerActionSystem = {
     this.bindCounterCheckoutAction();
     this.bindPointerActions();
     this.bindKeyboardActions();
-    // BM 최종본 기준 알바는 계산 담당이 아니므로 자동 계산 이벤트 바인딩을 하지 않는다.
+    // BM 최종본 기준 알바는 자동 계산 전담이 아니므로 자동 계산 이벤트 바인딩을 하지 않는다.
     this.bindDeliveryBoxEvents();
     this.bindSanitationEvents();
   },
@@ -162,7 +162,7 @@ export const PlayerActionSystem = {
 
   bindStaffAutoCheckoutEvents() {
     // Deprecated: 알바 자동 계산은 최종 BM/기획에서 제거됨.
-    // 알바 역할은 창고/진열대/청소 보조만 담당한다.
+    // 알바 역할은 창고/진열대/청소 보조로 제한한다.
   },
 
   bindDeliveryBoxEvents() {
@@ -878,7 +878,8 @@ movePlayerToCleaningZone(onComplete) {
 
 startTimedRestockPhase({ phase, message, onComplete }) {
   this.restockPhase = phase;
-  this.restockRemainingSeconds = Math.ceil(this.restockDuration / 1000);
+  const durationMs = this.getAssistedActionDurationMs(phase, this.restockDuration);
+  this.restockRemainingSeconds = Math.ceil(durationMs / 1000);
   const usesWarehouseBox = phase === "warehouse" || phase === "delivery";
 
   if (usesWarehouseBox) {
@@ -908,7 +909,42 @@ startTimedRestockPhase({ phase, message, onComplete }) {
     }
 
     onComplete?.();
-  }, this.restockDuration);
+  }, durationMs);
+},
+
+getStaffAssistPower(type = "shelf") {
+  const staff = GameState.staff?.hired;
+
+  if (!staff) {
+    return 0;
+  }
+
+  const base = Math.max(0, Math.floor(Number(staff.stats?.[type]) || 0));
+  const bonus = Math.max(0, Math.floor(Number(GameState.bm?.staffAbilityUpgrade?.abilities?.[type]) || 0));
+
+  return Math.min(5, base + bonus);
+},
+
+getAssistTypeForActionPhase(phase = "shelf") {
+  if (phase === "warehouse" || phase === "delivery") {
+    return "warehouse";
+  }
+
+  if (phase === "cleaning") {
+    return "cleaning";
+  }
+
+  return "shelf";
+},
+
+getAssistedActionDurationMs(phase = "shelf", baseDurationMs = this.restockDuration) {
+  const safeBaseDuration = Math.max(1000, Math.floor(Number(baseDurationMs) || this.restockDuration));
+  const assistType = this.getAssistTypeForActionPhase(phase);
+  const assistPower = this.getStaffAssistPower(assistType);
+  const reductionRate = Math.min(0.4, assistPower * 0.08);
+  const reducedDuration = Math.round(safeBaseDuration * (1 - reductionRate));
+
+  return Math.max(1800, reducedDuration);
 },
 
 completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {

@@ -2743,7 +2743,7 @@ export const UIManager = {
     status.textContent = `${hired.name} 근무 중`;
     body.innerHTML = `
       <span>${hired.type}</span>
-      <span>창고/진열대/청소 보조 중</span>
+      <span>창고/진열/청소 보조 중</span>
       <span>${statText}</span>
       <span>시급 ₩${Number(hired.hourlyWage).toLocaleString("ko-KR")}</span>
       <span>예상 일급 ₩${expectedDailyWage.toLocaleString("ko-KR")}</span>
@@ -2828,7 +2828,7 @@ export const UIManager = {
     staffCharacter.dataset.staffType = String(hired.id ?? "staff");
     staffCharacter.setAttribute(
       "aria-label",
-      `${staffName} ${staffType}, 창고/진열대/청소 보조 중`
+      `${staffName} ${staffType}, 창고/진열/청소 보조 중`
     );
     staffCharacter.innerHTML = "";
 
@@ -2851,7 +2851,7 @@ export const UIManager = {
     nameNode.textContent = staffName;
 
     const statusNode = document.createElement("span");
-    statusNode.textContent = "창고/진열대/청소 보조";
+    statusNode.textContent = "창고/진열/청소 보조";
 
     const countNode = document.createElement("em");
     countNode.textContent = statSummary;
@@ -6316,6 +6316,7 @@ export const UIManager = {
         <div class="bm-contract-product-copy">
           <strong>알바 강화권</strong>
           <span>80다이아 · 원하는 분야 1칸 강화 · 총 ${state.totalCount ?? 0}/${state.maxTotal ?? 5}</span>
+          <small>강화한 분야의 창고/진열/청소 작업 시간이 짧아집니다.</small>
           <em>${canUpgrade ? "강화 가능" : GameState.staff?.hired ? `다음 가능 Day ${state.nextAvailableDay ?? "-"}` : "고용된 알바 필요"}</em>
         </div>
         <div class="bm-tool-actions bm-staff-upgrade-actions">
@@ -7726,7 +7727,7 @@ export const UIManager = {
     const nextStepText = resultData.nextStepText ??
       "정산 확인 후 업그레이드를 선택하고 다음 Day로 진행합니다.";
     const mvpText = resultData.mvpTestDataApplied
-      ? `<p class="modal-note">※ 임시 MVP 테스트 데이터가 적용되었습니다.</p>`
+      ? `<p class="modal-note">※ 개발 점검용 정산 데이터가 적용되었습니다.</p>`
       : "";
     const staffResult = resultData.staff ?? {};
     const infiniteGameOverNotice = this.createInfiniteGameOverResultNotice(

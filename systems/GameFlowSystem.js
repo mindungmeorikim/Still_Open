@@ -44,31 +44,31 @@ const STAFF_CANDIDATES = Object.freeze([
     id: "kim_minji",
     assetVariant: "staff_female_glasses",
     name: "김민지",
-    type: "꼼꼼한 진열/청소 담당",
+    type: "꼼꼼한 정리형 알바",
     hourlyWage: 1200,
     attendance: 95,
     stats: Object.freeze({ warehouse: 1, shelf: 3, cleaning: 1 }),
-    ability: "체크리스트를 보며 진열 정리와 청소 보조를 꼼꼼하게 챙깁니다. 집중력이 좋고 잔소리를 조금 하지만 매장 정리에 강한 타입입니다."
+    ability: "창고/진열/청소 보조를 모두 수행하지만, 진열 정리 능력이 조금 높은 알바입니다. 체크리스트를 보며 매장 정리를 꼼꼼하게 챙깁니다."
   }),
   Object.freeze({
     id: "park_junho",
     assetVariant: "staff_male_cashier",
     name: "박준호",
-    type: "성실한 신입 알바",
+    type: "성실한 창고형 알바",
     hourlyWage: 1350,
     attendance: 88,
     stats: Object.freeze({ warehouse: 3, shelf: 1, cleaning: 1 }),
-    ability: "바코드 스캐너를 들고 늘 긴장한 눈빛이지만, 시키면 착실히 해내는 신입 알바입니다. 창고에서 재고를 가져오는 속도가 빠릅니다."
+    ability: "창고/진열/청소 보조를 모두 수행하지만, 창고에서 재고를 가져오는 능력이 조금 높은 알바입니다. 시키면 착실히 해내는 신입 타입입니다."
   }),
   Object.freeze({
     id: "lee_bora",
     assetVariant: "staff_female_friendly",
     name: "이보라",
-    type: "밝고 침착한 서비스형",
+    type: "밝고 침착한 위생형 알바",
     hourlyWage: 1300,
     attendance: 90,
     stats: Object.freeze({ warehouse: 1, shelf: 1, cleaning: 3 }),
-    ability: "밝고 침착한 미소로 매장을 정돈하는 베테랑 알바입니다. 진상도 웃으면서 넘기는 타입이며 청소와 위생 유지 보조에 강합니다."
+    ability: "창고/진열/청소 보조를 모두 수행하지만, 청소와 위생 유지 능력이 조금 높은 알바입니다. 밝고 침착한 미소로 매장을 정돈합니다."
   })
 ]);
 
@@ -325,7 +325,7 @@ export const GameFlowSystem = {
   },
 
   handleStaffAutoCheckoutTick() {
-    // BM 최종본 기준 알바는 자동 계산 담당이 아니라 창고/진열대/청소 보조 담당이다.
+    // BM 최종본 기준 알바는 자동 계산 전담이 아니라 창고/진열대/청소 보조를 수행한다.
     this.staffAutoCheckoutElapsedSeconds = 0;
   },
 

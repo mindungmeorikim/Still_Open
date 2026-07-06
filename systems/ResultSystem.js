@@ -24,6 +24,8 @@ import { UIManager } from "../ui/UIManager.js";
 import { getUnlockedProducts } from "../data/ProductData.js";
 import { InventorySystem } from "./InventorySystem.js";
 
+const ENABLE_MVP_TEST_SETTLEMENT_DATA = false;
+
 export const ResultSystem = {
   calculatedResultDay: null,
   processedCheckoutKeys: new Set(),
@@ -501,6 +503,10 @@ export const ResultSystem = {
   },
 
   shouldApplyMvpTestData() {
+    if (ENABLE_MVP_TEST_SETTLEMENT_DATA !== true) {
+      return false;
+    }
+
     const stats = GameState.todayStats;
 
     return (
@@ -516,12 +522,9 @@ export const ResultSystem = {
 
   applyMvpTestData() {
     /*
-      임시 MVP 테스트 데이터
-      추후 CustomerSystem / InventorySystem / EconomySystem 연결 후 제거 가능
-
-      목적:
-      - NPC, 재고, 경제 시스템이 아직 완성되지 않아도
-        Day 종료 → 정산 → 업그레이드 → 다음 Day 흐름이 눈에 보이게 작동하도록 함
+      개발 점검 전용 정산 더미 데이터입니다.
+      ENABLE_MVP_TEST_SETTLEMENT_DATA를 true로 바꾼 로컬 테스트에서만 작동합니다.
+      실제 플레이/제출 빌드에서는 자동 성공 정산이 발생하지 않도록 기본값을 false로 유지합니다.
     */
 
     const targetRevenue = GameState.dailyGoal.targetRevenue;
@@ -584,7 +587,7 @@ export const ResultSystem = {
   createResultMessage(resultData) {
     const resultText = resultData.success ? "영업 성공" : "영업 실패";
     const mvpText = resultData.mvpTestDataApplied
-      ? " / 임시 MVP 데이터 적용"
+      ? " / 개발 점검용 정산 데이터 적용"
       : "";
     const sanitationText = resultData.sanitationPenalty?.applies
       ? ` / 위생 페널티 ${resultData.sanitationPenalty.satisfactionPenalty}`

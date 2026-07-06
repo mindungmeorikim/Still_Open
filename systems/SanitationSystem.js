@@ -37,6 +37,7 @@ export const SanitationSystem = {
   warningArmed: true,
   cleaningTimerId: null,
   cleaningDurationMs: CLEANING_DURATION_MS,
+  activeCleaningDurationMs: null,
   processedDisruptionKeys: new Set(),
 
   init() {
@@ -94,7 +95,7 @@ export const SanitationSystem = {
       isCleaningNeeded: this.isCleaningNeeded,
       isCleaning: this.isCleaning,
       warningArmed: this.warningArmed,
-      cleaningDurationMs: this.cleaningDurationMs,
+      cleaningDurationMs: this.activeCleaningDurationMs ?? this.cleaningDurationMs,
       settlementPenalty: this.getSettlementPenalty()
     };
   },
@@ -183,25 +184,28 @@ export const SanitationSystem = {
       return result;
     }
 
+    const durationMs = this.getAssistedCleaningDurationMs(this.cleaningDurationMs, options.actorType);
+
     this.isCleaning = true;
+    this.activeCleaningDurationMs = durationMs;
     this.emitChanged("cleaning_started", { source: options.source ?? "unknown" });
     EventBus.emit(SANITATION_EVENTS.CLEANING_STARTED, {
       day: this.getCurrentDay(),
-      durationMs: this.cleaningDurationMs,
+      durationMs,
       source: options.source ?? "unknown",
       state: this.getState()
     });
     EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
       message: "청소 중...",
-      duration: this.cleaningDurationMs
+      duration: durationMs
     });
 
-    this.scheduleCleaningCompletion();
+    this.scheduleCleaningCompletion(durationMs);
 
     return {
       success: true,
       reason: "started",
-      durationMs: this.cleaningDurationMs,
+      durationMs,
       state: this.getState()
     };
   },
@@ -213,6 +217,7 @@ export const SanitationSystem = {
     this.clearCleaningTimer();
     this.value = this.clampSanitation(this.value + CLEANING_RECOVERY);
     this.isCleaning = false;
+    this.activeCleaningDurationMs = null;
     this.isCleaningNeeded = this.value < DEFAULT_SANITATION;
     this.updateWarningState(previousValue, this.value);
 
@@ -252,6 +257,7 @@ export const SanitationSystem = {
     this.value = DEFAULT_SANITATION;
     this.isCleaningNeeded = false;
     this.isCleaning = false;
+    this.activeCleaningDurationMs = null;
     this.warningArmed = true;
     this.processedDisruptionKeys.clear();
     this.emitChanged("reset");
@@ -284,7 +290,7 @@ export const SanitationSystem = {
       this.scheduleCleaningCompletion();
       EventBus.emit(SANITATION_EVENTS.CLEANING_STARTED, {
         day: this.getCurrentDay(),
-        durationMs: this.cleaningDurationMs,
+        durationMs: this.activeCleaningDurationMs ?? this.cleaningDurationMs,
         source: "hydrate",
         state: this.getState()
       });
@@ -365,12 +371,41 @@ export const SanitationSystem = {
     }
   },
 
-  scheduleCleaningCompletion() {
+  scheduleCleaningCompletion(durationMs = this.activeCleaningDurationMs ?? this.cleaningDurationMs) {
+    const safeDurationMs = Math.max(1000, Math.floor(Number(durationMs) || this.cleaningDurationMs));
+
+    this.activeCleaningDurationMs = safeDurationMs;
     this.clearCleaningTimer();
     this.cleaningTimerId = window.setTimeout(() => {
       this.cleaningTimerId = null;
       this.completeCleaning();
-    }, this.cleaningDurationMs);
+    }, safeDurationMs);
+  },
+
+  getStaffAssistPower(type = "cleaning") {
+    const staff = GameState.staff?.hired;
+
+    if (!staff) {
+      return 0;
+    }
+
+    const base = Math.max(0, Math.floor(Number(staff.stats?.[type]) || 0));
+    const bonus = Math.max(0, Math.floor(Number(GameState.bm?.staffAbilityUpgrade?.abilities?.[type]) || 0));
+
+    return Math.min(5, base + bonus);
+  },
+
+  getAssistedCleaningDurationMs(baseDurationMs = this.cleaningDurationMs, actorType = "player") {
+    if (actorType !== "player") {
+      return Math.max(1000, Math.floor(Number(baseDurationMs) || this.cleaningDurationMs));
+    }
+
+    const safeBaseDuration = Math.max(1000, Math.floor(Number(baseDurationMs) || this.cleaningDurationMs));
+    const assistPower = this.getStaffAssistPower("cleaning");
+    const reductionRate = Math.min(0.4, assistPower * 0.08);
+    const reducedDuration = Math.round(safeBaseDuration * (1 - reductionRate));
+
+    return Math.max(1800, reducedDuration);
   },
 
   clearCleaningTimer() {

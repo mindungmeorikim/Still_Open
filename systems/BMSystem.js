@@ -521,7 +521,14 @@ export const BMSystem = {
     const product = this.resolveProduct(productOrId);
     if (!product) return "";
     const level = this.getProductUpgradeLevel(product);
+
+    // 최종 강화명은 해당 상품이 Lv.5 강화에 성공한 뒤에만 공개한다.
     return level >= 5 && product.finalName ? product.finalName : product.name;
+  },
+
+  getProductBaseDisplayName(productOrId) {
+    const product = this.resolveProduct(productOrId);
+    return product?.name ?? "";
   },
 
   getProductUpgradeState(productId) {
@@ -532,7 +539,7 @@ export const BMSystem = {
     const config = PRODUCT_UPGRADE_CONFIGS[product.upgradeType] ?? PRODUCT_UPGRADE_CONFIGS.normal;
     const currentPrice = this.getProductSalePriceAtLevel(product, level);
     const nextPrice = nextLevel ? this.getProductSalePriceAtLevel(product, nextLevel) : currentPrice;
-    return { product, level, nextLevel, displayName: this.getProductDisplayName(product), currentPrice, nextPrice, nextCost: nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0, typeLabel: config.name, canUpgrade: !!nextLevel && this.canSellProduct(product.id) && GameState.money >= (nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0) };
+    return { product, level, nextLevel, displayName: this.getProductDisplayName(product), baseDisplayName: this.getProductBaseDisplayName(product), currentPrice, nextPrice, nextCost: nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0, typeLabel: config.name, canUpgrade: !!nextLevel && this.canSellProduct(product.id) && GameState.money >= (nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0) };
   },
 
   purchaseStaffAbilityUpgrade(abilityKey) {
@@ -709,8 +716,8 @@ export const BMSystem = {
   getContractUnlockSkipState() { const v = this.validateContractUnlockSkip(); return { priceDiamond: CONTRACT_UNLOCK_SKIP_DIAMOND_PRICE, cooldownDays: CONTRACT_UNLOCK_SKIP_COOLDOWN_DAYS, canUse: v.success, reason: v.reason, message: v.message, nextProducts: this.getNextContractUnlockProducts().map((p) => this.createContractProductPayload(p)) }; },
   getPeakCouponState() { const bm = this.ensureBMState(); const v = this.validatePeakCouponUse(); return { priceDiamond: PEAK_COUPON_DIAMOND_PRICE, purchasePriceDiamond: this.getPeakCouponPurchasePrice(), discountActive: bm.peakCouponDiscountDay === GameState.day && bm.peakCouponDiscountUsedDay !== GameState.day, durationSeconds: PEAK_COUPON_DURATION_SECONDS, revenueMultiplier: PEAK_COUPON_REVENUE_MULTIPLIER, ownedCount: bm.peakTimeCoupons, usedDay: bm.peakCouponUsedDay, isActive: bm.peakCouponActive, canUse: v.success, reason: v.reason, message: v.message }; },
 
-  createContractProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, finalName: product.finalName, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, contractCost: product.contractCost, unlockDay: product.unlockDay, isOwned: this.hasProductContract(product.id), isShopUnlocked: this.isContractShopUnlocked(product.id) } : null; },
-  createPremiumProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, finalName: product.finalName, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, diamondPrice: product.diamondPrice, isPurchased: this.isPremiumProductPurchased(product.id), isZoneUnlocked: this.isZoneUnlocked(product.requiredZoneId) } : null; },
+  createContractProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, contractCost: product.contractCost, unlockDay: product.unlockDay, isOwned: this.hasProductContract(product.id), isShopUnlocked: this.isContractShopUnlocked(product.id) } : null; },
+  createPremiumProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, diamondPrice: product.diamondPrice, isPurchased: this.isPremiumProductPurchased(product.id), isZoneUnlocked: this.isZoneUnlocked(product.requiredZoneId) } : null; },
   emitStateChanged(reason, details = {}) { EventBus.emit(BM_EVENTS.STATE_CHANGED, { reason, ...details, bmState: this.getBMState() }); },
   ok(reason, message, details = {}) { return { success: true, reason, message, day: GameState.day, ...details, bmState: this.getBMState?.() ?? null }; },
   fail(reason, message, details = {}) { return { success: false, reason, message, day: GameState.day, ...details }; },

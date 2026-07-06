@@ -2101,3 +2101,14 @@
 - Wired staff candidate data to use assetVariant mapping.
 - Updated staff hire modal to show actual staff sprites instead of generic icons.
 - Updated in-store hired staff display to show sprite image instead of letter badge.
+
+## [v7.0.9] 2026-07-06 17:25 - 정산/알바/BM 표시 규칙 보정
+
+### Changed
+- 임시 MVP 정산 더미 데이터 자동 적용을 기본 비활성화했습니다. 실제 플레이 정산은 누적된 매출/비용/고객/위생 데이터를 기준으로 계산됩니다.
+- 알바 후보 문구를 고정 담당 역할처럼 보이지 않도록 정리형/창고형/위생형 보조 콘셉트로 수정했습니다.
+- 알바 능력치와 알바 강화권 효과가 창고/진열/청소 작업 시간 감소에 반영되도록 연결했습니다.
+- 상품 최종 강화명은 해당 상품이 Lv.5 강화 완료된 뒤에만 표시되도록 BM 표시 규칙을 명확히 했습니다.
+
+### Fixed
+- 판매권/프리미엄 상품 payload에서 최종 강화명이 사전 노출될 수 있는 필드를 제거했습니다.
