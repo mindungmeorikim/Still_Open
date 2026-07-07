@@ -1,3 +1,9 @@
+## [v7.13.46] Small Screen Full View Button Fix
+
+### Fixed
+- 작은 화면에서 우측 상단 설정/도움말 아이콘이 `전체보기` 버튼을 가려 보이지 않던 문제를 수정했습니다.
+- `전체보기` 버튼을 우측 아이콘 줄 아래로 충분히 내려, 작은 화면에서도 독립적으로 보이도록 보정했습니다.
+
 ## [v7.13.45] Tutorial In-Game Ready Return Flow
 
 ### Changed

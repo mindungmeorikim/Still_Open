@@ -26355,3 +26355,55 @@ body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tut
   display: none !important;
 }
 
+
+/* [v7.13.46] Small-screen full-view button position fix
+   - 작은 화면에서 우측 상단 설정/도움말 아이콘이 `전체보기` 버튼을 가리는 문제를 방지한다.
+   - 우측 아이콘 줄 아래로 전체보기 버튼을 충분히 내려 독립 보조 버튼처럼 보이게 한다. */
+#store-composition.world-store-composition .store-composition-header {
+  right: clamp(8px, 1vw, 12px) !important;
+  top: clamp(72px, 10.5vh, 94px) !important;
+  z-index: 548 !important;
+}
+
+#store-camera-fit-button {
+  min-width: 62px !important;
+  min-height: 24px !important;
+  padding: 4px 8px !important;
+  font-size: 8px !important;
+  opacity: 0.94 !important;
+}
+
+@media (max-width: 1180px), (max-height: 720px) {
+  #store-composition.world-store-composition .store-composition-header {
+    top: 70px !important;
+    right: 7px !important;
+  }
+
+  #store-camera-fit-button {
+    min-width: 60px !important;
+    min-height: 23px !important;
+    padding: 4px 8px !important;
+    font-size: 8px !important;
+  }
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #store-composition.world-store-composition .store-composition-header {
+    top: 66px !important;
+    right: 6px !important;
+  }
+
+  #store-camera-fit-button {
+    min-width: 58px !important;
+    min-height: 22px !important;
+    padding: 4px 7px !important;
+    font-size: 8px !important;
+  }
+}
+
+@media (max-height: 450px) and (orientation: landscape) {
+  #store-composition.world-store-composition .store-composition-header {
+    top: 62px !important;
+    right: 6px !important;
+  }
+}
