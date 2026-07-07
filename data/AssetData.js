@@ -22,6 +22,7 @@ export const STOCK_VISUAL_STATES = Object.freeze({
 
 export const STOCK_VISUAL_OBJECT_TYPES = Object.freeze({
   DISPLAY_STAND: "displayStand",
+  FRESH_SHELF: "freshShelf",
   BEVERAGE_FRIDGE: "beverageFridge",
   FOOD_WARMER: "foodWarmer"
 });
@@ -240,6 +241,20 @@ export const ASSET_PATHS = deepFreeze({
         right: "./assets/objects/display_stand/display_stand_empty_right.png"
       }
     },
+    freshShelf: {
+      full: {
+        left: "./assets/objects/fresh_shelf/fresh_shelf_full_left.png",
+        right: "./assets/objects/fresh_shelf/fresh_shelf_full_right.png"
+      },
+      half: {
+        left: "./assets/objects/fresh_shelf/fresh_shelf_half_left.png",
+        right: "./assets/objects/fresh_shelf/fresh_shelf_half_right.png"
+      },
+      empty: {
+        left: "./assets/objects/fresh_shelf/fresh_shelf_empty_left.png",
+        right: "./assets/objects/fresh_shelf/fresh_shelf_empty_right.png"
+      }
+    },
     beverageFridge: {
       full: {
         left: "./assets/objects/beverage_fridge/beverage_fridge_full_left.png",
@@ -383,6 +398,9 @@ const OBJECT_TYPE_ALIASES = Object.freeze({
   "display-stand": STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
   stand: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
   shelf: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+  freshShelf: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
+  fresh_shelf: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
+  "fresh-shelf": STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
   beverageFridge: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
   beverage_fridge: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
   "beverage-fridge": STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
@@ -401,6 +419,12 @@ export const STOCK_VISUAL_OBJECTS = deepFreeze({
     label: "display stand",
     defaultFacing: OBJECT_FACINGS.LEFT,
     assets: ASSET_PATHS.objects.displayStand
+  },
+  freshShelf: {
+    objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
+    label: "fresh shelf",
+    defaultFacing: OBJECT_FACINGS.LEFT,
+    assets: ASSET_PATHS.objects.freshShelf
   },
   beverageFridge: {
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,

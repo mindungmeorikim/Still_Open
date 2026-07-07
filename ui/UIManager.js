@@ -7321,6 +7321,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     if (counterZone) {
       counterZone.dataset.playerAction = "checkout";
+      counterZone.dataset.counterAssetReady = "true";
       counterZone.setAttribute("role", "button");
       counterZone.setAttribute("tabindex", "0");
     }

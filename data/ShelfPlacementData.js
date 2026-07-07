@@ -97,7 +97,7 @@ export const SHELF_INSTANCES = [
     interactionX: 855,
     interactionY: 295,
     interactionDistance: 160,
-    objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+    objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
   {
@@ -187,7 +187,7 @@ export const SHELF_INSTANCES = [
     interactionX: 940,
     interactionY: 605,
     interactionDistance: 160,
-    objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+    objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
   {
@@ -241,7 +241,7 @@ export const SHELF_INSTANCES = [
     interactionX: 1230,
     interactionY: 325,
     interactionDistance: 160,
-    objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+    objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
   {
@@ -259,7 +259,7 @@ export const SHELF_INSTANCES = [
     interactionX: 1315,
     interactionY: 335,
     interactionDistance: 160,
-    objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
+    objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
   {

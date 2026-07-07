@@ -26198,7 +26198,7 @@ body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tut
 
 #counter-zone,
 #store-interaction-layer > #counter-zone {
-  --counter-zone-asset: none;
+  --counter-zone-asset: url("./assets/objects/checkout_counter/checkout_counter.png");
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
