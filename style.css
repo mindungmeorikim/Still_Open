@@ -11784,7 +11784,7 @@ body {
 
 #store-interaction-layer .customer-zone-counter {
   left: calc(625px + var(--queue-x)) !important;
-  top: calc(500px + var(--queue-y)) !important;
+  top: calc(475px + var(--queue-y)) !important;
 }
 
 #store-interaction-layer .customer-zone-exit {
