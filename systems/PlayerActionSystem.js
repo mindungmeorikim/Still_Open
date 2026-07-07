@@ -445,38 +445,50 @@ export const PlayerActionSystem = {
     return shelfTargets[0] ?? null;
   },
 
+  isShelfZoneUnlocked(shelf) {
+    const unlockedZoneIds = GameState.expansion?.unlockedZoneIds;
+
+    if (!Array.isArray(unlockedZoneIds)) {
+      return shelf?.zoneId === "zone_basic";
+    }
+
+    return unlockedZoneIds.includes(shelf?.zoneId);
+  },
+
   getShelfSlots() {
-    const slots = SHELF_INSTANCES.map((shelf) => {
-      const stockKey = shelf.instanceId;
-      const defaultProductId = this.getDefaultProductIdForShelf(shelf);
+    const slots = SHELF_INSTANCES
+      .filter((shelf) => this.isShelfZoneUnlocked(shelf))
+      .map((shelf) => {
+        const stockKey = shelf.instanceId;
+        const defaultProductId = this.getDefaultProductIdForShelf(shelf);
 
-      if (!this.shelfStocks[stockKey]) {
-        this.shelfStocks[stockKey] = {
-          products: {
-            [defaultProductId]: {
-              currentStock: 0,
-              maxStock: 8
+        if (!this.shelfStocks[stockKey]) {
+          this.shelfStocks[stockKey] = {
+            products: {
+              [defaultProductId]: {
+                currentStock: 0,
+                maxStock: 8
+              }
             }
-          }
+          };
+        }
+
+        const stockData = this.shelfStocks[stockKey];
+        const productIds = Object.keys(stockData.products ?? {});
+        const primaryProductId = productIds[0] ?? defaultProductId;
+        const primaryStock = stockData.products?.[primaryProductId] ?? {
+          currentStock: 0,
+          maxStock: 8
         };
-      }
 
-      const stockData = this.shelfStocks[stockKey];
-      const productIds = Object.keys(stockData.products ?? {});
-      const primaryProductId = productIds[0] ?? defaultProductId;
-      const primaryStock = stockData.products?.[primaryProductId] ?? {
-        currentStock: 0,
-        maxStock: 8
-      };
-
-      return {
-        ...shelf,
-        productId: primaryProductId,
-        products: stockData.products,
-        currentStock: primaryStock.currentStock,
-        maxStock: primaryStock.maxStock ?? 8
-      };
-    });
+        return {
+          ...shelf,
+          productId: primaryProductId,
+          products: stockData.products,
+          currentStock: primaryStock.currentStock,
+          maxStock: primaryStock.maxStock ?? 8
+        };
+      });
 
     this.syncShelfStocksToGameState("get_shelf_slots");
 

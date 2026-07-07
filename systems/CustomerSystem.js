@@ -606,6 +606,16 @@ export const CustomerSystem = {
     return null;
   },
 
+  isShelfZoneUnlocked(shelf) {
+    const unlockedZoneIds = GameState.expansion?.unlockedZoneIds;
+
+    if (!Array.isArray(unlockedZoneIds)) {
+      return shelf?.zoneId === "zone_basic";
+    }
+
+    return unlockedZoneIds.includes(shelf?.zoneId);
+  },
+
   getShelfInstanceForProduct(productId) {
     const shelfInstanceId = getShelfInstanceIdByProductId(productId);
 
@@ -613,7 +623,11 @@ export const CustomerSystem = {
       return null;
     }
 
-    return getShelfInstanceById(shelfInstanceId);
+    const shelfInstance = getShelfInstanceById(shelfInstanceId);
+    if (!this.isShelfZoneUnlocked(shelfInstance)) {
+      return null;
+    }
+    return shelfInstance;
   },
 
   canCustomerChooseProduct(product) {

@@ -3643,6 +3643,9 @@ getNearestDebugShelf(point) {
       this.renderExpansionZones(this.expansionState);
       this.playAssetEffectToast("construction", "공사 완료!");
       this.playStoreExpansionUnlockEffect(data.animation?.zoneId ?? data.zoneId);
+      this.renderStoreObjectVisuals();
+      this.renderInteractionFeedback();
+      this.renderFocusedZonePanel(data.zoneId);
     });
 
     EventBus.on(EVENTS.EXPANSION_FAILED, (data) => {
@@ -4484,6 +4487,17 @@ getNearestDebugShelf(point) {
       const node = this.getStoreObjectNode(config, interactionLayer);
 
       if (!node) return;
+
+      const isUnlocked = this.isShelfZoneUnlocked(config);
+
+      node.style.setProperty("display", isUnlocked ? "" : "none", "important");
+      node.hidden = !isUnlocked;
+      node.setAttribute("aria-hidden", isUnlocked ? "false" : "true");
+      node.tabIndex = isUnlocked ? 0 : -1;
+
+      if (!isUnlocked) {
+        return;
+      }
 
       node.dataset.playerAction = "shelf_restock";
       node.setAttribute("role", "button");
@@ -6186,6 +6200,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     return worldMap;
+  },
+
+  isShelfZoneUnlocked(shelf) {
+    const unlockedZoneIds = GameState.expansion?.unlockedZoneIds;
+
+    if (!Array.isArray(unlockedZoneIds)) {
+      return shelf?.zoneId === "zone_basic";
+    }
+
+    return unlockedZoneIds.includes(shelf?.zoneId);
   },
 
   getStoreInteractionLayer() {
