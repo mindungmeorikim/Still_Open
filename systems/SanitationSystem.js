@@ -46,6 +46,7 @@ export const SanitationSystem = {
   cleaningTimerId: null,
   cleaningDurationMs: CLEANING_DURATION_MS,
   activeCleaningDurationMs: null,
+  currentCleaningActorType: null,
   dirtyZoneId: DEFAULT_CLEANING_ZONE_ID,
   dirtySpotId: getCleaningPointByZoneId(DEFAULT_CLEANING_ZONE_ID).id,
   processedDisruptionKeys: new Set(),
@@ -107,6 +108,7 @@ export const SanitationSystem = {
       status: this.getStatus(this.value),
       isCleaningNeeded: this.isCleaningNeeded,
       isCleaning: this.isCleaning,
+      currentCleaningActorType: this.currentCleaningActorType,
       warningArmed: this.warningArmed,
       cleaningDurationMs: this.activeCleaningDurationMs ?? this.cleaningDurationMs,
       dirtyZoneId: activeCleaningPoint.zoneId,
@@ -118,7 +120,7 @@ export const SanitationSystem = {
     };
   },
 
-  getStatus(value = this.value) {
+  getStatus(  getStatus(value = this.value) {
     const sanitation = this.clampSanitation(value);
 
     if (sanitation === 0) return "critical";
@@ -212,8 +214,10 @@ export const SanitationSystem = {
 
     this.isCleaning = true;
     this.activeCleaningDurationMs = durationMs;
+    this.currentCleaningActorType = options.actorType ?? "player";
     this.emitChanged("cleaning_started", {
       source: options.source ?? "unknown",
+      actorType: this.currentCleaningActorType,
       activeCleaningPoint
     });
     EventBus.emit(SANITATION_EVENTS.CLEANING_STARTED, {
@@ -223,6 +227,7 @@ export const SanitationSystem = {
       dirtySpotId: activeCleaningPoint.id,
       activeCleaningPoint,
       source: options.source ?? "unknown",
+      actorType: this.currentCleaningActorType,
       state: this.getState()
     });
     EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
@@ -244,11 +249,13 @@ export const SanitationSystem = {
     const wasCleaning = this.isCleaning;
     const previousValue = this.value;
     const cleanedPoint = this.getActiveCleaningPoint();
+    const completedActorType = this.currentCleaningActorType ?? "player";
 
     this.clearCleaningTimer();
     this.value = this.clampSanitation(this.value + CLEANING_RECOVERY);
     this.isCleaning = false;
     this.activeCleaningDurationMs = null;
+    this.currentCleaningActorType = null;
     this.isCleaningNeeded = this.value < DEFAULT_SANITATION;
 
     if (this.isCleaningNeeded) {
@@ -259,16 +266,29 @@ export const SanitationSystem = {
 
     this.updateWarningState(previousValue, this.value);
 
+    if (!wasCleaning) {
+      this.emitChanged(reason, {
+        previousValue,
+        amount: this.value - previousValue
+      });
+
+      return {
+        success: false,
+        reason: "not_cleaning",
+        state: this.getState()
+      };
+    }
+
     const payload = {
       day: this.getCurrentDay(),
       reason,
-      wasCleaning,
       previousValue,
       value: this.value,
       recoveredAmount: this.value - previousValue,
       cleanedZoneId: cleanedPoint.zoneId,
       cleanedSpotId: cleanedPoint.id,
       cleanedPoint,
+      actorType: completedActorType,
       activeCleaningPoint: this.getActiveCleaningPoint(),
       state: this.getState()
     };
@@ -294,12 +314,13 @@ export const SanitationSystem = {
     };
   },
 
-  reset() {
+  reset() {  reset() {
     this.clearCleaningTimer();
     this.value = DEFAULT_SANITATION;
     this.isCleaningNeeded = false;
     this.isCleaning = false;
     this.activeCleaningDurationMs = null;
+    this.currentCleaningActorType = null;
     this.clearDirtyCleaningPoint();
     this.warningArmed = true;
     this.processedDisruptionKeys.clear();
@@ -319,16 +340,24 @@ export const SanitationSystem = {
     this.value = this.clampSanitation(restoredValue, DEFAULT_SANITATION);
     this.isCleaningNeeded = sourceData.isCleaningNeeded === true ||
       (sourceData.isCleaningNeeded !== false && this.value < DEFAULT_SANITATION);
-    this.setDirtyCleaningPoint(sourceData.dirtyZoneId ?? sourceData.activeCleaningPoint?.zoneId ?? DEFAULT_CLEANING_ZONE_ID);
+    this.setDirtyCleaningPoint(
+      sourceData.dirtyZoneId ?? sourceData.activeCleaningPoint?.zoneId ?? DEFAULT_CLEANING_ZONE_ID
+    );
+
     if (this.isCleaningNeeded) {
       this.ensureDirtyCleaningPoint(sourceData.dirtyZoneId ?? "hydrate");
     } else {
       this.clearDirtyCleaningPoint();
     }
+
     this.isCleaning = sourceData.isCleaning === true && this.isCleaningNeeded;
     this.warningArmed = sourceData.warningArmed === undefined
       ? this.value >= WARNING_RESET_THRESHOLD
       : sourceData.warningArmed === true;
+    this.activeCleaningDurationMs = sourceData.cleaningDurationMs ?? this.cleaningDurationMs;
+    this.currentCleaningActorType = this.isCleaning
+      ? (sourceData.currentCleaningActorType ?? "player")
+      : null;
     this.processedDisruptionKeys = new Set(
       Array.isArray(sourceData.processedDisruptionKeys)
         ? sourceData.processedDisruptionKeys.filter(Boolean).map(String)
@@ -341,6 +370,7 @@ export const SanitationSystem = {
         day: this.getCurrentDay(),
         durationMs: this.activeCleaningDurationMs ?? this.cleaningDurationMs,
         source: "hydrate",
+        actorType: this.currentCleaningActorType ?? "player",
         state: this.getState()
       });
     }
@@ -355,7 +385,9 @@ export const SanitationSystem = {
       status: this.getStatus(this.value),
       isCleaningNeeded: this.isCleaningNeeded,
       isCleaning: this.isCleaning,
+      currentCleaningActorType: this.currentCleaningActorType,
       warningArmed: this.warningArmed,
+      cleaningDurationMs: this.activeCleaningDurationMs ?? this.cleaningDurationMs,
       dirtyZoneId: this.getActiveCleaningPoint().zoneId,
       dirtySpotId: this.getActiveCleaningPoint().id,
       activeCleaningPoint: this.getActiveCleaningPoint(),
@@ -365,7 +397,7 @@ export const SanitationSystem = {
     };
   },
 
-  getSettlementPenalty() {
+  getSettlementPenalty() {  getSettlementPenalty() {
     const applies = this.value <= WARNING_THRESHOLD;
 
     return {
@@ -493,6 +525,7 @@ export const SanitationSystem = {
       status: state.status,
       isCleaningNeeded: state.isCleaningNeeded,
       isCleaning: state.isCleaning,
+      currentCleaningActorType: state.currentCleaningActorType,
       warningArmed: state.warningArmed,
       cleaningDurationMs: state.cleaningDurationMs,
       dirtyZoneId: state.dirtyZoneId,

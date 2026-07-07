@@ -26064,3 +26064,81 @@ body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tut
 .shelf-warning-icon.is-warning {
   background: #ffc107 !important;
 }
+
+/* v7.13.34 알바 청소 보조 시 청소도구 표시 */
+.staff-cleaning-tool {
+  position: absolute;
+  right: -14px;
+  bottom: -4px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(91, 66, 39, 0.22));
+  transform-origin: 50% 80%;
+}
+
+.staff-cleaning-tool[hidden],
+#staff-character[data-cleaning-tool="false"] .staff-cleaning-tool {
+  display: none !important;
+}
+
+#staff-character[data-assist-status="cleaning"] .staff-cleaning-tool {
+  display: block;
+  animation: staffCleaningToolWiggle 0.72s ease-in-out infinite;
+}
+
+#staff-character[data-staff-moving="true"][data-assist-status="cleaning"] .staff-cleaning-tool {
+  animation: staffCleaningToolCarry 0.42s ease-in-out infinite;
+}
+
+@keyframes staffCleaningToolWiggle {
+  0%, 100% {
+    transform: rotate(-7deg) translateY(0);
+  }
+  50% {
+    transform: rotate(8deg) translateY(-2px);
+  }
+}
+
+@keyframes staffCleaningToolCarry {
+  0%, 100% {
+    transform: rotate(-10deg) translateY(0);
+  }
+  50% {
+    transform: rotate(6deg) translateY(-3px);
+  }
+}
+
+/* v7.13.35 플레이어 청소 중 청소도구 표시 */
+#player-zone.player-character .player-cleaning-tool {
+  position: absolute;
+  right: -10px;
+  bottom: 18px;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 3px rgba(91, 66, 39, 0.24));
+  transform-origin: 45% 85%;
+}
+
+#player-zone.player-character[data-cleaning-tool="false"] .player-cleaning-tool {
+  display: none !important;
+}
+
+#player-zone.player-character[data-cleaning-tool="true"] .player-cleaning-tool {
+  display: block;
+  animation: playerCleaningToolWiggle 0.68s ease-in-out infinite;
+}
+
+@keyframes playerCleaningToolWiggle {
+  0%, 100% {
+    transform: rotate(-8deg) translateY(0);
+  }
+  50% {
+    transform: rotate(7deg) translateY(-2px);
+  }
+}

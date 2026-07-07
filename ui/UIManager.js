@@ -3203,6 +3203,8 @@ export const UIManager = {
     playerNode.style.setProperty("top", `${y}px`, "important");
     playerNode.style.setProperty("--player-x", `${x}px`);
     playerNode.style.setProperty("--player-y", `${y}px`);
+
+    this.renderPlayerCleaningTool(playerNode);
     playerNode.dataset.direction = direction;
     this.renderPlayerCarryingBox(playerNode, GameState.player.carryingBoxType ?? null);
   },
@@ -3238,6 +3240,42 @@ export const UIManager = {
       imageNode.src = imagePath;
     }
   },
+  renderPlayerCleaningTool(playerNode) {
+    if (!playerNode) {
+      return;
+    }
+
+    const sanitation = GameState.sanitation ?? {};
+    const shouldShowCleaningTool = (
+      sanitation.isCleaning === true &&
+      sanitation.currentCleaningActorType === "player"
+    );
+
+    playerNode.dataset.cleaningTool = shouldShowCleaningTool ? "true" : "false";
+
+    let cleaningTool = playerNode.querySelector(".player-cleaning-tool");
+
+    if (!shouldShowCleaningTool) {
+      cleaningTool?.remove();
+      return;
+    }
+
+    if (!cleaningTool) {
+      cleaningTool = document.createElement("img");
+      cleaningTool.className = "player-cleaning-tool";
+      cleaningTool.alt = "";
+      cleaningTool.draggable = false;
+      cleaningTool.loading = "eager";
+      cleaningTool.decoding = "async";
+      cleaningTool.setAttribute("aria-hidden", "true");
+      playerNode.appendChild(cleaningTool);
+    }
+
+    if (cleaningTool.getAttribute("src") !== SANITATION_ASSETS.tools) {
+      cleaningTool.src = SANITATION_ASSETS.tools;
+    }
+  },
+
 
 
 // 진열대 배치 좌표 확인용 코드 추후 주석처리 필요  
@@ -5660,6 +5698,27 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (sprite.getAttribute("src") !== nextSpriteSrc) {
       sprite.src = nextSpriteSrc;
     }
+
+    let cleaningTool = avatar.querySelector(":scope > .staff-cleaning-tool");
+
+    if (!cleaningTool) {
+      cleaningTool = document.createElement("img");
+      cleaningTool.className = "staff-cleaning-tool";
+      cleaningTool.alt = "";
+      cleaningTool.loading = "eager";
+      cleaningTool.decoding = "async";
+      cleaningTool.draggable = false;
+      cleaningTool.setAttribute("aria-hidden", "true");
+      avatar.appendChild(cleaningTool);
+    }
+
+    if (cleaningTool.getAttribute("src") !== SANITATION_ASSETS.tools) {
+      cleaningTool.src = SANITATION_ASSETS.tools;
+    }
+
+    const shouldShowCleaningTool = assistState.status === "cleaning";
+    staffCharacter.dataset.cleaningTool = shouldShowCleaningTool ? "true" : "false";
+    cleaningTool.hidden = !shouldShowCleaningTool;
 
     let label = staffCharacter.querySelector(":scope > .staff-character-label");
 

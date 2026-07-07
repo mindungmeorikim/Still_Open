@@ -1,3 +1,21 @@
+## [v7.13.35] Player Cleaning Tool Visual
+
+### Added
+- 플레이어가 청소 중일 때 캐릭터 옆/손 근처에 기존 청소도구 이미지를 작게 표시하도록 추가했습니다.
+- 플레이어 청소 중에는 청소도구가 작은 흔들림 애니메이션으로 보이도록 처리했습니다.
+
+### Changed
+- 위생 시스템 상태에 `currentCleaningActorType`를 저장해, 플레이어 청소와 알바생 청소를 UI에서 구분해 표시할 수 있도록 정리했습니다.
+
+## [v7.13.34] Staff Cleaning Tool Visual
+
+### Added
+- 알바생 상태가 `cleaning`일 때 캐릭터 손/옆에 기존 청소도구 이미지를 작게 표시하도록 추가했습니다.
+- 청소 포인트로 이동 중에는 청소도구가 같이 따라다니고, 청소 중에는 작은 흔들림 애니메이션으로 청소 중임을 알 수 있게 했습니다.
+
+### Changed
+- 알바생이 청소 완료 후 `returning`/`idle` 상태로 바뀌면 청소도구 표시가 자동으로 사라지도록 처리했습니다.
+
 ## [v7.13.33] Zone Cleaning Points + Sanitation Pressure
 
 ### Added
