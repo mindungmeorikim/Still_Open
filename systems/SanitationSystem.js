@@ -120,7 +120,7 @@ export const SanitationSystem = {
     };
   },
 
-  getStatus(  getStatus(value = this.value) {
+  getStatus(value = this.value) {
     const sanitation = this.clampSanitation(value);
 
     if (sanitation === 0) return "critical";
@@ -314,7 +314,7 @@ export const SanitationSystem = {
     };
   },
 
-  reset() {  reset() {
+  reset() {
     this.clearCleaningTimer();
     this.value = DEFAULT_SANITATION;
     this.isCleaningNeeded = false;
@@ -397,7 +397,7 @@ export const SanitationSystem = {
     };
   },
 
-  getSettlementPenalty() {  getSettlementPenalty() {
+  getSettlementPenalty() {
     const applies = this.value <= WARNING_THRESHOLD;
 
     return {

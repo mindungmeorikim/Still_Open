@@ -1,3 +1,61 @@
+## [v7.13.43] Entrance Marker Hard Reset
+
+### Fixed
+- 입구 마커에 남아 있던 반투명 사각 배경/잔여 스타일을 제거하기 위해 `#entrance-zone`에 `all: unset` 기반 강제 초기화를 적용했습니다.
+- 입구 마커는 이제 화살표 이미지 한 장만 보이도록 정리했습니다.
+- 입구 위치는 기존 조정값(`top: 650px`)을 유지했습니다.
+
+## [v7.13.42] Entrance Marker Image Restore and Transparent BG Fix
+
+### Fixed
+- 이전 수정에서 `background: none`이 입구 화살표 이미지까지 지워버린 문제를 수정했습니다.
+- 입구 마커 배경은 투명으로 유지하면서 `icon_entrance_arrow.png` 이미지만 다시 보이도록 복구했습니다.
+- 입구 좌표를 기존보다 조금 더 위로 올렸습니다. (`top: 658px → 650px`)
+
+## [v7.13.41] Entrance Marker Raise and Clean Background
+
+### Changed
+- 입구 좌표를 기존보다 조금 더 위로 조정했습니다. (`top: 672px → 658px`)
+- 입구 마커 뒤에 다시 보이던 반투명/회색 배경 느낌을 제거하기 위해 입구 전용 상호작용 이펙트(`interaction-glow-ring`, `interaction-finger-tap`, `interaction-click-sparkle`)를 숨겼습니다.
+- 입구 아이콘 자체는 그대로 유지하고, 입구 표시 영역만 더 깔끔하게 정리했습니다.
+
+## [v7.13.40] Entrance Marker Coordinate Lowered
+
+### Changed
+- 입구 아이콘만 이동시키는 방식이 아니라 `#entrance-zone` 자체 좌표를 아래로 내려, 입구 표시 기준점이 매장 바닥 위가 아니라 하단 입구선 쪽에 오도록 조정했습니다.
+- 입구 표시 크기와 텍스트 제거 상태는 유지했습니다.
+
+## [v7.13.39] Entrance Marker Tiny Clean Override
+
+### Fixed
+- 입구 표시 아이콘을 34×34px로 축소해 메인 화면에서 과하게 커 보이지 않도록 조정했습니다.
+- 입구/진열대/계산대 기존 라벨·배경·테두리·그림자·가상요소를 강제로 제거해 아이콘 주변 사각 배경이 보이지 않도록 정리했습니다.
+- 진열대 메인 표시는 계속 숨기고, 계산대는 추후 에셋 연결용 CSS 변수 구조만 유지했습니다.
+
+## [v7.13.38] Sanitation Duplicate Header Fix
+
+### Fixed
+- `SanitationSystem.js`의 `reset()` 선언부가 `reset() {  reset() {` 형태로 중복되어 발생한 `SyntaxError: Unexpected token '{'` 오류를 수정했습니다.
+- 같은 방식으로 중복되어 있던 `getSettlementPenalty()` 선언부도 함께 정리했습니다.
+- `SanitationSystem.js`, `UIManager.js`, `PlayerActionSystem.js`, `StaffAssistSystem.js` 문법 검사를 다시 통과했습니다.
+
+## [v7.13.37] Sanitation Syntax Fix
+
+### Fixed
+- `SanitationSystem.js`의 `getStatus()` 선언부가 병합 과정에서 중복되어 발생한 `SyntaxError: Unexpected token '('` 오류를 수정했습니다.
+- 수정 후 주요 JS 파일 `node --check` 문법 검사를 통과했습니다.
+
+## [v7.13.36] Main Interaction Icon Cleanup
+
+### Changed
+- 메인 화면의 `입구/진열대/계산대` 텍스트 라벨을 전부 제거해 더 깔끔하게 보이도록 정리했습니다.
+- `입구`는 기존 원형 버튼형 아이콘 대신 전달받은 화살표 이미지로 바로 교체했습니다.
+- `진열대` 메인 아이콘은 완전히 숨겨, 실제 진열대 오브젝트만 보이도록 정리했습니다.
+- `계산대`는 나중에 에셋만 연결하면 바로 보이도록 `--counter-zone-asset` CSS 변수 기반 연결 구조를 남기고, 현재는 시각적으로 숨겼습니다.
+
+### Added
+- `assets/ui/icons/icon_entrance_arrow.png`
+
 ## [v7.13.35] Player Cleaning Tool Visual
 
 ### Added

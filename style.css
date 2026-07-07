@@ -26142,3 +26142,216 @@ body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tut
     transform: rotate(7deg) translateY(-2px);
   }
 }
+
+/* [v7.13.39] Entrance marker tiny clean override */
+#entrance-zone,
+#counter-zone,
+#shelf-zone,
+#store-interaction-layer > #entrance-zone,
+#store-interaction-layer > #counter-zone,
+#store-interaction-layer > #shelf-zone {
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -9999px !important;
+}
+
+#entrance-zone::before,
+#entrance-zone::after,
+#counter-zone::before,
+#counter-zone::after,
+#shelf-zone::before,
+#shelf-zone::after,
+#store-interaction-layer > #entrance-zone::before,
+#store-interaction-layer > #entrance-zone::after,
+#store-interaction-layer > #counter-zone::before,
+#store-interaction-layer > #counter-zone::after,
+#store-interaction-layer > #shelf-zone::before,
+#store-interaction-layer > #shelf-zone::after {
+  content: none !important;
+  display: none !important;
+}
+
+#entrance-zone,
+#store-interaction-layer > #entrance-zone {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  background-image: url("./assets/ui/icons/icon_entrance_arrow.png") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  filter: none !important;
+  opacity: 1 !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+#shelf-zone,
+#store-interaction-layer > #shelf-zone {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+#counter-zone,
+#store-interaction-layer > #counter-zone {
+  --counter-zone-asset: none;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  background-image: var(--counter-zone-asset) !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  overflow: visible !important;
+}
+
+#counter-zone:not([data-counter-asset-ready="true"]),
+#store-interaction-layer > #counter-zone:not([data-counter-asset-ready="true"]) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* [v7.13.40] Entrance marker coordinate lowered */
+#store-interaction-layer > #entrance-zone,
+#entrance-zone {
+  left: 577px !important;
+  top: 672px !important;
+}
+
+/* [v7.13.41] Entrance marker raise and clean background */
+#entrance-zone,
+#store-interaction-layer > #entrance-zone {
+  left: 577px !important;
+  top: 658px !important;
+  background: none !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+#store-interaction-layer > #entrance-zone.interaction-feedback-target > .interaction-glow-ring,
+#store-interaction-layer > #entrance-zone.interaction-feedback-target > .interaction-finger-tap,
+#store-interaction-layer > #entrance-zone.interaction-feedback-target > .interaction-click-sparkle,
+#store-interaction-layer > #entrance-zone .interaction-glow-ring,
+#store-interaction-layer > #entrance-zone .interaction-finger-tap,
+#store-interaction-layer > #entrance-zone .interaction-click-sparkle {
+  display: none !important;
+  opacity: 0 !important;
+  background: none !important;
+  background-image: none !important;
+}
+
+/* [v7.13.42] Entrance marker image restore and transparent bg fix */
+#entrance-zone,
+#store-interaction-layer > #entrance-zone {
+  left: 577px !important;
+  top: 650px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -9999px !important;
+  overflow: visible !important;
+  background: transparent url("./assets/ui/icons/icon_entrance_arrow.png") center / contain no-repeat !important;
+}
+
+#entrance-zone::before,
+#entrance-zone::after,
+#store-interaction-layer > #entrance-zone::before,
+#store-interaction-layer > #entrance-zone::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+#store-interaction-layer > #entrance-zone.interaction-feedback-target > .interaction-glow-ring,
+#store-interaction-layer > #entrance-zone.interaction-feedback-target > .interaction-finger-tap,
+#store-interaction-layer > #entrance-zone.interaction-feedback-target > .interaction-click-sparkle,
+#store-interaction-layer > #entrance-zone .interaction-glow-ring,
+#store-interaction-layer > #entrance-zone .interaction-finger-tap,
+#store-interaction-layer > #entrance-zone .interaction-click-sparkle {
+  display: none !important;
+  opacity: 0 !important;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+/* [v7.13.43] Entrance marker hard reset */
+#entrance-zone,
+#store-interaction-layer > #entrance-zone {
+  all: unset;
+  position: absolute !important;
+  left: 577px !important;
+  top: 650px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  max-width: 34px !important;
+  max-height: 34px !important;
+  display: block !important;
+  z-index: 4 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  background-color: transparent !important;
+  background-image: url("./assets/ui/icons/icon_entrance_arrow.png") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: contain !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -9999px !important;
+  transform: none !important;
+}
+
+#entrance-zone *,
+#store-interaction-layer > #entrance-zone * {
+  display: none !important;
+}
+
+#entrance-zone::before,
+#entrance-zone::after,
+#store-interaction-layer > #entrance-zone::before,
+#store-interaction-layer > #entrance-zone::after {
+  content: none !important;
+  display: none !important;
+}
+
