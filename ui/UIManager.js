@@ -9019,7 +9019,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   getBMShelfUpgradeImagePath(group = {}) {
     const shelfImageMap = {
       basic_shelf: "./assets/objects/display_stand/display_stand_full_left.png",
-      fresh_shelf: "./assets/objects/display_stand/display_stand_full_right.png",
+      fresh_shelf: "./assets/objects/fresh_shelf/fresh_shelf_full_left.png",
       fridge: "./assets/objects/beverage_fridge/beverage_fridge_full_left.png",
       warmer: "./assets/objects/food_warmer/food_warmer_full_left.png"
     };

@@ -1,3 +1,19 @@
+## [v7.13.49] Fresh Shelf Shop Direction Fix
+
+### Fixed
+- BM 상점 UI의 `진열대 강화` 카드에서 신선매대 이미지를 다른 진열대 강화 카드들과 동일하게 왼쪽 방향 에셋(`fresh_shelf_full_left.png`)으로 맞췄습니다.
+
+### Maintained
+- 기본 매대, 냉장고, 온장고 에셋 경로와 상점 UI 레이아웃/비율/버튼 동작은 변경하지 않았습니다.
+
+## [v7.13.48] Fresh Shelf Shop Asset Swap
+
+### Changed
+- BM 상점 UI의 `진열대 강화` 카드에서 신선 매대 이미지를 임시 대체용 기본 매대 오른쪽 에셋에서 실제 신선 매대 에셋(`fresh_shelf_full_right.png`)으로 교체했습니다.
+
+### Maintained
+- 기본 매대, 냉장고, 온장고 에셋 경로와 상점 UI 레이아웃/비율/버튼 동작은 변경하지 않았습니다.
+
 ## [v7.13.47] CSS Final Override and Console Cleanup
 
 ### Added
