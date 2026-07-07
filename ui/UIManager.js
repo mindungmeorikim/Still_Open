@@ -5023,6 +5023,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       return;
     }
 
+    this.clearInteractionFeedbackNode("delivery-box-zone");
+
     const playerCenter = this.getInteractionPlayerCenter();
 
     this.getInteractionFeedbackTargets().forEach((target) => {
@@ -5048,6 +5050,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   isDeliveryBoxSortingInteractionSuppressed() {
     return (
+      GameState.deliveryBoxInteractionSuppressed === true ||
       GameState.deliveryBoxState === "carrying" ||
       GameState.player?.carryingBoxType === "arrive"
     );
@@ -5210,7 +5213,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   bindInteractionFeedbackNode(node) {
-    if (!node || node.dataset.interactionFeedbackBound === "true") {
+    if (!node || node.id === "delivery-box-zone" || node.dataset.interactionFeedbackBound === "true") {
       return;
     }
 
@@ -5221,6 +5224,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   showInteractionSparkle(nodeId) {
+    if (nodeId === "delivery-box-zone" || this.isDeliveryBoxSortingInteractionSuppressed()) {
+      return;
+    }
+
     const node = document.getElementById(nodeId);
 
     if (!node) return;
@@ -10693,6 +10700,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     deliveryBox.classList.remove("interaction-feedback-target", "is-interactable", "is-interaction-ready", "is-click-sparkling");
+    deliveryBox.dataset.interactionFeedbackDisabled = "true";
+    this.clearInteractionFeedbackNode("delivery-box-zone");
     this.ensureDeliveryBoxVisuals(deliveryBox, remainingCount);
     this.syncOrderDeliveryTutorialArrival();
 

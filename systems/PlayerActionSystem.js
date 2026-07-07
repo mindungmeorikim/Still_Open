@@ -179,6 +179,7 @@ export const PlayerActionSystem = {
     this.isPlayerBusy = false;
     this.restockRemainingSeconds = 0;
     this.restockPhase = null;
+    this.setDeliveryBoxInteractionSuppressed(false);
     this.setCarryingBoxType(null);
     this.setDeliveryBoxState(null);
     this.setWarehouseBoxState("closed");
@@ -1011,6 +1012,17 @@ export const PlayerActionSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
+  setDeliveryBoxInteractionSuppressed(isSuppressed) {
+    const nextValue = isSuppressed === true;
+
+    if (GameState.deliveryBoxInteractionSuppressed === nextValue) {
+      return;
+    }
+
+    GameState.deliveryBoxInteractionSuppressed = nextValue;
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
   handleDeliveryBoxPickupRequested(data = {}) {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
@@ -1026,6 +1038,7 @@ export const PlayerActionSystem = {
     }
 
     this.isPlayerBusy = true;
+    this.setDeliveryBoxInteractionSuppressed(true);
     this.setCarryingBoxType(null);
     this.setDeliveryBoxState(null);
     this.showActionMessage("도착한 물류 박스로 이동 중입니다.");
@@ -1051,6 +1064,7 @@ export const PlayerActionSystem = {
 
             this.setCarryingBoxType(null);
             this.setDeliveryBoxState(null);
+            this.setDeliveryBoxInteractionSuppressed(false);
             this.setWarehouseBoxState("closed");
             this.isPlayerBusy = false;
             this.restockPhase = null;
