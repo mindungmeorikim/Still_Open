@@ -15,6 +15,7 @@
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
+import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 
@@ -36,6 +37,12 @@ export const PlayerMovementSystem = {
   defaultPlayerSize: {
     width: 58,
     height: 102
+  },
+
+  playerFootCollisionBox: {
+    width: 24,
+    height: 14,
+    offsetY: 6
   },
 
   isInitialized: false,
@@ -147,8 +154,24 @@ export const PlayerMovementSystem = {
     const isDiagonal = moveX !== 0 && moveY !== 0;
     const moveSpeed = isDiagonal ? speed * 0.707 : speed;
 
-    player.x += moveX * moveSpeed;
-    player.y += moveY * moveSpeed;
+    const currentX = player.x;
+    const currentY = player.y;
+    const nextX = currentX + moveX * moveSpeed;
+    const nextY = currentY + moveY * moveSpeed;
+
+    player.x = nextX;
+    player.y = currentY;
+    this.clampPlayerToAllowedMovement(player);
+    if (this.isPlayerCollidingWithStoreObject(player)) {
+      player.x = currentX;
+    }
+
+    player.y = nextY;
+    this.clampPlayerToAllowedMovement(player);
+    if (this.isPlayerCollidingWithStoreObject(player)) {
+      player.y = currentY;
+    }
+
     this.clampPlayerToAllowedMovement(player);
 
     EventBus.emit(PLAYER_POSITION_CHANGED, GameState);
@@ -219,6 +242,39 @@ export const PlayerMovementSystem = {
     };
   },
 
+  getPlayerFootRect(player = GameState.player) {
+    const playerSize = this.getPlayerSize();
+    const footWidth = Math.min(
+      playerSize.width,
+      Number(this.playerFootCollisionBox.width) || playerSize.width
+    );
+    const footHeight = Math.min(
+      playerSize.height,
+      Number(this.playerFootCollisionBox.height) || 12
+    );
+    const offsetY = Number(this.playerFootCollisionBox.offsetY) || 0;
+
+    return {
+      x: (Number(player?.x) || 0) + (playerSize.width - footWidth) / 2,
+      y: (Number(player?.y) || 0) + playerSize.height - footHeight - offsetY,
+      width: footWidth,
+      height: footHeight
+    };
+  },
+
+  isPlayerCollidingWithStoreObject(player = GameState.player) {
+    if (!player) return false;
+
+    const footRect = this.getPlayerFootRect(player);
+    const collisionRects = getStoreObjectCollisionRects(
+      GameState.expansion?.unlockedZoneIds
+    );
+
+    return collisionRects.some((rect) => {
+      return this.doRectsOverlap(footRect, rect);
+    });
+  },
+
   getAllowedMovementRects(storeSize) {
     const movementBounds = Array.isArray(GameState.expansion?.movementBounds)
       ? GameState.expansion.movementBounds
@@ -277,6 +333,15 @@ export const PlayerMovementSystem = {
       point.x <= rect.x + rect.width &&
       point.y >= rect.y &&
       point.y <= rect.y + rect.height
+    );
+  },
+
+  doRectsOverlap(a, b) {
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
     );
   },
 
