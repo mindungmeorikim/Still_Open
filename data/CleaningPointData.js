@@ -12,10 +12,10 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
     id: "zone1_cleaning_spot",
     zoneId: CLEANING_ZONE_IDS.ZONE_1,
     label: "1구역 계산대 주변",
-    x: 870,
-    y: 650,
-    staffX: 825,
-    staffY: 640,
+    x: 430,
+    y: 610,
+    staffX: 400,
+    staffY: 610,
     interactionDistance: 130
   }),
   [CLEANING_ZONE_IDS.ZONE_2]: Object.freeze({

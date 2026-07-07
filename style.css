@@ -11758,8 +11758,8 @@ body {
 }
 
 #store-interaction-layer > #counter-zone {
-  left: 781px !important;
-  top: 576px !important;
+  left: 600px !important;
+  top: 500px !important;
 }
 
 #store-interaction-layer > #entrance-zone {
@@ -11783,8 +11783,8 @@ body {
 }
 
 #store-interaction-layer .customer-zone-counter {
-  left: calc(794px + var(--queue-x)) !important;
-  top: calc(573px + var(--queue-y)) !important;
+  left: calc(625px + var(--queue-x)) !important;
+  top: calc(500px + var(--queue-y)) !important;
 }
 
 #store-interaction-layer .customer-zone-exit {
@@ -26199,6 +26199,11 @@ body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tut
 #counter-zone,
 #store-interaction-layer > #counter-zone {
   --counter-zone-asset: url("./assets/objects/checkout_counter/checkout_counter.png");
+  width: 112px !important;
+  height: 112px !important;
+  min-width: 112px !important;
+  min-height: 112px !important;
+  display: block !important;
   padding: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
