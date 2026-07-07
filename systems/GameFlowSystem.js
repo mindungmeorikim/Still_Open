@@ -679,7 +679,6 @@ export const GameFlowSystem = {
 
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
     this.isDayTimerPaused = false;
-    console.log("[DAY TIMER START]", this.remainingDaySeconds);
 
     this.dayTimerId = setInterval(() => {
       if (GameState.phase !== GAME_PHASE.STORE_RUNNING || this.isClosing) {
@@ -693,10 +692,8 @@ export const GameFlowSystem = {
 
       this.remainingDaySeconds = Math.max(0, this.remainingDaySeconds - 1);
       this.handleStaffAutoCheckoutTick(1);
-      console.log("[DAY TIMER]", this.remainingDaySeconds);
 
       if (this.remainingDaySeconds <= 0) {
-        console.log("[DAY TIMER END]");
         this.closeStore({ source: "day_timer_finished" });
       }
     }, 1000);
@@ -707,7 +704,6 @@ export const GameFlowSystem = {
 
     clearInterval(this.dayTimerId);
     this.dayTimerId = null;
-    console.log("[DAY TIMER CLEAR]");
   },
 
   resetTodayStats() {

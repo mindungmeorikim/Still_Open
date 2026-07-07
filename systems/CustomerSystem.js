@@ -107,10 +107,6 @@ export const CustomerSystem = {
     }
 
     this.startRouteTimer();
-
-    console.log(
-      `[CustomerSystem] Day ${GameState.day} 손님 ${this.targetSpawnCount}명 순차 생성 시작`
-    );
   },
 
   resetCustomersForDay() {
@@ -1037,10 +1033,6 @@ export const CustomerSystem = {
       quantity: data.quantity ?? 1,
       checkoutAmount: data.amount ?? 0
     });
-
-    console.log(
-      `[CustomerSystem] ${checkedOutCustomer.typeName} 계산 완료: ${checkedOutCustomer.wantedProductName}`
-    );
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },

@@ -46,11 +46,6 @@ export const DebugSystem = {
     this.isInitialized = true;
     this.bindConsoleCommands();
     this.bindHotkeys();
-
-    console.log(
-      "%c[QA MODE ON] window.QA 명령어 사용 가능",
-      "color:#7cfc00;font-weight:bold;"
-    );
   },
 
   bindConsoleCommands() {
@@ -106,32 +101,32 @@ export const DebugSystem = {
       switch (event.code) {
         case "F5":
           event.preventDefault();
-          console.log(QA.nextDay());
+          QA.nextDay();
           break;
 
         case "F6":
           event.preventDefault();
-          console.log(QA.rich());
+          QA.rich();
           break;
 
         case "F7":
           event.preventDefault();
-          console.log(QA.unlockAll());
+          QA.unlockAll();
           break;
 
         case "F11":
           event.preventDefault();
-          console.log(QA.stockAll(99));
+          QA.stockAll(99);
           break;
 
         case "F9":
           event.preventDefault();
-          console.log(QA.fillShelves());
+          QA.fillShelves();
           break;
 
         case "F10":
           event.preventDefault();
-          console.log(QA.master());
+          QA.master();
           break;
 
         default:

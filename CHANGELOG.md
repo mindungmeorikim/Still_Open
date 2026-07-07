@@ -1,3 +1,16 @@
+## [v7.13.47] CSS Final Override and Console Cleanup
+
+### Added
+- `style.css` 맨 아래에 `[FINAL OVERRIDE ZONE]` 기준 구역을 추가해 이후 작은 화면/16:9/팝업 위치 보정을 한 곳에 누적할 수 있도록 정리했습니다.
+- `PROMPT_RULE.md`에 CSS 최종 오버라이드 작성 규칙과 콘솔 로그 사용 규칙을 추가했습니다.
+
+### Changed
+- 일반 플레이 중 자동으로 반복 출력되던 손님 흐름/Day Timer/업그레이드 확인용 `console.log`를 제거했습니다.
+- QA 단축키는 기능은 유지하되, 단축키 실행 시 콘솔에 결과 문자열을 자동 출력하지 않도록 정리했습니다.
+
+### Note
+- `main.js`는 이번 요청 범위에서 제외해 수정하지 않았습니다.
+
 ## [v7.13.46] Small Screen Full View Button Fix
 
 ### Fixed

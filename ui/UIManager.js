@@ -8299,7 +8299,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   showUpgradeOptions(upgrades) {
-    console.log("업그레이드 목록:", upgrades);
+    // 업그레이드 UI는 현재 별도 렌더링 흐름에서 처리됩니다.
   },
 
   createDayScenarioModal() {
