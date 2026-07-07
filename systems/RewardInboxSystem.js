@@ -1,9 +1,9 @@
 /*
   RewardInboxSystem.js
 
-  Local/mock reward inbox MVP.
-  Later, RewardInboxService.fetchRewards() can be replaced with
-  fetch('/api/reward-inbox') so reward grants and claim validation are server-owned.
+  Local reward inbox MVP.
+  The inbox must not ship with default gifts. Future reward grants should be
+  added explicitly through backend/operator data or addInboxReward().
 */
 
 import { GameState } from "../core/GameState.js";
@@ -26,6 +26,12 @@ const SUPPORTED_REWARD_TYPES = new Set([
   "skip_ticket",
   "contract_ticket",
   "item"
+]);
+
+const LEGACY_BUNDLED_REWARD_IDS = new Set([
+  "launch_reward_dia_100",
+  "community_event_dia_300",
+  "maintenance_reward_gold_5000_dia_50"
 ]);
 
 const unique = (values = []) => [...new Set(
@@ -258,7 +264,9 @@ export const RewardInboxSystem = {
   normalizeState(state = {}) {
     const source = state && typeof state === "object" ? state : {};
     const rewards = Array.isArray(source.rewards)
-      ? source.rewards.map((reward) => this.normalizeReward(reward)).filter(Boolean)
+      ? source.rewards
+        .map((reward) => this.normalizeReward(reward))
+        .filter((reward) => reward && !LEGACY_BUNDLED_REWARD_IDS.has(reward.id))
       : [];
     const items = source.items && typeof source.items === "object"
       ? Object.fromEntries(

@@ -1,3 +1,12 @@
+## [v7.13.50] Reward Inbox Default Grant Removal
+
+### Fixed
+- 보상함에 기본으로 들어가 있던 테스트/임시 보상 3개를 제거했습니다.
+- 기존 저장 데이터에 남아 있을 수 있는 임시 보상 ID도 보상함 상태 정규화 단계에서 자동으로 제외되도록 정리했습니다.
+
+### Maintained
+- 쿠폰 코드 입력, 실제 보상 추가, 개별 수령/모두 받기, 재화 지급 로직은 유지했습니다.
+
 ## [v7.13.49] Fresh Shelf Shop Direction Fix
 
 ### Fixed
