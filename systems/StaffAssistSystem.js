@@ -32,6 +32,52 @@ const POSITIONS = Object.freeze({
   cleaningAssist: Object.freeze({ x: 825, y: 640 })
 });
 
+// F8 좌표 모드에서 쓰는 월드 좌표 기준 알바 이동 경유지입니다.
+// 화면 비율/카메라 줌이 바뀌어도 월드 좌표만 따라가도록 StaffAssistSystem 내부에서만 사용합니다.
+const STAFF_ROUTE_POINTS = Object.freeze({
+  entryAisle: Object.freeze({ x: 500, y: 645 }),
+  mainAisle: Object.freeze({ x: 520, y: 640 }),
+  warehouseAisle: Object.freeze({ x: 340, y: 610 }),
+  cleaningAisle: Object.freeze({ x: 760, y: 640 }),
+  zone1Aisle: Object.freeze({ x: 515, y: 610 }),
+  zone2Aisle: Object.freeze({ x: 700, y: 430 }),
+  zone3Aisle: Object.freeze({ x: 925, y: 565 }),
+  zone4Aisle: Object.freeze({ x: 1085, y: 430 })
+});
+
+const STAFF_ROUTE_POINTS_BY_ZONE_ID = Object.freeze({
+  zone_basic: Object.freeze([STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.zone1Aisle]),
+  zone_extra_shelf: Object.freeze([STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.zone2Aisle]),
+  zone_cold_food: Object.freeze([STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.zone3Aisle]),
+  zone_premium_store: Object.freeze([STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.zone4Aisle])
+});
+
+const STAFF_CHARACTER_ANCHOR = Object.freeze({ x: 56, y: 58 });
+const STAFF_DEFAULT_STAND_FOOT_OFFSET = Object.freeze({ x: 0, y: 54, direction: "up" });
+
+// 각 진열대의 interaction 좌표는 플레이어/알바가 실제로 접근해야 하는 기준점입니다.
+// 알바 캐릭터는 DOM left/top 좌표로 배치되므로, 보이는 발 위치가 interaction 주변 통로에 오도록 보정합니다.
+const STAFF_STAND_FOOT_OFFSETS_BY_SHELF_INSTANCE_ID = Object.freeze({
+  zone1_basic_shelf_1: Object.freeze({ x: -30, y: 60, direction: "up_right" }),
+  zone1_fridge_1: Object.freeze({ x: 10, y: 28, direction: "up" }),
+
+  zone2_basic_shelf_1: Object.freeze({ x: 0, y: 96, direction: "up" }),
+  zone2_fridge_1: Object.freeze({ x: 0, y: 112, direction: "up" }),
+  zone2_fresh_shelf_1: Object.freeze({ x: -5, y: 104, direction: "up_left" }),
+
+  zone3_basic_shelf_1: Object.freeze({ x: 5, y: 66, direction: "up_left" }),
+  zone3_basic_shelf_2: Object.freeze({ x: 5, y: 66, direction: "up_left" }),
+  zone3_fridge_1: Object.freeze({ x: -5, y: 30, direction: "up" }),
+  zone3_fridge_2: Object.freeze({ x: 0, y: 42, direction: "up_left" }),
+  zone3_fresh_shelf_1: Object.freeze({ x: 0, y: 56, direction: "up" }),
+
+  zone4_fridge_1: Object.freeze({ x: -5, y: 96, direction: "up_left" }),
+  zone4_fridge_2: Object.freeze({ x: -5, y: 96, direction: "up_left" }),
+  zone4_fresh_shelf_1: Object.freeze({ x: -10, y: 106, direction: "up_left" }),
+  zone4_fresh_shelf_2: Object.freeze({ x: -10, y: 106, direction: "up_left" }),
+  zone4_warmer_1: Object.freeze({ x: -5, y: 62, direction: "up_left" })
+});
+
 const STATUS_LABELS = Object.freeze({
   off_duty: "출근 대기 중",
   entering: "출근 중",
@@ -269,6 +315,10 @@ export const StaffAssistSystem = {
     for (const shelf of shelves) {
       const normalizedShelf = this.normalizeShelfSlot(shelf);
 
+      if (!this.isShelfZoneUnlocked(normalizedShelf)) {
+        continue;
+      }
+
       if (!normalizedShelf.productId) {
         continue;
       }
@@ -400,11 +450,15 @@ export const StaffAssistSystem = {
           return;
         }
 
+        const shelfAssistPosition = this.getShelfAssistPosition(refreshedTask.shelf);
+
         this.moveStaffToState("shelf", {
           reason: "shelf_refill_started",
           taskType: "shelf",
-          position: this.getShelfAssistPosition(refreshedTask.shelf),
+          position: shelfAssistPosition,
+          direction: shelfAssistPosition.direction,
           targetShelfInstanceId: refreshedTask.shelf.instanceId,
+          targetShelfZoneId: refreshedTask.shelf.zoneId,
           productId: refreshedTask.productId,
           taskDurationMs: refreshedTask.refillDurationMs
         }, () => {
@@ -479,9 +533,18 @@ export const StaffAssistSystem = {
       normalizedShelf.currentStock + restockAmount
     );
 
-    PlayerActionSystem.shelfStocks[normalizedShelf.instanceId] = {
+    if (!PlayerActionSystem.shelfStocks[normalizedShelf.instanceId]) {
+      PlayerActionSystem.shelfStocks[normalizedShelf.instanceId] = { products: {} };
+    }
+
+    if (!PlayerActionSystem.shelfStocks[normalizedShelf.instanceId].products) {
+      PlayerActionSystem.shelfStocks[normalizedShelf.instanceId].products = {};
+    }
+
+    PlayerActionSystem.shelfStocks[normalizedShelf.instanceId].products[normalizedShelf.productId] = {
       productId: normalizedShelf.productId,
-      currentStock: nextStock
+      currentStock: nextStock,
+      maxStock: normalizedShelf.maxStock
     };
     PlayerActionSystem.syncShelfStocksToGameState?.("staff_shelf_refill");
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -773,9 +836,56 @@ export const StaffAssistSystem = {
   },
 
   moveStaffToState(status, options = {}, onArrive = null) {
-    const targetPosition = options.position ?? POSITIONS[status] ?? POSITIONS.idle;
-    const targetX = Math.round(Number(targetPosition.x) || POSITIONS.idle.x);
-    const targetY = Math.round(Number(targetPosition.y) || POSITIONS.idle.y);
+    const targetPosition = this.normalizePoint(
+      options.position ?? POSITIONS[status] ?? POSITIONS.idle,
+      POSITIONS.idle
+    );
+    const movementPath = this.createMovementPath(status, options, targetPosition);
+
+    if (movementPath.length <= 1) {
+      this.moveStaffDirectToState(status, {
+        ...options,
+        position: targetPosition
+      }, onArrive);
+      return;
+    }
+
+    this.moveStaffAlongPath(status, options, movementPath, onArrive);
+  },
+
+  moveStaffAlongPath(status, options = {}, path = [], onArrive = null) {
+    const [nextPoint, ...remainingPath] = path;
+
+    if (!nextPoint) {
+      onArrive?.();
+      return;
+    }
+
+    const isFinalPoint = remainingPath.length === 0;
+    const segmentOptions = {
+      ...options,
+      position: nextPoint,
+      direction: isFinalPoint ? options.direction : undefined,
+      routeRemainingCount: remainingPath.length
+    };
+
+    this.moveStaffDirectToState(status, segmentOptions, () => {
+      if (remainingPath.length > 0) {
+        this.moveStaffAlongPath(status, options, remainingPath, onArrive);
+        return;
+      }
+
+      onArrive?.();
+    });
+  },
+
+  moveStaffDirectToState(status, options = {}, onArrive = null) {
+    const targetPosition = this.normalizePoint(
+      options.position ?? POSITIONS[status] ?? POSITIONS.idle,
+      POSITIONS.idle
+    );
+    const targetX = targetPosition.x;
+    const targetY = targetPosition.y;
     const startX = Math.round(Number(this.state.x) || POSITIONS.idle.x);
     const startY = Math.round(Number(this.state.y) || POSITIONS.idle.y);
     const distance = this.getPointDistance(startX, startY, targetX, targetY);
@@ -795,12 +905,16 @@ export const StaffAssistSystem = {
 
     const sequence = this.moveSequence + 1;
     this.moveSequence = sequence;
-    const direction = this.getDirectionFromMovement(targetX - startX, targetY - startY, this.state.direction);
+    const movementDirection = this.getDirectionFromMovement(
+      targetX - startX,
+      targetY - startY,
+      this.state.direction
+    );
 
     this.updateState(status, {
       ...options,
       position: { x: startX, y: startY },
-      direction,
+      direction: movementDirection,
       isMoving: true
     });
 
@@ -827,7 +941,7 @@ export const StaffAssistSystem = {
         this.updateState(status, {
           ...options,
           position: { x: targetX, y: targetY },
-          direction: this.getDirectionFromMovement(dx, dy, direction),
+          direction: options.direction ?? this.getDirectionFromMovement(dx, dy, movementDirection),
           isMoving: false
         });
         this.moveRafId = null;
@@ -841,7 +955,7 @@ export const StaffAssistSystem = {
       this.updateState(status, {
         ...options,
         position: { x: nextX, y: nextY },
-        direction: this.getDirectionFromMovement(dx, dy, direction),
+        direction: this.getDirectionFromMovement(dx, dy, movementDirection),
         isMoving: true
       });
 
@@ -849,6 +963,80 @@ export const StaffAssistSystem = {
     };
 
     this.moveRafId = window.requestAnimationFrame(step);
+  },
+
+  createMovementPath(status, options = {}, targetPosition = POSITIONS.idle) {
+    const explicitRoute = Array.isArray(options.routePoints) ? options.routePoints : null;
+    const routePoints = explicitRoute ?? this.getDefaultRoutePoints(status, options);
+    const rawPath = [
+      ...routePoints,
+      targetPosition
+    ];
+
+    return this.compactMovementPath(rawPath);
+  },
+
+  getDefaultRoutePoints(status, options = {}) {
+    if (status === "idle" && String(options.reason ?? "").includes("arrive_idle")) {
+      return [STAFF_ROUTE_POINTS.entryAisle, STAFF_ROUTE_POINTS.mainAisle];
+    }
+
+    if (status === "warehouse") {
+      return [STAFF_ROUTE_POINTS.warehouseAisle];
+    }
+
+    if (status === "shelf") {
+      const targetZoneId = options.targetShelfZoneId ?? this.getShelfZoneIdByInstanceId(options.targetShelfInstanceId);
+
+      return STAFF_ROUTE_POINTS_BY_ZONE_ID[targetZoneId] ?? [STAFF_ROUTE_POINTS.mainAisle];
+    }
+
+    if (status === "cleaning") {
+      return [STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.cleaningAisle];
+    }
+
+    if (status === "returning") {
+      return [STAFF_ROUTE_POINTS.mainAisle];
+    }
+
+    return [];
+  },
+
+  compactMovementPath(points = []) {
+    const compacted = [];
+    let previousPoint = this.normalizePoint({ x: this.state.x, y: this.state.y }, POSITIONS.idle);
+
+    points.forEach((point) => {
+      const normalizedPoint = this.normalizePoint(point, previousPoint);
+
+      if (this.getPointDistance(previousPoint.x, previousPoint.y, normalizedPoint.x, normalizedPoint.y) < 18) {
+        return;
+      }
+
+      compacted.push(normalizedPoint);
+      previousPoint = normalizedPoint;
+    });
+
+    return compacted;
+  },
+
+  normalizePoint(point = {}, fallback = POSITIONS.idle) {
+    const fallbackX = Math.round(Number(fallback.x) || POSITIONS.idle.x);
+    const fallbackY = Math.round(Number(fallback.y) || POSITIONS.idle.y);
+
+    return {
+      ...point,
+      x: Math.round(Number.isFinite(Number(point.x)) ? Number(point.x) : fallbackX),
+      y: Math.round(Number.isFinite(Number(point.y)) ? Number(point.y) : fallbackY)
+    };
+  },
+
+  getShelfZoneIdByInstanceId(instanceId) {
+    if (!instanceId) {
+      return null;
+    }
+
+    return SHELF_INSTANCES.find((shelf) => shelf.instanceId === instanceId)?.zoneId ?? null;
   },
 
   cancelStaffMovement() {
@@ -900,6 +1088,28 @@ export const StaffAssistSystem = {
       currentStock: 0,
       maxStock: 3
     }));
+  },
+
+  getUnlockedZoneIds() {
+    const savedUnlockedZoneIds = Array.isArray(GameState.expansion?.unlockedZoneIds)
+      ? GameState.expansion.unlockedZoneIds
+      : [];
+    const unlockedZoneIds = new Set(savedUnlockedZoneIds.filter(Boolean));
+
+    // 기본 1구역은 세이브/초기화 순서와 관계없이 항상 알바 이동 가능 구역으로 유지합니다.
+    unlockedZoneIds.add("zone_basic");
+
+    return unlockedZoneIds;
+  },
+
+  isShelfZoneUnlocked(shelf = {}) {
+    const zoneId = shelf.zoneId ?? this.getShelfZoneId(shelf.instanceId);
+
+    if (!zoneId) {
+      return true;
+    }
+
+    return this.getUnlockedZoneIds().has(zoneId);
   },
 
   getShelfSlotByInstanceId(instanceId) {
@@ -990,16 +1200,21 @@ export const StaffAssistSystem = {
   },
 
   getShelfAssistPosition(shelf = {}) {
-    const baseX = Number.isFinite(Number(shelf.standX))
-      ? Number(shelf.standX)
+    const interactionX = Number.isFinite(Number(shelf.interactionX))
+      ? Number(shelf.interactionX)
       : Number(shelf.x) || POSITIONS.idle.x;
-    const baseY = Number.isFinite(Number(shelf.standY))
-      ? Number(shelf.standY)
+    const interactionY = Number.isFinite(Number(shelf.interactionY))
+      ? Number(shelf.interactionY)
       : Number(shelf.y) || POSITIONS.idle.y;
+    const offset = STAFF_STAND_FOOT_OFFSETS_BY_SHELF_INSTANCE_ID[shelf.instanceId] ??
+      STAFF_DEFAULT_STAND_FOOT_OFFSET;
+    const footX = interactionX + (Number(offset.x) || 0);
+    const footY = interactionY + (Number(offset.y) || 0);
 
     return {
-      x: Math.round(baseX + 45),
-      y: Math.round(baseY + 20)
+      x: Math.round(footX - STAFF_CHARACTER_ANCHOR.x),
+      y: Math.round(footY - STAFF_CHARACTER_ANCHOR.y),
+      direction: offset.direction ?? "up"
     };
   },
 
@@ -1018,7 +1233,7 @@ export const StaffAssistSystem = {
 
     this.noStockMessageAtByProductId[key] = nowMs;
     this.lastGuideMessageAtMs = nowMs;
-    this.emitMessage("진열하려고 했는데 창고 재고가 없어요.", 2600);
+    this.emitMessage("창고에 정리된 재고가 없어 보충할 수 없어요.", 2600);
   },
 
   incrementStaffDailyCount(key) {
