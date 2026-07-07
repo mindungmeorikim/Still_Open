@@ -19,6 +19,7 @@ import { getProductById } from "../data/ProductData.js";
 import { BMSystem } from "./BMSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
 
+const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const ORDER_VALIDATION_MESSAGES = Object.freeze({
@@ -55,6 +56,27 @@ export const OrderSystem = {
 
     EventBus.on(EVENTS.PLAYER_ACTION_RECORDED, (data) => {
       this.handlePlayerActionRecorded(data);
+    });
+
+    EventBus.on(TUTORIAL_PRACTICE_RESET_REQUESTED, () => {
+      this.resetTutorialPracticeOrder();
+    });
+  },
+
+  resetTutorialPracticeOrder() {
+    this.clearDeliveryTimer();
+    this.pendingDelivery = null;
+    this.orderSequence = 0;
+
+    EventBus.emit(EVENTS.ORDER_DELIVERED, {
+      day: GameState.day,
+      orderId: null,
+      items: [],
+      totalCost: 0,
+      isArrived: false,
+      isCompleted: true,
+      status: "tutorial_reset",
+      message: "튜토리얼 연습 발주가 초기화되었습니다."
     });
   },
 

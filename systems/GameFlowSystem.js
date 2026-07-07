@@ -37,6 +37,7 @@ const STAFF_EVENTS = {
   AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED"
 };
 
+const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
 const STAFF_UNLOCK_DAY = 3;
 const STAFF_SHIFT_HOURS = 3;
 const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
@@ -152,10 +153,13 @@ export const GameFlowSystem = {
     this.ensureStaffState();
     this.applyDayBalance();
 
-    EventBus.on(EVENTS.DAY_START_REQUESTED, () => this.startDay());
+    EventBus.on(EVENTS.DAY_START_REQUESTED, (data) => this.startDay(data));
     EventBus.on(EVENTS.STORE_OPEN_REQUESTED, () => this.openStore());
     EventBus.on(EVENTS.STORE_CLOSE_REQUESTED, (data) => this.closeStore(data));
     EventBus.on(EVENTS.NEXT_DAY_READY, (data) => this.goToNextDay(data));
+    EventBus.on(TUTORIAL_PRACTICE_RESET_REQUESTED, (data) => {
+      this.resetTutorialPracticeRun(data);
+    });
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
       this.handleStockOrganized(data);
     });
@@ -364,7 +368,35 @@ export const GameFlowSystem = {
     };
   },
 
-  startDay() {
+  resetTutorialPracticeRun(data = {}) {
+    this.clearDayTimer();
+    this.orderReadyDay = null;
+    this.isStoreOpen = false;
+    this.isClosing = false;
+    this.isDayTimerPaused = false;
+    this.staffAutoCheckoutElapsedSeconds = 0;
+    this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
+
+    if (GameState.day <= 1 && GameState.isEndlessMode !== true) {
+      GameState.day = 1;
+    }
+
+    GameState.phase = GAME_PHASE.READY;
+    GameState.dayScenario = null;
+    GameState.deliveryBoxState = null;
+    GameState.warehouseBoxState = "closed";
+
+    if (GameState.player && typeof GameState.player === "object") {
+      delete GameState.player.carryingBoxType;
+    }
+
+    this.resetTodayStats();
+    this.applyDayBalance();
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  startDay(data = {}) {
     this.ensureStaffState();
 
     if (
@@ -391,8 +423,12 @@ export const GameFlowSystem = {
     const dayScenario = this.getCurrentDayScenario({ refresh: true });
     GameState.dayScenario = dayScenario;
 
+    const isTutorialRealStart = data?.source === "tutorial_real_start";
+
     UIManager.showMessage(
-      `Day ${GameState.day} 시작! ${modeText}입니다. 발주 → 도착한 발주 박스 정리 → 첫 진열까지 마치면 영업을 시작할 수 있습니다.`
+      isTutorialRealStart
+        ? "본격 게임이 시작됩니다! 세계 1등 편의점이 되는 날까지 발주부터 시작해보세요~"
+        : `Day ${GameState.day} 시작! ${modeText}입니다. 발주 → 도착한 발주 박스 정리 → 첫 진열까지 마치면 영업을 시작할 수 있습니다.`
     );
 
     UIManager.render();

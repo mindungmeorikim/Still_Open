@@ -35,6 +35,7 @@ const STAFF_EVENTS = {
   AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED"
 };
 
+const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
@@ -154,8 +155,35 @@ export const PlayerActionSystem = {
     this.bindDeliveryBoxEvents();
     this.bindSanitationEvents();
     this.bindShelfStockEvents();
+
+    EventBus.on(TUTORIAL_PRACTICE_RESET_REQUESTED, () => {
+      this.resetTutorialPracticeActions();
+    });
+
     this.getShelfSlots();
     this.syncShelfStocksToGameState("init");
+  },
+
+  resetTutorialPracticeActions() {
+    if (this.restockTimerId) {
+      clearInterval(this.restockTimerId);
+      this.restockTimerId = null;
+    }
+
+    if (this.cleaningCountdownTimerId) {
+      clearInterval(this.cleaningCountdownTimerId);
+      this.cleaningCountdownTimerId = null;
+    }
+
+    this.isPlayerBusy = false;
+    this.restockRemainingSeconds = 0;
+    this.restockPhase = null;
+    this.setCarryingBoxType(null);
+    this.setDeliveryBoxState(null);
+    this.setWarehouseBoxState("closed");
+    this.shelfStocks = {};
+    this.getShelfSlots();
+    this.syncShelfStocksToGameState("tutorial_practice_reset");
   },
 
   initializeWarehouseBoxState() {

@@ -28,6 +28,8 @@ import {
 import { getDayScenario } from "../data/DayScenarioData.js";
 import { BMSystem, BM_EVENTS } from "./BMSystem.js";
 
+const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
+
 export const InventorySystem = {
   lots: [],
   initializedProductIds: new Set(),
@@ -63,8 +65,20 @@ export const InventorySystem = {
       this.handleBMStateChanged();
     });
 
+    EventBus.on(TUTORIAL_PRACTICE_RESET_REQUESTED, () => {
+      this.resetTutorialPracticeInventory();
+    });
+
     this.unlockProductsForDay(GameState.day);
     this.emitInventoryChanged("inventory_initialized");
+  },
+
+  resetTutorialPracticeInventory() {
+    this.lots = [];
+    this.lotSequence = 0;
+    this.initializedProductIds = new Set();
+    this.unlockProductsForDay(GameState.day);
+    this.emitInventoryChanged("tutorial_practice_reset");
   },
 
   handleDayStarted() {

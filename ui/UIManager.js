@@ -44,6 +44,7 @@ const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const DEFAULT_CLEANING_POINT = Object.freeze(getCleaningPointByZoneId());
 const TUTORIAL_ORDER_TARGET_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
+const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
 const ORDER_VALIDATION_MESSAGES = Object.freeze({
   notEnoughGold: "골드가 부족합니다.",
   quantityExceeded: "발주 가능 수량을 초과했습니다.",
@@ -154,6 +155,7 @@ export const UIManager = {
   tutorialHelpButton: null,
   tutorialStepIndex: 0,
   tutorialAutoShown: false,
+  tutorialSessionStartedCompleted: false,
   tutorialMode: "guide",
   tutorialActionTarget: null,
   tutorialActionHandler: null,
@@ -600,19 +602,18 @@ export const UIManager = {
         spotlightSelector: "#open-store-button",
         actionSelector: "#open-store-button",
         anchorSelector: "#open-store-button",
-        targetLabel: "진짜 영업 시작",
-        title: "진짜 영업 시작",
-        description: `준비 끝!
-이제 진짜 영업을 시작해볼게요.
-[영업 시작] 버튼을 눌러주세요.`,
-        pendingDescription: "영업을 여는 중이에요. 잠시만 기다려주세요.",
+        targetLabel: "첫 화면으로 이동",
+        title: "연습 완료",
+        description: `방금까지는 조작을 익히기 위한 연습이었어요.
+[영업 시작] 버튼을 누르면 연습 기록을 정리하고 게임 첫 화면으로 돌아갑니다.
+첫 화면에서 [새 매장 시작]을 눌러 진짜 Day 1을 발주부터 시작하세요.`,
+        pendingDescription: "연습 기록을 정리하고 첫 화면으로 이동할 준비 중이에요. 잠시만 기다려주세요.",
         bullets: [],
         tip: "",
         actionGuide: "[영업 시작] 버튼 누르기",
         requireTargetClick: true,
         allowedActions: ["store:open"],
-        waitForEvent: "store-opened",
-        pendingLabel: "영업 시작 중...",
+        pendingLabel: "첫 화면 이동 중...",
         hideSkipButton: true,
         highlightPadding: 8
       }
@@ -872,6 +873,7 @@ export const UIManager = {
       this.createTutorialOverlay();
     }
 
+    this.tutorialSessionStartedCompleted = this.isTutorialCompleted();
     this.tutorialStepIndex = startIndex;
     // 기본 튜토리얼은 항상 작은 말풍선형 체험 모드로 보여준다.
     // 도움말에서 다시 열 때도 큰 팝업형 가이드로 돌아가지 않게 한다.
@@ -925,6 +927,7 @@ export const UIManager = {
     this.clearTutorialStepClass();
     this.clearTutorialGameFrameBounds();
     this.tutorialPendingStepId = null;
+    this.tutorialSessionStartedCompleted = false;
 
     if (overlay) {
       overlay.classList.add("hidden");
@@ -2176,13 +2179,69 @@ export const UIManager = {
     }
 
     if (step?.id === "open-store") {
-      EventBus.emit(EVENTS.STORE_OPEN_REQUESTED);
+      this.completeFirstRunTutorialAndStartRealGame();
       return true;
     }
 
     source?.click?.();
     advanceAfterAction();
     return true;
+  },
+
+  completeFirstRunTutorialAndStartRealGame() {
+    if (!this.isInteractiveTutorialActive?.()) {
+      return false;
+    }
+
+    const wasTutorialAlreadyCompleted = this.tutorialSessionStartedCompleted === true;
+
+    this.completeTutorialAndCleanup({
+      markCompleted: true,
+      message: ""
+    });
+
+    if (wasTutorialAlreadyCompleted) {
+      this.showMessage("튜토리얼 도움말 확인을 마쳤습니다.", {
+        duration: 2600
+      });
+      return true;
+    }
+
+    this.resetTutorialOrderUiState();
+
+    EventBus.emit(TUTORIAL_PRACTICE_RESET_REQUESTED, {
+      day: GameState.day,
+      source: "tutorial_open_store_button"
+    });
+
+    this.hideDayScenarioModal?.();
+    this.closeTitleScreen?.();
+    this.render();
+    this.renderCustomers?.();
+
+    window.setTimeout(() => {
+      this.showMessage("본격 게임이 시작됩니다! 세계 1등 편의점이 되는 날까지 발주부터 시작해보세요~", {
+        duration: 3600
+      });
+      this.focusElementSafely?.(document.getElementById("start-day-button"));
+    }, 80);
+
+    return true;
+  },
+
+  resetTutorialOrderUiState() {
+    this.orderDraftQuantities = {};
+    this.orderDeliveredData = null;
+    this.orderModalMode = "closed";
+    this.pendingOrderPhaseData = null;
+
+    if (typeof this.hideOrderModal === "function") {
+      this.hideOrderModal();
+    }
+
+    if (typeof this.clearDeliveryBox === "function") {
+      this.clearDeliveryBox();
+    }
   },
 
   removeTutorialTargetProxy() {
@@ -3429,6 +3488,12 @@ getNearestDebugShelf(point) {
 
     openStoreButton.addEventListener("click", (event) => {
       if (!this.guardTutorialAction("store:open", event)) return;
+
+      if (this.isInteractiveTutorialActive?.() && this.getCurrentTutorialStep?.()?.id === "open-store") {
+        this.completeFirstRunTutorialAndStartRealGame();
+        return;
+      }
+
       EventBus.emit(EVENTS.STORE_OPEN_REQUESTED);
     });
 
@@ -3505,7 +3570,7 @@ getNearestDebugShelf(point) {
     EventBus.on(EVENTS.STOCK_ORGANIZED, () => {
       this.showTutorialHintOnce(
         "stock-organized",
-        "튜토리얼: 발주 상품이 창고 재고로 정리되었습니다. 이제 영업 시작 버튼을 누르면 진짜 영업이 시작됩니다."
+        "튜토리얼: 발주 상품이 창고 재고로 정리되었습니다. 이제 영업 시작 버튼을 눌러 연습을 마무리합니다."
       );
       this.maybeAdvanceInteractiveTutorial("stock-organized", { delayMs: 180 });
     });
