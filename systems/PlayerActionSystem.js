@@ -1289,7 +1289,10 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     } 
 
     if (actionType === "cleaning") {
-      this.handleCleaningAction({ source: "player_action_system_pointer" });
+      this.handleCleaningAction({
+        source: "player_action_system_pointer",
+        requireNear: true
+      });
       return;
     }
 

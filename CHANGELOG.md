@@ -1,3 +1,9 @@
+## [v7.13.32] Cleaning Pointer Distance Guard
+
+### Fixed
+- `data-player-action="cleaning"` 직접 클릭/터치 경로에도 `requireNear: true`를 적용해, 플레이어가 청소 도구 근처에 있을 때만 청소가 시작되도록 수정했습니다.
+- 키보드 상호작용 청소와 직접 클릭/터치 청소의 거리 조건을 동일하게 맞췄습니다.
+
 ## [v7.13.31] Git Pull Conflict Resolve
 
 ### Fixed
