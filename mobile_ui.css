@@ -1,0 +1,72 @@
+/* mobile-ui.css */
+
+.mobile-controls {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99999;
+}
+
+.mobile-joystick {
+  position: absolute;
+  left: 28px;
+  bottom: 28px;
+  width: 120px;
+  height: 120px;
+  pointer-events: auto;
+}
+
+.mobile-joystick-base {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.24);
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(4px);
+}
+
+.mobile-joystick-thumb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.85);
+  border: 2px solid rgba(80, 80, 80, 0.25);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+}
+
+.mobile-interact-button {
+  position: absolute;
+  right: 28px;
+  bottom: 42px;
+  width: 108px;
+  height: 108px;
+  border-radius: 50%;
+  border: none;
+  pointer-events: auto;
+
+  font-size: 16px;
+  font-weight: 700;
+  color: #333;
+
+  background: rgba(255, 235, 130, 0.92);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+.mobile-interact-button:active {
+  transform: scale(0.94);
+}
+
+.mobile-controls,
+.mobile-joystick,
+.mobile-joystick-base,
+.mobile-joystick-thumb,
+.mobile-interact-button {
+  touch-action: none;
+  user-select: none;
+}

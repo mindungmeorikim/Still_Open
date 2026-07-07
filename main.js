@@ -28,6 +28,9 @@ import { StaffAssistSystem } from "./systems/StaffAssistSystem.js";
 import { DebugSystem } from "./systems/DebugSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
 
+import { MobileUI } from "./ui/MobileUI.js";
+import { MobileInputSystem } from "./systems/MobileInputSystem.js";
+
 function isCustomerEventModalOpen() {
   return (
     UIManager.eventModal &&
@@ -197,6 +200,8 @@ function initGame() {
   StaffAssistSystem.init();
   DebugSystem.init();
   AudioSystem.init();
+  MobileUI.init();
+  MobileInputSystem.init();
   bindCustomerEventModalFlow();
   bindCustomerStockShortagePenalty();
   EventBus.emit(EVENTS.GAME_INIT);
@@ -206,6 +211,7 @@ function initGame() {
 }
 
 function gameloop() {
+  MobileInputSystem.update();
   PlayerMovementSystem.update();
   requestAnimationFrame(gameloop);
 }
