@@ -3233,6 +3233,145 @@ export const UIManager = {
     }
   },
 
+
+// 진열대 배치 좌표 확인용 코드 추후 주석처리 필요  
+bindDebugCoordinateMode() {
+  if (this.isDebugCoordinateModeBound) return;
+
+  this.isDebugCoordinateModeBound = true;
+  this.isDebugCoordinateModeVisible = false;
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "F8") return;
+
+    event.preventDefault();
+    this.isDebugCoordinateModeVisible = !this.isDebugCoordinateModeVisible;
+    this.renderDebugCoordinatePanel();
+  });
+
+  document.addEventListener("mousemove", (event) => {
+    if (!this.isDebugCoordinateModeVisible) return;
+
+    this.updateDebugCoordinatePanel(event);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!this.isDebugCoordinateModeVisible) return;
+
+    const worldPoint = this.getDebugWorldPoint(event);
+
+    console.log(
+      `[좌표 복사용] x: ${worldPoint.x}, y: ${worldPoint.y}`
+    );
+  });
+},
+
+renderDebugCoordinatePanel() {
+  let panel = document.getElementById("debug-coordinate-panel");
+
+  if (!this.isDebugCoordinateModeVisible) {
+    panel?.remove();
+    return;
+  }
+
+  if (!panel) {
+    panel = document.createElement("div");
+    panel.id = "debug-coordinate-panel";
+    panel.style.position = "fixed";
+    panel.style.left = "12px";
+    panel.style.bottom = "12px";
+    panel.style.zIndex = "99999";
+    panel.style.padding = "10px 12px";
+    panel.style.borderRadius = "8px";
+    panel.style.background = "rgba(0, 0, 0, 0.78)";
+    panel.style.color = "#fff";
+    panel.style.fontSize = "12px";
+    panel.style.lineHeight = "1.5";
+    panel.style.fontFamily = "monospace";
+    panel.style.pointerEvents = "none";
+    panel.style.whiteSpace = "pre-line";
+    document.body.appendChild(panel);
+  }
+
+  panel.textContent = "F8 좌표 모드 ON\n마우스를 움직여 좌표 확인\n클릭하면 콘솔에 좌표 출력";
+},
+
+updateDebugCoordinatePanel(event) {
+  const panel = document.getElementById("debug-coordinate-panel");
+
+  if (!panel) return;
+
+  const worldPoint = this.getDebugWorldPoint(event);
+  const player = GameState.player ?? {};
+  const nearestShelf = this.getNearestDebugShelf(worldPoint);
+
+  panel.textContent = [
+    "F8 좌표 모드 ON",
+    "",
+    `Mouse World X: ${worldPoint.x}`,
+    `Mouse World Y: ${worldPoint.y}`,
+    "",
+    `Player X: ${Math.round(Number(player.x) || 0)}`,
+    `Player Y: ${Math.round(Number(player.y) || 0)}`,
+    "",
+    nearestShelf
+      ? `Nearest Shelf: ${nearestShelf.label}`
+      : "Nearest Shelf: 없음",
+    nearestShelf
+      ? `Shelf x/y: ${nearestShelf.x}, ${nearestShelf.y}`
+      : "",
+    nearestShelf
+      ? `Interaction: ${nearestShelf.interactionX}, ${nearestShelf.interactionY}`
+      : "",
+    nearestShelf
+      ? `Distance: ${nearestShelf.distance}`
+      : "",
+    "",
+    "클릭하면 콘솔에 좌표 출력"
+  ].filter(Boolean).join("\n");
+},
+
+getDebugWorldPoint(event) {
+  const viewport = document.getElementById("store-area");
+  const rect = viewport?.getBoundingClientRect();
+
+  if (!viewport || !rect) {
+    return {
+      x: Math.round(event.clientX),
+      y: Math.round(event.clientY)
+    };
+  }
+
+  const localX = event.clientX - rect.left;
+  const localY = event.clientY - rect.top;
+  const zoom = Number(this.worldCamera?.zoom) || 1;
+  const cameraX = Number(this.worldCamera?.x) || 0;
+  const cameraY = Number(this.worldCamera?.y) || 0;
+
+  return {
+    x: Math.round((localX - cameraX) / zoom),
+    y: Math.round((localY - cameraY) / zoom)
+  };
+},
+
+getNearestDebugShelf(point) {
+  if (!point) return null;
+
+  return SHELF_INSTANCES
+    .map((shelf) => {
+      const x = Number(shelf.interactionX ?? shelf.x) || 0;
+      const y = Number(shelf.interactionY ?? shelf.y) || 0;
+      const dx = point.x - x;
+      const dy = point.y - y;
+
+      return {
+        ...shelf,
+        distance: Math.round(Math.sqrt(dx * dx + dy * dy))
+      };
+    })
+    .sort((a, b) => a.distance - b.distance)[0] ?? null;
+},
+
   bindButtons() {
     const startDayButton = document.getElementById("start-day-button");
     const openStoreButton = document.getElementById("open-store-button");
@@ -4260,6 +4399,11 @@ export const UIManager = {
         y: shelf.y,
         width: shelf.width,
         height: shelf.height,
+        // rotation: Number(shelf.rotation) || 0,
+        // skewX: Number(shelf.skewX) || 0,
+        // skewY: Number(shelf.skewY) || 0,
+        // scaleX: Number(shelf.scaleX) || 1,
+        // scaleY: Number(shelf.scaleY) || 1,
         createIfMissing: true
       };
     });
@@ -4278,6 +4422,13 @@ export const UIManager = {
       node.dataset.shelfId = config.shelfId;
       node.style.setProperty("left", `${config.x}px`, "important");
       node.style.setProperty("top", `${config.y}px`, "important");
+//       node.style.setProperty(
+//         "transform",
+//         `rotate(${config.rotation}deg) skew(${config.skewX}deg, ${config.skewY}deg) scale(${config.scaleX}, ${config.scaleY})`,
+//         "important"
+// );
+
+// node.style.setProperty("transform-origin", "center bottom", "important");
       if (config.width) {
         node.style.setProperty("width", `${config.width}px`, "important");
       }

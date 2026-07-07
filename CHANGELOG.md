@@ -1,3 +1,12 @@
+## [v7.13.31] Git Pull Conflict Resolve
+
+### Fixed
+- `style.css` 병합 충돌을 해결하고 튜토리얼/발주창 작은 화면 보정/하단 버튼 backplate 제거 스타일을 유지했습니다.
+- `systems/DebugSystem.js` 병합 충돌을 해결하고 F8 좌표 출력 모드와 겹치지 않도록 재고 채우기 단축키를 F11로 유지했습니다.
+
+### Kept
+- 자동 병합된 `ui/UIManager.js`의 팀원 진열대/재고 부족 표시 관련 변경을 유지했습니다.
+
 ## [v7.13.30] Tutorial + Shelf Merge Fix
 
 ### Added
