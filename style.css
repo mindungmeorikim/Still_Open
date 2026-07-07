@@ -26031,32 +26031,36 @@ body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tut
 /* [v7.13.30] Shelf stock warning indicators merged from teammate shelf work */
 .shelf-warning-icons {
   position: absolute !important;
-  left: 50% !important;
-  top: 8px !important;
+  left: 45% !important;
+  top: -5px !important;
   right: auto !important;
   transform: translateX(-50%) !important;
   display: flex !important;
   flex-direction: row !important;
-  gap: 3px !important;
+  gap: 4px !important;
   pointer-events: none !important;
-  z-index: 25 !important;
+  z-index: 40 !important;
 }
 
 .shelf-warning-icon {
-  width: 8px !important;
-  height: 8px !important;
+  width: 24px !important;
+  height: 24px !important;
   display: block !important;
+  object-fit: contain !important;
   font-size: 0 !important;
   line-height: 0 !important;
-  border-radius: 999px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
 
 .shelf-warning-icon.is-empty {
-  background: #ff3b30 !important;
+  width: 26px !important;
+  height: 26px !important;
+  background: transparent !important;
 }
 
 .shelf-warning-icon.is-warning {
-  background: #ffc107 !important;
+  background: transparent !important;
 }
 
 /* v7.13.34 알바 청소 보조 시 청소도구 표시 */
@@ -27460,3 +27464,27 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
    현재는 이후 UI 핫픽스가 누적될 기준점만 생성합니다.
    다음 CSS 수정은 반드시 이 주석 아래에 추가하세요. */
 
+/* =========================
+   진열대 재고 경고 아이콘
+   ========================= */
+
+.shelf-warning-icons {
+  position: absolute;
+  right: -14px;
+  top: -22px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.shelf-warning-icon {
+  width: 50px;
+  height: 50px;
+  display: block;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.shelf-warning-icon.is-empty {
+  width: 54px;
+  height: 54px;
+}

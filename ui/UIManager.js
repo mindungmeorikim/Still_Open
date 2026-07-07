@@ -11,6 +11,7 @@ import { CustomerSystem } from "../systems/CustomerSystem.js";
 import { PRODUCTS, PRODUCT_SHELF_IDS } from "../data/ProductData.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
+import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 import {
   EXPANSION_ZONES,
   getPreviousExpansionZone
@@ -3350,6 +3351,7 @@ bindDebugCoordinateMode() {
     event.preventDefault();
     this.isDebugCoordinateModeVisible = !this.isDebugCoordinateModeVisible;
     this.renderDebugCoordinatePanel();
+    this.renderDebugCollisionBoxes();
   });
 
   document.addEventListener("mousemove", (event) => {
@@ -3473,6 +3475,43 @@ getNearestDebugShelf(point) {
       };
     })
     .sort((a, b) => a.distance - b.distance)[0] ?? null;
+},
+
+renderDebugCollisionBoxes() {
+  const interactionLayer = this.getStoreInteractionLayer();
+
+  if (!interactionLayer) return;
+
+  interactionLayer
+    .querySelectorAll(".debug-collision-box")
+    .forEach((node) => node.remove());
+
+  if (!this.isDebugCoordinateModeVisible) return;
+
+  const collisionRects = getStoreObjectCollisionRects(
+    GameState.expansion?.unlockedZoneIds
+  ); 
+
+  collisionRects.forEach((rect) => {
+    const box = document.createElement("div");
+
+    box.className = "debug-collision-box";
+    box.style.position = "absolute";
+    box.style.left = `${Number(rect.x) || 0}px`;
+    box.style.top = `${Number(rect.y) || 0}px`;
+    box.style.width = `${Number(rect.width) || 0}px`;
+    box.style.height = `${Number(rect.height) || 0}px`;
+    box.style.border = "2px solid rgba(255, 0, 0, 0.85)";
+    box.style.background = "rgba(255, 0, 0, 0.12)";
+    box.style.zIndex = "9999";
+    box.style.pointerEvents = "none";
+    box.textContent = rect.sourceId ?? rect.id;
+    box.style.color = "#ff0000";
+    box.style.fontSize = "10px";
+    box.style.fontWeight = "900";
+
+    interactionLayer.appendChild(box);
+  });
 },
 
   bindButtons() {
@@ -4672,6 +4711,7 @@ getNearestDebugShelf(point) {
         visualAsset
       });
     });
+    this.renderDebugCollisionBoxes();
   },
 
   renderWarehouseBox() {
@@ -4978,12 +5018,21 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       node.appendChild(iconLayer);
     }
 
-    const className = hasEmpty
+    const iconSrc = hasEmpty
+      ? ASSET_PATHS.ui.components.icons.shelfWarningRed
+      : ASSET_PATHS.ui.components.icons.shelfWarningYellow;
+
+    const iconClassName = hasEmpty
       ? "shelf-warning-icon is-empty"
       : "shelf-warning-icon is-warning";
 
     iconLayer.innerHTML = `
-      <span class="${className}"></span>
+     <img
+        class="${iconClassName}"
+        src="${iconSrc}"
+        alt=""
+        draggable="false"
+      />
     `;
   },
 

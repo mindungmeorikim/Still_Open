@@ -139,8 +139,8 @@ export const PlayerActionSystem = {
   },
 
   cleaningZone: {
-    x: 430,
-    y: 610,
+    x: 785,
+    y: 470,
     interactionDistance: 130
   },
 

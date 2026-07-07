@@ -387,6 +387,10 @@ export const ASSET_PATHS = deepFreeze({
         checkedDisabled: "./assets/ui/components/checkbox/ui_checkbox_checked_disabled.png",
         unchecked: "./assets/ui/components/checkbox/ui_checkbox_unchecked.png",
         uncheckedDisabled: "./assets/ui/components/checkbox/ui_checkbox_unchecked_disabled.png"
+      },
+      icons: {
+        shelfWarningYellow: "./assets/ui/icons/shelf_warning_yellow.png",
+        shelfWarningRed: "./assets/ui/icons/shelf_warning_red.png"
       }
     }
   }

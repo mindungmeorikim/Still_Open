@@ -21,7 +21,7 @@ import {
 
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 
-const DEBUG_ENABLED = true; // 배포 전 false로 변경
+const DEBUG_ENABLED = false; // 배포 전 false로 변경
 
 function toSafeNumber(value, fallback = 0) {
   const number = Number(value);
