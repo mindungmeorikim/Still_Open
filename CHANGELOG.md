@@ -1,3 +1,15 @@
+## [v7.13.51] Audio System Merge
+
+### Added
+- 오디오 작업본의 `AudioSystem.js`와 BGM/SFX mp3 파일 15종을 최신 작업본에 병합했습니다.
+- 타이틀/영업/정산 BGM 전환과 클릭, 발주 확정, 진열 보충, 계산 완료, 재화 획득, 이벤트 성공/실패 효과음 연결을 추가했습니다.
+
+### Changed
+- `main.js`에서 `AudioSystem` import와 초기화만 추가했습니다.
+
+### Maintained
+- 최신 작업본의 신선매대 에셋, 보상함 기본 보상 제거, CSS 최종 override 구역, 튜토리얼/상점/알바/정산 UI 수정사항은 덮어쓰지 않았습니다.
+
 ## [v7.13.50] Reward Inbox Default Grant Removal
 
 ### Fixed
