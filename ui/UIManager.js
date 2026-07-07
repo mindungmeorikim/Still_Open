@@ -5016,14 +5016,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   renderInteractionFeedback() {
-    const playerCenter = this.getInteractionPlayerCenter();
     const isDeliveryBoxSorting = this.isDeliveryBoxSortingInteractionSuppressed();
 
     if (isDeliveryBoxSorting) {
-      this.clearShelfInteractionFeedback();
+      this.clearAllInteractionFeedback();
+      return;
     }
 
-    this.getInteractionFeedbackTargets({ suppressShelf: isDeliveryBoxSorting }).forEach((target) => {
+    const playerCenter = this.getInteractionPlayerCenter();
+
+    this.getInteractionFeedbackTargets().forEach((target) => {
       const node = document.getElementById(target.nodeId);
 
       if (!node || node.hidden) return;
@@ -5054,6 +5056,19 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   clearShelfInteractionFeedback() {
     SHELF_INSTANCES.forEach((shelf) => {
       this.clearInteractionFeedbackNode(shelf.nodeId);
+    });
+  },
+
+  clearAllInteractionFeedback() {
+    const nodeIds = new Set([
+      "counter-zone",
+      "warehouse-box-zone",
+      "delivery-box-zone",
+      ...SHELF_INSTANCES.map((shelf) => shelf.nodeId).filter(Boolean)
+    ]);
+
+    nodeIds.forEach((nodeId) => {
+      this.clearInteractionFeedbackNode(nodeId);
     });
   },
 

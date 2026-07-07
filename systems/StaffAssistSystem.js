@@ -28,10 +28,15 @@ const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 
 const POSITIONS = Object.freeze({
   entry: Object.freeze({ x: 577, y: 612 }),
-  idle: Object.freeze({ x: 270, y: 610 }),
+  // fallback 좌표입니다. 실제 알바 대기 위치는 getIdlePosition()에서 청소 도구함 좌표를 기준으로 계산합니다.
+  idle: Object.freeze({ x: 895, y: 548 }),
   warehouseAssist: Object.freeze({ x: 285, y: 575 }),
-  cleaningAssist: Object.freeze({ x: 825, y: 640 })
+  cleaningAssist: Object.freeze({ x: 895, y: 548 })
 });
+
+// 청소 도구함 기준 알바 대기 오프셋입니다.
+// 청소 도구함/청소 포인트 좌표가 바뀌면 알바도 같은 기준점 옆으로 따라붙습니다.
+const STAFF_IDLE_CLEANING_TOOL_OFFSET = Object.freeze({ x: 25, y: -102, direction: "down_left" });
 
 // F8 좌표 모드에서 쓰는 월드 좌표 기준 알바 이동 경유지입니다.
 // 화면 비율/카메라 줌이 바뀌어도 월드 좌표만 따라가도록 StaffAssistSystem 내부에서만 사용합니다.
@@ -148,7 +153,7 @@ export const StaffAssistSystem = {
     this.isInitialized = true;
     this.bindEvents();
     if (this.canAssistInCurrentPhase()) {
-      this.updateState("idle", { reason: "init_active", position: POSITIONS.idle });
+      this.updateState("idle", { reason: "init_active", position: this.getIdlePosition() });
       this.scheduleNextCheck(1000);
       return;
     }
@@ -159,7 +164,7 @@ export const StaffAssistSystem = {
   bindEvents() {
     EventBus.on(EVENTS.GAME_INIT, () => {
       if (this.canAssistInCurrentPhase()) {
-        this.updateState("idle", { reason: "game_init_active", position: POSITIONS.idle });
+        this.updateState("idle", { reason: "game_init_active", position: this.getIdlePosition() });
         this.scheduleNextCheck(1000);
         return;
       }
@@ -592,7 +597,7 @@ export const StaffAssistSystem = {
     this.moveStaffToState("returning", {
       reason: "task_finished",
       taskType: result.type ?? null,
-      position: POSITIONS.idle
+      position: this.getIdlePosition()
     }, () => {
       this.setTaskTimer(() => {
         this.isWorking = false;
@@ -600,7 +605,7 @@ export const StaffAssistSystem = {
         this.updateState("idle", {
           reason: "task_cooldown",
           lastTaskType: result.type ?? null,
-          position: POSITIONS.idle
+          position: this.getIdlePosition()
         });
         this.scheduleNextCheck(this.getCooldownMs());
       }, RETURNING_SETTLE_DELAY_MS);
@@ -829,7 +834,7 @@ export const StaffAssistSystem = {
 
     this.moveStaffToState("idle", {
       reason: `${reason}_arrive_idle`,
-      position: POSITIONS.idle,
+      position: this.getIdlePosition(),
       label: STATUS_LABELS.idle,
       ...attendanceFields
     }, () => {
@@ -853,8 +858,8 @@ export const StaffAssistSystem = {
 
   moveStaffToState(status, options = {}, onArrive = null) {
     const targetPosition = this.normalizePoint(
-      options.position ?? POSITIONS[status] ?? POSITIONS.idle,
-      POSITIONS.idle
+      options.position ?? this.getDefaultPositionForStatus(status),
+      this.getDefaultPositionForStatus("idle")
     );
     const movementPath = this.createMovementPath(status, options, targetPosition);
 
@@ -897,13 +902,14 @@ export const StaffAssistSystem = {
 
   moveStaffDirectToState(status, options = {}, onArrive = null) {
     const targetPosition = this.normalizePoint(
-      options.position ?? POSITIONS[status] ?? POSITIONS.idle,
-      POSITIONS.idle
+      options.position ?? this.getDefaultPositionForStatus(status),
+      this.getDefaultPositionForStatus("idle")
     );
     const targetX = targetPosition.x;
     const targetY = targetPosition.y;
-    const startX = Math.round(Number(this.state.x) || POSITIONS.idle.x);
-    const startY = Math.round(Number(this.state.y) || POSITIONS.idle.y);
+    const idlePosition = this.getDefaultPositionForStatus("idle");
+    const startX = Math.round(Number(this.state.x) || idlePosition.x);
+    const startY = Math.round(Number(this.state.y) || idlePosition.y);
     const distance = this.getPointDistance(startX, startY, targetX, targetY);
 
     this.cancelStaffMovement();
@@ -1017,6 +1023,26 @@ export const StaffAssistSystem = {
     };
   },
 
+  getIdlePosition() {
+    const cleaningPoint = this.getActiveCleaningAssistPoint() ?? getCleaningPointByZoneId();
+    const baseX = Number(cleaningPoint.x ?? POSITIONS.idle.x);
+    const baseY = Number(cleaningPoint.y ?? POSITIONS.idle.y);
+
+    return {
+      x: baseX + STAFF_IDLE_CLEANING_TOOL_OFFSET.x,
+      y: baseY + STAFF_IDLE_CLEANING_TOOL_OFFSET.y,
+      direction: STAFF_IDLE_CLEANING_TOOL_OFFSET.direction
+    };
+  },
+
+  getDefaultPositionForStatus(status = "idle") {
+    if (status === "idle" || status === "returning") {
+      return this.getIdlePosition();
+    }
+
+    return POSITIONS[status] ?? this.getIdlePosition();
+  },
+
   getDefaultRoutePoints(status, options = {}) {
     if (status === "idle" && String(options.reason ?? "").includes("arrive_idle")) {
       return [STAFF_ROUTE_POINTS.entryAisle, STAFF_ROUTE_POINTS.mainAisle];
@@ -1047,7 +1073,7 @@ export const StaffAssistSystem = {
 
   compactMovementPath(points = []) {
     const compacted = [];
-    let previousPoint = this.normalizePoint({ x: this.state.x, y: this.state.y }, POSITIONS.idle);
+    let previousPoint = this.normalizePoint({ x: this.state.x, y: this.state.y }, this.getDefaultPositionForStatus("idle"));
 
     points.forEach((point) => {
       const normalizedPoint = this.normalizePoint(point, previousPoint);
@@ -1296,7 +1322,7 @@ export const StaffAssistSystem = {
   },
 
   updateState(status, options = {}) {
-    const position = options.position ?? POSITIONS[status] ?? POSITIONS.idle;
+    const position = options.position ?? this.getDefaultPositionForStatus(status);
     const label = options.label ?? STATUS_LABELS[status] ?? STATUS_LABELS.idle;
     const nowMs = this.getNowMs();
     const hasOption = (key) => Object.prototype.hasOwnProperty.call(options, key);
@@ -1307,9 +1333,9 @@ export const StaffAssistSystem = {
     const nextState = {
       status,
       label,
-      x: Math.round(Number(position.x) || POSITIONS.idle.x),
-      y: Math.round(Number(position.y) || POSITIONS.idle.y),
-      direction: options.direction ?? this.state.direction ?? "down",
+      x: Math.round(Number(position.x) || this.getDefaultPositionForStatus("idle").x),
+      y: Math.round(Number(position.y) || this.getDefaultPositionForStatus("idle").y),
+      direction: options.direction ?? position.direction ?? this.state.direction ?? "down",
       isMoving: options.isMoving === true,
       isWorking: this.isWorking,
       taskType: options.taskType ?? null,

@@ -26899,3 +26899,329 @@ body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-skip-button {
     font-size: 12px !important;
   }
 }
+
+/* v8.0.22 result modal clipping hotfix
+   목적: 16:9 프레임 정렬 상태에서 정산창 왼쪽 영업 기록이 아래에서 잘리는 문제 복구
+   범위: 정산창 높이/스크롤 처리만 수정 */
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .modal-content.result-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: auto !important;
+  max-height: min(92%, 610px) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-landscape-layout {
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-left-panel,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel .result-check-list {
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-left-panel {
+  overflow-y: auto !important;
+  padding-right: 6px !important;
+  scrollbar-gutter: stable !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-modal-actions {
+  flex: 0 0 auto !important;
+}
+
+/* v8.0.23 result/staff/delivery sorting targeted correction
+   범위:
+   1) 정산창 내부 영업 기록 행 간격/패딩만 조정해 잘림 완화
+   2) 알바 고용창 오늘은 넘기기 버튼은 세로 위치 유지, 좌우만 중앙 정렬
+   3) 발주 박스 운반 중 상호작용 이펙트는 JS에서 전부 제거 */
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .modal-content.result-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  width: min(92%, 940px) !important;
+  max-width: min(92%, 940px) !important;
+  height: auto !important;
+  max-height: min(86%, 610px) !important;
+  padding: 14px 16px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-modal-content h2 {
+  flex: 0 0 auto !important;
+  margin: 0 0 8px !important;
+  line-height: 1.1 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-modal-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-landscape-layout {
+  display: grid !important;
+  grid-template-columns: 326px minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "left right"
+    "next next" !important;
+  gap: 8px 14px !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  align-items: stretch !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-left-panel {
+  grid-area: left !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  padding: 0 8px 2px 4px !important;
+  scrollbar-gutter: stable !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel {
+  grid-area: right !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel .result-check-list {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  margin: 0 !important;
+  padding-right: 4px !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-summary {
+  margin: 0 0 6px !important;
+  padding: 10px 12px !important;
+  min-height: 0 !important;
+  align-content: center !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-summary strong {
+  font-size: clamp(21px, 2.25vw, 26px) !important;
+  line-height: 1.08 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-summary span {
+  margin-top: 6px !important;
+  font-size: 13px !important;
+  line-height: 1.25 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-section-title {
+  margin: 5px 0 5px !important;
+  padding: 4px 10px !important;
+  line-height: 1.1 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row {
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 5px 8px !important;
+  font-size: 13px !important;
+  line-height: 1.15 !important;
+  box-sizing: border-box !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row + .result-row {
+  margin-top: 2px !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row span,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row strong {
+  line-height: 1.15 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-next-step,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .modal-note {
+  grid-area: next !important;
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  line-height: 1.25 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-modal-actions {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  margin-top: 8px !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-button {
+  margin: 0 auto !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-skip-button,
+body:not(.is-tutorial-active) #staff-hire-modal #staff-hire-skip-button {
+  display: flex !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+/* v8.0.25 result modal visible internal-fit correction
+   정산창 위치는 유지하고, 내부 콘텐츠만 위쪽부터 촘촘하게 배치한다.
+   v8.0.24에서 #result-modal-body가 0 높이처럼 접혀 내용이 사라지던 문제를 재발하지 않도록
+   body/layout 높이를 명시하고, 영업 기록 행 간격만 압축한다. */
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .modal-content.result-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  width: min(92%, 940px) !important;
+  max-width: min(92%, 940px) !important;
+  height: min(84svh, 500px) !important;
+  min-height: 430px !important;
+  max-height: calc(100svh - 24px) !important;
+  padding: 10px 16px 12px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-modal-content h2 {
+  flex: 0 0 auto !important;
+  margin: 0 0 6px !important;
+  font-size: 21px !important;
+  line-height: 1.08 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-modal-body {
+  display: block !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-landscape-layout {
+  display: grid !important;
+  grid-template-columns: 318px minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  grid-template-areas:
+    "left right"
+    "next next" !important;
+  gap: 5px 14px !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  align-items: stretch !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-left-panel {
+  grid-area: left !important;
+  display: block !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  padding: 0 6px 0 0 !important;
+  overflow-y: auto !important;
+  scrollbar-gutter: stable !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel {
+  grid-area: right !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel .result-check-list {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding-right: 4px !important;
+  overflow-y: auto !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-summary {
+  margin: 0 0 4px !important;
+  padding: 7px 9px !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-summary strong {
+  font-size: 21px !important;
+  line-height: 1.04 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-summary span {
+  margin-top: 4px !important;
+  font-size: 12px !important;
+  line-height: 1.14 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-section-title {
+  margin: 2px 0 3px !important;
+  padding: 3px 10px !important;
+  font-size: 12px !important;
+  line-height: 1.05 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row {
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 3px 8px !important;
+  font-size: 12px !important;
+  line-height: 1.08 !important;
+  box-sizing: border-box !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row + .result-row {
+  margin-top: 1px !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row span,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-row strong {
+  line-height: 1.08 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-next-step,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .modal-note {
+  grid-area: next !important;
+  max-height: 20px !important;
+  margin: 0 !important;
+  padding: 2px 8px !important;
+  overflow: hidden !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-modal-actions {
+  flex: 0 0 auto !important;
+  display: flex !important;
+  justify-content: center !important;
+  margin-top: 6px !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-button {
+  min-height: 36px !important;
+  margin: 0 auto !important;
+}
