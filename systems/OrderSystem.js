@@ -21,6 +21,13 @@ import { InventorySystem } from "./InventorySystem.js";
 
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
+const ORDER_VALIDATION_MESSAGES = Object.freeze({
+  notEnoughGold: "골드가 부족합니다.",
+  quantityExceeded: "발주 가능 수량을 초과했습니다.",
+  emptyOrder: "발주할 상품을 선택해주세요.",
+  lockedProduct: "발주할 수 없는 상품입니다.",
+  unavailable: "발주를 진행할 수 없습니다."
+});
 
 export const OrderSystem = {
   isInitialized: false,
@@ -70,17 +77,41 @@ export const OrderSystem = {
   getOrderFailureMessage(reason = "", details = {}) {
     const reasonText = String(reason || "");
 
-    if (reasonText.includes("보유금") || reasonText.includes("발주 가능 금액")) {
-      const totalCost = Math.max(0, Math.floor(Number(details.totalCost) || 0));
-      const availableMoney = Math.max(0, Math.floor(Number(details.availableMoney) || 0));
-      return `발주 가능 금액이 부족합니다. 필요 ₩${totalCost.toLocaleString("ko-KR")} / 가능 ₩${availableMoney.toLocaleString("ko-KR")}`;
+    if (
+      reasonText === "not_enough_gold" ||
+      reasonText === ORDER_VALIDATION_MESSAGES.notEnoughGold ||
+      reasonText.includes("보유금") ||
+      reasonText.includes("발주 가능 금액") ||
+      reasonText.includes("골드")
+    ) {
+      return ORDER_VALIDATION_MESSAGES.notEnoughGold;
     }
 
-    if (reasonText.includes("창고")) {
-      return `창고 용량을 초과했습니다. 현재 ${details.currentWarehouseStock ?? 0}개 + 발주 ${details.orderQuantity ?? 0}개 / 한도 ${details.warehouseCapacity ?? 0}개`;
+    if (
+      reasonText === "quantity_exceeded" ||
+      reasonText === ORDER_VALIDATION_MESSAGES.quantityExceeded ||
+      reasonText.includes("창고") ||
+      reasonText.includes("수량")
+    ) {
+      return ORDER_VALIDATION_MESSAGES.quantityExceeded;
     }
 
-    return reasonText || "발주를 진행할 수 없습니다.";
+    if (
+      reasonText === "empty_order" ||
+      reasonText === ORDER_VALIDATION_MESSAGES.emptyOrder
+    ) {
+      return ORDER_VALIDATION_MESSAGES.emptyOrder;
+    }
+
+    if (
+      reasonText === "locked_product" ||
+      reasonText === "no_orderable_items" ||
+      reasonText === ORDER_VALIDATION_MESSAGES.lockedProduct
+    ) {
+      return ORDER_VALIDATION_MESSAGES.lockedProduct;
+    }
+
+    return reasonText || ORDER_VALIDATION_MESSAGES.unavailable;
   },
 
   handleOrderRequested(data = {}) {
@@ -89,11 +120,13 @@ export const OrderSystem = {
 
     if (!productId) {
       console.warn("[OrderSystem] ORDER_REQUESTED에 productId가 없습니다.", data);
+      this.emitOrderConfirmationFailed("locked_product", data);
       return;
     }
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
       console.warn("[OrderSystem] 잘못된 발주 수량입니다.", data);
+      this.emitOrderConfirmationFailed("empty_order", data);
       return;
     }
 
@@ -117,42 +150,16 @@ export const OrderSystem = {
       return;
     }
 
-    const requestedItems = Array.isArray(data.items) ? data.items : [];
-    const hasRequestedItems = requestedItems.some((item) => {
-      return this.toPositiveInteger(item.quantity) > 0;
-    });
-    const items = this.normalizeOrderItems(requestedItems);
+    const orderValidation = this.validateConfirmedOrderItems(data);
 
-    if (hasRequestedItems && items.length === 0) {
-      this.emitOrderConfirmationFailed("발주 가능한 상품이 없습니다.", data, {
-        requestedItems,
-        reason: "no_orderable_items"
-      });
-      return;
-    }
-    const totalCost = this.calculateTotalCost(items);
-    const availableMoney = this.getAvailableMoney();
-
-    if (totalCost > availableMoney) {
-      this.emitOrderConfirmationFailed("발주 가능 금액보다 발주 비용이 큽니다.", data, {
-        totalCost,
-        availableMoney
-      });
+    if (!orderValidation.isAvailable) {
+      this.emitOrderConfirmationFailed(orderValidation.reason, data, orderValidation.details);
       return;
     }
 
-    const currentWarehouseStock = InventorySystem.getInventorySnapshot?.().totalQuantity ?? 0;
-    const orderQuantity = items.reduce((total, item) => total + item.quantity, 0);
-    const warehouseCapacity = BMSystem.getWarehouseCapacity();
-
-    if (currentWarehouseStock + orderQuantity > warehouseCapacity) {
-      this.emitOrderConfirmationFailed("창고 용량을 초과하는 발주입니다.", data, {
-        currentWarehouseStock,
-        orderQuantity,
-        warehouseCapacity
-      });
-      return;
-    }
+    const items = orderValidation.items;
+    const totalCost = orderValidation.totalCost;
+    const availableMoney = orderValidation.availableMoney;
 
     this.orderSequence += 1;
 
@@ -170,22 +177,6 @@ export const OrderSystem = {
     }
 
     this.clearDeliveryTimer();
-
-    if (items.length === 0) {
-      this.pendingDelivery = null;
-
-      EventBus.emit(EVENTS.STOCK_ORGANIZED, {
-        day: GameState.day,
-        orderId,
-        items: [],
-        totalCost: 0,
-        source: "empty_order",
-        message: "발주 상품 없이 영업 준비를 완료했습니다."
-      });
-
-      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
-      return;
-    }
 
     this.pendingDelivery = {
       orderId,
@@ -307,7 +298,7 @@ export const OrderSystem = {
         items: completedItems,
         totalCost: completedPayload.totalCost,
         source: "delivery_box_sorted",
-        message: "모든 입고 상품 정리가 완료되었습니다."
+        message: "발주 상품 정리가 완료되었습니다."
       });
     } else {
       EventBus.emit(EVENTS.ORDER_DELIVERED, this.createDeliveryPayload("item_sorted", {
@@ -349,6 +340,116 @@ export const OrderSystem = {
 
     EventBus.emit(EVENTS.ORDER_DELIVERED, completedPayload);
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  validateConfirmedOrderItems(data = {}) {
+    const requestedItems = Array.isArray(data.items) ? data.items : [];
+    const positiveItems = requestedItems.filter((item) => {
+      return this.toPositiveInteger(item.quantity) > 0;
+    });
+
+    if (positiveItems.length === 0) {
+      return {
+        isAvailable: false,
+        reason: "empty_order",
+        details: {
+          requestedItems
+        }
+      };
+    }
+
+    const items = [];
+
+    for (const item of positiveItems) {
+      const product = getProductById(item.productId);
+      const quantity = this.toPositiveInteger(item.quantity);
+
+      if (!product || !BMSystem.canOrderProduct(product.id)) {
+        const productId = product?.id ?? item.productId ?? null;
+
+        console.warn("[OrderSystem] 발주 조건 미충족 상품 차단:", {
+          productId,
+          productName: product ? BMSystem.getProductDisplayName(product) : null,
+          reason: productId ? BMSystem.getProductLockReason(productId) : "invalid_product"
+        });
+
+        return {
+          isAvailable: false,
+          reason: "locked_product",
+          details: {
+            productId,
+            requestedItems
+          }
+        };
+      }
+
+      items.push({
+        productId: product.id,
+        productName: BMSystem.getProductDisplayName(product),
+        shelfId: product.shelfId,
+        imagePath: product.imagePath,
+        quantity,
+        purchasePrice: product.purchasePrice,
+        salePrice: BMSystem.getProductSalePrice(product.id) || product.salePrice,
+        lineCost: product.purchasePrice * quantity
+      });
+    }
+
+    const orderQuantity = items.reduce((total, item) => total + item.quantity, 0);
+
+    if (orderQuantity <= 0) {
+      return {
+        isAvailable: false,
+        reason: "empty_order",
+        details: {
+          requestedItems
+        }
+      };
+    }
+
+    const totalCost = this.calculateTotalCost(items);
+    const availableMoney = this.getAvailableMoney();
+
+    if (totalCost > availableMoney) {
+      return {
+        isAvailable: false,
+        reason: "not_enough_gold",
+        details: {
+          totalCost,
+          availableMoney,
+          requestedItems
+        }
+      };
+    }
+
+    const inventorySnapshot = InventorySystem.getInventorySnapshot?.() ?? {};
+    const currentWarehouseStock = Math.max(0, Math.floor(Number(inventorySnapshot.totalQuantity) || 0));
+    const warehouseCapacity = BMSystem.getWarehouseCapacity();
+
+    if (currentWarehouseStock + orderQuantity > warehouseCapacity) {
+      return {
+        isAvailable: false,
+        reason: "quantity_exceeded",
+        details: {
+          currentWarehouseStock,
+          orderQuantity,
+          warehouseCapacity,
+          requestedItems
+        }
+      };
+    }
+
+    return {
+      isAvailable: true,
+      reason: null,
+      details: {},
+      items,
+      totalCost,
+      availableMoney,
+      orderQuantity,
+      currentWarehouseStock,
+      warehouseCapacity
+    };
   },
 
   normalizeOrderItems(items = []) {
@@ -446,7 +547,7 @@ export const OrderSystem = {
       return "발주 없이 오늘 영업 준비를 진행합니다.";
     }
 
-    return "가게 앞 택배 박스가 도착했습니다. 박스를 눌러 입고 상품을 정리해주세요.";
+    return "가게 앞 발주 박스가 도착했습니다. 박스를 눌러 발주 상품을 정리해주세요.";
   },
 
   createDeliveryPayload(reason = "arrived", details = {}) {
@@ -459,7 +560,7 @@ export const OrderSystem = {
         items: [],
         totalCost: 0,
         reason,
-        message: "정리할 입고 상품이 없습니다.",
+        message: "정리할 발주 상품이 없습니다.",
         ...details
       };
     }

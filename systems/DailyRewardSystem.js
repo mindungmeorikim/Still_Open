@@ -246,6 +246,25 @@ export const DailyRewardSystem = {
     this.writeJson(BM_WALLET_STORAGE_KEY, wallet);
   },
 
+  resetForNewGame(wallet = DEFAULT_BM_WALLET) {
+    const preservedAttendance = this.readAttendanceState();
+    const normalizedWallet = {
+      ...DEFAULT_BM_WALLET,
+      ...wallet
+    };
+
+    // 새로 시작은 새 계정 생성이 아니라 새 매장/진행도 초기화입니다.
+    // 출석 보상 수령 기록은 계정 단위 데이터로 유지하고, BM 지갑은 현재 보존값으로 동기화합니다.
+    this.writeAttendanceState(preservedAttendance);
+    this.writeWallet(normalizedWallet);
+    this.syncGameStateWallet(normalizedWallet);
+
+    return {
+      attendance: this.readAttendanceState(),
+      wallet: this.readWallet()
+    };
+  },
+
   syncGameStateWallet(wallet = this.readWallet()) {
     const normalizedWallet = {
       ...DEFAULT_BM_WALLET,

@@ -39,8 +39,16 @@ const INTERACTION_FEEDBACK_DISTANCE = 120;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
+const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const CLEANING_ZONE_POSITION = Object.freeze({ x: 870, y: 650 });
+const TUTORIAL_ORDER_TARGET_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
+const ORDER_VALIDATION_MESSAGES = Object.freeze({
+  notEnoughGold: "골드가 부족합니다.",
+  quantityExceeded: "발주 가능 수량을 초과했습니다.",
+  emptyOrder: "발주할 상품을 선택해주세요.",
+  lockedProduct: "발주할 수 없는 상품입니다."
+});
 const SANITATION_EVENTS = Object.freeze({
   CHANGED: "SANITATION_CHANGED",
   MESSAGE_REQUESTED: "SANITATION_MESSAGE_REQUESTED",
@@ -136,6 +144,26 @@ const STAFF_ASSIST_STATUS_LABELS = Object.freeze({
 
 export const UIManager = {
   titleScreen: null,
+  tutorialOverlay: null,
+  tutorialHelpButton: null,
+  tutorialStepIndex: 0,
+  tutorialAutoShown: false,
+  tutorialMode: "guide",
+  tutorialActionTarget: null,
+  tutorialActionHandler: null,
+  tutorialHighlightedTargets: [],
+  tutorialPendingStepId: null,
+  pendingFirstRunTutorialAfterDailyReward: false,
+  tutorialCompletedKey: "stillOpen.tutorial.completed",
+  tutorialLegacyCompletedKeys: [],
+  tutorialHintPrefix: "stillOpen.tutorial.hint.",
+  tutorialHighlightResizeHandler: null,
+  tutorialInputGuardClickHandler: null,
+  tutorialInputGuardPointerHandler: null,
+  tutorialBlockedMessageTimerId: null,
+  tutorialTargetProxy: null,
+  tutorialTargetProxySource: null,
+  tutorialTargetProxyClickHandler: null,
   settingsModal: null,
   settingsEscapeKeyBound: false,
   dailyRewardModal: null,
@@ -212,6 +240,7 @@ export const UIManager = {
     RewardInboxUI.init();
     this.bindButtons();
     this.bindGameEvents();
+    this.bindDebugCoordinateMode();
     this.bindDayStartEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
@@ -234,6 +263,8 @@ export const UIManager = {
     this.createSettingsModal();
     this.createDailyRewardModal();
     this.createDailyMissionModal();
+    this.createTutorialOverlay();
+    this.createTutorialHelpButton();
     RewardInboxUI.createModal();
     this.createInventorySummary();
     this.createStaffSummary();
@@ -251,6 +282,2273 @@ export const UIManager = {
     this.renderCustomers();
     this.showMessage("게임 준비 완료. Day 시작 버튼을 눌러주세요.");
     this.queueInitialCameraFocus();
+    this.syncTutorialHelpButtonVisibility();
+  },
+
+
+  createTutorialHelpButton() {
+    const gameRoot = document.getElementById("game-root");
+    const topIconMenu = document.getElementById("top-icon-menu");
+
+    if (!gameRoot && !topIconMenu) return null;
+
+    let button = document.getElementById("tutorial-help-button");
+
+    if (!button) {
+      button = document.createElement("button");
+      button.id = "tutorial-help-button";
+      button.type = "button";
+    }
+
+    button.className = "hud-icon-button tutorial-help-button";
+    button.disabled = false;
+    button.hidden = false;
+    button.tabIndex = 0;
+    button.title = "도움말";
+    button.setAttribute("aria-label", "튜토리얼 다시 보기");
+    button.setAttribute("aria-disabled", "false");
+    button.removeAttribute("aria-hidden");
+    button.innerHTML = `
+      <span class="tutorial-help-button-icon" aria-hidden="true">?</span>
+      <span class="top-icon-button-label tutorial-help-button-label">도움말</span>
+    `;
+
+    const settingsButton = document.getElementById("ingame-settings-button")
+      ?? topIconMenu?.querySelector('button[aria-label="설정"], .ingame-settings-button')
+      ?? null;
+
+    if (topIconMenu) {
+      if (settingsButton && settingsButton.parentElement === topIconMenu) {
+        topIconMenu.insertBefore(button, settingsButton);
+      } else if (button.parentElement !== topIconMenu) {
+        topIconMenu.appendChild(button);
+      }
+    } else if (gameRoot && button.parentElement !== gameRoot) {
+      gameRoot.appendChild(button);
+    }
+
+    button.onclick = () => {
+      this.showTutorialOverlay({ startIndex: 0, force: true, mode: "interactive" });
+    };
+
+    this.tutorialHelpButton = button;
+    this.syncTutorialHelpButtonVisibility();
+
+    return button;
+  },
+
+  syncTutorialHelpButtonVisibility() {
+    const button = this.tutorialHelpButton ?? document.getElementById("tutorial-help-button");
+
+    if (!button) return;
+
+    const isTitleActive = document.body.classList.contains("is-title-screen-active");
+    button.classList.toggle("hidden", isTitleActive);
+  },
+
+  createTutorialOverlay() {
+    let overlay = document.getElementById("tutorial-overlay");
+
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "tutorial-overlay";
+      overlay.className = "tutorial-overlay hidden";
+      overlay.setAttribute("aria-live", "polite");
+      overlay.innerHTML = `
+        <div class="tutorial-dim tutorial-dim--full" aria-hidden="true"></div>
+        <div id="tutorial-highlight-ring" class="tutorial-highlight-ring hidden" aria-hidden="true"></div>
+        <div id="tutorial-target-proxy-layer" class="tutorial-target-proxy-layer" aria-hidden="true"></div>
+        <article class="tutorial-card" tabindex="-1">
+          <header class="tutorial-card-header">
+            <div>
+              <p id="tutorial-kicker" class="tutorial-kicker">첫 영업 가이드</p>
+              <h2 id="tutorial-title">튜토리얼</h2>
+            </div>
+          </header>
+          <div class="tutorial-step-meta">
+            <span id="tutorial-step-count">1 / 1</span>
+            <span id="tutorial-step-target">기본 안내</span>
+          </div>
+          <p id="tutorial-description" class="tutorial-description"></p>
+          <ul id="tutorial-bullets" class="tutorial-bullets"></ul>
+          <p id="tutorial-tip" class="tutorial-tip"></p>
+          <p id="tutorial-action-guide" class="tutorial-action-guide"></p>
+          <footer class="tutorial-actions">
+            <button id="tutorial-prev-button" class="tutorial-secondary-button" type="button">이전</button>
+            <button id="tutorial-next-button" class="tutorial-primary-button" type="button">다음</button>
+            <button id="tutorial-skip-button" class="tutorial-secondary-button tutorial-skip-button" type="button">튜토리얼 건너뛰기</button>
+          </footer>
+        </article>
+      `;
+      document.body.appendChild(overlay);
+    }
+
+    this.tutorialOverlay = overlay;
+    this.bindTutorialOverlayButtons();
+
+    return overlay;
+  },
+
+  bindTutorialOverlayButtons() {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+
+    if (!overlay) return;
+
+    const closeButton = overlay.querySelector("#tutorial-close-button");
+    const prevButton = overlay.querySelector("#tutorial-prev-button");
+    const nextButton = overlay.querySelector("#tutorial-next-button");
+    const skipButton = overlay.querySelector("#tutorial-skip-button");
+
+    if (closeButton) {
+      closeButton.onclick = () => this.hideTutorialOverlay();
+    }
+
+    if (prevButton) {
+      prevButton.onclick = () => this.moveTutorialStep(-1);
+    }
+
+    if (nextButton) {
+      nextButton.onclick = () => this.moveTutorialStep(1);
+    }
+
+    if (skipButton) {
+      skipButton.onclick = () => {
+        this.completeTutorialAndCleanup({
+          markCompleted: true,
+          message: "튜토리얼을 건너뛰었습니다. 필요하면 오른쪽 위 도움말 버튼에서 다시 볼 수 있어요."
+        });
+      };
+    }
+  },
+
+  getTutorialSteps() {
+    const tutorialOrderPlusSelector = '#order-modal .order-product-card[data-tutorial-order-target="true"] .order-qty-button[data-action="increase"]:not(:disabled)';
+    const tutorialOrderQuantitySelector = '#order-modal .order-product-card[data-tutorial-order-target="true"] .order-qty-button:not(:disabled)';
+
+    return [
+      {
+        id: "start-day",
+        selector: "#start-day-button",
+        spotlightSelector: "#start-day-button",
+        actionSelector: "#start-day-button",
+        anchorSelector: "#start-day-button",
+        targetLabel: "발주 버튼",
+        title: "영업 준비 시작",
+        description: `오늘 영업은 발주 준비부터 시작해요.
+아래의 [발주] 버튼을 눌러주세요.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "[발주] 버튼 누르기",
+        requireTargetClick: true,
+        allowedActions: ["day:start-order"],
+        advanceAfterTargetClickMs: 180,
+        highlightPadding: 8
+      },
+      {
+        id: "briefing-confirm",
+        contextSelector: "#day-scenario-modal .day-scenario-modal-content",
+        spotlightSelector: "#day-scenario-confirm-button",
+        actionSelector: "#day-scenario-confirm-button",
+        anchorSelector: "#day-scenario-confirm-button",
+        targetLabel: "오늘 목표/상권 정보",
+        title: "브리핑 확인",
+        description: `오늘 목표와 상권 정보를 확인해요.
+이 정보를 보고 어떤 상품을 주문할지 정할 수 있어요.
+[발주하러 가기]를 눌러주세요.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "[발주하러 가기] 누르기",
+        requireTargetClick: true,
+        allowedActions: ["day:briefing-confirm"],
+        advanceAfterTargetClickMs: 180,
+        highlightPadding: 8,
+        contextPadding: 10
+      },
+      {
+        id: "order-quantity",
+        contextSelector: "#order-modal .order-modal-content",
+        spotlightSelector: tutorialOrderPlusSelector,
+        actionSelector: tutorialOrderPlusSelector,
+        anchorSelector: tutorialOrderPlusSelector,
+        allowedSelectors: [tutorialOrderQuantitySelector],
+        targetLabel: "상품 수량 선택",
+        title: "상품 수량 선택",
+        description: `상품의 [+] 버튼을 눌러 발주 수량을 1개 이상 선택하세요.
+수량을 정한 뒤 [다음]을 누르면 확정 단계로 넘어갑니다.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "[+] 버튼으로 수량 선택",
+        requireTargetClick: false,
+        allowedActions: ["order:quantity"],
+        requiresOrderQuantity: true,
+        nextLabel: "다음",
+        highlightPadding: 7,
+        contextPadding: 10
+      },
+      {
+        id: "order-confirm",
+        contextSelector: "#order-modal .order-modal-content",
+        spotlightSelector: "#order-confirm-button:not(:disabled)",
+        actionSelector: "#order-confirm-button:not(:disabled)",
+        anchorSelector: "#order-confirm-button:not(:disabled)",
+        targetLabel: "발주 확정",
+        title: "발주 확정",
+        description: `수량을 정했다면 주문을 확정해요.
+주문한 상품은 잠시 후 도착한 발주 박스로 나타나요.`,
+        pendingDescription: "발주가 접수되었어요. 도착한 발주 박스가 나타날 때까지 잠시만 기다려주세요.",
+        bullets: [],
+        tip: "",
+        actionGuide: "[발주 확정] 누르기",
+        requireTargetClick: true,
+        allowedActions: ["order:confirm"],
+        waitForEvent: "order-delivered",
+        pendingLabel: "배송 대기 중...",
+        highlightPadding: 8,
+        contextPadding: 10
+      },
+      {
+        id: "delivery-box",
+        selector: "#delivery-box-zone",
+        spotlightSelector: "#delivery-box-zone",
+        actionSelector: "#delivery-box-zone",
+        anchorSelector: "#delivery-box-zone",
+        targetLabel: "발주 박스",
+        title: "발주 도착",
+        description: `발주 박스가 도착했어요.
+박스를 눌러 상품을 정리해보세요.`,
+        pendingDescription: "발주 상품 정리 중이에요. 잠시만 기다려주세요.",
+        bullets: [],
+        tip: "",
+        actionGuide: "[발주 박스] 누르기",
+        requireTargetClick: true,
+        allowedActions: ["delivery:open"],
+        waitForEvent: "stock-organized",
+        pendingLabel: "발주 상품 정리 중...",
+        hideCardWhilePending: true,
+        highlightPadding: 8
+      },
+      {
+        id: "auto-shelf-guide",
+        selector: "#zone1-basic-shelf-1",
+        spotlightSelector: "#zone1-basic-shelf-1",
+        anchorSelector: "#zone1-basic-shelf-1",
+        targetLabel: "창고 정리 완료",
+        title: "상품 정리 완료",
+        description: `상품 정리가 끝났어요.
+발주 상품이 창고 재고로 정리되었어요.
+이제 다음 준비를 이어가볼게요.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "다음 안내 보기",
+        requireTargetClick: false,
+        highlightPadding: 8
+      },
+      {
+        id: "checkout-guide",
+        selector: "#counter-zone",
+        spotlightSelector: "#counter-zone",
+        anchorSelector: "#counter-zone",
+        targetLabel: "계산대",
+        title: "계산대",
+        description: `영업 중 손님이 계산대로 오면
+계산대를 눌러 결제를 처리하세요.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "다음 안내 보기",
+        requireTargetClick: false,
+        highlightPadding: 8
+      },
+      {
+        id: "shelf-restock-guide",
+        selector: "#zone1-basic-shelf-1",
+        spotlightSelector: "#zone1-basic-shelf-1",
+        anchorSelector: "#zone1-basic-shelf-1",
+        targetLabel: "진열대 보충",
+        title: "진열대 보충",
+        description: `상품이 팔리면 진열대 재고가 줄어들어요.
+영업 중 재고가 부족해지면 진열대를 눌러 보충하세요.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "다음 안내 보기",
+        requireTargetClick: false,
+        highlightPadding: 8
+      },
+      {
+        id: "cleaning-guide",
+        selector: "#cleaning-zone .cleaning-tools-image, #cleaning-zone",
+        spotlightSelector: "#cleaning-zone .cleaning-tools-image, #cleaning-zone",
+        anchorSelector: "#cleaning-zone .cleaning-tools-image, #cleaning-zone",
+        targetLabel: "청소 도구",
+        title: "청소",
+        description: `매장이 더러워지면 위생이 떨어져요.
+청소가 필요할 때 청소 도구를 눌러 정리하세요.`,
+        bullets: [],
+        tip: "",
+        actionGuide: "다음 안내 보기",
+        requireTargetClick: false,
+        highlightPadding: 8
+      },
+      {
+        id: "open-store",
+        selector: "#open-store-button",
+        spotlightSelector: "#open-store-button",
+        actionSelector: "#open-store-button",
+        anchorSelector: "#open-store-button",
+        targetLabel: "진짜 영업 시작",
+        title: "진짜 영업 시작",
+        description: `준비 끝!
+이제 진짜 영업을 시작해볼게요.
+[영업 시작] 버튼을 눌러주세요.`,
+        pendingDescription: "영업을 여는 중이에요. 잠시만 기다려주세요.",
+        bullets: [],
+        tip: "",
+        actionGuide: "[영업 시작] 버튼 누르기",
+        requireTargetClick: true,
+        allowedActions: ["store:open"],
+        waitForEvent: "store-opened",
+        pendingLabel: "영업 시작 중...",
+        hideSkipButton: true,
+        highlightPadding: 8
+      }
+    ];
+  },
+
+  showFirstRunTutorialSoon() {
+    if (this.tutorialAutoShown || this.isTutorialCompleted()) {
+      return;
+    }
+
+    this.tutorialAutoShown = true;
+
+    window.setTimeout(() => {
+      if (document.body.classList.contains("is-title-screen-active")) {
+        return;
+      }
+
+      this.showTutorialOverlay({ startIndex: 0, mode: "interactive" });
+    }, 260);
+  },
+
+  enableTutorialInputGuard() {
+    if (this.tutorialInputGuardClickHandler || this.tutorialInputGuardPointerHandler) {
+      return;
+    }
+
+    this.tutorialInputGuardClickHandler = (event) => {
+      this.handleTutorialInputCapture(event, "click");
+    };
+    this.tutorialInputGuardPointerHandler = (event) => {
+      this.handleTutorialInputCapture(event, "pointerdown");
+    };
+
+    document.addEventListener("pointerdown", this.tutorialInputGuardPointerHandler, true);
+    document.addEventListener("click", this.tutorialInputGuardClickHandler, true);
+  },
+
+  disableTutorialInputGuard() {
+    if (this.tutorialInputGuardPointerHandler) {
+      document.removeEventListener("pointerdown", this.tutorialInputGuardPointerHandler, true);
+    }
+
+    if (this.tutorialInputGuardClickHandler) {
+      document.removeEventListener("click", this.tutorialInputGuardClickHandler, true);
+    }
+
+    this.tutorialInputGuardPointerHandler = null;
+    this.tutorialInputGuardClickHandler = null;
+  },
+
+  handleTutorialInputCapture(event, eventType = "click") {
+    if (!this.isInteractiveTutorialActive()) return true;
+
+    if (this.tryActivateTutorialTargetProxyFromEvent(event, eventType)) {
+      return false;
+    }
+
+    if (this.isTutorialEventAllowed(event)) {
+      return true;
+    }
+
+    this.blockTutorialInputEvent(event, eventType);
+    return false;
+  },
+
+  tryActivateTutorialTargetProxyFromEvent(event, eventType = "click") {
+    if (!this.isInteractiveTutorialActive()) return false;
+    if (!event || !["pointerdown", "click"].includes(eventType)) return false;
+    if (typeof event.button === "number" && event.button !== 0) return false;
+
+    const step = this.getCurrentTutorialStep();
+
+    if (!this.shouldUseTutorialTargetProxy(step)) return false;
+
+    const proxy = this.tutorialTargetProxy;
+    const source = this.tutorialTargetProxySource;
+
+    if (!proxy || !source || !document.body.contains(proxy)) return false;
+
+    const clientX = Number(event.clientX);
+    const clientY = Number(event.clientY);
+
+    if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) return false;
+
+    const rect = proxy.getBoundingClientRect();
+    const hitPadding = 4;
+    const isInsideProxy = clientX >= rect.left - hitPadding
+      && clientX <= rect.right + hitPadding
+      && clientY >= rect.top - hitPadding
+      && clientY <= rect.bottom + hitPadding;
+
+    if (!isInsideProxy) return false;
+
+    if (event.cancelable !== false) {
+      event.preventDefault?.();
+    }
+
+    event.stopPropagation?.();
+    event.stopImmediatePropagation?.();
+
+    if (this.tutorialTargetProxyActivating) return true;
+
+    this.tutorialTargetProxyActivating = true;
+
+    window.setTimeout(() => {
+      this.tutorialTargetProxyActivating = false;
+    }, 240);
+
+    this.activateTutorialTargetProxy(step, source, null);
+    return true;
+  },
+
+  isTutorialEventAllowed(event) {
+    if (!event) return true;
+
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+
+    if (!target) return true;
+
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+
+    if (overlay?.contains(target)) {
+      return Boolean(target.closest("#tutorial-next-button, #tutorial-skip-button, [data-tutorial-target-proxy='true']"));
+    }
+
+    if (target.closest("[data-tutorial-target-proxy='true']")) {
+      return true;
+    }
+
+    let step = this.getCurrentTutorialStep();
+
+    if (this.syncOrderDeliveryTutorialArrival(step)) {
+      step = this.getCurrentTutorialStep();
+    }
+
+    if (!step || this.tutorialPendingStepId === step.id) {
+      return false;
+    }
+
+    const shouldAllowStepTarget = step.requireTargetClick === true || step.requiresOrderQuantity === true;
+    const allowedSelectors = [
+      shouldAllowStepTarget ? this.getTutorialActionSelector(step) : "",
+      ...(shouldAllowStepTarget && Array.isArray(step.allowedSelectors) ? step.allowedSelectors : [])
+    ]
+      .map((selector) => String(selector ?? "").trim())
+      .filter(Boolean);
+
+    return allowedSelectors.some((selector) => {
+      try {
+        return Boolean(target.closest(selector));
+      } catch (error) {
+        return false;
+      }
+    });
+  },
+
+  blockTutorialInputEvent(event, eventType = "click") {
+    if (event?.cancelable !== false) {
+      event?.preventDefault?.();
+    }
+
+    event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
+
+    if (eventType === "click") {
+      this.showTutorialBlockedMessage();
+    }
+  },
+
+  showTutorialBlockedMessage() {
+    if (this.tutorialBlockedMessageTimerId) return;
+
+    this.showMessage("지금은 튜토리얼에서 표시된 곳만 누를 수 있어요.", {
+      duration: 1500
+    });
+
+    this.tutorialBlockedMessageTimerId = window.setTimeout(() => {
+      this.tutorialBlockedMessageTimerId = null;
+    }, 900);
+  },
+
+  guardTutorialAction(actionKey, event = null) {
+    if (!this.isInteractiveTutorialActive()) return true;
+
+    const step = this.getCurrentTutorialStep();
+    const allowedActions = new Set(Array.isArray(step?.allowedActions) ? step.allowedActions : []);
+
+    if (allowedActions.has(actionKey)) {
+      return true;
+    }
+
+    this.blockTutorialInputEvent(event, "click");
+    return false;
+  },
+
+  isTutorialOrderQuantityControlAllowed(button) {
+    if (!this.isInteractiveTutorialActive()) return true;
+
+    const step = this.getCurrentTutorialStep();
+
+    if (step?.id !== "order-quantity") {
+      return false;
+    }
+
+    return Boolean(button?.closest?.('[data-tutorial-order-target="true"]'));
+  },
+
+  ensureTutorialOrderTargetVisible(delayMs = 0) {
+    if (!this.isInteractiveTutorialActive()) return;
+
+    const step = this.getCurrentTutorialStep();
+
+    if (step?.id !== "order-quantity") return;
+
+    const syncAnchoredLayout = () => {
+      if (!this.isInteractiveTutorialActive()) return;
+      if (this.getCurrentTutorialStep()?.id !== "order-quantity") return;
+
+      const list = document.querySelector(".order-product-list");
+
+      if (list) {
+        list.scrollTop = 0;
+      }
+
+      this.positionTutorialCard();
+      this.updateTutorialHighlight();
+      this.bindTutorialActionTarget();
+    };
+    const run = () => {
+      syncAnchoredLayout();
+      window.requestAnimationFrame(syncAnchoredLayout);
+      window.setTimeout(syncAnchoredLayout, 120);
+    };
+
+    if (delayMs > 0) {
+      window.setTimeout(run, delayMs);
+    } else {
+      run();
+    }
+  },
+
+  showTutorialOverlay(options = {}) {
+    const force = options.force === true;
+
+    if (!force && this.isTutorialCompleted()) {
+      return;
+    }
+
+    const steps = this.getTutorialSteps();
+    const startIndex = Math.min(
+      steps.length - 1,
+      Math.max(0, Math.floor(Number(options.startIndex) || 0))
+    );
+
+    if (!this.tutorialOverlay) {
+      this.createTutorialOverlay();
+    }
+
+    this.tutorialStepIndex = startIndex;
+    // 기본 튜토리얼은 항상 작은 말풍선형 체험 모드로 보여준다.
+    // 도움말에서 다시 열 때도 큰 팝업형 가이드로 돌아가지 않게 한다.
+    this.tutorialMode = options.mode === "guide" ? "guide" : "interactive";
+    this.tutorialPendingStepId = null;
+    this.tutorialOverlay.dataset.mode = this.tutorialMode;
+    this.tutorialOverlay.classList.remove("hidden");
+    this.tutorialOverlay.setAttribute("aria-hidden", "false");
+    this.tutorialOverlay.style.pointerEvents = "none";
+    document.body.classList.add("is-tutorial-active");
+    this.syncTutorialGameFrameBounds();
+    this.enableTutorialInputGuard();
+    this.renderTutorialStep();
+
+    if (!this.tutorialHighlightResizeHandler) {
+      this.tutorialHighlightResizeHandler = () => this.refreshTutorialAnchoredLayout();
+    }
+
+    window.addEventListener("resize", this.tutorialHighlightResizeHandler);
+    window.addEventListener("scroll", this.tutorialHighlightResizeHandler, true);
+
+    window.requestAnimationFrame(() => {
+      const card = this.tutorialOverlay?.querySelector(".tutorial-card");
+      this.focusElementSafely(card);
+      this.refreshTutorialAnchoredLayout();
+    });
+  },
+
+  hideTutorialOverlay() {
+    this.completeTutorialAndCleanup({ markCompleted: false, message: "" });
+  },
+
+  completeTutorialAndCleanup(options = {}) {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+    const shouldMarkCompleted = options.markCompleted === true;
+    const message = String(options.message ?? "").trim();
+
+    if (shouldMarkCompleted) {
+      this.markTutorialCompleted();
+    }
+
+    const activeElement = document.activeElement;
+
+    if (activeElement instanceof HTMLElement && overlay?.contains(activeElement)) {
+      activeElement.blur();
+    }
+
+    this.unbindTutorialActionTarget();
+    this.removeTutorialTargetProxy();
+    this.hideTutorialHighlight();
+    this.clearTutorialStepClass();
+    this.clearTutorialGameFrameBounds();
+    this.tutorialPendingStepId = null;
+
+    if (overlay) {
+      overlay.classList.add("hidden");
+      overlay.classList.remove("tutorial-overlay--card-hidden");
+      overlay.setAttribute("aria-hidden", "true");
+      overlay.dataset.mode = "hidden";
+      overlay.style.pointerEvents = "none";
+
+      overlay.querySelectorAll(".tutorial-dim").forEach((panel) => {
+        if (!(panel instanceof HTMLElement)) return;
+        panel.classList.add("hidden");
+        panel.style.left = "0px";
+        panel.style.top = "0px";
+        panel.style.width = "0px";
+        panel.style.height = "0px";
+      });
+    }
+
+    document.body.classList.remove("is-tutorial-active");
+
+    if (this.tutorialHighlightResizeHandler) {
+      window.removeEventListener("resize", this.tutorialHighlightResizeHandler);
+      window.removeEventListener("scroll", this.tutorialHighlightResizeHandler, true);
+    }
+
+    this.tutorialHighlightResizeHandler = null;
+    this.disableTutorialInputGuard();
+
+    if (message) {
+      this.showMessage(message, { duration: options.duration ?? 3200 });
+    }
+  },
+
+  clearTutorialStepClass() {
+    document.body.classList.forEach((className) => {
+      if (String(className).startsWith("is-tutorial-step-")) {
+        document.body.classList.remove(className);
+      }
+    });
+  },
+
+  setTutorialStepClass(stepId = "") {
+    this.clearTutorialStepClass();
+
+    const normalizedStepId = String(stepId || "")
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, "-");
+
+    if (normalizedStepId) {
+      document.body.classList.add(`is-tutorial-step-${normalizedStepId}`);
+    }
+  },
+
+  refreshTutorialAfterUiChange(delayMs = 80) {
+    if (!this.isTutorialVisible()) return;
+
+    window.setTimeout(() => {
+      if (!this.isTutorialVisible()) return;
+
+      if (this.syncOrderDeliveryTutorialArrival()) return;
+
+      this.positionTutorialCard();
+      this.updateTutorialHighlight();
+      this.bindTutorialActionTarget();
+    }, Math.max(0, Math.floor(Number(delayMs) || 0)));
+  },
+
+  getVisibleDeliveryBoxTarget() {
+    return this.findVisibleTutorialTarget("#delivery-box-zone");
+  },
+
+  syncOrderDeliveryTutorialArrival(step = this.getCurrentTutorialStep()) {
+    if (!this.isInteractiveTutorialActive()) return false;
+    if (step?.id !== "order-confirm") return false;
+    if (!this.getVisibleDeliveryBoxTarget()) return false;
+
+    this.tutorialPendingStepId = null;
+    return this.moveTutorialToStep("delivery-box");
+  },
+
+  getCurrentTutorialStep() {
+    return this.getTutorialSteps()[this.tutorialStepIndex] ?? null;
+  },
+
+  getTutorialStepIndexById(stepId) {
+    const normalizedStepId = String(stepId ?? "").trim();
+
+    return this.getTutorialSteps().findIndex((step) => step.id === normalizedStepId);
+  },
+
+  isTutorialVisible() {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+
+    return Boolean(overlay && !overlay.classList.contains("hidden"));
+  },
+
+  isInteractiveTutorialActive() {
+    return this.isTutorialVisible() && this.tutorialMode === "interactive";
+  },
+
+  moveTutorialToStep(stepId, options = {}) {
+    if (!this.isTutorialVisible()) return false;
+
+    const nextIndex = this.getTutorialStepIndexById(stepId);
+
+    if (nextIndex < 0 || nextIndex === this.tutorialStepIndex) {
+      return false;
+    }
+
+    const delayMs = Math.max(0, Math.floor(Number(options.delayMs) || 0));
+    const applyMove = () => {
+      if (!this.isTutorialVisible()) return;
+
+      this.tutorialStepIndex = nextIndex;
+      this.renderTutorialStep();
+    };
+
+    if (delayMs > 0) {
+      window.setTimeout(applyMove, delayMs);
+    } else {
+      applyMove();
+    }
+
+    return true;
+  },
+
+  maybeAdvanceInteractiveTutorial(eventName, options = {}) {
+    if (!this.isInteractiveTutorialActive()) return false;
+
+    const step = this.getCurrentTutorialStep();
+
+    if (!step || step.waitForEvent !== eventName) {
+      return false;
+    }
+
+    const currentIndex = this.tutorialStepIndex;
+    const delayMs = Math.max(0, Math.floor(Number(options.delayMs) || 0));
+
+    const advance = () => {
+      if (
+        this.isInteractiveTutorialActive() &&
+        this.tutorialStepIndex === currentIndex
+      ) {
+        this.tutorialPendingStepId = null;
+        this.moveTutorialStep(1, { fromAction: true });
+      }
+    };
+
+    if (delayMs > 0) {
+      window.setTimeout(advance, delayMs);
+    } else {
+      advance();
+    }
+
+    return true;
+  },
+
+  moveTutorialStep(direction = 1, options = {}) {
+    const steps = this.getTutorialSteps();
+    const nextIndex = this.tutorialStepIndex + direction;
+
+    if (
+      this.tutorialMode === "interactive" &&
+      direction > 0 &&
+      options.fromAction !== true
+    ) {
+      const step = this.getCurrentTutorialStep();
+
+      if (step?.blockNextUntilEvent) {
+        this.showMessage("현재 단계가 완료될 때까지 잠시 기다려주세요.", {
+          duration: 2000
+        });
+        this.updateTutorialHighlight();
+        return;
+      }
+
+      if (step?.requiresOrderQuantity && this.getOrderDraftTotalQuantity() <= 0) {
+        this.showMessage("상품을 1개 이상 선택한 뒤 넘어갈 수 있습니다.", {
+          duration: 2200
+        });
+        this.updateTutorialHighlight();
+        return;
+      }
+
+      if (step?.requireTargetClick) {
+        this.showMessage("노란 테두리로 표시된 곳을 직접 눌러야 다음으로 넘어갑니다.", {
+          duration: 2200
+        });
+        this.updateTutorialHighlight();
+        return;
+      }
+    }
+
+    if (nextIndex >= steps.length) {
+      this.completeTutorialAndCleanup({
+        markCompleted: true,
+        message: "튜토리얼을 완료했습니다. 오른쪽 위 도움말 버튼에서 다시 볼 수 있어요."
+      });
+      return;
+    }
+
+    this.tutorialStepIndex = Math.min(
+      steps.length - 1,
+      Math.max(0, nextIndex)
+    );
+    this.tutorialPendingStepId = null;
+    this.renderTutorialStep();
+  },
+
+  renderTutorialStep() {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+    const steps = this.getTutorialSteps();
+    const step = steps[this.tutorialStepIndex] ?? steps[0];
+
+    if (!overlay || !step) return;
+
+    const title = overlay.querySelector("#tutorial-title");
+    const kicker = overlay.querySelector("#tutorial-kicker");
+    const count = overlay.querySelector("#tutorial-step-count");
+    const target = overlay.querySelector("#tutorial-step-target");
+    const description = overlay.querySelector("#tutorial-description");
+    const bullets = overlay.querySelector("#tutorial-bullets");
+    const tip = overlay.querySelector("#tutorial-tip");
+    const actionGuide = overlay.querySelector("#tutorial-action-guide");
+    const prevButton = overlay.querySelector("#tutorial-prev-button");
+    const nextButton = overlay.querySelector("#tutorial-next-button");
+    const card = overlay.querySelector(".tutorial-card");
+    const isInteractiveMode = this.tutorialMode === "interactive";
+    const isPendingStep = this.tutorialPendingStepId === step.id;
+    const displayTitle = isInteractiveMode
+      ? String(step.title ?? "튜토리얼").replace(/^\d+\.\s*/, "")
+      : step.title;
+
+    if (this.syncOrderDeliveryTutorialArrival(step)) return;
+
+    this.setTutorialStepClass(step.id);
+
+    if (title) title.textContent = displayTitle;
+    if (kicker) {
+      kicker.textContent = isInteractiveMode
+        ? `첫 영업 가이드 ${this.tutorialStepIndex + 1}/${steps.length}`
+        : "첫 영업 가이드";
+    }
+    if (count) count.textContent = `${this.tutorialStepIndex + 1} / ${steps.length}`;
+    if (target) target.textContent = step.targetLabel ?? "게임 화면";
+    if (description) {
+      description.textContent = isPendingStep
+        ? step.pendingDescription ?? step.pendingLabel ?? step.description ?? ""
+        : step.description ?? "";
+    }
+    if (tip) tip.textContent = step.tip ?? "";
+    if (actionGuide) {
+      const guideText = isPendingStep ? step.pendingLabel ?? "진행 중..." : step.actionGuide ?? "";
+      actionGuide.textContent = guideText;
+      actionGuide.classList.toggle("hidden", !guideText);
+    }
+
+    if (bullets) {
+      const bulletItems = Array.isArray(step.bullets) ? step.bullets : [];
+      bullets.innerHTML = bulletItems
+        .map((item) => `<li>${item}</li>`)
+        .join("");
+      bullets.classList.toggle("hidden", bulletItems.length === 0);
+    }
+
+    if (prevButton) {
+      prevButton.disabled = this.tutorialStepIndex <= 0;
+    }
+
+    const skipButton = overlay.querySelector("#tutorial-skip-button");
+    if (skipButton) {
+      skipButton.classList.toggle("hidden", step.hideSkipButton === true || isPendingStep);
+    }
+
+    const actionSelector = this.getTutorialActionSelector(step);
+    const highlightSelector = this.getTutorialHighlightSelector(step);
+    const hasVisibleTarget = Boolean(highlightSelector && this.findVisibleTutorialTarget(highlightSelector));
+    const hasActionTarget = Boolean(actionSelector && this.findVisibleTutorialTarget(actionSelector));
+    const shouldWaitForTarget = this.tutorialMode === "interactive" && step.requireTargetClick && hasActionTarget && !isPendingStep;
+    const shouldHideCardWhilePending = this.tutorialMode === "interactive" &&
+      isPendingStep &&
+      step.hideCardWhilePending === true;
+
+    overlay.classList.toggle("tutorial-overlay--card-hidden", shouldHideCardWhilePending);
+
+    if (nextButton) {
+      const isLastStep = this.tutorialStepIndex >= steps.length - 1;
+      nextButton.textContent = isPendingStep || step.blockNextUntilEvent
+        ? step.pendingLabel ?? "진행 중..."
+        : shouldWaitForTarget
+          ? "표시된 곳 눌러보기"
+          : step.nextLabel
+            ? step.nextLabel
+            : isLastStep
+              ? "시작하기"
+              : "다음";
+      nextButton.disabled = Boolean(step.blockNextUntilEvent || isPendingStep);
+      nextButton.classList.toggle("is-waiting-action", shouldWaitForTarget || Boolean(step.blockNextUntilEvent || isPendingStep));
+    }
+
+    if (card) {
+      card.classList.toggle("tutorial-card--requires-action", shouldWaitForTarget);
+      card.classList.toggle("tutorial-card--read-only", this.tutorialMode === "interactive" && !shouldWaitForTarget);
+      card.classList.toggle("tutorial-card--missing-target", this.tutorialMode === "interactive" && step.requireTargetClick && !hasVisibleTarget);
+      card.classList.toggle("tutorial-card--pending", isPendingStep);
+      card.classList.toggle("tutorial-card--hidden-pending", shouldHideCardWhilePending);
+    }
+
+    if (shouldHideCardWhilePending) {
+      this.unbindTutorialActionTarget();
+      this.removeTutorialTargetProxy();
+      this.hideTutorialHighlight();
+      this.updateTutorialDimPanels();
+      return;
+    }
+
+    this.syncTutorialTargetProxy(step);
+    this.positionTutorialCard();
+    this.updateTutorialHighlight();
+    this.bindTutorialActionTarget();
+  },
+
+  syncTutorialGameFrameBounds() {
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const gameRoot = document.getElementById("game-root");
+    const gameRect = gameRoot?.getBoundingClientRect?.();
+    const hasGameBounds = Boolean(
+      gameRect &&
+      Number.isFinite(gameRect.left) &&
+      Number.isFinite(gameRect.top) &&
+      Number.isFinite(gameRect.width) &&
+      Number.isFinite(gameRect.height) &&
+      gameRect.width > 0 &&
+      gameRect.height > 0
+    );
+
+    const frame = hasGameBounds
+      ? {
+          left: Math.max(0, gameRect.left),
+          top: Math.max(0, gameRect.top),
+          width: Math.min(viewportWidth, gameRect.right) - Math.max(0, gameRect.left),
+          height: Math.min(viewportHeight, gameRect.bottom) - Math.max(0, gameRect.top)
+        }
+      : {
+          left: 0,
+          top: 0,
+          width: viewportWidth,
+          height: viewportHeight
+        };
+
+    frame.width = Math.max(0, frame.width);
+    frame.height = Math.max(0, frame.height);
+
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty("--tutorial-game-left", `${Math.round(frame.left)}px`);
+    rootStyle.setProperty("--tutorial-game-top", `${Math.round(frame.top)}px`);
+    rootStyle.setProperty("--tutorial-game-width", `${Math.round(frame.width)}px`);
+    rootStyle.setProperty("--tutorial-game-height", `${Math.round(frame.height)}px`);
+
+    return frame;
+  },
+
+  clearTutorialGameFrameBounds() {
+    const rootStyle = document.documentElement.style;
+    rootStyle.removeProperty("--tutorial-game-left");
+    rootStyle.removeProperty("--tutorial-game-top");
+    rootStyle.removeProperty("--tutorial-game-width");
+    rootStyle.removeProperty("--tutorial-game-height");
+  },
+
+  clampTutorialValue(value, min, max) {
+    const lower = Math.min(min, max);
+    const upper = Math.max(min, max);
+
+    return Math.min(upper, Math.max(lower, value));
+  },
+
+  getTutorialSafeBounds(rect = null, fallbackBounds = null, inset = 0) {
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const fallback = fallbackBounds && Number.isFinite(fallbackBounds.left)
+      ? fallbackBounds
+      : {
+          left: 0,
+          top: 0,
+          right: viewportWidth,
+          bottom: viewportHeight
+        };
+    const hasRect = Boolean(
+      rect &&
+      Number.isFinite(rect.left) &&
+      Number.isFinite(rect.top) &&
+      Number.isFinite(rect.right) &&
+      Number.isFinite(rect.bottom) &&
+      rect.right > rect.left &&
+      rect.bottom > rect.top
+    );
+    const source = hasRect
+      ? {
+          left: Math.max(fallback.left, rect.left),
+          top: Math.max(fallback.top, rect.top),
+          right: Math.min(fallback.right, rect.right),
+          bottom: Math.min(fallback.bottom, rect.bottom)
+        }
+      : { ...fallback };
+    const safeInset = Math.max(0, Math.floor(Number(inset) || 0));
+    const left = Math.min(source.right, source.left + safeInset);
+    const top = Math.min(source.bottom, source.top + safeInset);
+    const right = Math.max(left, source.right - safeInset);
+    const bottom = Math.max(top, source.bottom - safeInset);
+
+    return {
+      left,
+      top,
+      right,
+      bottom,
+      width: Math.max(0, right - left),
+      height: Math.max(0, bottom - top)
+    };
+  },
+
+  getTutorialRectOverlapArea(rectA = null, rectB = null) {
+    if (!rectA || !rectB) return 0;
+
+    const left = Math.max(rectA.left, rectB.left);
+    const right = Math.min(rectA.right, rectB.right);
+    const top = Math.max(rectA.top, rectB.top);
+    const bottom = Math.min(rectA.bottom, rectB.bottom);
+
+    return Math.max(0, right - left) * Math.max(0, bottom - top);
+  },
+
+  applyTutorialCardPosition(card, {
+    left = 0,
+    top = 0,
+    placement = "below-target",
+    cardWidth = 0,
+    cardHeight = 0,
+    anchorRect = null,
+    extraClasses = []
+  } = {}) {
+    if (!card) return;
+
+    card.classList.add("tutorial-card--anchored", `tutorial-card--${placement}`, ...extraClasses);
+    card.style.left = `${Math.round(left)}px`;
+    card.style.top = `${Math.round(top)}px`;
+    this.syncTutorialCardArrow(card, {
+      left,
+      top,
+      placement,
+      cardWidth,
+      cardHeight,
+      anchorRect
+    });
+  },
+
+  syncTutorialCardArrow(card, {
+    left = 0,
+    top = 0,
+    placement = "below-target",
+    cardWidth = 0,
+    cardHeight = 0,
+    anchorRect = null
+  } = {}) {
+    if (!card || !anchorRect) return;
+
+    const arrowInset = 18;
+    const anchorCenterX = anchorRect.left + anchorRect.width / 2;
+    const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+
+    if (placement === "above-target" || placement === "below-target") {
+      const arrowLeft = this.clampTutorialValue(anchorCenterX - left, arrowInset, Math.max(arrowInset, cardWidth - arrowInset));
+      card.style.setProperty("--tutorial-arrow-left", `${Math.round(arrowLeft)}px`);
+      card.style.removeProperty("--tutorial-arrow-top");
+      return;
+    }
+
+    const arrowTop = this.clampTutorialValue(anchorCenterY - top, arrowInset, Math.max(arrowInset, cardHeight - arrowInset));
+    card.style.setProperty("--tutorial-arrow-top", `${Math.round(arrowTop)}px`);
+    card.style.removeProperty("--tutorial-arrow-left");
+  },
+
+  positionTutorialCard() {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+    const card = overlay?.querySelector(".tutorial-card");
+    const step = this.getCurrentTutorialStep();
+
+    if (!overlay || !card || !step) return;
+
+    this.syncTutorialGameFrameBounds();
+
+    card.classList.remove(
+      "tutorial-card--top-left",
+      "tutorial-card--top-right",
+      "tutorial-card--bottom-left",
+      "tutorial-card--bottom-right",
+      "tutorial-card--center",
+      "tutorial-card--anchored",
+      "tutorial-card--above-target",
+      "tutorial-card--below-target",
+      "tutorial-card--left-of-target",
+      "tutorial-card--right-of-target",
+      "tutorial-card--order-quantity",
+      "tutorial-card--delivery-box"
+    );
+    card.style.removeProperty("left");
+    card.style.removeProperty("right");
+    card.style.removeProperty("top");
+    card.style.removeProperty("bottom");
+    card.style.removeProperty("transform");
+    card.style.removeProperty("--tutorial-arrow-left");
+    card.style.removeProperty("--tutorial-arrow-top");
+    card.style.removeProperty("--tutorial-card-safe-width");
+    card.style.removeProperty("--tutorial-card-safe-height");
+
+    const target = this.getTutorialAnchorTarget(step);
+
+    if (!target || this.tutorialMode !== "interactive") {
+      card.classList.add("tutorial-card--center");
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const gameRoot = document.getElementById("game-root");
+    const gameRect = gameRoot?.getBoundingClientRect?.();
+    const hasGameBounds = Boolean(
+      gameRect &&
+      Number.isFinite(gameRect.left) &&
+      Number.isFinite(gameRect.top) &&
+      gameRect.width > 0 &&
+      gameRect.height > 0
+    );
+    const bounds = hasGameBounds
+      ? {
+          left: Math.max(0, gameRect.left),
+          top: Math.max(0, gameRect.top),
+          right: Math.min(viewportWidth, gameRect.right),
+          bottom: Math.min(viewportHeight, gameRect.bottom)
+        }
+      : {
+          left: 0,
+          top: 0,
+          right: viewportWidth,
+          bottom: viewportHeight
+        };
+
+    const storeAreaRect = document.getElementById("store-area")?.getBoundingClientRect?.();
+    const isBottomDockStep = ["start-day", "open-store"].includes(step?.id);
+
+    if (
+      isBottomDockStep &&
+      storeAreaRect &&
+      Number.isFinite(storeAreaRect.top) &&
+      Number.isFinite(storeAreaRect.bottom) &&
+      storeAreaRect.height > 0
+    ) {
+      bounds.top = Math.max(bounds.top, Math.max(0, storeAreaRect.top));
+      bounds.bottom = Math.min(bounds.bottom, Math.min(viewportHeight, storeAreaRect.bottom));
+    }
+
+    bounds.width = Math.max(0, bounds.right - bounds.left);
+    bounds.height = Math.max(0, bounds.bottom - bounds.top);
+
+    const isCompact = bounds.height <= 600 || viewportHeight <= 680 || viewportWidth <= 980;
+    const isOrderQuantityStep = step?.id === "order-quantity";
+    const isDeliveryBoxStep = step?.id === "delivery-box";
+    card.classList.toggle("tutorial-card--compact", isCompact);
+    card.classList.toggle("tutorial-card--order-quantity", isOrderQuantityStep);
+    card.classList.toggle("tutorial-card--delivery-box", isDeliveryBoxStep);
+
+    const margin = isCompact ? 10 : 14;
+    const gap = isCompact ? 12 : 14;
+    const measuredRect = card.getBoundingClientRect();
+    const measuredWidth = measuredRect.width || card.offsetWidth || 250;
+    const measuredHeight = measuredRect.height || card.offsetHeight || 150;
+    const maxCardWidth = Math.max(220, bounds.width - margin * 2);
+    const maxCardHeight = Math.max(108, bounds.height - margin * 2);
+    const cardWidth = Math.min(measuredWidth, maxCardWidth);
+    const cardHeight = Math.min(measuredHeight, maxCardHeight);
+    const targetCenterX = rect.left + rect.width / 2;
+    const targetCenterY = rect.top + rect.height / 2;
+    let placement = "below-target";
+    let left = Math.min(
+      bounds.right - cardWidth - margin,
+      Math.max(bounds.left + margin, targetCenterX - cardWidth / 2)
+    );
+    let top = rect.bottom + gap;
+
+    if (step?.id === "briefing-confirm") {
+      const modalContentRect = document
+        .querySelector("#day-scenario-modal .day-scenario-modal-content")
+        ?.getBoundingClientRect?.();
+      const hasModalBounds = Boolean(
+        modalContentRect &&
+        Number.isFinite(modalContentRect.left) &&
+        Number.isFinite(modalContentRect.top) &&
+        modalContentRect.width > 0 &&
+        modalContentRect.height > 0
+      );
+      const placementBounds = hasModalBounds
+        ? {
+            left: Math.max(bounds.left, modalContentRect.left),
+            top: Math.max(bounds.top, modalContentRect.top),
+            right: Math.min(bounds.right, modalContentRect.right),
+            bottom: Math.min(bounds.bottom, modalContentRect.bottom)
+          }
+        : bounds;
+      const briefingGap = isCompact ? 12 : 16;
+      const canPlaceRight = rect.right + briefingGap + cardWidth <= placementBounds.right - margin;
+      const canPlaceLeft = rect.left - briefingGap - cardWidth >= placementBounds.left + margin;
+      const preferredTop = rect.top - cardHeight - briefingGap;
+      const sideTop = Math.min(
+        placementBounds.bottom - cardHeight - margin,
+        Math.max(placementBounds.top + margin, rect.top + rect.height / 2 - cardHeight / 2)
+      );
+
+      // 브리핑 단계는 화면 크기와 관계없이 CTA 오른쪽 배치를 우선한다.
+      // 작은 화면에서도 왼쪽 목표/본문 영역을 가리지 않도록 오른쪽 여백을 먼저 사용하고,
+      // 오른쪽 공간이 정말 부족할 때만 왼쪽/상단으로 후퇴한다.
+      if (canPlaceRight) {
+        left = rect.right + briefingGap;
+        top = sideTop;
+        placement = "right-of-target";
+      } else if (canPlaceLeft) {
+        left = rect.left - cardWidth - briefingGap;
+        top = sideTop;
+        placement = "left-of-target";
+      } else {
+        left = Math.min(
+          placementBounds.right - cardWidth - margin,
+          Math.max(placementBounds.left + margin, rect.right - cardWidth)
+        );
+        top = preferredTop;
+        placement = "above-target";
+      }
+
+      left = Math.min(
+        placementBounds.right - cardWidth - margin,
+        Math.max(placementBounds.left + margin, left)
+      );
+      top = Math.min(
+        placementBounds.bottom - cardHeight - margin,
+        Math.max(placementBounds.top + margin, top)
+      );
+
+      this.applyTutorialCardPosition(card, {
+        left,
+        top,
+        placement,
+        cardWidth,
+        cardHeight,
+        anchorRect: rect
+      });
+      return;
+    }
+
+    if (step?.id === "order-quantity") {
+      const actionSelector = this.getTutorialActionSelector(step);
+      const visibleActionTargets = [...document.querySelectorAll(actionSelector)]
+        .filter((node) => {
+          if (!(node instanceof HTMLElement) || node.classList.contains("hidden") || node.closest(".hidden")) {
+            return false;
+          }
+
+          const nodeRect = node.getBoundingClientRect();
+          return nodeRect.width > 0 && nodeRect.height > 0;
+        });
+      const visibleTargetCards = [...document.querySelectorAll('#order-modal .order-product-card[data-tutorial-order-target="true"]')]
+        .filter((node) => {
+          if (!(node instanceof HTMLElement) || node.classList.contains("hidden") || node.closest(".hidden")) {
+            return false;
+          }
+
+          const nodeRect = node.getBoundingClientRect();
+          return nodeRect.width > 0 && nodeRect.height > 0;
+        });
+      const protectedTargetRects = visibleTargetCards
+        .flatMap((targetCard) => [
+          ...targetCard.querySelectorAll(
+            '.order-product-image-box, .order-quantity-controls, .order-qty-button[data-action="increase"]'
+          )
+        ])
+        .map((node) => node?.getBoundingClientRect?.())
+        .filter((protectedRect) => {
+          return protectedRect &&
+            Number.isFinite(protectedRect.left) &&
+            Number.isFinite(protectedRect.top) &&
+            protectedRect.right > protectedRect.left &&
+            protectedRect.bottom > protectedRect.top;
+        });
+      const focusRect = this.getTutorialHighlightRectFromTargets(
+        visibleActionTargets.length > 0 ? visibleActionTargets : visibleTargetCards
+      ) ?? this.getTutorialHighlightRectFromTargets([target]);
+      const modalRect = document.querySelector("#order-modal .order-modal-content")?.getBoundingClientRect?.();
+      const sidebarRect = document.querySelector("#order-modal .order-draft-sidebar")?.getBoundingClientRect?.();
+      const productPanelRect = document.querySelector("#order-modal .order-draft-card-panel, #order-modal .order-draft-list-panel")?.getBoundingClientRect?.();
+      const listRect = document.querySelector("#order-modal .order-product-list")?.getBoundingClientRect?.();
+      const confirmButtonRect = document.getElementById("order-confirm-button")?.getBoundingClientRect?.();
+      const modalBounds = this.getTutorialSafeBounds(modalRect, bounds, margin);
+      const productPanelBounds = this.getTutorialSafeBounds(productPanelRect, modalBounds, 0);
+      const sidebarBounds = this.getTutorialSafeBounds(sidebarRect, modalBounds, 0);
+      const canUseProductPanel = productPanelBounds.width >= 178 && productPanelBounds.height >= 112;
+      const isMobileOrderPlacement = modalBounds.width <= 760 || viewportWidth <= 900 || viewportHeight <= 620;
+      const maxOrderPopoverWidth = isMobileOrderPlacement ? 190 : 236;
+      const maxOrderPopoverHeight = isMobileOrderPlacement ? 190 : 210;
+      const orderSafeWidth = this.clampTutorialValue(
+        modalBounds.width - margin * 2,
+        Math.min(120, modalBounds.width),
+        Math.min(maxOrderPopoverWidth, modalBounds.width)
+      );
+      const orderSafeHeight = this.clampTutorialValue(
+        modalBounds.height - margin * 2,
+        Math.min(112, modalBounds.height),
+        Math.min(maxOrderPopoverHeight, modalBounds.height)
+      );
+
+      card.style.setProperty("--tutorial-card-safe-width", `${Math.round(orderSafeWidth)}px`);
+      card.style.setProperty("--tutorial-card-safe-height", `${Math.round(orderSafeHeight)}px`);
+
+      const orderMeasuredRect = card.getBoundingClientRect();
+      const orderCardWidth = Math.min(orderMeasuredRect.width || cardWidth, orderSafeWidth);
+      const orderCardHeight = Math.min(orderMeasuredRect.height || cardHeight, orderSafeHeight);
+      const anchorRect = focusRect ?? rect;
+      const targetCardsRect = this.getTutorialHighlightRectFromTargets(visibleTargetCards) ?? anchorRect;
+      const productPlacementBounds = canUseProductPanel ? productPanelBounds : modalBounds;
+      const sidebarMinimumWidth = isMobileOrderPlacement ? Math.min(orderCardWidth, 112) : orderCardWidth;
+      const sidebarMinimumHeight = isMobileOrderPlacement ? Math.min(orderCardHeight, 112) : orderCardHeight;
+      const sidebarPlacementBounds = sidebarBounds.width >= sidebarMinimumWidth && sidebarBounds.height >= sidebarMinimumHeight
+        ? sidebarBounds
+        : null;
+      const avoidRects = [
+        { rect: targetCardsRect, weight: 8 },
+        { rect: confirmButtonRect, weight: 4 }
+      ].filter(({ rect: avoidRect }) => {
+        return avoidRect &&
+          Number.isFinite(avoidRect.left) &&
+          Number.isFinite(avoidRect.top) &&
+          avoidRect.right > avoidRect.left &&
+          avoidRect.bottom > avoidRect.top;
+      });
+      const centerInModal = modalBounds.left + modalBounds.width / 2 - orderCardWidth / 2;
+      const anchorCenterX = anchorRect.left + anchorRect.width / 2 - orderCardWidth / 2;
+      const anchorCenterY = anchorRect.top + anchorRect.height / 2 - orderCardHeight / 2;
+      const listTop = Math.max(productPlacementBounds.top, listRect?.top ?? productPlacementBounds.top);
+      const candidates = [
+        ...(sidebarPlacementBounds ? [
+          {
+            placement: "right-of-target",
+            bounds: sidebarPlacementBounds,
+            left: sidebarPlacementBounds.left + sidebarPlacementBounds.width / 2 - orderCardWidth / 2,
+            top: sidebarPlacementBounds.top + margin,
+            priority: isMobileOrderPlacement ? 0 : 3,
+            region: "sidebar"
+          },
+          {
+            placement: "right-of-target",
+            bounds: sidebarPlacementBounds,
+            left: sidebarPlacementBounds.left + sidebarPlacementBounds.width / 2 - orderCardWidth / 2,
+            top: sidebarPlacementBounds.top + sidebarPlacementBounds.height / 2 - orderCardHeight / 2,
+            priority: isMobileOrderPlacement ? 1 : 4,
+            region: "sidebar"
+          }
+        ] : []),
+        {
+          placement: "above-target",
+          bounds: productPlacementBounds,
+          left: productPlacementBounds.left + productPlacementBounds.width / 2 - orderCardWidth / 2,
+          top: Math.min(listTop - gap - orderCardHeight, productPlacementBounds.top + margin),
+          priority: isMobileOrderPlacement ? 2 : 6,
+          region: "product-top"
+        },
+        {
+          placement: "below-target",
+          bounds: modalBounds,
+          left: centerInModal,
+          top: modalBounds.bottom - orderCardHeight - margin,
+          priority: isMobileOrderPlacement ? 3 : 9,
+          region: "modal-bottom"
+        },
+        {
+          placement: "above-target",
+          bounds: modalBounds,
+          left: centerInModal,
+          top: modalBounds.top + margin,
+          priority: isMobileOrderPlacement ? 4 : 8,
+          region: "modal-top"
+        },
+        {
+          placement: "above-target",
+          bounds: productPlacementBounds,
+          left: anchorCenterX,
+          top: targetCardsRect.top - gap - orderCardHeight,
+          priority: isMobileOrderPlacement ? 9 : 4,
+          region: "target-above"
+        },
+        {
+          placement: "right-of-target",
+          bounds: modalBounds,
+          left: targetCardsRect.right + gap,
+          top: anchorCenterY,
+          priority: isMobileOrderPlacement ? 16 : 2,
+          region: "target-side"
+        },
+        {
+          placement: "left-of-target",
+          bounds: modalBounds,
+          left: targetCardsRect.left - gap - orderCardWidth,
+          top: anchorCenterY,
+          priority: isMobileOrderPlacement ? 18 : 5,
+          region: "target-side"
+        },
+        {
+          placement: "below-target",
+          bounds: modalBounds,
+          left: anchorCenterX,
+          top: targetCardsRect.bottom + gap,
+          priority: isMobileOrderPlacement ? 12 : 7,
+          region: "target-below"
+        }
+      ];
+      const scoredCandidates = candidates.map((candidate) => {
+        const candidateBounds = candidate.bounds &&
+          candidate.bounds.width >= orderCardWidth &&
+          candidate.bounds.height >= orderCardHeight
+          ? candidate.bounds
+          : modalBounds;
+        const candidateLeft = this.clampTutorialValue(
+          candidate.left,
+          candidateBounds.left,
+          candidateBounds.right - orderCardWidth
+        );
+        const candidateTop = this.clampTutorialValue(
+          candidate.top,
+          candidateBounds.top,
+          candidateBounds.bottom - orderCardHeight
+        );
+        const candidateRect = {
+          left: candidateLeft,
+          top: candidateTop,
+          right: candidateLeft + orderCardWidth,
+          bottom: candidateTop + orderCardHeight
+        };
+        const protectedOverlap = protectedTargetRects.reduce((score, protectedRect) => {
+          return score + this.getTutorialRectOverlapArea(candidateRect, protectedRect);
+        }, 0);
+        const avoidOverlap = avoidRects.reduce((score, { rect: avoidRect, weight }) => {
+          return score + this.getTutorialRectOverlapArea(candidateRect, avoidRect) * weight;
+        }, 0);
+        const protectedOverlapPenalty = protectedOverlap > 0
+          ? 1000000 + protectedOverlap * 200
+          : 0;
+        const mobileTargetSidePenalty = isMobileOrderPlacement && candidate.region === "target-side" ? 5000 : 0;
+
+        return {
+          ...candidate,
+          left: candidateLeft,
+          top: candidateTop,
+          score: protectedOverlapPenalty + avoidOverlap + mobileTargetSidePenalty + candidate.priority * 100
+        };
+      });
+      const selectedCandidate = scoredCandidates.sort((a, b) => a.score - b.score)[0] ?? scoredCandidates[0];
+
+      left = selectedCandidate?.left ?? modalBounds.left;
+      top = selectedCandidate?.top ?? modalBounds.top;
+      placement = selectedCandidate?.placement ?? "above-target";
+
+      this.applyTutorialCardPosition(card, {
+        left,
+        top,
+        placement,
+        cardWidth: orderCardWidth,
+        cardHeight: orderCardHeight,
+        anchorRect,
+        extraClasses: ["tutorial-card--order-quantity"]
+      });
+      return;
+    }
+
+    if (step?.id === "delivery-box") {
+      const storeRect = document.getElementById("store-area")?.getBoundingClientRect?.();
+      const hasStoreBounds = Boolean(
+        storeRect &&
+        Number.isFinite(storeRect.left) &&
+        Number.isFinite(storeRect.top) &&
+        storeRect.width > 0 &&
+        storeRect.height > 0
+      );
+      const placementBounds = hasStoreBounds
+        ? {
+            left: Math.max(bounds.left, storeRect.left),
+            top: Math.max(bounds.top, storeRect.top),
+            right: Math.min(bounds.right, storeRect.right),
+            bottom: Math.min(bounds.bottom, storeRect.bottom)
+          }
+        : bounds;
+      placementBounds.width = Math.max(0, placementBounds.right - placementBounds.left);
+      placementBounds.height = Math.max(0, placementBounds.bottom - placementBounds.top);
+
+      const isSmallDeliveryPlacement = placementBounds.width <= 760 || viewportWidth <= 980 || viewportHeight <= 680;
+      const deliverySafeWidth = this.clampTutorialValue(
+        placementBounds.width - margin * 2,
+        Math.min(170, placementBounds.width),
+        Math.min(isSmallDeliveryPlacement ? 220 : 260, placementBounds.width)
+      );
+      const deliverySafeHeight = this.clampTutorialValue(
+        placementBounds.height - margin * 2,
+        Math.min(108, placementBounds.height),
+        Math.min(isSmallDeliveryPlacement ? 180 : 210, placementBounds.height)
+      );
+
+      card.style.setProperty("--tutorial-card-safe-width", `${Math.round(deliverySafeWidth)}px`);
+      card.style.setProperty("--tutorial-card-safe-height", `${Math.round(deliverySafeHeight)}px`);
+
+      const deliveryMeasuredRect = card.getBoundingClientRect();
+      const deliveryCardWidth = Math.min(deliveryMeasuredRect.width || cardWidth, deliverySafeWidth);
+      const deliveryCardHeight = Math.min(deliveryMeasuredRect.height || cardHeight, deliverySafeHeight);
+      const deliveryCenterX = rect.left + rect.width / 2 - deliveryCardWidth / 2;
+      const deliveryCenterY = rect.top + rect.height / 2 - deliveryCardHeight / 2;
+      const topCenterLeft = placementBounds.left + placementBounds.width / 2 - deliveryCardWidth / 2;
+      const topRightLeft = placementBounds.right - deliveryCardWidth - margin;
+      const topLeft = placementBounds.left + margin;
+      const candidates = [
+        {
+          placement: "above-target",
+          left: topCenterLeft,
+          top: placementBounds.top + margin,
+          priority: isSmallDeliveryPlacement ? 0 : 8
+        },
+        {
+          placement: "above-target",
+          left: topRightLeft,
+          top: placementBounds.top + margin,
+          priority: isSmallDeliveryPlacement ? 1 : 9
+        },
+        {
+          placement: "above-target",
+          left: topLeft,
+          top: placementBounds.top + margin,
+          priority: isSmallDeliveryPlacement ? 2 : 10
+        },
+        {
+          placement: "above-target",
+          left: deliveryCenterX,
+          top: rect.top - gap - deliveryCardHeight,
+          priority: isSmallDeliveryPlacement ? 5 : 0
+        },
+        {
+          placement: "right-of-target",
+          left: rect.right + gap,
+          top: deliveryCenterY,
+          priority: isSmallDeliveryPlacement ? 7 : 1
+        },
+        {
+          placement: "left-of-target",
+          left: rect.left - gap - deliveryCardWidth,
+          top: deliveryCenterY,
+          priority: isSmallDeliveryPlacement ? 8 : 2
+        },
+        {
+          placement: "below-target",
+          left: deliveryCenterX,
+          top: rect.bottom + gap,
+          priority: isSmallDeliveryPlacement ? 12 : 4
+        }
+      ];
+      const scoredCandidates = candidates.map((candidate) => {
+        const candidateLeft = this.clampTutorialValue(
+          candidate.left,
+          placementBounds.left,
+          placementBounds.right - deliveryCardWidth
+        );
+        const candidateTop = this.clampTutorialValue(
+          candidate.top,
+          placementBounds.top,
+          placementBounds.bottom - deliveryCardHeight
+        );
+        const candidateRect = {
+          left: candidateLeft,
+          top: candidateTop,
+          right: candidateLeft + deliveryCardWidth,
+          bottom: candidateTop + deliveryCardHeight
+        };
+        const boxOverlap = this.getTutorialRectOverlapArea(candidateRect, rect);
+        const overlapPenalty = boxOverlap > 0 ? 1000000 + boxOverlap * 200 : 0;
+
+        return {
+          ...candidate,
+          left: candidateLeft,
+          top: candidateTop,
+          score: overlapPenalty + candidate.priority * 100
+        };
+      });
+      const selectedCandidate = scoredCandidates.sort((a, b) => a.score - b.score)[0] ?? scoredCandidates[0];
+
+      this.applyTutorialCardPosition(card, {
+        left: selectedCandidate?.left ?? placementBounds.left + margin,
+        top: selectedCandidate?.top ?? placementBounds.top + margin,
+        placement: selectedCandidate?.placement ?? "above-target",
+        cardWidth: deliveryCardWidth,
+        cardHeight: deliveryCardHeight,
+        anchorRect: rect,
+        extraClasses: ["tutorial-card--delivery-box"]
+      });
+      return;
+    }
+
+    const forceAbove = ["start-day", "open-store"].includes(step?.id);
+    const preferAbove =
+      step?.preferredPlacement === "above" ||
+      forceAbove ||
+      targetCenterY > bounds.top + bounds.height * 0.56;
+    placement = preferAbove ? "above-target" : "below-target";
+    left = Math.min(
+      bounds.right - cardWidth - margin,
+      Math.max(bounds.left + margin, targetCenterX - cardWidth / 2)
+    );
+    top = preferAbove ? rect.top - cardHeight - gap : rect.bottom + gap;
+
+    if (!preferAbove && top + cardHeight > bounds.bottom - margin) {
+      top = rect.top - cardHeight - gap;
+      placement = "above-target";
+    }
+
+    // 하단 버튼 대상은 말풍선이 버튼을 덮으면 안 되므로, 위 배치를 우선 유지한다.
+    if (preferAbove && top < bounds.top + margin && !forceAbove) {
+      top = rect.bottom + gap;
+      placement = "below-target";
+    }
+
+    if (forceAbove) {
+      placement = "above-target";
+      top = rect.top - cardHeight - gap;
+      top = Math.min(top, bounds.bottom - cardHeight - margin);
+      top = Math.max(bounds.top + margin, top);
+
+      // 버튼을 눌러야 하는 단계에서는 말풍선이 대상 버튼 위를 침범하면 실패로 본다.
+      // 공간이 부족하면 카드만 게임 프레임 상단으로 올리고, 버튼은 프록시로 독립 표시한다.
+      if (top + cardHeight + gap > rect.top) {
+        top = bounds.top + margin;
+      }
+    }
+
+    if (top + cardHeight > bounds.bottom - margin) {
+      top = bounds.bottom - cardHeight - margin;
+    }
+
+    if (top < bounds.top + margin) {
+      const canPlaceRight = rect.right + gap + cardWidth <= bounds.right - margin;
+      const canPlaceLeft = rect.left - gap - cardWidth >= bounds.left + margin;
+
+      if (!forceAbove && (canPlaceRight || canPlaceLeft)) {
+        left = canPlaceRight ? rect.right + gap : rect.left - cardWidth - gap;
+        placement = canPlaceRight ? "right-of-target" : "left-of-target";
+        top = Math.min(
+          bounds.bottom - cardHeight - margin,
+          Math.max(bounds.top + margin, rect.top + rect.height / 2 - cardHeight / 2)
+        );
+      } else {
+        top = Math.max(bounds.top + margin, Math.min(rect.top - cardHeight - gap, bounds.bottom - cardHeight - margin));
+        placement = "above-target";
+      }
+    }
+
+    this.applyTutorialCardPosition(card, {
+      left,
+      top,
+      placement,
+      cardWidth,
+      cardHeight,
+      anchorRect: rect
+    });
+  },
+
+
+  refreshTutorialAnchoredLayout() {
+    if (!this.isTutorialVisible()) return;
+
+    const step = this.getCurrentTutorialStep();
+
+    this.syncTutorialTargetProxy(step);
+    this.positionTutorialCard();
+    this.updateTutorialHighlight();
+  },
+
+  shouldUseTutorialTargetProxy(step = this.getCurrentTutorialStep()) {
+    return this.tutorialMode === "interactive" && step?.id === "start-day";
+  },
+
+  getTutorialProxyLayer() {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+    let layer = overlay?.querySelector("#tutorial-target-proxy-layer");
+
+    if (!overlay) return null;
+
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "tutorial-target-proxy-layer";
+      layer.className = "tutorial-target-proxy-layer";
+      layer.setAttribute("aria-hidden", "true");
+      overlay.insertBefore(layer, overlay.querySelector(".tutorial-card") ?? null);
+    }
+
+    return layer;
+  },
+
+  syncTutorialTargetProxy(step = this.getCurrentTutorialStep()) {
+    if (!this.shouldUseTutorialTargetProxy(step)) {
+      this.removeTutorialTargetProxy();
+      return null;
+    }
+
+    const sourceSelector = step?.selector ?? step?.actionSelector ?? "";
+    const source = this.findVisibleTutorialTarget(sourceSelector);
+    const layer = this.getTutorialProxyLayer();
+
+    if (!source || !layer) {
+      this.removeTutorialTargetProxy();
+      return null;
+    }
+
+    const rect = source.getBoundingClientRect();
+
+    if (rect.width <= 0 || rect.height <= 0) {
+      this.removeTutorialTargetProxy();
+      return null;
+    }
+
+    if (this.tutorialTargetProxySource && this.tutorialTargetProxySource !== source) {
+      this.tutorialTargetProxySource.classList.remove("tutorial-proxy-source-hidden");
+    }
+
+    let proxy = this.tutorialTargetProxy;
+    const sourceClassName = Array.from(source.classList ?? [])
+      .filter((className) => ![
+        "tutorial-proxy-source-hidden",
+        "tutorial-action-target",
+        "tutorial-spotlight-target"
+      ].includes(className))
+      .join(" ");
+    const expectedClass = `tutorial-target-proxy tutorial-target-proxy--${step.id} ${sourceClassName}`.trim();
+    const proxyContent = this.getTutorialTargetProxyContent(step, source);
+
+    if (!proxy || this.tutorialTargetProxySource !== source || proxy.dataset.tutorialProxyStepId !== step.id) {
+      this.removeTutorialTargetProxy();
+
+      proxy = document.createElement(source.tagName.toLowerCase() === "button" ? "button" : "div");
+      proxy.type = source instanceof HTMLButtonElement ? "button" : undefined;
+      proxy.dataset.tutorialTargetProxy = "true";
+      proxy.dataset.tutorialProxyStepId = step.id;
+      proxy.setAttribute("aria-hidden", "true");
+      proxy.tabIndex = -1;
+      proxy.textContent = proxyContent;
+      proxy.className = expectedClass;
+
+      const clickHandler = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation?.();
+
+        if (!this.isInteractiveTutorialActive()) return;
+
+        const currentStep = this.getCurrentTutorialStep();
+        const currentSource = this.tutorialTargetProxySource
+          ?? this.findVisibleTutorialTarget(currentStep?.selector ?? currentStep?.actionSelector ?? "");
+
+        if (!this.shouldUseTutorialTargetProxy(currentStep) || !currentSource) return;
+
+        this.activateTutorialTargetProxy(currentStep, currentSource, event);
+      };
+
+      proxy.addEventListener("click", clickHandler);
+      this.tutorialTargetProxy = proxy;
+      this.tutorialTargetProxySource = source;
+      this.tutorialTargetProxyClickHandler = clickHandler;
+      layer.appendChild(proxy);
+    } else {
+      proxy.className = expectedClass;
+      proxy.textContent = proxyContent;
+    }
+
+    proxy.classList.remove("tutorial-proxy-source-hidden");
+    proxy.style.left = `${rect.left}px`;
+    proxy.style.top = `${rect.top}px`;
+    proxy.style.width = `${rect.width}px`;
+    proxy.style.height = `${rect.height}px`;
+
+    source.classList.add("tutorial-proxy-source-hidden");
+
+    return proxy;
+  },
+
+
+  getTutorialTargetProxyContent(step = this.getCurrentTutorialStep(), source = null) {
+    if (step?.id === "start-day") return "발주";
+    if (step?.id === "open-store") return "영업 시작";
+
+    return String(source?.textContent || step?.targetLabel || "").trim();
+  },
+
+  getTutorialTargetProxyActionKey(step = this.getCurrentTutorialStep()) {
+    if (step?.id === "start-day") return "day:start-order";
+    if (step?.id === "open-store") return "store:open";
+
+    return "";
+  },
+
+  activateTutorialTargetProxy(step = this.getCurrentTutorialStep(), source = null, event = null) {
+    if (!this.isInteractiveTutorialActive() || !this.shouldUseTutorialTargetProxy(step)) {
+      return false;
+    }
+
+    const actionKey = this.getTutorialTargetProxyActionKey(step);
+
+    if (actionKey && !this.guardTutorialAction(actionKey, event)) {
+      return false;
+    }
+
+    const activatedStepIndex = this.tutorialStepIndex;
+    const shouldWaitForEvent = Boolean(step?.waitForEvent);
+    const advanceAfterAction = () => {
+      if (shouldWaitForEvent) return;
+
+      const delayMs = Math.max(0, Math.floor(Number(step?.advanceAfterTargetClickMs) || 0));
+      window.setTimeout(() => {
+        if (
+          this.isInteractiveTutorialActive() &&
+          this.tutorialStepIndex === activatedStepIndex
+        ) {
+          this.moveTutorialStep(1, { fromAction: true });
+        }
+      }, delayMs);
+    };
+
+    source?.classList?.remove("tutorial-proxy-source-hidden");
+    this.removeTutorialTargetProxy();
+
+    if (shouldWaitForEvent) {
+      this.tutorialPendingStepId = step.id;
+      this.renderTutorialStep();
+    }
+
+    if (step?.id === "start-day") {
+      EventBus.emit(EVENTS.DAY_START_REQUESTED);
+      advanceAfterAction();
+      return true;
+    }
+
+    if (step?.id === "open-store") {
+      EventBus.emit(EVENTS.STORE_OPEN_REQUESTED);
+      return true;
+    }
+
+    source?.click?.();
+    advanceAfterAction();
+    return true;
+  },
+
+  removeTutorialTargetProxy() {
+    const proxy = this.tutorialTargetProxy;
+    const source = this.tutorialTargetProxySource;
+
+    if (proxy && this.tutorialTargetProxyClickHandler) {
+      proxy.removeEventListener("click", this.tutorialTargetProxyClickHandler);
+    }
+
+    source?.classList?.remove("tutorial-proxy-source-hidden");
+    proxy?.remove?.();
+    this.tutorialTargetProxy = null;
+    this.tutorialTargetProxySource = null;
+    this.tutorialTargetProxyClickHandler = null;
+  },
+
+  getTutorialAnchorTarget(step = this.getCurrentTutorialStep()) {
+    if (this.shouldUseTutorialTargetProxy(step)) {
+      const proxy = this.syncTutorialTargetProxy(step);
+
+      if (proxy) return proxy;
+    }
+
+    return this.findVisibleTutorialTarget(this.getTutorialAnchorSelector(step));
+  },
+
+  bindTutorialActionTarget() {
+    this.unbindTutorialActionTarget();
+
+    if (this.tutorialMode !== "interactive") return;
+
+    const step = this.getCurrentTutorialStep();
+
+    const actionSelector = this.getTutorialActionSelector(step);
+
+    if (!step?.requireTargetClick || !actionSelector) return;
+
+    const target = this.shouldUseTutorialTargetProxy(step)
+      ? this.syncTutorialTargetProxy(step)
+      : this.findVisibleTutorialTarget(actionSelector);
+
+    if (!target) return;
+
+    const boundStepIndex = this.tutorialStepIndex;
+    const handler = () => {
+      if (
+        !this.isInteractiveTutorialActive() ||
+        this.tutorialStepIndex !== boundStepIndex
+      ) {
+        return;
+      }
+
+      if (step.waitForEvent) {
+        this.tutorialPendingStepId = step.id;
+        this.unbindTutorialActionTarget();
+        this.renderTutorialStep();
+        window.setTimeout(() => {
+          this.positionTutorialCard();
+          this.updateTutorialHighlight();
+        }, 80);
+        return;
+      }
+
+      const delayMs = Math.max(0, Math.floor(Number(step.advanceAfterTargetClickMs) || 0));
+      window.setTimeout(() => {
+        if (
+          this.isInteractiveTutorialActive() &&
+          this.tutorialStepIndex === boundStepIndex
+        ) {
+          this.moveTutorialStep(1, { fromAction: true });
+        }
+      }, delayMs);
+    };
+
+    target.addEventListener("click", handler);
+    this.tutorialActionTarget = target;
+    this.tutorialActionHandler = handler;
+    target.classList.add("tutorial-action-target");
+  },
+
+  unbindTutorialActionTarget() {
+    if (this.tutorialActionTarget && this.tutorialActionHandler) {
+      this.tutorialActionTarget.removeEventListener("click", this.tutorialActionHandler);
+      this.tutorialActionTarget.classList.remove("tutorial-action-target");
+    }
+
+    this.tutorialActionTarget = null;
+    this.tutorialActionHandler = null;
+  },
+
+  updateTutorialHighlight() {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+    const ring = document.getElementById("tutorial-highlight-ring");
+    const step = this.getTutorialSteps()[this.tutorialStepIndex];
+    const highlightSelector = this.getTutorialHighlightSelector(step);
+
+    if (!overlay || overlay.classList.contains("hidden") || !ring || !highlightSelector) {
+      this.hideTutorialHighlight();
+      return;
+    }
+
+    const proxy = this.shouldUseTutorialTargetProxy(step) ? this.syncTutorialTargetProxy(step) : null;
+    const highlightRect = proxy
+      ? this.getTutorialHighlightRectFromTargets([proxy])
+      : this.getTutorialHighlightRect(highlightSelector);
+
+    if (!highlightRect) {
+      this.hideTutorialHighlight();
+      return;
+    }
+
+    this.clearTutorialHighlightedTargets();
+    this.tutorialHighlightedTargets = [...(highlightRect.targets ?? [])];
+    this.tutorialHighlightedTargets.forEach((target) => {
+      target.classList.add("tutorial-highlight-target");
+    });
+
+    const padding = Math.max(6, Math.floor(Number(step?.highlightPadding) || 8));
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const left = Math.max(6, highlightRect.left - padding);
+    const top = Math.max(6, highlightRect.top - padding);
+    const right = Math.min(viewportWidth - 6, highlightRect.right + padding);
+    const bottom = Math.min(viewportHeight - 6, highlightRect.bottom + padding);
+    const width = Math.max(36, right - left);
+    const height = Math.max(36, bottom - top);
+
+    ring.classList.remove("hidden");
+    ring.style.left = `${left}px`;
+    ring.style.top = `${top}px`;
+    ring.style.width = `${width}px`;
+    ring.style.height = `${height}px`;
+
+    // v7.13.3: no more cut-out dim panels.
+    // A single full-screen dim layer keeps the darkness uniform and prevents
+    // black bars / bright strips on small screens. The target itself is
+    // emphasized with a ring and step-specific CSS.
+    this.updateTutorialDimPanels({ viewportWidth, viewportHeight });
+  },
+
+  updateTutorialDimPanels(rect = null) {
+    const overlay = this.tutorialOverlay ?? document.getElementById("tutorial-overlay");
+
+    if (!overlay) return;
+
+    const panels = [...overlay.querySelectorAll(".tutorial-dim")];
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+    if (panels.length === 0) return;
+
+    const [mainPanel, ...extraPanels] = panels;
+
+    extraPanels.forEach((panel) => {
+      if (!(panel instanceof HTMLElement)) return;
+      panel.classList.add("hidden");
+      panel.style.left = "0px";
+      panel.style.top = "0px";
+      panel.style.width = "0px";
+      panel.style.height = "0px";
+    });
+
+    if (!(mainPanel instanceof HTMLElement) || !rect || viewportWidth <= 0 || viewportHeight <= 0) {
+      if (mainPanel instanceof HTMLElement) {
+        mainPanel.classList.add("hidden");
+        mainPanel.style.left = "0px";
+        mainPanel.style.top = "0px";
+        mainPanel.style.width = "0px";
+        mainPanel.style.height = "0px";
+      }
+      return;
+    }
+
+    mainPanel.classList.remove("hidden");
+    mainPanel.style.left = "0px";
+    mainPanel.style.top = "0px";
+    mainPanel.style.width = `${Math.round(viewportWidth)}px`;
+    mainPanel.style.height = `${Math.round(viewportHeight)}px`;
+  },
+
+  getTutorialHighlightSelector(step = this.getCurrentTutorialStep()) {
+    return step?.spotlightSelector ?? step?.highlightSelector ?? step?.selector ?? "";
+  },
+
+  getTutorialContextSelector(step = this.getCurrentTutorialStep()) {
+    return step?.contextSelector ?? "";
+  },
+
+  getTutorialActionSelector(step = this.getCurrentTutorialStep()) {
+    return step?.actionSelector ?? step?.selector ?? "";
+  },
+
+  getTutorialAnchorSelector(step = this.getCurrentTutorialStep()) {
+    return step?.anchorSelector ?? step?.actionSelector ?? step?.selector ?? "";
+  },
+
+  findVisibleTutorialTargets(selector = "") {
+    const selectors = String(selector)
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    for (const candidateSelector of selectors) {
+      const targets = [];
+      const seen = new Set();
+
+      document.querySelectorAll(candidateSelector).forEach((node) => {
+        if (!(node instanceof HTMLElement) || seen.has(node)) {
+          return;
+        }
+
+        if (node.classList.contains("hidden") || node.closest(".hidden")) {
+          return;
+        }
+
+        const rect = node.getBoundingClientRect();
+
+        if (rect.width <= 0 || rect.height <= 0) {
+          return;
+        }
+
+        seen.add(node);
+        targets.push(node);
+      });
+
+      if (targets.length > 0) {
+        return targets.slice(0, 1);
+      }
+    }
+
+    return [];
+  },
+
+  findVisibleTutorialTarget(selector = "") {
+    return this.findVisibleTutorialTargets(selector)[0] ?? null;
+  },
+
+  getTutorialHighlightRect(selector = "") {
+    return this.getTutorialHighlightRectFromTargets(this.findVisibleTutorialTargets(selector));
+  },
+
+  getTutorialHighlightRectFromTargets(targets = []) {
+    const visibleTargets = targets.filter((target) => target instanceof HTMLElement);
+
+    if (visibleTargets.length === 0) return null;
+
+    const unionRect = visibleTargets.reduce((rect, target) => {
+      const targetRect = target.getBoundingClientRect();
+
+      if (!rect) {
+        return {
+          left: targetRect.left,
+          top: targetRect.top,
+          right: targetRect.right,
+          bottom: targetRect.bottom
+        };
+      }
+
+      return {
+        left: Math.min(rect.left, targetRect.left),
+        top: Math.min(rect.top, targetRect.top),
+        right: Math.max(rect.right, targetRect.right),
+        bottom: Math.max(rect.bottom, targetRect.bottom)
+      };
+    }, null);
+
+    if (!unionRect) return null;
+
+    return {
+      ...unionRect,
+      width: unionRect.right - unionRect.left,
+      height: unionRect.bottom - unionRect.top,
+      targets: visibleTargets
+    };
+  },
+
+  clearTutorialHighlightedTargets() {
+    (this.tutorialHighlightedTargets ?? []).forEach((target) => {
+      target.classList?.remove("tutorial-highlight-target");
+    });
+
+    this.tutorialHighlightedTargets = [];
+  },
+
+  hideTutorialHighlight() {
+    const ring = document.getElementById("tutorial-highlight-ring");
+
+    this.clearTutorialHighlightedTargets();
+
+    if (!ring) return;
+
+    ring.classList.add("hidden");
+    ring.style.removeProperty("left");
+    ring.style.removeProperty("top");
+    ring.style.removeProperty("width");
+    ring.style.removeProperty("height");
+
+    this.updateTutorialDimPanels(null);
+  },
+
+  markTutorialCompleted() {
+    try {
+      window.localStorage?.setItem(this.tutorialCompletedKey, "true");
+    } catch (error) {
+      console.warn("튜토리얼 완료 상태를 저장하지 못했습니다.", error);
+    }
+  },
+
+  isTutorialCompleted() {
+    try {
+      const storage = window.localStorage;
+
+      if (!storage) return false;
+
+      return [this.tutorialCompletedKey, ...(this.tutorialLegacyCompletedKeys ?? [])]
+        .some((key) => storage.getItem(key) === "true");
+    } catch (error) {
+      return false;
+    }
+  },
+
+  resetTutorialProgressForNewGame() {
+    // 새 매장 시작은 매장 진행도 리셋일 뿐, 계정성 설정인
+    // "튜토리얼 완료/건너뛰기" 선택은 유지한다.
+    this.tutorialAutoShown = false;
+    this.pendingFirstRunTutorialAfterDailyReward = false;
+
+    try {
+      const storage = window.localStorage;
+
+      if (!storage) return;
+
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+
+        if (key?.startsWith(this.tutorialHintPrefix)) {
+          storage.removeItem(key);
+        }
+      }
+    } catch (error) {
+      console.warn("튜토리얼 힌트 초기화 상태를 저장하지 못했습니다.", error);
+    }
+  },
+
+  showTutorialHintOnce(key, message, options = {}) {
+    if (this.isTutorialCompleted() || this.isInteractiveTutorialActive()) {
+      return;
+    }
+
+    const normalizedKey = String(key ?? "").trim();
+    const normalizedMessage = String(message ?? "").trim();
+
+    if (!normalizedKey || !normalizedMessage) {
+      return;
+    }
+
+    try {
+      const storageKey = `${this.tutorialHintPrefix}${normalizedKey}`;
+
+      if (window.localStorage?.getItem(storageKey) === "true") {
+        return;
+      }
+
+      window.localStorage?.setItem(storageKey, "true");
+    } catch (error) {
+      // 저장 실패 시에도 안내 메시지는 표시한다.
+    }
+
+    this.showMessage(normalizedMessage, {
+      duration: options.duration ?? 3600
+    });
   },
 
   createTitleScreen() {
@@ -276,9 +2574,9 @@ export const UIManager = {
               id="title-new-game-button"
               class="title-menu-button title-new-game-button"
               type="button"
-              aria-label="새로 시작"
+              aria-label="새 매장 시작"
             >
-              <span class="title-button-caption">새로 시작</span>
+              <span class="title-button-caption">새 매장 시작</span>
             </button>
 
             <button
@@ -331,6 +2629,7 @@ export const UIManager = {
     if (newGameButton) {
       newGameButton.onclick = () => {
         SaveSystem.resetNewGameState();
+        this.resetTutorialProgressForNewGame();
         this.renderTitleResumeButton();
         this.enterGameFromTitle();
       };
@@ -399,8 +2698,15 @@ export const UIManager = {
 
   enterGameFromTitle() {
     this.closeTitleScreen();
-    this.showMessage("새 영업을 시작합니다. 발주 버튼으로 Day 1 준비를 시작하세요.");
-    this.showDailyRewardIfAvailable();
+    this.showMessage("새 매장으로 다시 시작합니다. 출석 기록과 BM 지갑은 유지하고 Day 1 준비를 시작하세요.");
+
+    this.pendingFirstRunTutorialAfterDailyReward = true;
+    const rewardShown = this.showDailyRewardIfAvailable();
+
+    if (!rewardShown) {
+      this.pendingFirstRunTutorialAfterDailyReward = false;
+      this.showFirstRunTutorialSoon();
+    }
   },
 
   showTitleScreen(message = "타이틀 화면으로 돌아왔습니다.") {
@@ -410,6 +2716,7 @@ export const UIManager = {
 
     this.setElementHiddenSafely(this.titleScreen, false);
     document.body.classList.add("is-title-screen-active");
+    this.syncTutorialHelpButtonVisibility();
     this.renderTitleResumeButton();
     this.render();
 
@@ -466,6 +2773,7 @@ export const UIManager = {
 
     this.setElementHiddenSafely(this.titleScreen, true);
     document.body.classList.remove("is-title-screen-active");
+    this.syncTutorialHelpButtonVisibility();
     this.focusElementSafely(document.getElementById("start-day-button"));
   },
 
@@ -665,6 +2973,11 @@ export const UIManager = {
 
     this.setElementHiddenSafely(this.dailyRewardModal, true);
     this.focusElementSafely(document.getElementById("start-day-button"));
+
+    if (this.pendingFirstRunTutorialAfterDailyReward) {
+      this.pendingFirstRunTutorialAfterDailyReward = false;
+      this.showFirstRunTutorialSoon();
+    }
   },
 
   createDailyMissionModal() {
@@ -769,13 +3082,14 @@ export const UIManager = {
     settingsButton.disabled = false;
     settingsButton.hidden = false;
     settingsButton.tabIndex = 0;
-    settingsButton.textContent = "설정";
+    settingsButton.textContent = "";
     settingsButton.title = "설정";
     settingsButton.setAttribute("aria-label", "설정");
     settingsButton.setAttribute("aria-disabled", "false");
     settingsButton.removeAttribute("aria-hidden");
     settingsButton.classList.add("ingame-settings-button");
-    settingsButton.onclick = () => {
+    settingsButton.onclick = (event) => {
+      if (!this.guardTutorialAction("settings:open", event)) return;
       this.openSettingsModal("ingame");
     };
 
@@ -805,12 +3119,18 @@ export const UIManager = {
     };
 
     const rewardInboxButton = RewardInboxUI.ensureEntryButton(topIconMenu, settingsButton);
+    const tutorialHelpButton = this.createTutorialHelpButton();
+
+    if (tutorialHelpButton && settingsButton && tutorialHelpButton.parentElement === topIconMenu) {
+      topIconMenu.insertBefore(tutorialHelpButton, settingsButton);
+    }
 
     [...topIconMenu.querySelectorAll(".hud-icon-button")].forEach((button) => {
       const isSettingsButton = button === settingsButton;
       const isDailyMissionButton = button === dailyMissionButton;
       const isRewardInboxButton = button === rewardInboxButton;
-      const shouldShow = isSettingsButton || isDailyMissionButton || isRewardInboxButton;
+      const isTutorialHelpButton = button === tutorialHelpButton;
+      const shouldShow = isSettingsButton || isDailyMissionButton || isRewardInboxButton || isTutorialHelpButton;
 
       button.hidden = !shouldShow;
       button.classList.toggle("top-icon-secondary-hidden", !shouldShow);
@@ -919,20 +3239,24 @@ export const UIManager = {
     const endDayButton = document.getElementById("end-day-button");
     const shopShortcutButton = document.getElementById("shop-shortcut-button");
 
-    startDayButton.addEventListener("click", () => {
+    startDayButton.addEventListener("click", (event) => {
+      if (!this.guardTutorialAction("day:start-order", event)) return;
       EventBus.emit(EVENTS.DAY_START_REQUESTED);
     });
 
-    openStoreButton.addEventListener("click", () => {
+    openStoreButton.addEventListener("click", (event) => {
+      if (!this.guardTutorialAction("store:open", event)) return;
       EventBus.emit(EVENTS.STORE_OPEN_REQUESTED);
     });
 
-    endDayButton.addEventListener("click", () => {
+    endDayButton.addEventListener("click", (event) => {
+      if (!this.guardTutorialAction("day:end", event)) return;
       EventBus.emit(EVENTS.STORE_CLOSE_REQUESTED);
     });
 
     if (shopShortcutButton) {
-      shopShortcutButton.addEventListener("click", () => {
+      shopShortcutButton.addEventListener("click", (event) => {
+        if (!this.guardTutorialAction("shop:open", event)) return;
         if (shopShortcutButton.disabled) return;
 
         this.showBMContractShopModal();
@@ -971,6 +3295,10 @@ export const UIManager = {
       this.showInteractionSparkle("counter-zone");
     });
 
+    EventBus.on(SHELF_STOCK_CHANGED, () => {
+      this.renderStoreObjectVisuals();
+    });
+
     EventBus.on(EVENTS.RESTOCK_COMPLETED, (data = {}) => {
       const source = String(data.source ?? "");
 
@@ -979,6 +3307,32 @@ export const UIManager = {
       }
 
       this.showInteractionSparkle("shelf-zone");
+    });
+
+    EventBus.on(EVENTS.ORDER_DELIVERED, (data = {}) => {
+      if (data.status === "arrived") {
+        this.showTutorialHintOnce(
+          "delivery-arrived",
+          "튜토리얼: 도착한 발주 박스를 누르면 발주 상품 정리가 시작됩니다."
+        );
+        this.maybeAdvanceInteractiveTutorial("order-delivered", { delayMs: 120 });
+      }
+    });
+
+    EventBus.on(EVENTS.STOCK_ORGANIZED, () => {
+      this.showTutorialHintOnce(
+        "stock-organized",
+        "튜토리얼: 발주 상품이 창고 재고로 정리되었습니다. 이제 영업 시작 버튼을 누르면 진짜 영업이 시작됩니다."
+      );
+      this.maybeAdvanceInteractiveTutorial("stock-organized", { delayMs: 180 });
+    });
+
+    EventBus.on(EVENTS.STORE_OPENED, () => {
+      this.showTutorialHintOnce(
+        "store-opened",
+        "튜토리얼: 손님이 계산대에 오면 계산대 근처에서 계산대를 터치해 결제를 처리하세요."
+      );
+      this.maybeAdvanceInteractiveTutorial("store-opened", { delayMs: 220 });
     });
   },
 
@@ -1061,7 +3415,7 @@ export const UIManager = {
       this.hideOrderModal();
 
       this.showMessage(
-        data.message ?? "재고 정리 완료. 편의점 오픈 버튼을 눌러주세요."
+        data.message ?? "발주 상품이 창고에 정리되었습니다. 편의점 오픈 버튼을 눌러주세요."
       );
     });
   },
@@ -2046,58 +4400,76 @@ export const UIManager = {
   },
 
   getStoreObjectStockData(objectType, shelfId = null, shelfInstanceId = null) {
-    const shelfStock = shelfInstanceId
-      ? GameState.shelfStocks?.[shelfInstanceId]
-      : null;
+  const shelfStock = shelfInstanceId
+    ? GameState.shelfStocks?.[shelfInstanceId]
+    : null;
 
-    if (shelfStock) {
-      const product = PRODUCTS.find((item) => item.id === shelfStock.productId) ?? null;
-      const configuredCapacity = Number(product?.initialStock) || 0;
-      const syncedCapacity = Number(shelfStock.maxStock) || 0;
-      const currentStock = Math.max(
+  if (shelfStock?.products) {
+    const productStocks = Object.entries(shelfStock.products);
+
+    const stock = productStocks.reduce((total, [, productStock]) => {
+      return total + Math.max(
         0,
-        Math.floor(Number(shelfStock.currentStock) || 0)
+        Math.floor(Number(productStock.currentStock) || 0)
       );
-
-      return {
-        stock: currentStock,
-        capacity: Math.max(1, syncedCapacity, configuredCapacity, currentStock)
-      };
-    }
-
-    const items = this.getInventoryItemsForObjectVisuals();
-    const itemsByProductId = items.reduce((itemMap, item) => {
-      itemMap[item.productId] = item;
-      return itemMap;
-    }, {});
-    const matchingProducts = PRODUCTS.filter((product) => {
-      const isMatchingObject = this.getProductStockVisualObjectType(product) === objectType;
-      const isMatchingShelf = !shelfId || product.shelfId === shelfId;
-
-      return isMatchingObject && isMatchingShelf;
-    });
-    const visibleProducts = matchingProducts.filter((product) => {
-      const item = itemsByProductId[product.id];
-
-      return item?.isUnlocked || product.unlockDay <= GameState.day;
-    });
-    const stock = visibleProducts.reduce((total, product) => {
-      const item = itemsByProductId[product.id];
-
-      return total + (Number(item?.quantity) || 0);
     }, 0);
-    const capacity = visibleProducts.reduce((total, product) => {
-      const item = itemsByProductId[product.id];
-      const configuredCapacity = Number(product.initialStock) || 0;
-      const currentQuantity = Number(item?.quantity) || 0;
 
-      return total + Math.max(configuredCapacity, currentQuantity);
+    const capacity = productStocks.reduce((total, [, productStock]) => {
+      return total + Math.max(
+        1,
+        Math.floor(Number(productStock.maxStock) || 8)
+      );
     }, 0);
 
     return {
       stock,
-      capacity
+      capacity: Math.max(1, capacity)
     };
+  }
+
+  return {
+    stock: 0,
+    capacity: 1
+  };
+},
+
+getShelfWarningProducts(shelfInstanceId) {
+    const shelfStock = shelfInstanceId
+      ? GameState.shelfStocks?.[shelfInstanceId]
+      : null;
+
+    if (!shelfStock?.products) {
+      return [];
+    }
+
+    return Object.entries(shelfStock.products)
+      .map(([productId, productStock]) => {
+        const currentStock = Math.max(
+          0,
+          Math.floor(Number(productStock?.currentStock) || 0)
+        );
+        const maxStock = Math.max(
+          1,
+          Math.floor(Number(productStock?.maxStock) || 8)
+        );
+
+        if (currentStock <= 0) {
+          return {
+            productId,
+            state: "empty"
+          };
+        }
+
+        if (currentStock <= Math.floor(maxStock / 2)) {
+          return {
+            productId,
+            state: "warning"
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
   },
 
   getInventoryItemsForObjectVisuals() {
@@ -2145,6 +4517,12 @@ export const UIManager = {
     const originalLabel = node.dataset.objectLabel ||
       node.textContent.trim() ||
       config.label;
+
+    [...node.childNodes].forEach((childNode) => {
+      if (childNode.nodeType === Node.TEXT_NODE) {
+        childNode.remove();
+      }
+   });
 
     node.dataset.objectLabel = originalLabel;
     node.dataset.objectType = visualAsset.objectType;
@@ -2197,16 +4575,49 @@ export const UIManager = {
     hitboxNode.dataset.stockVisualState = visualAsset.state;
     hitboxNode.setAttribute("aria-hidden", "true");
 
-    this.ensureInteractionFeedbackNodes(node);
-    this.bindInteractionFeedbackNode(node);
+    // this.ensureInteractionFeedbackNodes(node);
+    // this.bindInteractionFeedbackNode(node);
 
-    const labelNode = this.ensureStoreObjectChild(
-      node,
-      "store-object-label",
-      "span"
-    );
+    const labelNode = node.querySelector(".store-object-label");
 
-    labelNode.textContent = originalLabel;
+    if (labelNode) {
+      labelNode.remove();
+    } 
+
+    this.renderShelfWarningIcons(node, config.instanceId);
+  },
+
+renderShelfWarningIcons(node, shelfInstanceId) {
+    if (!node || !shelfInstanceId) {
+      return;
+    }
+
+    const warningProducts = this.getShelfWarningProducts(shelfInstanceId);
+
+    let iconLayer = node.querySelector(".shelf-warning-icons");
+
+    const hasEmpty = warningProducts.some((item) => item.state === "empty");
+    const hasWarning = warningProducts.some((item) => item.state === "warning");
+
+    if (!hasEmpty && !hasWarning) {
+      iconLayer?.remove();
+      return;
+    }
+
+    if (!iconLayer) {
+      iconLayer = document.createElement("span");
+      iconLayer.className = "shelf-warning-icons";
+      iconLayer.setAttribute("aria-hidden", "true");
+      node.appendChild(iconLayer);
+    }
+
+    const className = hasEmpty
+      ? "shelf-warning-icon is-empty"
+      : "shelf-warning-icon is-warning";
+
+    iconLayer.innerHTML = `
+      <span class="${className}"></span>
+    `;
   },
 
   ensureStoreObjectChild(parentNode, className, tagName) {
@@ -5553,12 +7964,30 @@ export const UIManager = {
       return `<li>${feature}</li>`;
     }).join("");
 
-    confirmButton.onclick = () => {
+    const goToOrder = (event = null) => {
+      event?.preventDefault?.();
+      if (!this.guardTutorialAction("day:briefing-confirm", event)) return;
+      // 튜토리얼 오버레이/딤 레이어와 함께 떠 있어도 브리핑 CTA는 항상 실제 발주창으로 이어져야 한다.
       this.hideDayScenarioModal();
       this.continueDayStartFlow();
+
+      if (!this.isOrderModalVisible?.() && !this.pendingOrderPhaseData) {
+        this.showOrderModal({
+          day: GameState.day,
+          dailyGoal: GameState.dailyGoal,
+          difficulty: GameState.difficulty,
+          isEndlessMode: GameState.isEndlessMode,
+          dayScenario: GameState.dayScenario
+        });
+      }
     };
 
+    confirmButton.onclick = goToOrder;
+    confirmButton.style.pointerEvents = "auto";
+
+    this.dayScenarioModal.style.pointerEvents = "auto";
     this.dayScenarioModal.classList.remove("hidden");
+    this.refreshTutorialAfterUiChange(40);
   },
 
   hideDayScenarioModal() {
@@ -7069,6 +9498,7 @@ export const UIManager = {
       button.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (!this.guardTutorialAction("order:category", event)) return;
 
         const nextCategory = button.dataset.orderCategory || "all";
 
@@ -7125,6 +9555,7 @@ export const UIManager = {
     closeButton.onclick = (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (!this.guardTutorialAction("order:close", event)) return;
       this.hideOrderModal();
     };
   },
@@ -7155,6 +9586,8 @@ export const UIManager = {
 
     this.renderOrderDraft();
     this.orderModal.classList.remove("hidden");
+    this.ensureTutorialOrderTargetVisible(30);
+    this.refreshTutorialAfterUiChange();
 
     EventBus.emit(EVENTS.ORDER_MODAL_OPENED, {
       day: GameState.day,
@@ -7191,6 +9624,8 @@ export const UIManager = {
 
   renderOrderDraft(options = {}) {
     const body = document.getElementById("order-modal-body");
+    const isTutorialOrderQuantityStep = this.isInteractiveTutorialActive?.() &&
+      this.getCurrentTutorialStep?.()?.id === "order-quantity";
 
     if (body) {
       body.classList.add("order-modal-body--card-draft");
@@ -7198,7 +9633,7 @@ export const UIManager = {
     }
 
     const previousList = document.querySelector(".order-product-list");
-    const previousScrollTop = options.preserveScroll
+    const previousScrollTop = options.preserveScroll && !isTutorialOrderQuantityStep
       ? previousList?.scrollTop ?? this.orderListScrollTop
       : 0;
 
@@ -7216,7 +9651,12 @@ export const UIManager = {
       this.orderActiveCategory = "all";
     }
 
-    const visibleProducts = this.getOrderVisibleProducts(products);
+    if (isTutorialOrderQuantityStep) {
+      this.orderActiveCategory = "all";
+      this.orderListScrollTop = 0;
+    }
+
+    let visibleProducts = this.getOrderVisibleProducts(products);
     const totalCost = this.getOrderTotalCost(orderableProducts);
     const totalQuantity = orderableProducts.reduce((quantityTotal, product) => {
       return quantityTotal + (Number(this.orderDraftQuantities[product.id]) || 0);
@@ -7229,9 +9669,27 @@ export const UIManager = {
     const warehouseCapacity = BMSystem.getWarehouseCapacity();
     const currentWarehouseStock = Math.max(0, Math.floor(Number(this.inventorySnapshot?.totalQuantity) || 0));
     const isOverWarehouseCapacity = currentWarehouseStock + totalQuantity > warehouseCapacity;
-    const isZeroOrderBlocked = GameState.day === 1 && totalQuantity <= 0;
+    const isZeroOrderBlocked = totalQuantity <= 0;
     const dayScenario = this.pendingOrderPhaseData?.dayScenario ?? {};
     const recommendedProductIds = this.getRecommendedProductIdSet(dayScenario);
+    const tutorialOrderTargetProductIds = new Set(
+      this.getTutorialOrderTargetProductIds(orderableProducts, recommendedProductIds)
+    );
+    const tutorialOrderSortIndex = new Map(
+      [...tutorialOrderTargetProductIds].map((productId, index) => [productId, index])
+    );
+
+    if (isTutorialOrderQuantityStep && tutorialOrderSortIndex.size > 0) {
+      visibleProducts = [...visibleProducts].sort((a, b) => {
+        const aIndex = tutorialOrderSortIndex.has(a.id) ? tutorialOrderSortIndex.get(a.id) : 1000;
+        const bIndex = tutorialOrderSortIndex.has(b.id) ? tutorialOrderSortIndex.get(b.id) : 1000;
+
+        if (aIndex !== bIndex) return aIndex - bIndex;
+
+        return products.indexOf(a) - products.indexOf(b);
+      });
+    }
+
     const activeCategoryLabel = this.getOrderCategoryLabel(this.orderActiveCategory ?? "all");
 
     body.innerHTML = `
@@ -7299,9 +9757,10 @@ export const UIManager = {
                 : this.getOrderUnavailableReason(product);
               const isRecommended = recommendedProductIds.has(product.id);
               const salePrice = BMSystem.getProductSalePrice(product.id) || product.salePrice;
+              const isTutorialOrderTarget = tutorialOrderTargetProductIds.has(product.id);
 
               return `
-                <article class="order-product-card order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}" data-product-id="${product.id}">
+                <article class="order-product-card order-product-row${isOrderable ? "" : " is-order-unavailable"}${isRecommended ? " is-recommended" : ""}${isTutorialOrderTarget ? " is-tutorial-order-target" : ""}" data-product-id="${product.id}" data-tutorial-order-target="${isTutorialOrderTarget ? "true" : "false"}">
                   <span class="order-product-image-box">
                     ${isRecommended ? `<span class="order-recommend-badge">오늘의 추천</span>` : ""}
                     <img
@@ -7326,9 +9785,9 @@ export const UIManager = {
 
                   <div class="order-quantity-panel" aria-label="${displayName} 발주 수량">
                     <div class="order-quantity-controls">
-                      <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>-</button>
+                      <button class="order-qty-button" type="button" data-action="decrease" data-product-id="${product.id}" ${isOrderable && quantity > 0 ? "" : "disabled"}>-</button>
                       <strong class="order-quantity-value" data-product-id="${product.id}">${quantity}</strong>
-                      <button class="order-qty-button" type="button" data-action="increase" data-product-id="${product.id}" ${isOrderable ? "" : "disabled"}>+</button>
+                      <button class="order-qty-button${isTutorialOrderTarget ? " tutorial-active-target" : ""}" type="button" data-action="increase" data-product-id="${product.id}" ${isOrderable && this.canIncreaseOrderQuantity(product.id, orderableProducts).isAvailable ? "" : "disabled"}>+</button>
                     </div>
                   </div>
                 </article>
@@ -7342,14 +9801,42 @@ export const UIManager = {
     this.prepareUiImageButtons(body);
     this.bindOrderCategoryTabs();
     this.bindOrderDraftControls(orderableProducts);
+    this.ensureTutorialOrderTargetVisible(20);
 
-    if (options.preserveScroll) {
+    if (options.preserveScroll || isTutorialOrderQuantityStep) {
       const nextList = document.querySelector(".order-product-list");
 
       if (nextList) {
-        nextList.scrollTop = previousScrollTop;
+        nextList.scrollTop = isTutorialOrderQuantityStep ? 0 : previousScrollTop;
       }
     }
+  },
+
+  getTutorialOrderTargetProductId(orderableProducts = this.getOrderableProducts(), recommendedProductIds = new Set()) {
+    return this.getTutorialOrderTargetProductIds(orderableProducts, recommendedProductIds)[0] ?? "";
+  },
+
+  getTutorialOrderTargetProductIds(orderableProducts = this.getOrderableProducts(), recommendedProductIds = new Set()) {
+    const orderable = Array.isArray(orderableProducts) ? orderableProducts : [];
+    const orderableById = new Map(orderable.map((product) => [product.id, product]));
+    const targetIds = TUTORIAL_ORDER_TARGET_PRODUCT_IDS.filter((productId) => {
+      return orderableById.has(productId);
+    });
+
+    if (targetIds.length > 0) {
+      return targetIds;
+    }
+
+    const recommendedSet = recommendedProductIds instanceof Set
+      ? recommendedProductIds
+      : new Set(Array.isArray(recommendedProductIds) ? recommendedProductIds : []);
+    const recommendedIds = orderable
+      .filter((product) => recommendedSet.has(product.id))
+      .map((product) => product.id);
+
+    return recommendedIds.length > 0
+      ? recommendedIds.slice(0, 2)
+      : orderable.slice(0, 2).map((product) => product.id);
   },
 
   getOrderSpendableMoney() {
@@ -7357,6 +9844,50 @@ export const UIManager = {
     const recordedCost = Math.max(0, Math.floor(Number(GameState.todayStats?.cost) || 0));
 
     return Math.max(0, money - recordedCost);
+  },
+
+  getOrderDraftTotalQuantity() {
+    return Object.values(this.orderDraftQuantities ?? {}).reduce((total, quantity) => {
+      return total + Math.max(0, Math.floor(Number(quantity) || 0));
+    }, 0);
+  },
+
+  canIncreaseOrderQuantity(productId, products = this.getOrderableProducts()) {
+    const product = products.find((candidate) => candidate.id === productId);
+
+    if (!product || !this.isProductOrderable(product)) {
+      return {
+        isAvailable: false,
+        reason: ORDER_VALIDATION_MESSAGES.lockedProduct
+      };
+    }
+
+    const spendableMoney = this.getOrderSpendableMoney();
+    const currentTotalCost = this.getOrderTotalCost(products);
+    const nextTotalCost = currentTotalCost + product.purchasePrice;
+
+    if (nextTotalCost > spendableMoney) {
+      return {
+        isAvailable: false,
+        reason: ORDER_VALIDATION_MESSAGES.notEnoughGold
+      };
+    }
+
+    const warehouseCapacity = BMSystem.getWarehouseCapacity();
+    const currentWarehouseStock = Math.max(0, Math.floor(Number(this.inventorySnapshot?.totalQuantity) || 0));
+    const currentOrderQuantity = this.getOrderDraftTotalQuantity();
+
+    if (currentWarehouseStock + currentOrderQuantity + 1 > warehouseCapacity) {
+      return {
+        isAvailable: false,
+        reason: ORDER_VALIDATION_MESSAGES.quantityExceeded
+      };
+    }
+
+    return {
+      isAvailable: true,
+      reason: "발주 수량을 늘릴 수 있습니다."
+    };
   },
 
   getOrderBudgetMessage({
@@ -7368,18 +9899,18 @@ export const UIManager = {
     warehouseCapacity = 0
   } = {}) {
     if (isOverBudget) {
-      return "보유금보다 발주 비용이 큽니다.";
+      return ORDER_VALIDATION_MESSAGES.notEnoughGold;
     }
 
     if (isOverWarehouseCapacity) {
-      return `창고 용량 초과: 현재 ${currentWarehouseStock}개 + 발주 ${totalQuantity}개 / 한도 ${warehouseCapacity}개`;
+      return ORDER_VALIDATION_MESSAGES.quantityExceeded;
     }
 
     if (isZeroOrderBlocked) {
-      return "Day 1에는 기본 상품을 1개 이상 발주해야 영업을 시작할 수 있습니다.";
+      return ORDER_VALIDATION_MESSAGES.emptyOrder;
     }
 
-    return `창고 ${currentWarehouseStock + totalQuantity}/${warehouseCapacity}개 · Day 2부터는 수량 0으로도 발주 확정이 가능합니다.`;
+    return `창고 ${currentWarehouseStock + totalQuantity}/${warehouseCapacity}개`;
   },
 
   refreshOrderDraftDynamicState() {
@@ -7397,7 +9928,7 @@ export const UIManager = {
     const spendableMoney = this.getOrderSpendableMoney();
     const isOverBudget = totalCost > spendableMoney;
     const isOverWarehouseCapacity = currentWarehouseStock + totalQuantity > warehouseCapacity;
-    const isZeroOrderBlocked = GameState.day === 1 && totalQuantity <= 0;
+    const isZeroOrderBlocked = totalQuantity <= 0;
     const shouldDisableConfirm = isOverBudget || isZeroOrderBlocked || isOverWarehouseCapacity;
 
     const setText = (selector, value) => {
@@ -7414,6 +9945,28 @@ export const UIManager = {
 
     Object.entries(this.orderDraftQuantities).forEach(([productId, quantity]) => {
       setText(`.order-quantity-value[data-product-id="${productId}"]`, `${Number(quantity) || 0}`);
+    });
+
+    document.querySelectorAll(".order-qty-button").forEach((button) => {
+      const productId = button.dataset.productId;
+      const product = orderableProducts.find((candidate) => candidate.id === productId);
+      const quantity = Math.max(0, Math.floor(Number(this.orderDraftQuantities[productId]) || 0));
+      let shouldDisable = !product;
+
+      if (button.dataset.action === "decrease") {
+        shouldDisable = shouldDisable || quantity <= 0;
+      } else if (button.dataset.action === "increase") {
+        shouldDisable = shouldDisable || !this.canIncreaseOrderQuantity(productId, orderableProducts).isAvailable;
+      }
+
+      button.disabled = shouldDisable;
+      if (shouldDisable) {
+        button.setAttribute("aria-disabled", "true");
+      } else {
+        button.removeAttribute("disabled");
+        button.removeAttribute("aria-disabled");
+      }
+      this.syncUiImageButtonState(button);
     });
 
     const budgetMessage = document.getElementById("order-budget-message");
@@ -7448,7 +10001,12 @@ export const UIManager = {
 
   bindOrderDraftControls(products = []) {
     document.querySelectorAll(".order-qty-button").forEach((button) => {
-      button.onclick = () => {
+      button.onclick = (event) => {
+        if (!this.guardTutorialAction("order:quantity", event)) return;
+        if (!this.isTutorialOrderQuantityControlAllowed(button)) {
+          this.blockTutorialInputEvent(event, "click");
+          return;
+        }
         if (button.disabled) return;
 
         const productId = button.dataset.productId;
@@ -7456,15 +10014,35 @@ export const UIManager = {
         if (!(productId in this.orderDraftQuantities)) return;
 
         const currentQuantity = this.orderDraftQuantities[productId] ?? 0;
-        const nextQuantity =
-          button.dataset.action === "increase"
-            ? currentQuantity + 1
-            : Math.max(0, currentQuantity - 1);
+        let nextQuantity = currentQuantity;
+
+        if (button.dataset.action === "increase") {
+          const increaseAvailability = this.canIncreaseOrderQuantity(productId, products);
+
+          if (!increaseAvailability.isAvailable) {
+            this.showMessage(increaseAvailability.reason);
+            this.refreshOrderDraftDynamicState();
+            return;
+          }
+
+          nextQuantity = currentQuantity + 1;
+        } else {
+          nextQuantity = Math.max(0, currentQuantity - 1);
+        }
 
         const orderList = document.querySelector(".order-product-list");
-        this.orderListScrollTop = orderList?.scrollTop ?? this.orderListScrollTop;
+        const isTutorialQuantityStep = this.isInteractiveTutorialActive?.() &&
+          this.getCurrentTutorialStep?.()?.id === "order-quantity";
+
+        this.orderListScrollTop = isTutorialQuantityStep
+          ? 0
+          : orderList?.scrollTop ?? this.orderListScrollTop;
+        if (isTutorialQuantityStep && orderList) {
+          orderList.scrollTop = 0;
+        }
         this.orderDraftQuantities[productId] = nextQuantity;
         this.refreshOrderDraftDynamicState();
+        this.refreshTutorialAfterUiChange(20);
       };
     });
 
@@ -7472,10 +10050,16 @@ export const UIManager = {
 
     if (!confirmButton) return;
 
-    confirmButton.onclick = () => {
+    confirmButton.onclick = (event) => {
       this.refreshOrderDraftDynamicState();
 
-      if (confirmButton.disabled) return;
+      if (!this.guardTutorialAction("order:confirm", event)) {
+        if (this.isInteractiveTutorialActive?.() && this.getCurrentTutorialStep?.()?.id === "order-quantity") {
+          this.showMessage("아직 수량 선택 단계예요. 표시된 상품의 [+] 버튼을 누른 뒤 [다음]을 눌러주세요.", { duration: 2200 });
+          this.refreshTutorialAfterUiChange(20);
+        }
+        return;
+      }
 
       const items = products
         .map((product) => {
@@ -7498,6 +10082,8 @@ export const UIManager = {
         return;
       }
 
+      if (confirmButton.disabled) return;
+
       this.showOrderWaiting();
 
       EventBus.emit(EVENTS.ORDER_CONFIRMED, {
@@ -7505,6 +10091,12 @@ export const UIManager = {
         items,
         totalCost: this.getOrderTotalCost(products)
       });
+
+      window.setTimeout(() => {
+        if (this.orderModalMode === "waiting") {
+          this.hideOrderModal();
+        }
+      }, 260);
     };
   },
 
@@ -7525,24 +10117,36 @@ export const UIManager = {
       };
     }
 
-    if (GameState.day === 1 && totalQuantity <= 0) {
+    if (totalQuantity <= 0) {
       return {
         isAvailable: false,
-        message: "Day 1에는 기본 상품을 1개 이상 발주해야 합니다."
+        message: ORDER_VALIDATION_MESSAGES.emptyOrder
+      };
+    }
+
+    const hasLockedItem = items.some((item) => {
+      const product = products.find((candidate) => candidate.id === item.productId);
+      return !product || !this.isProductOrderable(product);
+    });
+
+    if (hasLockedItem) {
+      return {
+        isAvailable: false,
+        message: ORDER_VALIDATION_MESSAGES.lockedProduct
       };
     }
 
     if (totalCost > spendableMoney) {
       return {
         isAvailable: false,
-        message: `발주 가능 금액이 부족합니다. 필요 ₩${totalCost.toLocaleString()} / 가능 ₩${spendableMoney.toLocaleString()}`
+        message: ORDER_VALIDATION_MESSAGES.notEnoughGold
       };
     }
 
     if (currentWarehouseStock + totalQuantity > warehouseCapacity) {
       return {
         isAvailable: false,
-        message: `창고 용량을 초과했습니다. 현재 ${currentWarehouseStock}개 + 발주 ${totalQuantity}개 / 한도 ${warehouseCapacity}개`
+        message: ORDER_VALIDATION_MESSAGES.quantityExceeded
       };
     }
 
@@ -7578,7 +10182,7 @@ export const UIManager = {
         <div class="order-waiting-card">
           <span class="order-waiting-icon">📦</span>
           <h2>발주 접수 중</h2>
-          <p>발주가 접수되었습니다. 잠시 후 택배 박스가 매장 앞에 도착합니다.</p>
+          <p>발주가 접수되었습니다. 잠시 후 발주 박스가 매장 앞에 도착합니다.</p>
         </div>
       </div>
     `;
@@ -7596,6 +10200,7 @@ export const UIManager = {
     }
 
     this.renderDeliveryBox(orderData);
+    this.syncOrderDeliveryTutorialArrival();
 
     if (this.orderModalMode === "delivery") {
       this.showOrderDelivered(orderData);
@@ -7603,7 +10208,8 @@ export const UIManager = {
     }
 
     this.hideOrderModal();
-    this.showMessage("가게 앞에 택배 박스가 도착했습니다. 박스를 클릭해 열어주세요.");
+    this.showMessage("주문한 상품이 도착했어요. 도착한 발주 박스를 눌러 창고에 정리해볼게요.");
+    this.refreshTutorialAfterUiChange();
   },
 
   renderDeliveryBox(orderData = this.orderDeliveredData) {
@@ -7630,12 +10236,13 @@ export const UIManager = {
       deliveryBox.id = "delivery-box-zone";
       deliveryBox.className = "delivery-box-zone";
       deliveryBox.type = "button";
-      deliveryBox.setAttribute("aria-label", "택배 박스 열기");
+      deliveryBox.setAttribute("aria-label", "도착한 발주 박스 정리하기");
       storeArea.appendChild(deliveryBox);
     }
 
     deliveryBox.classList.remove("interaction-feedback-target", "is-interactable", "is-interaction-ready", "is-click-sparkling");
     this.ensureDeliveryBoxVisuals(deliveryBox, remainingCount);
+    this.syncOrderDeliveryTutorialArrival();
 
     deliveryBox.onpointerdown = (event) => {
       event.preventDefault();
@@ -7645,6 +10252,7 @@ export const UIManager = {
     deliveryBox.onclick = (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (!this.guardTutorialAction("delivery:open", event)) return;
 
       EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
         day: orderData.day ?? GameState.day,
@@ -7709,91 +10317,14 @@ export const UIManager = {
   },
 
   showOrderDelivered(orderData = {}) {
-    if (!this.orderModal) {
-      this.createOrderModal();
-    }
-
-    const body = document.getElementById("order-modal-body");
-    const deliveredItems = this.getDeliveredItems(orderData);
-    const remainingCount = deliveredItems.filter((item) => !item.isSorted).length;
-
-    if (!body) return;
-
+    // Deprecated flow: the game no longer asks players to click individual
+    // delivered products inside the order modal. Delivery is handled only by
+    // clicking the arrival box once, then automatic order item organization.
     this.orderDeliveredData = orderData;
-    this.orderModalMode = "delivery";
-    this.orderModal.classList.remove("hidden");
-
-    const dayLabel = document.getElementById("order-modal-day-label");
-
-    if (dayLabel) {
-      dayLabel.textContent = `Day ${orderData.day ?? GameState.day}`;
-    }
-
-    const gridSignature = deliveredItems.map((item) => `${item.productId}:${item.imagePath ?? ""}`).join("|");
-    const existingGrid = body.querySelector(".order-delivered-grid");
-    const existingButtons = existingGrid ? [...existingGrid.querySelectorAll(".delivered-product-button")] : [];
-    const canReuseGrid =
-      existingGrid &&
-      this.lastDeliveredGridSignature === gridSignature &&
-      existingButtons.length === deliveredItems.length &&
-      existingButtons.every((button, index) => button.dataset.productId === deliveredItems[index].productId);
-
-    if (canReuseGrid) {
-      this.syncOrderDeliveredState(orderData);
-      return;
-    }
-
-    this.lastDeliveredGridSignature = gridSignature;
-    body.innerHTML = `
-      <div class="order-delivery-state">
-        <h2>택배 박스 열기</h2>
-        <p>
-          상품 이미지를 누르면 해당 상품이 재고로 정리됩니다.
-          남은 상품 <strong id="order-delivery-remaining-count">${remainingCount}</strong>종을 모두 정리해야 편의점을 오픈할 수 있습니다.
-        </p>
-        <div class="order-delivered-grid">
-          ${
-            deliveredItems.length > 0
-              ? deliveredItems.map((item) => {
-                  const isSorted = Boolean(item.isSorted);
-                  const product = PRODUCTS.find((candidate) => candidate.id === item.productId) ?? {
-                    id: item.productId,
-                    name: item.productName,
-                    imagePath: item.imagePath
-                  };
-                  const imagePath = item.imagePath ?? product.imagePath ?? "";
-
-                  return `
-                    <button
-                      class="delivered-product-button${isSorted ? " is-sorted" : ""}"
-                      type="button"
-                      data-product-id="${item.productId}"
-                      ${isSorted ? "disabled" : ""}
-                    >
-                      <span class="delivered-product-image-box">
-                        <img
-                          class="delivered-product-image"
-                          src="${imagePath}"
-                          alt="${item.productName}"
-                          loading="eager"
-                          decoding="async"
-                          onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
-                        />
-                        <span class="delivered-product-fallback" hidden>${this.getProductFallbackIcon(product)}</span>
-                      </span>
-                      <span class="delivered-product-name">${item.productName}</span>
-                      <strong class="delivered-product-quantity">${item.quantity}개</strong>
-                      <em class="delivered-product-status">${isSorted ? "정리 완료" : "클릭해서 정리"}</em>
-                    </button>
-                  `;
-                }).join("")
-              : `<div class="order-empty-delivery">정리할 상품이 없습니다.</div>`
-          }
-        </div>
-      </div>
-    `;
-
-    this.bindDeliveredProductButtons(orderData);
+    this.orderModalMode = "closed";
+    this.hideOrderModal();
+    this.renderDeliveryBox(orderData);
+    this.refreshTutorialAfterUiChange();
   },
 
   syncOrderDeliveredState(orderData = {}) {
@@ -7837,37 +10368,18 @@ export const UIManager = {
 
       setText(".delivered-product-name", item.productName);
       setText(".delivered-product-quantity", `${item.quantity}개`);
-      setText(".delivered-product-status", isSorted ? "정리 완료" : "클릭해서 정리");
+      setText(".delivered-product-status", isSorted ? "정리 완료" : "정리 대기");
     });
   },
 
-  bindDeliveredProductButtons(orderData = {}) {
+  bindDeliveredProductButtons() {
+    // Deprecated safety no-op.
+    // Delivery sorting is now handled only through the arrival box: one click -> automatic organization.
     document.querySelectorAll(".delivered-product-button").forEach((button) => {
       button.onclick = (event) => {
         event.preventDefault();
         event.stopPropagation();
-
-        if (button.disabled) return;
-
-        const productId = button.dataset.productId;
-        const deliveredGrid = document.querySelector(".order-delivered-grid");
-        const previousScrollTop = deliveredGrid?.scrollTop ?? 0;
-
-        EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
-          day: orderData.day ?? GameState.day,
-          actionType: "sort_delivery_item",
-          orderId: orderData.orderId ?? null,
-          productId,
-          source: "delivery_box_modal"
-        });
-
-        requestAnimationFrame(() => {
-          const updatedDeliveredGrid = document.querySelector(".order-delivered-grid");
-
-          if (updatedDeliveredGrid) {
-            updatedDeliveredGrid.scrollTop = previousScrollTop;
-          }
-        });
+        this.showMessage("도착한 발주 박스를 눌러 발주 상품을 한 번에 정리해주세요.", { duration: 2200 });
       };
     });
   },
@@ -7937,6 +10449,10 @@ export const UIManager = {
   },
 
   showResultModal(resultData, onConfirm, options = {}) {
+    if (this.isTutorialVisible?.()) {
+      this.completeTutorialAndCleanup({ markCompleted: this.isTutorialCompleted?.() === true, message: "" });
+    }
+
     if (!this.resultModal) {
       this.createResultModal();
     }
@@ -8134,7 +10650,7 @@ export const UIManager = {
         <div class="infinite-game-over-reset-box">
           <strong>리셋 안내</strong>
           <p>Day 5 클리어 기록은 유지하고, 무한 모드 진행만 Day 6 초기 상태로 리셋됩니다. 타이틀의 이어하기 버튼으로 Day 6 무한 모드부터 다시 시작할 수 있습니다.</p>
-          <p class="infinite-game-over-reset-help">새로 시작을 누르면 Day 1부터 완전히 새 유저처럼 다시 시작합니다. 테스트 구매로 얻은 유료성 BM 지갑은 새 시작/무한모드 리셋 시 보존됩니다.</p>
+          <p class="infinite-game-over-reset-help">새 매장 시작을 누르면 매장 진행도만 Day 1부터 다시 시작합니다. 출석 보상 기록과 BM 지갑은 계정성 데이터로 유지됩니다.</p>
         </div>
         <button id="infinite-game-over-reset-button" type="button" class="infinite-game-over-reset-button">
           타이틀로 돌아가기
@@ -8184,8 +10700,8 @@ export const UIManager = {
         this.renderTitleResumeButton();
 
         const message = resetStatus?.success === false
-          ? "무한 모드 초기화 저장에 실패했습니다. 새로 시작을 이용해주세요."
-          : "무한 모드 진행이 Day 6 초기 상태로 리셋되었습니다. 이어하기로 무한 모드부터 재도전하거나, 새로 시작으로 Day 1부터 완전히 다시 시작할 수 있습니다.";
+          ? "무한 모드 초기화 저장에 실패했습니다. 새 매장 시작을 이용해주세요."
+          : "무한 모드 진행이 Day 6 초기 상태로 리셋되었습니다. 이어하기로 무한 모드부터 재도전하거나, 새 매장 시작으로 매장 진행도만 Day 1부터 다시 시작할 수 있습니다.";
 
         this.showTitleScreen(message);
       };

@@ -73,6 +73,22 @@ export const PlayerMovementSystem = {
     });
   },
 
+  isTutorialMovementLocked() {
+    const body = document.body;
+
+    return Boolean(
+      body?.classList?.contains("is-tutorial-active") &&
+      !body.classList.contains("is-tutorial-movement-allowed")
+    );
+  },
+
+  clearMovementKeys() {
+    this.keys.up = false;
+    this.keys.down = false;
+    this.keys.left = false;
+    this.keys.right = false;
+  },
+
   handleKeyChange(event, isPressed) {
     const normalizedKey = event.key.toLowerCase();
     let isMovementKey = true;
@@ -91,12 +107,24 @@ export const PlayerMovementSystem = {
 
     if (isMovementKey) {
       event.preventDefault();
+
+      if (this.isTutorialMovementLocked()) {
+        this.clearMovementKeys();
+        event.stopPropagation?.();
+        event.stopImmediatePropagation?.();
+        return;
+      }
     }
   },
 
   update() {
     if (!GameState.player) {
       this.initializePlayer();
+    }
+
+    if (this.isTutorialMovementLocked()) {
+      this.clearMovementKeys();
+      return;
     }
 
     const player = GameState.player;

@@ -1,3 +1,276 @@
+## [v7.13.30] Tutorial + Shelf Merge Fix
+
+### Added
+- 팀원 작업본의 구역별 진열대 배치, 품목 연결, 재고 부족 표시, F8 좌표 모드, DebugSystem 초기화를 병합했습니다.
+- F8 좌표 모드와 DebugSystem F8 재고 단축키가 겹쳐, 좌표 모드는 F8로 유지하고 재고 채우기 단축키만 F11로 변경했습니다.
+
+### Fixed
+- 기존 튜토리얼 UI/입력 차단/발주창 작은 화면 보정/하단 버튼 backplate 제거 작업이 팀 작업본 병합 과정에서 사라지지 않도록 복구했습니다.
+- 진열대 재고 표시가 새 `GameState.shelfStocks[instanceId].products` 구조를 읽도록 UIManager를 보정했습니다.
+
+### Kept
+- 알바생 지각/보조 동작, 2번 담당자 진열대 재고 수 체크 수정, 구역별 진열대 배치, 좌표 출력 모드, 마스터모드 관련 파일을 유지했습니다.
+
+## [v7.13.15] Tutorial Briefing Card Right Placement Fix
+
+### Fixed
+- 브리핑 단계에서 작은 화면이어도 튜토리얼 안내 카드가 [발주하러 가기] 버튼 오른쪽/오른쪽 옆에 우선 배치되도록 수정했습니다.
+- 기존 작은 화면 fallback이 안내 카드를 왼쪽 목표/본문 영역으로 보내 브리핑 내용을 가리던 문제를 수정했습니다.
+- 오른쪽 공간이 부족할 때만 왼쪽 또는 버튼 위쪽으로 후퇴하도록 배치 우선순위를 정리했습니다.
+
+## [v7.13.14] Tutorial Briefing Frame Clamp Fix
+
+### Fixed
+- 브리핑 단계 모달을 브라우저 viewport가 아니라 16:9 게임 프레임 내부 기준으로 배치하도록 보정했습니다.
+- 작은 화면에서 브리핑 모달 하단이 게임 프레임 밖 검은 여백으로 튀어나와 보이는 문제를 수정했습니다.
+- 튜토리얼 위치 계산용 게임 프레임 CSS 변수를 `UIManager.js`에서 동기화하고, 튜토리얼 종료 시 정리하도록 추가했습니다.
+
+## [v7.13.13] Tutorial Briefing Compact Layout Fix
+
+### Fixed
+- 작은 16:9 가로 화면에서 영업 브리핑 모달이 화면을 과하게 차지해 튀어나와 보이는 문제를 줄이기 위해 브리핑 단계 전용 compact 폭/여백/글자 크기를 추가했습니다.
+- 브리핑 단계 튜토리얼 카드가 작은 화면에서 상권/추천 정보 영역을 덮지 않도록 버튼 왼쪽 위의 빈 영역으로 우선 배치되게 수정했습니다.
+- 브리핑 모달은 밝게 유지하고, 배경/기타 버튼 클릭 차단은 기존 튜토리얼 입력 가드로 유지했습니다.
+
+## [v7.13.12] Tutorial Briefing Position Runtime Fix
+- Fixed `ReferenceError: Cannot access 'left' before initialization` in `positionTutorialCard()` during the briefing tutorial step.
+- Reworked briefing card placement so the guide card is positioned to the right/right-above of the [발주하러 가기] button when space allows, instead of falling back to the center.
+- Ensured the briefing step can continue updating the target highlight after card positioning, preventing stale highlight boxes from previous tutorial steps.
+
+## [v7.13.11] Tutorial Briefing Modal Focus Fix
+- Fixed the briefing tutorial step so the tutorial dim layer no longer darkens the briefing modal itself.
+- Repositioned the tutorial card for the briefing step to the side of the [발주하러 가기] button instead of the center.
+- Kept compact positioning for small screens so the card avoids blocking the briefing contents and CTA.
+
+## [v7.13.10] Tutorial Proxy Step Advance Fix
+- Fixed: [발주] tutorial proxy now advances the tutorial from step 1 to the briefing-confirm step after dispatching DAY_START_REQUESTED, so the first guide card/proxy no longer remains over the Day briefing modal.
+- Changed: proxy actions with waitForEvent, including the later [영업 시작] proxy, enter the pending tutorial state before dispatching their EventBus action so event-based tutorial advancement stays reliable.
+- Kept the proxy behavior tutorial-only and preserved the original source button cleanup before action dispatch.
+
+## [v7.13.9] Tutorial Proxy Click Hitbox Fix
+- Fixed tutorial proxy buttons not responding when the global tutorial capture guard or dim layer receives the event before the proxy click handler.
+- Added coordinate-based proxy activation for `pointerdown`/`click`, so `[발주]` and later `[영업 시작]` trigger their allowed tutorial actions even when the original source button is hidden.
+- Kept proxy-only behavior scoped to interactive tutorial steps.
+
+## [v7.13.8] Tutorial Proxy Action Dispatch Fix
+- Fixed tutorial proxy button clicks not advancing when the original source button is hidden during the proxy overlay.
+- Changed the tutorial proxy activation for [발주] and [영업 시작] to dispatch the allowed tutorial action directly through EventBus instead of relying on sourceButton.click().
+- Kept the original button unhidden/cleaned up before dispatch so the tutorial can continue without leaving a hidden target behind.
+
+## [v7.13.7] Tutorial Proxy Content Hotfix
+- Fixed tutorial target proxy class cloning so the hidden-source class is never copied to the visible proxy button.
+- Fixed the start-day proxy button rendering as an empty highlighted box after the original button was hidden.
+- Added a CSS fail-safe to keep tutorial proxy content visible even if a hidden class is accidentally present.
+
+# CHANGELOG
+
+## [v7.13.6] Tutorial Proxy Source Hide Fix
+- Fixed: 작은 화면에서 튜토리얼 프록시 [발주] 버튼과 실제 원본 [발주] 버튼이 살짝 어긋나 이중으로 보이던 문제를 수정했습니다.
+- Changed: 프록시 버튼 표시 중에는 원본 타깃 버튼을 `visibility: hidden`으로 숨기고, 프록시 제거/클릭 시 원본 숨김을 즉시 해제합니다.
+- Fixed: 프록시 버튼 위치/크기는 원본 `getBoundingClientRect()` 값을 그대로 사용하고 `box-sizing: border-box`를 적용해 작은 화면에서도 버튼 크기와 위치가 안정적으로 맞도록 했습니다.
+- Changed: 발주 버튼 강조 테두리/그림자를 한 겹 위주로 정리해 버튼 내부 아이콘과 글자가 더 또렷하게 보이도록 조정했습니다.
+
+## [v7.13.5] Tutorial Target Proxy + Frame-bound Tooltip
+- Fixed the first tutorial target button clarity by rendering a tutorial-only proxy button above the dim layer, so the [발주] icon/text/background no longer inherit parent opacity/filter.
+- Kept the real button as the actual action source while the proxy forwards the click, preserving tutorial input gating.
+- Rebounded the first-step tutorial card to the game/store frame so it does not drop into the black letterbox area on small preview windows.
+- Maintained the previous small-screen compact card and movement-lock behavior.
+
+## [v7.13.4] Tutorial First-Step Small Screen Fix
+- Fixed: 작은 화면에서 16:9 게임 프레임이 세로 중앙에 떠 위쪽에 큰 검은 빈 공간이 생기던 문제를 `#game-root` 상단 정렬/auto margin 제거로 보정했습니다.
+- Fixed: 튜토리얼 말풍선 위치를 브라우저 전체가 아니라 `#game-root` 게임 화면 영역 기준으로 계산해, 작은 화면에서 [발주] 버튼을 덮지 않게 수정했습니다.
+- Fixed: 작은 화면용 튜토리얼 카드 compact 스타일을 추가해 카드 높이/여백/글자 크기를 줄였습니다.
+- Fixed: 튜토리얼 1단계 [발주] 버튼이 부모 하단바의 흐림/반투명 효과를 같이 먹어 뿌옇게 보이던 문제를 수정하고, [발주] 버튼만 선명하게 고정했습니다.
+- Maintained: 설정 아이콘 정상 표시와 튜토리얼 중 플레이어 이동 차단은 기존 v7.13.3 동작을 유지했습니다.
+
+## [v7.13.3] Tutorial First-Step Visual Lock Hotfix
+- Fixed: 튜토리얼 1단계에서 화면을 4분할 딤 패널로 뚫던 방식을 단일 전체 딤 레이어로 바꿔 상단 검은 줄, 하단 밝은 띠, 작은 화면의 비정상 하이라이트 영역이 생기지 않도록 수정했습니다.
+- Fixed: 하단 [발주] 단계에서는 [발주] 버튼만 선명하게 보이고 다른 하단 버튼은 흐리게 보이도록 z-index/필터 기준을 재정리했습니다.
+- Fixed: 작은 화면에서 발주 버튼 말풍선이 아래 레터박스/초록 빈 영역으로 내려가지 않도록 하단 대상 단계는 기본적으로 대상 위쪽에 배치되도록 보정했습니다.
+- Fixed: 인게임 설정 버튼에 텍스트만 보이던 문제를 수정하고 설정 아이콘 버튼 에셋이 보이도록 정리했습니다.
+- Fixed: 튜토리얼 활성 중에는 수동 플레이어 이동 키 입력을 무시하고, 튜토리얼 완료/스킵 후에만 다시 이동 가능하도록 제한했습니다.
+
+## [v7.13.2] Tutorial User Completion Key
+
+### Changed
+- 튜토리얼 완료 저장 키를 출시/유저용 고정 키 `stillOpen.tutorial.completed`로 변경했습니다.
+- 완료/건너뛰기 후에는 재접속해도 튜토리얼이 다시 뜨지 않으며, 개발 검수 시에는 콘솔에서 해당 키를 삭제해 다시 확인할 수 있습니다.
+
+## [v7.13.1] Tutorial Auto-Show Hotfix
+
+### Fixed
+- 튜토리얼 입력잠금 수정본 적용 후에도 기존 브라우저 저장값 때문에 튜토리얼이 자동 표시되지 않던 문제를 방지했습니다.
+- 튜토리얼 완료 저장 키를 `stillOpen.tutorial.v13.completed`로 갱신해, 이전 깨진 튜토리얼을 완료/스킵한 기록이 새 튜토리얼 표시를 막지 않도록 했습니다.
+
+## [v7.13.0] Tutorial Input Lock Final Pass
+- Added: 인터랙티브 튜토리얼 전용 중앙 입력 가드를 추가해 현재 단계에서 허용된 버튼/오브젝트 외 클릭을 차단합니다. 튜토리얼 완료/건너뛰기 후에는 즉시 해제됩니다.
+- Fixed: 발주 단계에서 상점/영업 시작/종료/상단 메뉴 등 다른 버튼이 눌릴 수 있던 문제를 차단했습니다.
+- Fixed: 발주창 수량 선택 단계에서 튜토리얼 대상 상품의 수량 버튼만 사용할 수 있도록 제한하고, 카테고리/닫기/발주 확정/다른 상품 클릭을 막았습니다.
+- Fixed: 발주 수량 대상 상품을 `data-tutorial-order-target`으로 고정하고, 수량 버튼이 스크롤 아래에 숨지 않도록 자동 노출 보정을 추가했습니다.
+- Changed: 수량 선택 단계에서 발주 확정 버튼을 누르면 단계 이동하지 않고, 표시된 수량 버튼을 먼저 누르도록 안내합니다.
+- Fixed: 도착한 발주 박스 이미지를 `arrive_box.png` 기준으로 복구했습니다.
+- Changed: 도착 박스/정리 안내 문구를 “창고 재고로 정리” 기준으로 수정해 첫 진열 자동 보충처럼 보이지 않게 정리했습니다.
+- Changed: 튜토리얼 중 비대상 버튼/카드가 시각적으로 흐리게 보이도록 최종 CSS 오버라이드를 추가했습니다.
+
+## [v7.12.7] Tutorial Layout Safety Hotfix
+- Fixed: 튜토리얼 강조 대상에 남아 있던 `position`, `z-index`, `filter`, `transform` 강제 스타일을 제거해 계산대/진열대/청소 도구/도착박스 레이아웃이 튜토리얼 중 변형되지 않도록 수정.
+- Fixed: 10단계 영업 시작 타겟을 disabled 여부와 무관하게 버튼 자체로 잡아 하이라이트가 사라지거나 비활성처럼 보이는 문제를 줄임.
+- Fixed: 구버전 상품 개별 정리 버튼 바인딩을 no-op 처리해 발주 박스 1회 클릭 자동 정리 흐름만 유지.
+- Changed: 오픈 준비 안내 문구에서 택배 표현을 제거하고 “도착한 발주 박스/발주 상품 정리” 기준으로 통일.
+
+## [v7.12.6] Tutorial Full Cleanup
+- Fixed: 튜토리얼 완료 후 10/10 카드가 영업 중, 손님 등장 중, 정산 화면까지 남던 cleanup 문제를 수정했습니다.
+- Fixed: `.tutorial-overlay.hidden`이 후순위 interactive CSS에 덮여 다시 보이던 문제를 최종 오버라이드했습니다.
+- Changed: 튜토리얼 강조 로직을 `contextSelector`와 `spotlightSelector` 기준으로 분리해, 읽어야 하는 모달 영역과 실제 눌러야 하는 버튼을 따로 처리합니다.
+- Fixed: 발주 버튼/영업 시작 버튼 단계에서 현재 대상만 선명하고 나머지 하단 UI는 어둡게 보이도록 단계별 body class를 적용했습니다.
+- Fixed: 발주 확정 후 빈 발주창이 남지 않도록 발주 대기 모달을 자동으로 닫고 메인 화면 도착박스 흐름으로 전환합니다.
+- Changed: 도착박스는 상품 개별 클릭 정리 UI를 사용하지 않고, 박스 한 번 클릭 후 자동 발주 상품 정리 및 첫 진열 자동 보충으로 통일했습니다.
+- Changed: 도착박스/정리 관련 문구를 “발주 상품 정리” 기준으로 통일했습니다.
+- Removed: 도착박스의 과한 반짝임/광원/발광 효과가 튜토리얼 화면에 보이지 않도록 제거했습니다.
+- Fixed: 첫 진열 자동 보충/진열대 보충 단계가 실제 `1구역 기본 매대 1`을 강조하도록 수정했습니다.
+- Fixed: 청소 단계가 계산대까지 감싸지 않고 청소 도구만 강조하도록 수정했습니다.
+- Fixed: 계산대 단계에서 튜토리얼 하이라이트 때문에 계산대 UI가 늘어나지 않도록 하이라이트 CSS를 정리했습니다.
+- Fixed: 인터랙티브 튜토리얼 중 중복 시스템 힌트가 뜨지 않도록 차단했습니다.
+- Changed: PC 키보드 안내 문구를 제거하고 터치 중심 문구로 정리했습니다.
+
+## [v7.12.5] 체험형 튜토리얼 10단계 구조 재반영
+- Changed: 튜토리얼을 최종 10단계 구조로 재정리했습니다. 발주 버튼 → 브리핑 → 수량 자유 선택 → 발주 확정 → 도착 박스 → 첫 진열 자동 보충 → 계산대/진열대/청소 요약 → 영업 시작 순서입니다.
+- Changed: 발주창 수량 선택 단계에서 상품 `+` 한 번 클릭만으로 다음 단계로 넘어가지 않도록 수정했습니다. 사용자가 원하는 상품을 원하는 만큼 선택한 뒤 다음 안내로 넘어갑니다.
+- Fixed: 보유 골드/창고 재고 한도를 넘는 발주 수량 증가가 불가능하도록 기존 제한 로직을 튜토리얼 흐름에서도 유지했습니다.
+- Changed: 도착 박스 단계는 “창고 정리 화면”이 아니라 “도착한 발주 박스를 누르면 창고 정리가 시작됩니다” 문구로 수정했습니다.
+- Removed: 박스 안 상품을 별도로 다시 클릭하라는 튜토리얼 단계를 제거했습니다. 도착 박스 클릭 후 창고 정리 완료 이벤트를 기다린 뒤 첫 진열 자동 보충 안내로 넘어갑니다.
+- Changed: 계산대/진열대/청소 단계는 실제 상호작용 강제가 아니라 포커스 요약 설명으로 변경했습니다.
+- Fixed: 튜토리얼 딤 레이어를 네 방향 패널 방식으로 재정리해 강조 대상만 비우고 대상 외 영역 클릭은 차단하도록 수정했습니다.
+- Removed: 과한 노란 발광, 밝기 보정, 검은 세로 막대 원인이 되는 화면 처리 규칙을 최종 오버라이드했습니다.
+- Maintained: 튜토리얼 완료/건너뛰기 후 자동 표시 비활성화, 오른쪽 위 도움말에서 다시 보기, BM 지갑/출석 보상 기록 유지 규칙은 그대로 유지했습니다.
+
+
+## [v7.12.2] 튜토리얼 닫기/건너뛰기 UX 정리
+- Changed: 체험형 튜토리얼의 X 닫기 버튼을 제거하고, 명확한 `튜토리얼 건너뛰기` 버튼으로 대체.
+- Changed: 건너뛰기 선택 시 확인창을 띄운 뒤 튜토리얼을 즉시 종료하고 자동 표시를 비활성화.
+- Changed: 튜토리얼 완료/건너뛰기 후에도 오른쪽 위 도움말 버튼에서는 다시 볼 수 있는 구조 유지.
+- Fixed: 대상 클릭 단계에서도 건너뛰기 버튼은 클릭 가능하고, 다음 버튼은 노출되지 않도록 CSS 우선순위 정리.
+
+
+## [v7.11.9] 튜토리얼 말풍선 UI 최종 정리
+- Fixed: 도움말로 다시 열 때 큰 팝업형 튜토리얼이 노출되던 문제를 수정했습니다.
+- Changed: 튜토리얼 기본 모드를 작은 말풍선형 체험 모드로 고정했습니다.
+- Changed: 튜토리얼 문구를 한 단계 한 행동 기준의 짧은 문장으로 축소했습니다.
+- Fixed: 강조 대상이 어둡게 보이지 않도록 딤 패널과 하이라이트/대상 밝기 처리를 재조정했습니다.
+- Fixed: 대상 버튼이 없는 상황에서는 큰 전체 딤이 깔리지 않고 다음 단계로 넘길 수 있게 했습니다.
+
+## [v7.11.7] 튜토리얼 다시 보지 않기 유지 보정
+
+## [v7.11.8] 튜토리얼 도움말 버튼 위치 조정
+
+### Changed
+- 도움말 버튼을 하단 플로팅 위치에서 우측 상단 빠른 메뉴 영역으로 이동했습니다.
+- 도움말 버튼을 설정 버튼 바로 왼쪽에 배치해 플레이 화면과 하단 행동 버튼을 가리지 않도록 조정했습니다.
+- 튜토리얼 완료/다시 보지 않기 안내 문구의 “하단 도움말” 표현을 “오른쪽 위 도움말”로 수정했습니다.
+
+### Fixed
+- 도움말 버튼이 하단 발주/상점/영업 버튼 영역과 시각적으로 겹칠 수 있던 문제를 줄였습니다.
+
+
+### Fixed
+- `다시 보지 않기`를 누른 뒤 `새 매장 시작`을 해도 첫 실행 튜토리얼이 다시 자동 표시되지 않도록 수정했습니다.
+- 새 매장 시작 시 튜토리얼 1회성 힌트 기록만 초기화하고, 계정성 설정인 튜토리얼 완료/다시 보지 않기 기록은 유지하도록 변경했습니다.
+- `다시 보지 않기` 선택 시 자동 표시가 꺼졌다는 안내 메시지를 추가했습니다.
+
+### Maintained
+- 하단 `도움말` 버튼을 직접 누르면 사용자가 원할 때 튜토리얼을 다시 볼 수 있습니다.
+- 10단계 체험형 튜토리얼, 영업 전 루프, BM 지갑/출석 보상 기록 유지 규칙은 그대로 유지했습니다.
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.11.4] Ten-step anchored tutorial and pre-open loop lock
+
+### Changed
+- 첫 실행 튜토리얼을 10단계 미션형 구조로 재정리했습니다.
+  - 오늘 목표 확인 → 발주창 이동 → 상품 수량 선택 → 발주 확정 → 택배 열기 → 입고 상품 정리 → 영업 시작 → 계산대 안내 → 영업 중 진열대 보충 안내 → 청소 안내
+- 튜토리얼 문구를 긴 설명/체크리스트 중심에서 “지금 눌러야 할 행동 하나” 중심의 짧은 말풍선형 문구로 변경했습니다.
+- 튜토리얼 카드를 화면 모서리 고정이 아니라 강조 대상 근처에 자동 배치되도록 수정했습니다.
+- 튜토리얼 배경 딤을 더 옅게 조정해 게임 화면을 선명하게 볼 수 있게 했습니다.
+- 새 10단계 튜토리얼이 기존 v2 튜토리얼 완료 기록에 막히지 않도록 튜토리얼 완료 키를 v3로 갱신했습니다.
+
+### Fixed
+- 영업 전 루프 기준을 다시 고정했습니다. 매 Day 영업 전에는 `발주 → 발주 확정 → 택배 도착 → 택배 창고 정리 → 첫 진열 자동 보충 → 영업 시작` 흐름을 사용합니다.
+- 튜토리얼에서 영업 전 수동 진열대 보충을 유도하지 않도록 제거했습니다.
+
+### Maintained
+- 진열대 수동 보충은 영업 중 재고가 비었을 때만 가능합니다.
+- 출석 보상 기록과 BM 지갑 유지 규칙은 그대로 유지했습니다.
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.11.3] Pre-open loop correction and tutorial readability
+
+### Fixed
+- 영업 시작 전 루프를 `발주 → 택배 도착 → 택배 창고 정리 → 첫 진열 자동 보충 → 영업 시작` 순서로 다시 정리했습니다.
+- 영업 시작 전에는 플레이어가 진열대 상호작용으로 `창고 이동 → 물품 가져오기 → 진열대 보충` 루트를 실행하지 못하도록 차단했습니다.
+- 입고 정리 완료 시 발주 상품을 매핑된 진열대에 자동으로 채워, 첫 영업 시작 전에 수동 보충을 요구하지 않게 했습니다.
+
+### Changed
+- 튜토리얼 문구에서 영업 전 수동 진열 보충으로 오해될 수 있는 표현을 제거하고, `첫 진열은 자동 / 영업 중 재고가 비면 수동 보충` 구조로 수정했습니다.
+- 튜토리얼 오버레이의 배경 블러를 제거하고 어두운 딤 처리만 남겨 게임 화면을 더 선명하게 보이도록 조정했습니다.
+- 튜토리얼 카드 크기를 줄여 실제 클릭 대상이 더 잘 보이게 했습니다.
+
+### Maintained
+- 출석 보상 기록과 BM 지갑 유지 규칙은 그대로 유지했습니다.
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.11.2] Interactive tutorial syntax hotfix
+
+### Fixed
+- `ui/UIManager.js`의 `getTutorialSteps()` 메서드 뒤 누락된 쉼표를 추가해 `showFirstRunTutorialSoon` 구문 오류를 수정했습니다.
+- 튜토리얼/출석 유지 로직은 그대로 두고, 브라우저 콘솔의 `Uncaught SyntaxError: Unexpected identifier 'showFirstRunTutorialSoon'` 발생 원인만 핫픽스했습니다.
+
+### Maintained
+- 새 매장 시작 시 출석 보상 기록과 BM 지갑을 유지하는 v7.11.1 규칙은 유지했습니다.
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.11.1] New-game account data preservation
+
+### Changed
+- `새로 시작`을 새 계정 초기화가 아닌 새 매장/진행도 초기화로 정리했습니다.
+- 새로 시작 시 출석 보상 수령 기록을 초기화하지 않고 유지하도록 되돌렸습니다.
+- 새로 시작/무한 모드 리셋 시 현재 보유 BM 지갑 잔액도 유지되도록 보존 스냅샷을 추가했습니다.
+- 타이틀 버튼 문구를 `새 매장 시작`으로 변경해 새 계정 초기화처럼 보이지 않게 했습니다.
+- 새로 시작/무한 모드 안내 문구에서 “새 유저처럼 초기화” 표현을 제거하고, 출석 보상 기록과 BM 지갑이 유지된다는 점을 명확히 했습니다.
+
+### Maintained
+- 새로 시작 시 Day 진행도, 매장 진행도, 재고, 구역 해금 상태, 튜토리얼 진행 상태는 초기화됩니다.
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+
+## [v7.11.0] Interactive tutorial and new-game attendance reset
+
+### Added
+- 첫 실행 튜토리얼을 단순 설명형 팝업에서 실제 플레이 화면 타깃 클릭형 튜토리얼로 변경했습니다.
+- 출석 보상 확인 후 튜토리얼이 시작되도록 대기 플래그를 추가했습니다.
+- 발주 버튼 → 브리핑 확인 → 상품 + 버튼 → 발주 확정 → 택배 박스 → 입고 상품 정리 → 영업 시작 순서로 노란 하이라이트와 안내 카드를 표시합니다.
+- 튜토리얼 카드가 강조 대상과 겹치지 않도록 대상 위치에 따라 화면 모서리로 자동 배치되게 했습니다.
+
+### Changed
+- 튜토리얼 오버레이가 게임 화면 클릭을 막지 않도록 조정하고, 강조 대상은 실제로 클릭할 수 있게 변경했습니다.
+- 새로 시작 시 튜토리얼 완료/힌트 기록을 초기화하여 새 게임에서는 튜토리얼이 다시 뜨게 했습니다.
+- 새로 시작 시 출석 보상 진행도를 1일차부터 다시 받을 수 있도록 초기화했습니다. 단, 유료성 BM 지갑 carryover는 기존 보호 규칙을 유지합니다.
+
+### Fixed
+- 출석 보상 이미지 위에 튜토리얼이 먼저 떠서 가려지던 문제를 수정했습니다.
+
+### Maintained
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js` 미수정
+
+## [v7.10.0] First-run tutorial and help guide
+
+### Added
+- 첫 실행 시 자동으로 표시되는 8단계 튜토리얼 오버레이를 추가했습니다.
+- 하단 도움말 플로팅 버튼으로 언제든 튜토리얼을 다시 볼 수 있게 했습니다.
+- 발주/브리핑/물류 정리/영업 시작/플레이어 조작/계산·보충·청소/정산·성장 루프를 순서대로 안내합니다.
+- 물류 도착, 입고 정리 완료, 영업 시작 시 1회성 상황 안내 메시지를 추가했습니다.
+
+### Maintained
+- `index.html`, `main.js`, `core/GameState.js`, `core/EventBus.js`, `core/Constants.js`는 수정하지 않았습니다.
+- 기존 발주, 입고, 계산, 보충, 청소, BM 로직은 변경하지 않았습니다.
+
 
 ## [v23.20.1] 진열 표시/손님 타이머 안정화
 
@@ -2189,3 +2462,65 @@
 - Fixed: 플레이어 청소 중에는 알바 자동 청소가 중복 시작되지 않도록 방어 조건 추가.
 - Changed: 알바 자동보조는 영업 시작 후(STORE_RUNNING)부터 작동하며, 영업 시작 시 입구 위치에서 매장 안 대기 위치로 들어오는 연출로 변경.
 - Deferred: 진열대 재고/UI 연결 관련 수정은 담당자 진열대 작업 병합 후 재검수 예정.
+
+## [v7.11.5] 튜토리얼 말풍선/스포트라이트 UX 수정
+
+### Changed
+- 체험형 튜토리얼 UI를 큰 팝업 패널이 아닌 작은 말풍선 형태로 재조정했습니다.
+- 튜토리얼 단계 문구를 한 행동 단위의 짧은 안내문으로 축약했습니다.
+- 배경 전체 블러/강한 딤을 제거하고, 눌러야 할 대상 주변만 제외한 스포트라이트 딤 처리로 변경했습니다.
+
+### Fixed
+- 튜토리얼 하이라이트 대상 버튼이 딤 레이어 아래에서 어둡게 보이던 문제를 수정했습니다.
+- 대상 버튼/오브젝트가 선명하게 보이도록 스포트라이트 구멍과 노란 하이라이트 링을 분리했습니다.
+
+## [v7.11.6] 체험형 튜토리얼 클릭 차단 수정
+
+### Fixed
+- 체험형 튜토리얼에서 `발주하러 가기` 등 강조 대상 버튼이 눌리지 않는 문제를 수정했습니다.
+- 기존 단일 딤 레이어/스포트라이트 그림자 방식 대신, 대상 영역을 비워두는 4방향 딤 패널 방식으로 변경했습니다.
+- 눌러야 할 버튼 영역 위에는 실제 딤 레이어가 올라가지 않도록 수정했습니다.
+- 튜토리얼 닫기/전환 시 `aria-hidden` 포커스 경고가 발생하지 않도록 포커스 처리와 aria-hidden 사용 방식을 정리했습니다.
+
+### Kept
+- 10단계 체험형 튜토리얼 구조 유지.
+- 영업 전 루프 유지: 발주 → 확정 → 택배 도착 → 창고 정리 → 첫 진열 자동 보충 → 영업 시작.
+- 새 매장 시작 시 BM 지갑/출석 보상 기록 유지.
+
+## [v7.12.0] Tutorial click-safety hotfix
+- Fixed: 체험형 튜토리얼 오버레이가 발주/발주하러 가기 등 실제 게임 버튼 클릭을 막지 않도록 pointer-event 구조를 재정리.
+- Changed: 튜토리얼 완료 저장 키를 v4로 갱신해, 개발 중 기존 v3 완료 기록이 있어도 새 말풍선 튜토리얼을 다시 검수할 수 있게 수정.
+- Fixed: 튜토리얼 문구 문자열의 줄바꿈을 안전한 `\n` 표기로 정리.
+- Kept: 첫 자동 튜토리얼은 계정 기준 1회, 이후 도움말 버튼으로 다시 보기 가능.
+
+
+## [v7.12.1] 체험형 튜토리얼 포커스/발주 버튼 클릭 복구
+
+### Fixed
+- 튜토리얼 중 `발주하러 가기` 버튼이 눌리지 않는 문제를 방지하기 위해 브리핑 모달/버튼의 pointer-events를 명시적으로 복구했습니다.
+- 브리핑 CTA 클릭 시 발주 데이터가 아직 연결되지 않은 예외 상황에서도 발주창으로 이어지는 fallback을 추가했습니다.
+
+### Changed
+- 튜토리얼 딤 처리를 다시 활성화하되, 노란 하이라이트 대상 영역만 구멍처럼 비워 클릭 가능하게 조정했습니다.
+- 배경은 살짝 어둡고 흐리게 처리해 시선을 유도하고, 표시된 대상 외 영역은 클릭을 막도록 변경했습니다.
+- 새 말풍선 튜토리얼 검수를 위해 튜토리얼 완료 키를 `stillOpen.tutorial.v5.completed`로 갱신했습니다.
+
+## [v7.12.3] 체험형 튜토리얼 최종 루프/포커스 정리
+- Changed: 브리핑 단계에서 목표/상권/추천 카드와 [발주하러 가기] 버튼을 함께 밝게 보여주도록 튜토리얼 포커스 범위를 확장했습니다.
+- Changed: 발주 수량 선택 단계는 상품 1개 클릭 즉시 넘어가지 않고, 사용자가 원하는 상품을 예산/창고 한도 내에서 자유롭게 선택한 뒤 [수량 선택 완료]로 진행하도록 변경했습니다.
+- Fixed: 발주 + 버튼은 보유 골드 또는 창고 한도를 넘기는 경우 비활성화되며, 감소 버튼은 선택 수량이 0이면 비활성화됩니다.
+- Changed: 도착한 발주 박스 클릭 후 별도 상품 클릭 단계를 제거하고, 창고 정리 진행 안내 후 정리 완료 이벤트를 기다리도록 수정했습니다.
+- Changed: 계산대/진열대/청소는 직접 상호작용을 강제하지 않고 클로즈업 요약 안내로 보여준 뒤 마지막에 [영업 시작] 버튼을 강조하도록 수정했습니다.
+- Changed: 튜토리얼 딤 처리 강도를 높여 표시 대상만 밝고 주변은 어둡고 흐리게 보이도록 조정했습니다.
+
+## [v7.12.4] 2026-07-07
+### Fixed
+- 튜토리얼 포커스 처리 중 화면 중앙에 검은 세로 딤 막대가 남는 문제를 제거했습니다.
+- 튜토리얼 강조 대상에 적용되던 과한 노란 발광/밝기 보정 효과를 제거했습니다.
+- 튜토리얼 딤 구조를 네 방향 패널 방식에서 전체 딤 1장 + 대상 z-index 강조 방식으로 단순화했습니다.
+- 발주 확정 직후 튜토리얼이 도착 박스 단계로 넘어가지 않고 이전 문구에 머무르던 문제를 완화했습니다.
+- 도착 박스/창고 정리 튜토리얼 문구를 실제 루프 기준으로 수정했습니다.
+
+### Changed
+- 브리핑 단계는 오늘 목표/상권 정보/추천 상품 카드와 [발주하러 가기] 버튼이 함께 선명하게 보이도록 정리했습니다.
+- 발주 박스 클릭 후에는 박스 안 상품을 눌러 창고 재고로 정리해야 한다는 안내가 명확히 보이도록 수정했습니다.

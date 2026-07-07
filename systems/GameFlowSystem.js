@@ -392,7 +392,7 @@ export const GameFlowSystem = {
     GameState.dayScenario = dayScenario;
 
     UIManager.showMessage(
-      `Day ${GameState.day} 시작! ${modeText}입니다. 발주 → 택배 수령 → 재고 정리까지 마치면 영업을 시작할 수 있습니다.`
+      `Day ${GameState.day} 시작! ${modeText}입니다. 발주 → 도착한 발주 박스 정리 → 첫 진열까지 마치면 영업을 시작할 수 있습니다.`
     );
 
     UIManager.render();
@@ -420,7 +420,7 @@ export const GameFlowSystem = {
 
   openStore() {
     if (GameState.phase === GAME_PHASE.ORDER) {
-      UIManager.showMessage("아직 오픈 준비 중입니다. 발주를 확정하고 도착한 택배를 열어 재고 정리까지 완료해주세요.");
+      UIManager.showMessage("아직 오픈 준비 중입니다. 발주를 확정하고 도착한 발주 박스를 눌러 발주 상품 정리까지 완료해주세요.");
       return;
     }
 
@@ -435,7 +435,7 @@ export const GameFlowSystem = {
     }
 
     if (!this.isOrderReadyForCurrentDay()) {
-      UIManager.showMessage("아직 오픈 준비 중입니다. 발주를 확정하고 도착한 택배를 열어 재고 정리까지 완료해주세요.");
+      UIManager.showMessage("아직 오픈 준비 중입니다. 발주를 확정하고 도착한 발주 박스를 눌러 발주 상품 정리까지 완료해주세요.");
       return;
     }
 
@@ -576,7 +576,7 @@ export const GameFlowSystem = {
       GameState.phase = GAME_PHASE.DAY_START;
     }
 
-    UIManager.showMessage("재고 정리 완료! 오픈 준비가 끝났습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요.");
+    UIManager.showMessage("재고 정리 완료! 첫 진열대가 자동으로 채워졌습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요.");
     UIManager.render();
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);

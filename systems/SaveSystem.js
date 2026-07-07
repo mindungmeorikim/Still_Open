@@ -269,11 +269,14 @@ export const SaveSystem = {
 
   resetNewGameState() {
     const paidCarryover = this.createPaidBMCarryoverSnapshot(GameState.bm);
+    const accountWalletCarryover = this.createAccountBMWalletCarryoverSnapshot(GameState.bm);
     this.clearSaveData();
     this.isResettingNewGame = true;
 
     this.applyGameStateSnapshot(this.createDefaultGameStateSnapshot());
     this.applyPaidBMCarryover(paidCarryover);
+    this.applyAccountBMWalletCarryover(accountWalletCarryover);
+    DailyRewardSystem.resetForNewGame(GameState.bmWallet);
     this.applyInventorySnapshot({ lots: [], lotSequence: 0, initializedProductIds: [] });
     this.applyExpansionSnapshot({ unlockedZoneIds: ["zone_basic"], constructionZoneId: null });
 
@@ -294,8 +297,10 @@ export const SaveSystem = {
     this.isResettingNewGame = true;
 
     const paidCarryover = this.createPaidBMCarryoverSnapshot(GameState.bm);
+    const accountWalletCarryover = this.createAccountBMWalletCarryoverSnapshot(GameState.bm);
     this.applyGameStateSnapshot(this.createInfiniteModeStartSnapshot());
     this.applyPaidBMCarryover(paidCarryover);
+    this.applyAccountBMWalletCarryover(accountWalletCarryover);
     this.applyInventorySnapshot(this.createInfiniteModeStartInventorySnapshot());
     this.applyExpansionSnapshot({
       unlockedZoneIds: ["zone_basic"],
@@ -706,6 +711,40 @@ export const SaveSystem = {
       coffeeTickets: this.toNonNegativeInteger(paidWallet.coffeeTickets),
       purchasedDiamondProductIds: this.createUniqueStringArray(source?.purchasedDiamondProductIds)
     };
+  },
+
+  createAccountBMWalletCarryoverSnapshot(source = {}) {
+    return {
+      diamond: this.toNonNegativeInteger(source?.diamond),
+      adSkipTickets: this.toNonNegativeInteger(source?.adSkipTickets),
+      peakTimeCoupons: this.toNonNegativeInteger(source?.peakTimeCoupons),
+      coffeeTickets: this.toNonNegativeInteger(source?.coffeeTickets)
+    };
+  },
+
+  applyAccountBMWalletCarryover(carryover = {}) {
+    if (!GameState.bm || typeof GameState.bm !== "object") {
+      GameState.bm = this.createDefaultBMSnapshot();
+    }
+
+    GameState.bm.diamond = Math.max(
+      this.toNonNegativeInteger(GameState.bm.diamond),
+      this.toNonNegativeInteger(carryover.diamond)
+    );
+    GameState.bm.adSkipTickets = Math.max(
+      this.toNonNegativeInteger(GameState.bm.adSkipTickets),
+      this.toNonNegativeInteger(carryover.adSkipTickets)
+    );
+    GameState.bm.peakTimeCoupons = Math.max(
+      this.toNonNegativeInteger(GameState.bm.peakTimeCoupons),
+      this.toNonNegativeInteger(carryover.peakTimeCoupons)
+    );
+    GameState.bm.coffeeTickets = Math.max(
+      this.toNonNegativeInteger(GameState.bm.coffeeTickets),
+      this.toNonNegativeInteger(carryover.coffeeTickets)
+    );
+
+    this.syncBMWalletFromBMSnapshot(GameState.bm);
   },
 
   applyPaidBMCarryover(carryover = {}) {

@@ -2941,6 +2941,7 @@ button:active {
 .modal {
   background: rgba(74, 56, 39, 0.46);
   backdrop-filter: blur(2px);
+  pointer-events: none;
 }
 
 .modal-content {
@@ -4101,7 +4102,7 @@ button:active {
 
 .customer-event-modal-summary {
   margin: 0 0 14px;
-  padding: 12px 13px;
+  padding: 10px 12px;
   border: 1px solid rgba(234, 217, 191, 0.95);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.72);
@@ -21972,4 +21973,4094 @@ body.is-title-screen-active #game-root {
   50% {
     transform: rotate(1.5deg);
   }
+}
+
+/* [v7.11.0] Interactive first-run tutorial overlay */
+.tutorial-help-button {
+  cursor: pointer;
+}
+
+#top-icon-menu .tutorial-help-button {
+  position: relative !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: auto !important;
+  width: 52px !important;
+  min-width: 52px !important;
+  height: 50px !important;
+  min-height: 50px !important;
+  display: inline-grid !important;
+  grid-template-rows: 24px auto !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 1px !important;
+  padding: 4px 3px 3px !important;
+  border-radius: 14px !important;
+  border: 2px solid rgba(244, 188, 78, .82) !important;
+  background: linear-gradient(180deg, rgba(255, 250, 222, .98), rgba(255, 225, 117, .96)) !important;
+  box-shadow: 0 4px 0 rgba(111, 82, 34, .18), inset 0 1px 0 rgba(255,255,255,.84) !important;
+  color: #5d3b00 !important;
+  font-weight: 950 !important;
+  overflow: visible !important;
+}
+
+#top-icon-menu .tutorial-help-button-icon {
+  display: inline-grid !important;
+  place-items: center !important;
+  width: 23px !important;
+  height: 23px !important;
+  border-radius: 50% !important;
+  background: #ffffff !important;
+  color: #ff9f1c !important;
+  font-size: 15px !important;
+  line-height: 1 !important;
+  box-shadow: inset 0 -1px 0 rgba(135, 91, 0, .12) !important;
+}
+
+#top-icon-menu .tutorial-help-button-label {
+  font-size: 9.5px !important;
+  line-height: 1.05 !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+.tutorial-help-button.hidden,
+.tutorial-overlay.hidden,
+.tutorial-highlight-ring.hidden {
+  display: none !important;
+}
+
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  pointer-events: none;
+}
+
+.tutorial-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 24, 32, 0.28);
+  backdrop-filter: none;
+}
+
+.tutorial-highlight-ring {
+  position: fixed;
+  z-index: 9001;
+  border: 3px solid #ffd84d;
+  border-radius: 18px;
+  box-shadow: 0 0 0 6px rgba(255, 216, 77, 0.24), 0 0 22px rgba(255, 216, 77, 0.72);
+  pointer-events: none;
+  animation: tutorialPulse 1.2s ease-in-out infinite;
+}
+
+.tutorial-card {
+  position: relative;
+  z-index: 9002;
+  width: min(90vw, 400px);
+  max-height: min(72vh, 520px);
+  overflow-y: auto;
+  padding: 15px;
+  border: 3px solid #2d2d2d;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #fffdf6 0%, #fff4df 100%);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28), inset 0 -4px 0 rgba(176, 116, 43, 0.1);
+  color: #2f2a23;
+  pointer-events: auto;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  position: fixed;
+  width: min(84vw, 320px);
+  max-height: min(54vh, 340px);
+  padding: 13px;
+}
+
+.tutorial-card--center {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tutorial-card--top-left {
+  left: 18px;
+  top: 18px;
+  transform: none;
+}
+
+.tutorial-card--top-right {
+  right: 18px;
+  top: 18px;
+  transform: none;
+}
+
+.tutorial-card--bottom-left {
+  left: 18px;
+  bottom: 18px;
+  transform: none;
+}
+
+.tutorial-card--bottom-right {
+  right: 18px;
+  bottom: 18px;
+  transform: none;
+}
+
+.tutorial-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.tutorial-kicker {
+  margin: 0 0 4px;
+  color: #ef8f00;
+  font-size: 12px;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tutorial-card h2 {
+  margin: 0;
+  font-size: clamp(18px, 2.7vw, 24px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+}
+
+.tutorial-close-button {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 2px solid rgba(45, 45, 45, 0.24);
+  border-radius: 50%;
+  background: #ffffff;
+  color: #333333;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tutorial-step-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.tutorial-step-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #fff;
+  color: #6f4a05;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: inset 0 0 0 1px rgba(111, 74, 5, 0.14);
+}
+
+.tutorial-description {
+  margin: 0 0 8px;
+  color: #3d352b;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.58;
+  letter-spacing: -0.02em;
+}
+
+.tutorial-bullets {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+
+.tutorial-bullets.hidden {
+  display: none !important;
+}
+
+.tutorial-card--anchored {
+  transform: none;
+}
+
+.tutorial-bullets li {
+  position: relative;
+  padding: 8px 10px 8px 30px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  color: #3a3028;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.45;
+}
+
+.tutorial-bullets li::before {
+  content: "✓";
+  position: absolute;
+  left: 12px;
+  top: 10px;
+  color: #12a150;
+  font-weight: 1000;
+}
+
+.tutorial-tip {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #2c323f;
+  color: #fff8d2;
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.5;
+}
+
+.tutorial-action-guide {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  border: 2px dashed rgba(255, 170, 0, 0.7);
+  border-radius: 16px;
+  background: rgba(255, 247, 209, 0.94);
+  color: #6b4300;
+  font-size: 13px;
+  font-weight: 1000;
+  line-height: 1.45;
+}
+
+.tutorial-action-guide.hidden {
+  display: none !important;
+}
+
+.tutorial-action-target {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+.tutorial-primary-button.is-waiting-action {
+  background: linear-gradient(180deg, #ffd765 0%, #ffa51f 100%);
+  color: #5c3600;
+  box-shadow: 0 8px 16px rgba(173, 105, 0, 0.24);
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  background: rgba(20, 24, 32, 0.26);
+}
+
+.tutorial-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.tutorial-primary-button,
+.tutorial-secondary-button {
+  min-height: 36px;
+  padding: 0 13px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 1000;
+  cursor: pointer;
+}
+
+.tutorial-primary-button {
+  border: 0;
+  background: linear-gradient(180deg, #35c978 0%, #16a65c 100%);
+  color: #ffffff;
+  box-shadow: 0 8px 16px rgba(21, 123, 71, 0.22);
+}
+
+.tutorial-secondary-button {
+  border: 2px solid rgba(45, 45, 45, 0.14);
+  background: #ffffff;
+  color: #4a4034;
+}
+
+.tutorial-secondary-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@keyframes tutorialPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.025);
+    opacity: 0.72;
+  }
+}
+
+@media (max-width: 720px) {
+  #top-icon-menu .tutorial-help-button {
+    width: 48px !important;
+    min-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  #top-icon-menu .tutorial-help-button-label {
+    font-size: 9px !important;
+  }
+
+  .tutorial-card {
+    width: min(94vw, 480px);
+    padding: 16px;
+    border-radius: 22px;
+  }
+
+  .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(88vw, 310px);
+    max-height: min(52vh, 320px);
+    transform: none;
+  }
+
+  .tutorial-actions {
+    justify-content: stretch;
+  }
+
+  .tutorial-primary-button,
+  .tutorial-secondary-button {
+    flex: 1 1 30%;
+    padding: 0 12px;
+  }
+}
+
+/* [v7.11.5] Compact speech-bubble tutorial + spotlight target */
+.tutorial-overlay {
+  pointer-events: none;
+}
+
+.tutorial-dim {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 24, 32, 0.12);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  background: rgba(20, 24, 32, 0.1);
+}
+
+.tutorial-dim.tutorial-dim--spotlight {
+  inset: auto !important;
+  border-radius: 18px;
+  background: transparent !important;
+  box-shadow: 0 0 0 9999px rgba(20, 24, 32, 0.16);
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  width: min(76vw, 280px);
+  max-height: none;
+  overflow: visible;
+  padding: 12px 14px 13px;
+  border: 2px solid rgba(255, 185, 45, 0.95);
+  border-radius: 18px;
+  background: #fff8e7;
+  box-shadow: 0 12px 24px rgba(44, 32, 12, 0.22), inset 0 -2px 0 rgba(173, 110, 23, 0.08);
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: #fff8e7;
+  border: 2px solid rgba(255, 185, 45, 0.95);
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--below-target::after {
+  top: -9px;
+  left: 50%;
+  margin-left: -8px;
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--above-target::after {
+  bottom: -9px;
+  left: 50%;
+  margin-left: -8px;
+  border-left: 0;
+  border-top: 0;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--right-of-target::after {
+  left: -9px;
+  top: 50%;
+  margin-top: -8px;
+  border-right: 0;
+  border-top: 0;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--left-of-target::after {
+  right: -9px;
+  top: 50%;
+  margin-top: -8px;
+  border-left: 0;
+  border-bottom: 0;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card-header {
+  display: block;
+  margin-bottom: 6px;
+  padding-right: 28px;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-kicker {
+  margin: 0 0 3px;
+  color: #ef8f00;
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+  letter-spacing: -0.035em;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-close-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.78);
+  color: #6c5a3a;
+  font-size: 18px;
+  box-shadow: inset 0 0 0 1px rgba(78, 57, 21, 0.13);
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-step-meta,
+.tutorial-overlay[data-mode="interactive"] .tutorial-bullets,
+.tutorial-overlay[data-mode="interactive"] .tutorial-tip {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-description {
+  margin: 0;
+  color: #3d352b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.48;
+  letter-spacing: -0.02em;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #7c5200;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 1000;
+  line-height: 1.45;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide::before {
+  content: "↓";
+  display: block;
+  margin: 0 0 2px;
+  color: #3d352b;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--above-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--left-of-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--right-of-target .tutorial-action-guide::before {
+  content: "";
+  display: none;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions {
+  margin-top: 9px;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-secondary-button {
+  display: none;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action .tutorial-actions {
+  display: none;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-primary-button {
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+}
+
+.tutorial-highlight-ring {
+  border: 3px solid #ffda4f;
+  background: rgba(255, 222, 92, 0.08);
+  box-shadow: 0 0 0 5px rgba(255, 219, 65, 0.24), 0 0 26px rgba(255, 211, 33, 0.82);
+  pointer-events: none;
+}
+
+.tutorial-action-target {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+@media (max-width: 720px) {
+  .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(78vw, 260px);
+    padding: 11px 13px 12px;
+  }
+
+  .tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+    font-size: 15px;
+  }
+
+  .tutorial-overlay[data-mode="interactive"] .tutorial-description {
+    font-size: 12px;
+  }
+}
+
+/* [v7.11.6] Tutorial target click fix: real spotlight panels, no aria-hidden focus lock */
+.tutorial-overlay {
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+.tutorial-dim {
+  position: fixed !important;
+  inset: auto !important;
+  background: rgba(20, 24, 32, 0.18) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+  z-index: 9000;
+}
+
+.tutorial-dim.hidden {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  background: rgba(20, 24, 32, 0.18) !important;
+}
+
+.tutorial-dim.tutorial-dim--spotlight {
+  background: rgba(20, 24, 32, 0.18) !important;
+  box-shadow: none !important;
+}
+
+.tutorial-highlight-ring {
+  z-index: 9010 !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  z-index: 9020 !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-action-target {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+/* [v7.11.9] Final tutorial cleanup: true compact speech bubble, no large panel fallback in help mode */
+.tutorial-overlay[data-mode="interactive"] {
+  display: block !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  position: fixed !important;
+  inset: auto !important;
+  background: rgba(15, 18, 26, 0.10) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+  z-index: 8900 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9000 !important;
+  border: 3px solid #ffdd4f !important;
+  border-radius: 16px !important;
+  background: rgba(255, 233, 104, 0.08) !important;
+  box-shadow: 0 0 0 5px rgba(255, 222, 72, 0.32), 0 0 20px rgba(255, 206, 36, 0.9) !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  position: fixed !important;
+  width: min(260px, calc(100vw - 28px)) !important;
+  max-width: min(260px, calc(100vw - 28px)) !important;
+  min-width: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 10px 12px 12px !important;
+  border: 2px solid rgba(255, 197, 57, 0.98) !important;
+  border-radius: 16px !important;
+  background: rgba(255, 249, 231, 0.98) !important;
+  box-shadow: 0 10px 24px rgba(39, 28, 8, 0.2), inset 0 -2px 0 rgba(191, 117, 25, 0.08) !important;
+  color: #2f2a23 !important;
+  z-index: 9100 !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card-header {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  margin: 0 0 5px !important;
+  padding-right: 24px !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-kicker {
+  margin: 0 0 2px !important;
+  color: #f09300 !important;
+  font-size: 10px !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+  margin: 0 !important;
+  font-size: 15px !important;
+  line-height: 1.22 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-close-button {
+  position: absolute !important;
+  top: 7px !important;
+  right: 7px !important;
+  width: 23px !important;
+  height: 23px !important;
+  min-width: 23px !important;
+  min-height: 23px !important;
+  border: 1px solid rgba(89, 66, 25, 0.14) !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #6d5a36 !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-step-meta,
+.tutorial-overlay[data-mode="interactive"] .tutorial-bullets,
+.tutorial-overlay[data-mode="interactive"] .tutorial-tip {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-description {
+  margin: 0 !important;
+  color: #352d23 !important;
+  font-size: 12.5px !important;
+  font-weight: 800 !important;
+  line-height: 1.45 !important;
+  letter-spacing: -0.02em !important;
+  white-space: pre-line !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+  margin: 7px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #7a5100 !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-weight: 1000 !important;
+  line-height: 1.35 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide::before {
+  content: "↓" !important;
+  display: block !important;
+  margin: 0 0 2px !important;
+  color: #2f2a23 !important;
+  font-size: 16px !important;
+  line-height: 1 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--above-target .tutorial-action-guide::before {
+  content: "↓" !important;
+  display: block !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--below-target .tutorial-action-guide::before {
+  content: "↑" !important;
+  display: block !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--left-of-target .tutorial-action-guide::before {
+  content: "→" !important;
+  display: block !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--right-of-target .tutorial-action-guide::before {
+  content: "←" !important;
+  display: block !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions {
+  margin-top: 8px !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action .tutorial-actions,
+.tutorial-overlay[data-mode="interactive"] .tutorial-secondary-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-primary-button {
+  min-height: 30px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  font-weight: 1000 !important;
+}
+
+.tutorial-action-target {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+@media (max-width: 720px) {
+  .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(240px, calc(100vw - 24px)) !important;
+    max-width: min(240px, calc(100vw - 24px)) !important;
+    padding: 9px 11px 11px !important;
+  }
+
+  .tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+    font-size: 14px !important;
+  }
+
+  .tutorial-overlay[data-mode="interactive"] .tutorial-description,
+  .tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+    font-size: 11.5px !important;
+  }
+}
+
+/* [v7.12.0] Tutorial click-safety hotfix: the guide must never block game buttons. */
+.tutorial-overlay,
+.tutorial-overlay[data-mode="interactive"] {
+  pointer-events: none !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.tutorial-overlay.hidden {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  display: none !important;
+  pointer-events: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  pointer-events: none !important;
+  z-index: 8900 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  pointer-events: none !important;
+  width: min(250px, calc(100vw - 24px)) !important;
+  max-width: min(250px, calc(100vw - 24px)) !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-close-button,
+.tutorial-overlay[data-mode="interactive"] .tutorial-primary-button {
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action .tutorial-actions,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action .tutorial-primary-button {
+  display: none !important;
+}
+
+.tutorial-action-target {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+
+/* [v7.12.1] Tutorial spotlight blur + modal click recovery
+   - 튜토리얼은 대상 버튼 주변만 구멍으로 남기고 나머지 화면을 살짝 흐리게 한다.
+   - dim 패널은 대상 외 영역 클릭을 막지만, 노란 테두리 대상은 실제 클릭이 통과된다.
+   - 브리핑/발주 모달 버튼은 튜토리얼 중에도 반드시 클릭 가능하게 한다. */
+.modal:not(.hidden),
+.modal:not(.hidden) .modal-content,
+.modal:not(.hidden) button,
+#day-scenario-modal:not(.hidden),
+#day-scenario-modal:not(.hidden) .day-scenario-modal-content,
+#day-scenario-confirm-button {
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] {
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  display: block !important;
+  position: fixed !important;
+  inset: auto !important;
+  z-index: 8800 !important;
+  background: rgba(9, 12, 18, 0.34) !important;
+  backdrop-filter: blur(1.8px) brightness(0.82) !important;
+  -webkit-backdrop-filter: blur(1.8px) brightness(0.82) !important;
+  pointer-events: auto !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim.hidden {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9050 !important;
+  pointer-events: none !important;
+  border: 3px solid #ffdd4f !important;
+  background: rgba(255, 237, 104, 0.12) !important;
+  box-shadow: 0 0 0 5px rgba(255, 222, 72, 0.34), 0 0 24px rgba(255, 205, 28, 0.95) !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  z-index: 9100 !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-close-button,
+.tutorial-overlay[data-mode="interactive"] .tutorial-primary-button {
+  pointer-events: auto !important;
+}
+
+.tutorial-action-target,
+.tutorial-action-target * {
+  pointer-events: auto !important;}
+
+.tutorial-action-target {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+/* [v7.12.2] Tutorial skip UX cleanup
+   - X 닫기 버튼 제거
+   - 명확한 [튜토리얼 건너뛰기] 버튼만 제공
+   - 대상 클릭 단계에서도 건너뛰기는 가능하되, 다음 버튼은 숨긴다. */
+.tutorial-close-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card-header {
+  padding-right: 0 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-prev-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 28px !important;
+  padding: 0 11px !important;
+  border: 1px solid rgba(132, 95, 34, 0.25) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.86) !important;
+  color: #6b4b18 !important;
+  font-size: 11px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action .tutorial-actions {
+  display: flex !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action #tutorial-next-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--read-only #tutorial-next-button,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--missing-target #tutorial-next-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-primary-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  pointer-events: auto !important;
+}
+
+/* [v7.12.3] Tutorial final focus pass
+   - 선택 대상만 밝고, 나머지 화면은 어둡고 흐리게 유지
+   - 브리핑/발주창처럼 맥락이 필요한 단계는 카드 전체를 밝게 보여줌
+   - 닫기 버튼 없이 건너뛰기만 제공 */
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  display: block !important;
+  position: fixed !important;
+  inset: auto !important;
+  z-index: 8800 !important;
+  background: rgba(7, 10, 16, 0.46) !important;
+  backdrop-filter: blur(2.4px) brightness(0.72) !important;
+  -webkit-backdrop-filter: blur(2.4px) brightness(0.72) !important;
+  pointer-events: auto !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9050 !important;
+  border: 3px solid #ffda4d !important;
+  border-radius: 16px !important;
+  background: rgba(255, 238, 122, 0.12) !important;
+  box-shadow:
+    0 0 0 5px rgba(255, 224, 72, 0.34),
+    0 0 24px rgba(255, 205, 28, 0.98) !important;
+  pointer-events: none !important;
+}
+
+.tutorial-highlight-target {
+  /* Keep the original asset color; the fixed ring provides focus. */}
+
+.tutorial-action-target,
+.tutorial-action-target * {
+  pointer-events: auto !important;}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  width: min(270px, calc(100vw - 28px)) !important;
+  max-width: min(270px, calc(100vw - 28px)) !important;
+  padding: 10px 12px 11px !important;
+  border-radius: 16px !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions,
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button:disabled {
+  opacity: 0.58 !important;
+  cursor: default !important;
+  filter: grayscale(0.2) !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-description {
+  white-space: pre-line !important;
+}
+
+/* 발주/브리핑 모달 내부는 튜토리얼 중에도 클릭 가능해야 한다. */
+#day-scenario-modal:not(.hidden),
+#day-scenario-modal:not(.hidden) *,
+#order-modal:not(.hidden),
+#order-modal:not(.hidden) * {
+  pointer-events: auto;
+}
+
+/* [v7.12.4] Tutorial cleanup hotfix
+   - 검은 세로 딤 잔상 제거: 전체 딤 1장 + 대상 z-index 방식으로 정리
+   - 과한 노란 발광/밝기 보정 제거
+   - 대상은 딤 위에 올라와 선명하게 보이고, 주변만 어둡고 살짝 흐리게 처리 */
+.tutorial-overlay[data-mode="interactive"] {
+  display: block !important;
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  display: none !important;
+  position: fixed !important;
+  inset: auto !important;
+  z-index: 8800 !important;
+  background: rgba(5, 8, 14, 0.48) !important;
+  backdrop-filter: blur(1.6px) brightness(0.74) !important;
+  -webkit-backdrop-filter: blur(1.6px) brightness(0.74) !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim--top:not(.hidden) {
+  display: block !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim--bottom,
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim--left,
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim--right {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9250 !important;
+  border: 2px solid rgba(255, 205, 55, 0.95) !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+}
+
+/* Layout-safe tutorial targets: never change target positioning/z-index/size.
+   The fixed .tutorial-highlight-ring renders the visual focus instead. */
+.tutorial-highlight-target,
+.tutorial-action-target,
+.tutorial-highlight-target *,
+.tutorial-action-target * {
+  box-shadow: none !important;
+  animation: none !important;}
+
+/* 모달형 화면은 딤 위로 올려야 검은 막대 없이 브리핑/발주창을 선명하게 볼 수 있다. */
+body.is-tutorial-active #day-scenario-modal:not(.hidden),
+body.is-tutorial-active #order-modal:not(.hidden),
+body.is-tutorial-active .modal:not(.hidden):has(.tutorial-highlight-target) {
+  /* layout-safe: visual focus is rendered by .tutorial-highlight-ring */
+}
+
+body.is-tutorial-active #day-scenario-modal:not(.hidden) .day-scenario-modal-content,
+body.is-tutorial-active #order-modal:not(.hidden) .order-modal-content {
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  z-index: 9400 !important;
+  width: min(270px, calc(100vw - 28px)) !important;
+  max-width: min(270px, calc(100vw - 28px)) !important;
+  border: 2px solid rgba(238, 168, 34, 0.95) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions,
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-primary-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  box-shadow: none !important;
+}
+
+/* [v7.12.5] Tutorial 10-step flow final cleanup
+   - 딤 레이어는 네 방향 패널로 정확히 구멍을 내고, 대상 외 클릭을 차단한다.
+   - 강조 대상은 과한 발광/밝기 보정 없이 얇은 테두리만 사용한다.
+   - 튜토리얼 말풍선과 건너뛰기/다음 버튼만 클릭 가능하게 유지한다. */
+.tutorial-overlay[data-mode="interactive"] {
+  display: block !important;
+  pointer-events: none !important;
+  background: transparent !important;
+  z-index: 9000 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  display: block !important;
+  position: fixed !important;
+  inset: auto !important;
+  z-index: 9001 !important;
+  background: rgba(5, 8, 14, 0.52) !important;
+  backdrop-filter: blur(1.8px) brightness(0.72) !important;
+  -webkit-backdrop-filter: blur(1.8px) brightness(0.72) !important;
+  pointer-events: auto !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim.hidden {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  display: block !important;
+  position: fixed !important;
+  z-index: 9002 !important;
+  border: 2px solid rgba(255, 204, 47, 0.95) !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring.hidden {
+  display: none !important;
+}
+
+.tutorial-highlight-target,
+.tutorial-action-target {
+  box-shadow: none !important;}
+
+.tutorial-action-target,
+.tutorial-action-target * {
+  pointer-events: auto !important;}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  position: fixed !important;
+  z-index: 9010 !important;
+  width: min(270px, calc(100vw - 28px)) !important;
+  max-width: min(270px, calc(100vw - 28px)) !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 10px 12px 11px !important;
+  border: 2px solid rgba(238, 168, 34, 0.95) !important;
+  border-radius: 16px !important;
+  background: #fff8e7 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card-header {
+  display: block !important;
+  margin-bottom: 6px !important;
+  padding-right: 0 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-kicker {
+  margin: 0 0 3px !important;
+  color: #ef8f00 !important;
+  font-size: 11px !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+  margin: 0 !important;
+  color: #2f2a23 !important;
+  font-size: 16px !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-step-meta,
+.tutorial-overlay[data-mode="interactive"] .tutorial-bullets,
+.tutorial-overlay[data-mode="interactive"] .tutorial-tip,
+.tutorial-overlay[data-mode="interactive"] .tutorial-close-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-prev-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-description {
+  margin: 0 !important;
+  color: #3d352b !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.48 !important;
+  letter-spacing: -0.02em !important;
+  white-space: pre-line !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #7c5200 !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-weight: 1000 !important;
+  line-height: 1.45 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide::before {
+  content: "↓" !important;
+  display: block !important;
+  margin: 0 0 2px !important;
+  color: #3d352b !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--above-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--left-of-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--right-of-target .tutorial-action-guide::before {
+  content: "" !important;
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action #tutorial-next-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 28px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button {
+  border: 0 !important;
+  background: #16a65c !important;
+  color: #ffffff !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button:disabled {
+  opacity: 0.55 !important;
+  cursor: default !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  border: 1px solid rgba(132, 95, 34, 0.25) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #6b4b18 !important;
+}
+
+body.is-tutorial-active #day-scenario-modal:not(.hidden),
+body.is-tutorial-active #order-modal:not(.hidden) {
+  pointer-events: auto !important;
+}
+
+/* [v7.12.6] Tutorial full cleanup override
+   Final source of truth for the first-run tutorial. Keep this block at the end. */
+.tutorial-overlay.hidden,
+.tutorial-overlay.hidden[data-mode],
+.tutorial-overlay.hidden[data-mode="interactive"],
+.tutorial-overlay.hidden[data-mode="hidden"],
+.tutorial-overlay.hidden .tutorial-card,
+.tutorial-overlay.hidden .tutorial-dim,
+.tutorial-overlay.hidden .tutorial-highlight-ring,
+.tutorial-highlight-ring.hidden,
+.tutorial-dim.hidden,
+#tutorial-skip-button.hidden {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] {
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9400 !important;
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  display: block !important;
+  position: fixed !important;
+  inset: auto !important;
+  z-index: 9401 !important;
+  background: rgba(5, 8, 14, 0.58) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  display: block !important;
+  position: fixed !important;
+  z-index: 9402 !important;
+  border: 2px solid rgba(255, 204, 47, 0.98) !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring.hidden {
+  display: none !important;
+}
+
+.tutorial-highlight-target,
+.tutorial-action-target,
+.tutorial-highlight-target *,
+.tutorial-action-target * {
+  /* Do not alter position, z-index, transform, filter, width, or height here.
+     Those properties can distort map objects such as the counter/shelf/cleaning tools. */
+  box-shadow: none !important;
+  animation: none !important;}
+
+.tutorial-action-target,
+.tutorial-action-target * {
+  pointer-events: auto !important;}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  display: block !important;
+  position: fixed !important;
+  z-index: 9410 !important;
+  width: min(280px, calc(100vw - 28px)) !important;
+  max-width: min(280px, calc(100vw - 28px)) !important;
+  max-height: min(58vh, 360px) !important;
+  overflow: visible !important;
+  padding: 10px 12px 11px !important;
+  border: 2px solid rgba(238, 168, 34, 0.95) !important;
+  border-radius: 16px !important;
+  background: #fff8e7 !important;
+  color: #2f2a23 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18) !important;
+  pointer-events: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card::after {
+  z-index: -1 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card-header {
+  display: block !important;
+  margin-bottom: 6px !important;
+  padding-right: 0 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-kicker {
+  margin: 0 0 3px !important;
+  color: #ef8f00 !important;
+  font-size: 11px !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.01em !important;
+  text-transform: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+  margin: 0 !important;
+  color: #2f2a23 !important;
+  font-size: 16px !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-step-meta,
+.tutorial-overlay[data-mode="interactive"] .tutorial-bullets,
+.tutorial-overlay[data-mode="interactive"] .tutorial-tip,
+.tutorial-overlay[data-mode="interactive"] .tutorial-close-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-prev-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-description {
+  margin: 0 !important;
+  color: #3d352b !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  line-height: 1.48 !important;
+  letter-spacing: -0.02em !important;
+  white-space: pre-line !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #7c5200 !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  font-weight: 1000 !important;
+  line-height: 1.45 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card:not(.tutorial-card--pending) .tutorial-action-guide::before {
+  content: "↓" !important;
+  display: block !important;
+  margin: 0 0 2px !important;
+  color: #3d352b !important;
+  font-size: 17px !important;
+  line-height: 1 !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--above-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--left-of-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--right-of-target .tutorial-action-guide::before,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--pending .tutorial-action-guide::before {
+  content: "" !important;
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+  pointer-events: auto !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--requires-action #tutorial-next-button,
+.tutorial-overlay[data-mode="interactive"] .tutorial-card--pending #tutorial-next-button {
+  display: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button,
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 28px !important;
+  padding: 0 12px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 1000 !important;
+  line-height: 1 !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button {
+  border: 0 !important;
+  background: #16a65c !important;
+  color: #ffffff !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-next-button:disabled {
+  opacity: 0.55 !important;
+  cursor: default !important;
+}
+
+.tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  border: 1px solid rgba(132, 95, 34, 0.25) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: #6b4b18 !important;
+}
+
+body.is-tutorial-active #day-scenario-modal:not(.hidden),
+body.is-tutorial-active #order-modal:not(.hidden) {
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-start-day #bottom-ui button,
+body.is-tutorial-step-open-store #bottom-ui button,
+body.is-tutorial-active #bottom-ui button:not(.tutorial-action-target):not(.tutorial-highlight-target) {
+  opacity: 0.58 !important;}
+
+body.is-tutorial-step-start-day #start-day-button,
+body.is-tutorial-step-start-day #start-day-button *,
+body.is-tutorial-step-open-store #open-store-button,
+body.is-tutorial-step-open-store #open-store-button * {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.is-tutorial-step-start-day #open-store-button,
+body.is-tutorial-step-start-day #open-store-button *,
+body.is-tutorial-step-open-store #action-dock button,
+body.is-tutorial-step-open-store #action-dock button * {
+  filter: brightness(0.46) saturate(0.7) !important;
+  opacity: 0.58 !important;
+}
+
+body.is-tutorial-step-open-store #open-store-button:not(:disabled) {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone {
+  filter: none !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone::before,
+#delivery-box-zone.delivery-box-zone::after,
+#delivery-box-zone.delivery-box-zone .interaction-effect,
+#delivery-box-zone.delivery-box-zone .interaction-glow-ring,
+#delivery-box-zone.delivery-box-zone .interaction-finger-tap,
+#delivery-box-zone.delivery-box-zone .interaction-click-sparkle,
+#delivery-box-zone.delivery-box-zone .asset-object-effect {
+  display: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-visual,
+#delivery-box-zone.delivery-box-zone .delivery-box-visual img {
+  filter: none !important;
+  animation: none !important;
+  box-shadow: none !important;
+}
+
+#delivery-box-zone.delivery-box-zone .delivery-box-count {
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* [v7.12.7] Tutorial layout safety hotfix.
+   Only the active tutorial target should appear normal; other controls remain dim.
+   Target elements themselves must keep their original layout. */
+.tutorial-highlight-target,
+.tutorial-action-target {
+  /* Intentionally no position/z-index/transform/filter override. */}
+
+body.is-tutorial-step-start-day #bottom-ui button:not(#start-day-button),
+body.is-tutorial-step-start-day #open-store-button,
+body.is-tutorial-step-open-store #bottom-ui button {
+  filter: brightness(0.46) saturate(0.7) !important;
+  opacity: 0.55 !important;
+}
+
+body.is-tutorial-step-start-day #start-day-button,
+body.is-tutorial-step-start-day #start-day-button *,
+body.is-tutorial-step-open-store #open-store-button,
+body.is-tutorial-step-open-store #open-store-button * {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+body.is-tutorial-step-open-store #open-store-button {
+  cursor: pointer !important;
+}
+
+/* [v7.13.0] Tutorial input-lock final pass
+   - 튜토리얼 중에는 현재 단계의 실제 대상만 정상 표시한다.
+   - 발주 수량 단계에서는 튜토리얼 대상 상품만 선명하게 두고 나머지 발주창 조작은 시각적으로 잠근다.
+   - 클릭 차단의 원본은 UIManager.js의 tutorial input guard이며, CSS는 보조 시각 상태만 담당한다. */
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] {
+  pointer-events: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  background: rgba(5, 8, 14, 0.62) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  border: 2px solid rgba(255, 210, 65, 0.98) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  animation: none !important;
+}
+
+body.is-tutorial-active .tutorial-highlight-target,
+body.is-tutorial-active .tutorial-action-target,
+body.is-tutorial-active .tutorial-highlight-target *,
+body.is-tutorial-active .tutorial-action-target * {
+  filter: none !important;
+  opacity: 1 !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+body.is-tutorial-step-start-day #bottom-ui button:not(#start-day-button),
+body.is-tutorial-step-start-day #open-store-button,
+body.is-tutorial-step-start-day #shop-shortcut-button,
+body.is-tutorial-step-start-day #upgrade-shortcut-button,
+body.is-tutorial-step-start-day #end-day-button,
+body.is-tutorial-step-open-store #bottom-ui button,
+body.is-tutorial-step-open-store #shop-shortcut-button,
+body.is-tutorial-step-open-store #upgrade-shortcut-button,
+body.is-tutorial-step-open-store #end-day-button {
+  opacity: 0.48 !important;
+  filter: brightness(0.42) saturate(0.72) !important;
+}
+
+body.is-tutorial-step-start-day #start-day-button,
+body.is-tutorial-step-start-day #start-day-button *,
+body.is-tutorial-step-open-store #open-store-button,
+body.is-tutorial-step-open-store #open-store-button * {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card:not(.is-tutorial-order-target),
+body.is-tutorial-step-order-quantity #order-modal .order-category-tab,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-close-button,
+body.is-tutorial-step-order-quantity #order-modal #order-confirm-button,
+body.is-tutorial-step-order-confirm #order-modal .order-product-card,
+body.is-tutorial-step-order-confirm #order-modal .order-category-tab,
+body.is-tutorial-step-order-confirm #order-modal #order-modal-close-button,
+body.is-tutorial-step-order-confirm #order-modal .order-qty-button {
+  opacity: 0.42 !important;
+  filter: brightness(0.55) saturate(0.75) !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target *,
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button,
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button * {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target {
+  outline: 2px solid rgba(255, 210, 65, 0.92) !important;
+  outline-offset: 3px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-list {
+  scroll-behavior: smooth;
+}
+
+body.is-tutorial-step-delivery-box #delivery-box-zone,
+body.is-tutorial-step-delivery-box #delivery-box-zone * {
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+
+body.is-tutorial-step-delivery-box .store-zone:not(#delivery-box-zone),
+body.is-tutorial-step-delivery-box #bottom-ui button,
+body.is-tutorial-step-delivery-box #top-ui button:not(#tutorial-help-button) {
+  opacity: 0.48 !important;
+  filter: brightness(0.5) saturate(0.75) !important;
+}
+
+/* [v7.13.3] Tutorial first-step visual stabilization
+   - 화면을 여러 조각으로 나눠 밝게 뚫지 않고 단일 고정 딤 레이어로 통일.
+   - 작은 화면의 상단 검은 줄/하단 밝은 띠/초록 빈 영역 위 튜토리얼 배치 문제 완화.
+   - 튜토리얼 중 현재 대상은 선명하게, 나머지 버튼은 흐리게 유지. */
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9400 !important;
+  display: block !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim {
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-width: 100vw !important;
+  min-height: 100dvh !important;
+  z-index: 9401 !important;
+  display: block !important;
+  background: rgba(5, 8, 14, 0.58) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim.hidden,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim--bottom,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim--left,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim--right {
+  display: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9512 !important;
+  border: 2px solid rgba(255, 198, 35, 0.98) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-start-day #bottom-ui,
+body.is-tutorial-step-open-store #bottom-ui {
+  z-index: 9505 !important;
+}
+
+body.is-tutorial-step-start-day #start-day-button,
+body.is-tutorial-step-open-store #open-store-button {
+  position: relative !important;
+  z-index: 9515 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  box-shadow: 0 0 0 2px rgba(255, 198, 35, 0.92) !important;
+  transform: none !important;
+}
+
+body.is-tutorial-step-start-day #start-day-button *,
+body.is-tutorial-step-open-store #open-store-button * {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
+}
+
+body.is-tutorial-step-start-day #bottom-ui button:not(#start-day-button),
+body.is-tutorial-step-open-store #bottom-ui button:not(#open-store-button) {
+  opacity: 0.42 !important;
+  filter: brightness(0.38) saturate(0.68) !important;
+  box-shadow: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  z-index: 9525 !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-actions,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-next-button,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  pointer-events: auto !important;
+}
+
+#ingame-settings-button.ui-special-settings-button,
+#top-icon-menu #ingame-settings-button.ui-special-settings-button {
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-shadow: none !important;
+  overflow: hidden !important;
+  background-color: transparent !important;
+  background-image: var(--ui-button-image-current, var(--ui-button-image-normal)) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+}
+
+body.is-tutorial-active #player-zone {
+  pointer-events: none !important;
+}
+
+/* [v7.13.4] Tutorial first-step small-screen + clarity fix
+   - 16:9 게임 프레임의 세로 중앙 정렬/auto margin 때문에 생기던 위쪽 검은 빈 공간을 제거.
+   - 튜토리얼 말풍선 compact 모드를 추가해 작은 화면에서 발주 버튼을 덮지 않게 한다.
+   - 발주 버튼은 부모 하단바의 흐림/투명 효과를 먹지 않도록 튜토리얼 중 완전 선명하게 고정한다. */
+html,
+body {
+  align-items: flex-start !important;
+  justify-content: center !important;
+}
+
+#game-root {
+  margin: 0 auto !important;
+}
+
+body.is-tutorial-step-start-day #bottom-ui,
+body.is-tutorial-step-start-day #action-dock,
+body.is-tutorial-step-open-store #bottom-ui,
+body.is-tutorial-step-open-store #action-dock {
+  opacity: 1 !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform-style: flat !important;
+  isolation: auto !important;
+}
+
+body.is-tutorial-step-start-day #start-day-button,
+body.is-tutorial-step-start-day #start-day-button:hover,
+body.is-tutorial-step-start-day #start-day-button:focus-visible {
+  opacity: 1 !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  position: relative !important;
+  z-index: 9535 !important;
+  color: #ffffff !important;
+  background: linear-gradient(180deg, #f5b565 0%, #e58f34 48%, #cc7625 100%) !important;
+  border: 2px solid rgba(255, 213, 82, 1) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 198, 35, 0.72),
+    0 9px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18) !important;
+  transform: none !important;
+}
+
+body.is-tutorial-step-start-day #start-day-button *,
+body.is-tutorial-step-start-day #start-day-button::before {
+  opacity: 1 !important;
+  filter: none !important;
+  color: inherit !important;
+  text-shadow: inherit !important;
+  transform: none !important;
+}
+
+body.is-tutorial-step-start-day #bottom-ui button:not(#start-day-button) {
+  opacity: 0.34 !important;
+  filter: brightness(0.34) saturate(0.62) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+body.is-tutorial-step-open-store #open-store-button,
+body.is-tutorial-step-open-store #open-store-button:hover,
+body.is-tutorial-step-open-store #open-store-button:focus-visible {
+  opacity: 1 !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  position: relative !important;
+  z-index: 9535 !important;
+}
+
+body.is-tutorial-step-open-store #open-store-button *,
+body.is-tutorial-step-open-store #open-store-button::before {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-open-store #bottom-ui button:not(#open-store-button) {
+  opacity: 0.34 !important;
+  filter: brightness(0.34) saturate(0.62) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+@media (max-height: 680px), (max-width: 980px) {
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(260px, calc(100vw - 24px)) !important;
+    max-width: min(260px, calc(100vw - 24px)) !important;
+    max-height: min(46vh, 250px) !important;
+    padding: 8px 10px 9px !important;
+    border-radius: 14px !important;
+  }
+
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-kicker {
+    margin-bottom: 2px !important;
+    font-size: 10px !important;
+  }
+
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card h2 {
+    font-size: 15px !important;
+    line-height: 1.18 !important;
+  }
+
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-description {
+    font-size: 12px !important;
+    line-height: 1.34 !important;
+  }
+
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+    margin-top: 6px !important;
+    font-size: 11px !important;
+    line-height: 1.28 !important;
+  }
+
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-actions {
+    margin-top: 6px !important;
+  }
+
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-skip-button,
+  body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-next-button {
+    min-height: 24px !important;
+    padding: 0 10px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* [v7.13.5] Tutorial target proxy + frame-bound tooltip
+   - 발주 버튼은 실제 버튼 위에 튜토리얼 전용 프록시 버튼을 띄워 부모 dim/filter 영향 없이 원본처럼 선명하게 보인다.
+   - 튜토리얼 말풍선은 게임/매장 프레임 안에서만 배치해 검은 여백 영역으로 빠지지 않게 한다. */
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-target-proxy-layer,
+body.is-tutorial-active .tutorial-target-proxy-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9560 !important;
+  pointer-events: none !important;
+  overflow: visible !important;
+}
+
+body.is-tutorial-active .tutorial-target-proxy {
+  position: fixed !important;
+  z-index: 9565 !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  opacity: 1 !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transform: none !important;
+  mix-blend-mode: normal !important;
+  isolation: isolate !important;
+  visibility: visible !important;
+  font-family: inherit !important;
+  user-select: none !important;
+}
+
+body.is-tutorial-active .tutorial-target-proxy,
+body.is-tutorial-active .tutorial-target-proxy *,
+body.is-tutorial-active .tutorial-target-proxy::before,
+body.is-tutorial-active .tutorial-target-proxy::after {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: none !important;
+  mix-blend-mode: normal !important;
+  visibility: visible !important;
+}
+
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day,
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day.dock-button {
+  min-height: 0 !important;
+  padding: 8px 6px 7px !important;
+  border: 2px solid rgba(255, 213, 82, 1) !important;
+  border-radius: 15px !important;
+  background: linear-gradient(180deg, #f5b565 0%, #e58f34 48%, #cc7625 100%) !important;
+  color: #ffffff !important;
+  font-size: 13px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 198, 35, 0.72),
+    0 9px 18px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+}
+
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day::before {
+  content: "📦" !important;
+  display: block !important;
+  margin: 0 auto 3px !important;
+  font-size: 21px !important;
+  line-height: 1 !important;
+}
+
+body.is-tutorial-step-open-store .tutorial-target-proxy--open-store,
+body.is-tutorial-step-open-store .tutorial-target-proxy--open-store.primary-start-button {
+  border: 3px solid rgba(216,255,214,0.82) !important;
+  border-radius: 22px !important;
+  background: linear-gradient(180deg, #68c96d, #3c9449) !important;
+  color: #ffffff !important;
+  font-size: 21px !important;
+  font-weight: 1000 !important;
+  box-shadow: 0 5px 0 #236333, 0 12px 26px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.22) !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  max-width: min(300px, calc(100vw - 24px)) !important;
+}
+
+body.is-tutorial-step-start-day .tutorial-overlay[data-mode="interactive"] .tutorial-card,
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  z-index: 9575 !important;
+}
+
+@media (max-height: 680px), (max-width: 980px) {
+  body.is-tutorial-step-start-day .tutorial-overlay[data-mode="interactive"] .tutorial-card,
+  body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(260px, calc(100vw - 24px)) !important;
+    max-width: min(260px, calc(100vw - 24px)) !important;
+    max-height: min(42vh, 230px) !important;
+  }
+}
+
+
+/* [v7.13.6] Tutorial proxy source hiding
+   - 프록시 버튼 표시 중에는 실제 원본 발주/영업시작 버튼을 숨겨 작은 화면에서 이중 버튼처럼 겹쳐 보이지 않게 한다. */
+body.is-tutorial-active .tutorial-proxy-source-hidden {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-active .tutorial-target-proxy {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+
+body.is-tutorial-active .tutorial-target-proxy *,
+body.is-tutorial-active .tutorial-target-proxy::before,
+body.is-tutorial-active .tutorial-target-proxy::after {
+  box-sizing: border-box !important;
+}
+
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day,
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day.dock-button {
+  outline: none !important;
+  box-shadow:
+    0 0 0 2px rgba(255, 198, 35, 0.7),
+    0 8px 16px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+}
+
+
+/* [v7.13.7] Tutorial proxy content visibility fix
+   - 원본 버튼 숨김 클래스가 프록시 버튼으로 복제되어 프록시 내용까지 사라지는 문제를 방지한다. */
+body.is-tutorial-active .tutorial-target-proxy.tutorial-proxy-source-hidden,
+body.is-tutorial-active .tutorial-target-proxy.tutorial-proxy-source-hidden *,
+body.is-tutorial-active .tutorial-target-proxy.tutorial-proxy-source-hidden::before,
+body.is-tutorial-active .tutorial-target-proxy.tutorial-proxy-source-hidden::after {
+  visibility: visible !important;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day {
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+/* [v7.13.9] Tutorial proxy hit-area safety
+   - 프록시 버튼 클릭이 딤/오버레이 레이어에 먹히지 않도록 프록시 레이어를 클릭 가능한 히트 영역으로 보정한다.
+   - 실제 실행은 UIManager의 좌표 기반 프록시 활성화 로직이 담당한다. */
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-target-proxy-layer,
+body.is-tutorial-active .tutorial-target-proxy-layer {
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-active .tutorial-target-proxy {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+/* [v7.13.11] Tutorial briefing modal focus fix
+   - 브리핑 단계에서는 튜토리얼 딤 레이어가 브리핑 모달을 덮지 않게 한다.
+   - 브리핑 카드/내용은 원래 밝기로 유지하고, 안내 카드는 발주하러 가기 버튼의 오른쪽/측면에 배치한다. */
+body.is-tutorial-step-briefing-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-step-briefing-confirm .tutorial-dim {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden),
+body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) .day-scenario-modal-content,
+body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) .day-scenario-modal-content * {
+  opacity: 1 !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) .day-scenario-modal-content {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25) !important;
+}
+
+body.is-tutorial-step-briefing-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  z-index: 9580 !important;
+}
+
+body.is-tutorial-step-briefing-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9570 !important;
+}
+
+@media (max-height: 680px), (max-width: 980px) {
+  body.is-tutorial-step-briefing-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(250px, calc(100vw - 24px)) !important;
+    max-width: min(250px, calc(100vw - 24px)) !important;
+    max-height: min(44vh, 230px) !important;
+  }
+}
+
+
+/* [v7.13.13] Tutorial briefing compact modal fix
+   - 작은 16:9 가로 화면에서 영업 브리핑 모달이 프레임 밖으로 튀어나온 것처럼 보이지 않도록 폭/여백을 줄인다.
+   - 브리핑 모달 자체는 밝게 유지하고, 튜토리얼 안내 카드는 중앙/오른쪽 정보 영역을 덮지 않도록 compact 크기를 유지한다. */
+@media (max-width: 1280px), (max-height: 760px) {
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-modal-content {
+    width: min(84vw, 980px) !important;
+    max-width: min(84vw, 980px) !important;
+    max-height: calc(100svh - 74px) !important;
+    padding: 14px 16px !important;
+    gap: 8px 12px !important;
+    grid-template-columns: minmax(260px, 0.92fr) minmax(300px, 1.08fr) !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-title {
+    font-size: 20px !important;
+    line-height: 1.18 !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-kicker,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-subtitle,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-story,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal #day-scenario-market-message,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-features li,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-tip {
+    font-size: 12px !important;
+    line-height: 1.32 !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-goal-box {
+    gap: 6px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-goal-box > div,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-market-box,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-tip {
+    padding: 8px 9px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-market-box {
+    max-height: min(48svh, 330px) !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-features {
+    gap: 5px !important;
+    max-height: min(34svh, 230px) !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-features li,
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal #day-scenario-recommend-list li {
+    padding: 7px 9px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-confirm-button.day-scenario-confirm-button {
+    width: min(260px, 42vw) !important;
+    min-height: 38px !important;
+    margin-inline: auto !important;
+    font-size: 14px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+    width: min(245px, calc(100vw - 28px)) !important;
+    max-width: min(245px, calc(100vw - 28px)) !important;
+    padding: 10px 12px !important;
+    max-height: min(42vh, 224px) !important;
+  }
+}
+
+@media (max-width: 980px), (max-height: 620px) {
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-modal-content {
+    width: min(82vw, 880px) !important;
+    max-width: min(82vw, 880px) !important;
+    max-height: calc(100svh - 64px) !important;
+    padding: 12px 14px !important;
+    gap: 7px 10px !important;
+    grid-template-columns: minmax(230px, 0.9fr) minmax(270px, 1.1fr) !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-title {
+    font-size: 18px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-goal-box > div {
+    padding: 7px 8px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-goal-box strong {
+    font-size: 14px !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-market-box {
+    max-height: min(43svh, 280px) !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal .day-scenario-tip {
+    padding: 7px 8px !important;
+  }
+}
+
+/* [v7.13.14] Tutorial briefing frame clamp
+   - 브리핑 단계 모달은 브라우저 전체 viewport가 아니라 16:9 게임 프레임 내부에서만 배치한다.
+   - 작은 화면에서 모달 하단이 게임 프레임 밖/검은 여백으로 튀어나가지 않도록 높이와 중앙 정렬 기준을 고정한다. */
+body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) {
+  position: fixed !important;
+  inset: auto !important;
+  left: var(--tutorial-game-left, 0px) !important;
+  top: var(--tutorial-game-top, 0px) !important;
+  width: var(--tutorial-game-width, 100vw) !important;
+  height: var(--tutorial-game-height, 100svh) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: clamp(10px, 2.4svh, 22px) clamp(18px, 4.2vw, 44px) !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) .day-scenario-modal-content {
+  width: min(920px, calc(var(--tutorial-game-width, 100vw) - 96px)) !important;
+  max-width: min(920px, calc(var(--tutorial-game-width, 100vw) - 96px)) !important;
+  max-height: calc(var(--tutorial-game-height, 100svh) - 52px) !important;
+  box-sizing: border-box !important;
+  overflow: auto !important;
+}
+
+@media (max-width: 1280px), (max-height: 760px) {
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) {
+    padding: 12px clamp(22px, 5vw, 56px) !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) .day-scenario-modal-content {
+    width: min(880px, calc(var(--tutorial-game-width, 100vw) - 104px)) !important;
+    max-width: min(880px, calc(var(--tutorial-game-width, 100vw) - 104px)) !important;
+    max-height: calc(var(--tutorial-game-height, 100svh) - 44px) !important;
+  }
+}
+
+@media (max-width: 980px), (max-height: 620px) {
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) {
+    padding: 10px clamp(18px, 5vw, 48px) !important;
+  }
+
+  body.is-tutorial-step-briefing-confirm #day-scenario-modal:not(.hidden) .day-scenario-modal-content {
+    width: min(800px, calc(var(--tutorial-game-width, 100vw) - 76px)) !important;
+    max-width: min(800px, calc(var(--tutorial-game-width, 100vw) - 76px)) !important;
+    max-height: calc(var(--tutorial-game-height, 100svh) - 36px) !important;
+  }
+}
+
+/* [v7.13.15] Tutorial click-through guard
+   Keep visual tutorial layers transparent to input; the JS input guard still
+   blocks non-target UI while the current action target and skip button work. */
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"],
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-dim--spotlight,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-mask,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-spotlight,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-target-proxy-layer,
+body.is-tutorial-active .tutorial-target-proxy-layer,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card::after,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-action-guide::before {
+  pointer-events: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-actions,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-active .tutorial-target-proxy {
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-briefing-confirm #day-scenario-confirm-button,
+body.is-tutorial-step-briefing-confirm #day-scenario-confirm-button * {
+  pointer-events: auto !important;
+}
+
+/* [v7.13.16] Tutorial order quantity focus
+   Step 3 keeps potato chips/water visible, locks product-list scroll, and
+   moves attention to the target increase buttons without changing order flow. */
+body.is-tutorial-step-order-quantity,
+body.is-tutorial-step-order-quantity #game-root,
+body.is-tutorial-step-order-quantity #order-modal,
+body.is-tutorial-step-order-quantity #order-modal .modal-content,
+body.is-tutorial-step-order-quantity #order-modal .order-modal-content,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-body,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-body.order-modal-body--card-draft,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-layout,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-card-panel,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-list-panel,
+body.is-tutorial-step-order-quantity #order-modal .order-product-list {
+  overscroll-behavior: none !important;
+}
+
+body.is-tutorial-step-order-quantity {
+  overflow: hidden !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-list,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+  scrollbar-width: none !important;
+  scroll-behavior: auto !important;
+  touch-action: pan-x !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-list::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-step-order-quantity .tutorial-dim {
+  background: rgba(5, 8, 14, 0.2) !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal,
+body.is-tutorial-step-order-quantity #order-modal .order-modal-content,
+body.is-tutorial-step-order-quantity #order-modal .order-computer-frame,
+body.is-tutorial-step-order-quantity #order-modal .order-product-list {
+  filter: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target *,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"],
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] * {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] {
+  outline: none !important;
+  box-shadow:
+    0 8px 18px rgba(58, 41, 16, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.78) !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-qty-button[data-action="increase"]:not(:disabled),
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-qty-button[data-action="increase"]:not(:disabled) {
+  border: 2px solid rgba(255, 205, 44, 1) !important;
+  background: linear-gradient(180deg, #fff3a8 0%, #ffd24a 54%, #f5a91d 100%) !important;
+  color: #5a3600 !important;
+  box-shadow:
+    0 0 0 4px rgba(255, 218, 72, 0.36),
+    0 7px 13px rgba(164, 99, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+  transform: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-qty-button[data-action="decrease"],
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-qty-button[data-action="decrease"],
+body.is-tutorial-step-order-quantity #order-modal .order-product-card:not(.is-tutorial-order-target) .order-qty-button[data-action="increase"] {
+  box-shadow: none !important;
+}
+
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+  width: min(236px, calc(100vw - 24px)) !important;
+  max-width: min(236px, calc(100vw - 24px)) !important;
+  max-height: min(38vh, 210px) !important;
+  z-index: 9580 !important;
+}
+
+@media (max-width: 980px), (max-height: 620px) {
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+    width: min(220px, calc(100vw - 20px)) !important;
+    max-width: min(220px, calc(100vw - 20px)) !important;
+    max-height: min(36vh, 186px) !important;
+    padding: 8px 10px 9px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    gap: 12px 10px !important;
+    padding-bottom: 4px !important;
+  }
+}
+
+/* [v7.13.17] Tutorial order quantity brightness pass
+   A small lift only: lighter dim, clearer order panel, and softer non-target cards. */
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-step-order-quantity .tutorial-dim {
+  background: rgba(5, 8, 14, 0.12) !important;
+  opacity: 1 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal,
+body.is-tutorial-step-order-quantity #order-modal .modal-content,
+body.is-tutorial-step-order-quantity #order-modal .order-modal-content,
+body.is-tutorial-step-order-quantity #order-modal .order-computer-frame,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-body,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-layout,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-sidebar,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-card-panel,
+body.is-tutorial-step-order-quantity #order-modal .order-draft-list-panel,
+body.is-tutorial-step-order-quantity #order-modal .order-total-box,
+body.is-tutorial-step-order-quantity #order-modal .order-budget-message,
+body.is-tutorial-step-order-quantity #order-modal .order-category-summary {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card:not(.is-tutorial-order-target),
+body.is-tutorial-step-order-quantity #order-modal .order-product-card:not([data-tutorial-order-target="true"]),
+body.is-tutorial-step-order-quantity #order-modal .order-category-tab,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-close-button,
+body.is-tutorial-step-order-quantity #order-modal #order-confirm-button {
+  opacity: 0.72 !important;
+  filter: brightness(0.92) saturate(0.9) !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] {
+  opacity: 1 !important;
+  filter: brightness(1.06) saturate(1.04) !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target *,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] * {
+  opacity: 1 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-product-thumb,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-product-thumb,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-product-title,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-product-title,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-quantity-controls,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-quantity-controls {
+  filter: none !important;
+}
+
+/* [v7.13.18] Tutorial order quantity popover clamp
+   Keep the step-3 popover inside the order modal/product panel on small screens. */
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card--below-target::after,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card--above-target::after {
+  left: var(--tutorial-arrow-left, 50%) !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card--right-of-target::after,
+body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card--left-of-target::after {
+  top: var(--tutorial-arrow-top, 50%) !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+  width: min(236px, var(--tutorial-card-safe-width, calc(100vw - 24px))) !important;
+  max-width: min(236px, var(--tutorial-card-safe-width, calc(100vw - 24px))) !important;
+  max-height: min(210px, var(--tutorial-card-safe-height, 38vh)) !important;
+  overflow: visible !important;
+}
+
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity .tutorial-actions {
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+}
+
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity #tutorial-next-button,
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity #tutorial-skip-button {
+  flex: 0 1 auto !important;
+  min-width: max-content !important;
+  white-space: nowrap !important;
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+    width: min(210px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-width: min(210px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-height: min(184px, var(--tutorial-card-safe-height, 34vh)) !important;
+    padding: 8px 9px 9px !important;
+  }
+
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity .tutorial-description {
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    overflow-wrap: anywhere !important;
+  }
+
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity .tutorial-actions {
+    gap: 4px !important;
+  }
+
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity #tutorial-next-button,
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity #tutorial-skip-button {
+    min-height: 27px !important;
+    padding: 0 9px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* [v7.13.19] Tutorial order confirm target visibility
+   Step 4 keeps the confirm CTA readable and clearly clickable while other UI stays muted. */
+body.is-tutorial-step-order-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-step-order-confirm .tutorial-dim {
+  background: rgba(5, 8, 14, 0.38) !important;
+  opacity: 1 !important;
+}
+
+body.is-tutorial-step-order-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9570 !important;
+  border: 3px solid rgba(255, 218, 72, 1) !important;
+  background: rgba(255, 247, 185, 0.14) !important;
+  box-shadow:
+    0 0 0 5px rgba(255, 224, 92, 0.24),
+    0 0 20px rgba(255, 211, 59, 0.46) !important;
+}
+
+body.is-tutorial-step-order-confirm #order-modal .order-draft-sidebar,
+body.is-tutorial-step-order-confirm #order-modal .order-total-box,
+body.is-tutorial-step-order-confirm #order-modal .order-budget-message {
+  opacity: 1 !important;
+  filter: brightness(1.04) saturate(1.02) !important;
+}
+
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"]),
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button.ui-image-button:not(:disabled):not([aria-disabled="true"]),
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button.is-normal:not(:disabled):not([aria-disabled="true"]),
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button.is-disabled:not(:disabled):not([aria-disabled="true"]) {
+  --ui-button-image-current: var(--ui-button-image-normal, none) !important;
+  position: relative !important;
+  isolation: isolate !important;
+  opacity: 1 !important;
+  filter: brightness(1.16) saturate(1.16) contrast(1.05) drop-shadow(0 0 10px rgba(255, 224, 92, 0.42)) !important;
+  background: linear-gradient(180deg, #70d99c 0%, #42ab75 100%) !important;
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px rgba(21, 80, 49, 0.52) !important;
+  box-shadow:
+    0 0 0 4px rgba(255, 218, 72, 0.28),
+    0 6px 0 #2c8057,
+    0 14px 22px rgba(36, 111, 72, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34) !important;
+  cursor: pointer !important;
+}
+
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"]) *,
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"])::before,
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"])::after {
+  opacity: 1 !important;
+  filter: none !important;
+  color: inherit !important;
+  text-shadow: inherit !important;
+}
+
+body.is-tutorial-step-order-confirm #order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"])::before {
+  color: #fff8bf !important;
+  filter: drop-shadow(0 1px 2px rgba(31, 87, 48, 0.45)) !important;
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  body.is-tutorial-step-order-confirm .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+  body.is-tutorial-step-order-confirm .tutorial-dim {
+    background: rgba(5, 8, 14, 0.34) !important;
+  }
+
+  body.is-tutorial-step-order-confirm #order-modal #order-confirm-button:not(:disabled):not([aria-disabled="true"]) {
+    filter: brightness(1.18) saturate(1.14) contrast(1.05) drop-shadow(0 0 8px rgba(255, 224, 92, 0.4)) !important;
+  }
+}
+
+/* [v7.13.20] Store order modal responsive bounds
+   Keep the entire STORE-ORDER modal inside the viewport; logic remains unchanged. */
+#order-modal.modal {
+  padding: clamp(8px, 1.4vw, 20px) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+#order-modal .modal-content.order-modal-content {
+  width: min(96vw, 1240px) !important;
+  max-width: calc(100vw - 24px) !important;
+  height: min(86svh, 720px) !important;
+  max-height: calc(100svh - 24px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+#order-modal .order-computer-frame,
+#order-modal #order-modal-body,
+#order-modal #order-modal-body.order-modal-body--card-draft {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) clamp(218px, 22vw, 255px) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-areas: "products sidebar" !important;
+  gap: clamp(8px, 1.1vw, 14px) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar {
+  grid-area: sidebar !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-draft-card-panel,
+#order-modal #order-modal-body.order-modal-body--card-draft .order-draft-list-panel {
+  grid-area: products !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-list-toolbar,
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-tabs,
+#order-modal #order-modal-body.order-modal-body--card-draft .order-category-summary {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+  grid-template-columns: repeat(4, minmax(112px, 1fr)) !important;
+  gap: clamp(8px, 0.9vw, 14px) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: clamp(6px, 0.9vw, 12px) clamp(4px, 0.7vw, 10px) clamp(8px, 1vw, 14px) 0 !important;
+  box-sizing: border-box !important;
+  overflow-x: hidden !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+  grid-template-columns: clamp(56px, 6vw, 76px) minmax(0, 1fr) !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: clamp(176px, 25svh, 248px) !important;
+  padding: clamp(8px, 1vw, 12px) !important;
+  gap: clamp(6px, 0.8vw, 9px) !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-image-box {
+  width: clamp(56px, 6vw, 76px) !important;
+  height: clamp(56px, 6vw, 76px) !important;
+  min-width: clamp(56px, 6vw, 76px) !important;
+  min-height: clamp(56px, 6vw, 76px) !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-thumb,
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-fallback {
+  width: clamp(48px, 5.2vw, 66px) !important;
+  height: clamp(48px, 5.2vw, 66px) !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card > .order-product-title,
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-title {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-panel,
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls,
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls {
+  grid-template-columns: clamp(28px, 3vw, 34px) minmax(28px, 1fr) clamp(28px, 3vw, 34px) !important;
+  gap: clamp(4px, 0.6vw, 6px) !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-qty-button {
+  width: clamp(28px, 3vw, 34px) !important;
+  min-width: clamp(28px, 3vw, 34px) !important;
+  max-width: clamp(28px, 3vw, 34px) !important;
+  height: clamp(28px, 3vw, 34px) !important;
+  min-height: clamp(28px, 3vw, 34px) !important;
+  max-height: clamp(28px, 3vw, 34px) !important;
+}
+
+#order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls > strong {
+  min-width: 28px !important;
+  min-height: clamp(28px, 3vw, 34px) !important;
+  height: clamp(28px, 3vw, 34px) !important;
+}
+
+@media (max-width: 1100px), (max-height: 680px) {
+  #order-modal.modal {
+    padding: 8px !important;
+  }
+
+  #order-modal .modal-content.order-modal-content {
+    width: calc(100vw - 18px) !important;
+    max-width: calc(100vw - 18px) !important;
+    height: calc(100svh - 18px) !important;
+    max-height: calc(100svh - 18px) !important;
+    padding: clamp(8px, 1.2vw, 12px) !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(190px, 25vw, 220px) !important;
+    gap: 8px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar {
+    font-size: 11px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header {
+    gap: 3px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header h2 {
+    font-size: 17px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header p,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header .order-market-note,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-budget-message {
+    font-size: 10.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-total-box {
+    gap: 5px !important;
+    padding: 7px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-total-box div {
+    min-height: 30px !important;
+    padding: 5px 6px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-total-box span,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-total-box strong {
+    font-size: 10.5px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft #order-confirm-button {
+    min-height: 38px !important;
+    font-size: 13px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-category-tabs {
+    gap: 5px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-category-tab {
+    min-height: 30px !important;
+    padding: 6px 5px !important;
+    font-size: 10px !important;
+    gap: 4px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(4, minmax(96px, 1fr)) !important;
+    gap: 7px !important;
+    padding: 6px 4px 8px 0 !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+    min-height: clamp(138px, 23svh, 178px) !important;
+    padding: 7px !important;
+    gap: 5px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices span,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices b,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices strong,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card > .order-product-title,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-title {
+    font-size: 10px !important;
+    line-height: 1.1 !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card > .order-product-stock,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card > .order-product-status {
+    font-size: 9px !important;
+  }
+
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+    width: min(210px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-width: min(210px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-height: min(180px, var(--tutorial-card-safe-height, 34vh)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  #order-modal.modal {
+    padding: 8px !important;
+  }
+
+  #order-modal .modal-content.order-modal-content {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: calc(100svh - 16px) !important;
+    max-height: calc(100svh - 16px) !important;
+    padding: 7px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(150px, 32vw, 180px) !important;
+    gap: 6px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(2, minmax(84px, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+    grid-template-columns: 50px minmax(0, 1fr) !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header h2 {
+    font-size: 15px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header p,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-market-note {
+    display: none !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-budget-message {
+    padding: 6px !important;
+    font-size: 9.5px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-image-box {
+    width: 50px !important;
+    height: 50px !important;
+    min-width: 50px !important;
+    min-height: 50px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-thumb,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-fallback {
+    width: 44px !important;
+    height: 44px !important;
+  }
+}
+
+/* [v7.13.21] Tutorial order quantity small-screen collision guard
+   Keep the step-3 popover away from target product images and quantity controls. */
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+  width: min(236px, var(--tutorial-card-safe-width, calc(100vw - 24px))) !important;
+  max-width: min(236px, var(--tutorial-card-safe-width, calc(100vw - 24px))) !important;
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .modal-content.order-modal-content,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-body,
+body.is-tutorial-step-order-quantity #order-modal #order-modal-body.order-modal-body--card-draft {
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity::after,
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity .tutorial-action-guide::before,
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring,
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-mask,
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-spotlight,
+body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] #tutorial-target-proxy-layer,
+body.is-tutorial-step-order-quantity .tutorial-target-proxy-layer {
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] {
+  position: relative !important;
+  z-index: 9568 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-product-image-box,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-product-image-box,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-quantity-panel,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-quantity-panel,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-quantity-controls,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-quantity-controls,
+body.is-tutorial-step-order-quantity #order-modal .order-product-card.is-tutorial-order-target .order-qty-button[data-action="increase"],
+body.is-tutorial-step-order-quantity #order-modal .order-product-card[data-tutorial-order-target="true"] .order-qty-button[data-action="increase"],
+body.is-tutorial-step-order-quantity #order-modal .order-qty-button.tutorial-active-target[data-action="increase"] {
+  position: relative !important;
+  z-index: 9572 !important;
+  pointer-events: auto !important;
+}
+
+@media (max-width: 1100px), (max-height: 680px) {
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+    width: min(190px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-width: min(190px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-height: min(190px, var(--tutorial-card-safe-height, 34vh)) !important;
+  }
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(132px, 30vw, 164px) !important;
+    gap: 6px !important;
+  }
+
+  body.is-tutorial-step-order-quantity .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--order-quantity {
+    width: min(190px, var(--tutorial-card-safe-width, calc(100vw - 16px))) !important;
+    max-width: min(190px, var(--tutorial-card-safe-width, calc(100vw - 16px))) !important;
+    max-height: min(180px, var(--tutorial-card-safe-height, 32vh)) !important;
+    padding: 7px 8px 8px !important;
+  }
+}
+
+/* [v7.13.22] Tutorial delivery-box arrival state
+   Keep the arrival box visible and clickable while the popover avoids it. */
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--delivery-box {
+  width: min(260px, var(--tutorial-card-safe-width, calc(100vw - 24px))) !important;
+  max-width: min(260px, var(--tutorial-card-safe-width, calc(100vw - 24px))) !important;
+  max-height: min(210px, var(--tutorial-card-safe-height, 42vh)) !important;
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--delivery-box::after,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--delivery-box .tutorial-action-guide::before,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-mask,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-spotlight,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] #tutorial-target-proxy-layer,
+body.is-tutorial-step-delivery-box .tutorial-target-proxy-layer {
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-delivery-box #store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone {
+  z-index: 9572 !important;
+  opacity: 1 !important;
+  filter: none !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone *,
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone::before,
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone::after {
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone .delivery-box-visual,
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone .delivery-box-hitbox,
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone .delivery-box-count {
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-delivery-box #delivery-box-zone.delivery-box-zone .delivery-box-count {
+  z-index: 9573 !important;
+}
+
+@media (max-width: 980px), (max-height: 680px) {
+  body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--delivery-box {
+    width: min(220px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-width: min(220px, var(--tutorial-card-safe-width, calc(100vw - 18px))) !important;
+    max-height: min(180px, var(--tutorial-card-safe-height, 36vh)) !important;
+    padding: 8px 10px 9px !important;
+  }
+}
+
+@media (max-width: 720px), (max-height: 560px) {
+  body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--delivery-box {
+    width: min(200px, var(--tutorial-card-safe-width, calc(100vw - 16px))) !important;
+    max-width: min(200px, var(--tutorial-card-safe-width, calc(100vw - 16px))) !important;
+    max-height: min(170px, var(--tutorial-card-safe-height, 34vh)) !important;
+    padding: 7px 8px 8px !important;
+  }
+}
+
+/* [v7.13.23] Store order modal compact popup restore
+   Small screens keep the order window as an in-frame popup while card controls stay visible. */
+@media (max-width: 1100px), (max-height: 680px) {
+  #order-modal.modal {
+    padding: clamp(12px, 3svh, 20px) clamp(12px, 3vw, 24px) !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+  }
+
+  #order-modal .modal-content.order-modal-content {
+    width: min(92vw, 960px) !important;
+    max-width: calc(100vw - 32px) !important;
+    height: auto !important;
+    max-height: min(82svh, 560px) !important;
+    padding: clamp(8px, 1.2vw, 12px) !important;
+    overflow: hidden !important;
+  }
+
+  #order-modal .order-computer-frame,
+  #order-modal #order-modal-body,
+  #order-modal #order-modal-body.order-modal-body--card-draft {
+    height: auto !important;
+    max-height: min(78svh, 540px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft {
+    padding: 8px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(190px, 24vw, 230px) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    gap: 8px !important;
+    height: min(70svh, 500px) !important;
+    max-height: min(70svh, 500px) !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-card-panel,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-list-panel,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-sidebar {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-card-panel,
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-list-panel {
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    gap: 7px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(4, minmax(112px, 1fr)) !important;
+    gap: 7px !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    padding: 6px 4px 8px 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    align-content: start !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    overflow: hidden !important;
+    overflow-y: hidden !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto auto auto auto !important;
+    grid-template-areas:
+      "image"
+      "title"
+      "stock"
+      "price"
+      "qty" !important;
+    min-height: clamp(176px, 31svh, 216px) !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 7px !important;
+    gap: 5px !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-image-box {
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    min-height: 52px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-thumb,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-fallback {
+    width: 46px !important;
+    height: 46px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices {
+    gap: 3px !important;
+    margin-top: 0 !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices span {
+    min-height: 21px !important;
+    padding: 4px 6px !important;
+    gap: 5px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-panel,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls {
+    overflow: visible !important;
+    position: relative !important;
+    z-index: 2 !important;
+  }
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  #order-modal.modal {
+    padding: 12px !important;
+  }
+
+  #order-modal .modal-content.order-modal-content {
+    width: min(94vw, 900px) !important;
+    max-width: calc(100vw - 24px) !important;
+    height: auto !important;
+    max-height: min(80svh, 500px) !important;
+    padding: 7px !important;
+  }
+
+  #order-modal .order-computer-frame,
+  #order-modal #order-modal-body,
+  #order-modal #order-modal-body.order-modal-body--card-draft {
+    max-height: min(76svh, 486px) !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(132px, 30vw, 164px) !important;
+    gap: 6px !important;
+    height: min(68svh, 460px) !important;
+    max-height: min(68svh, 460px) !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(2, minmax(118px, 1fr)) !important;
+    gap: 6px !important;
+    padding: 5px 3px 7px 0 !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto auto auto auto !important;
+    grid-template-areas:
+      "image"
+      "title"
+      "stock"
+      "price"
+      "qty" !important;
+    min-height: clamp(168px, 43svh, 198px) !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 6px !important;
+    gap: 4px !important;
+    overflow: visible !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices {
+    gap: 2px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices span {
+    min-height: 18px !important;
+    padding: 3px 5px !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-panel {
+    min-height: 32px !important;
+    padding-top: 1px !important;
+    overflow: visible !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls {
+    grid-template-columns: 30px minmax(28px, 1fr) 30px !important;
+    gap: 4px !important;
+    min-height: 30px !important;
+    overflow: visible !important;
+  }
+
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-qty-button,
+  #order-modal #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls > strong {
+    width: 30px !important;
+    min-width: 30px !important;
+    max-width: 30px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    max-height: 30px !important;
+  }
+}
+
+/* [v7.13.24] Hide the tutorial card during automatic delivery sorting.
+   The action bubble/countdown remains while player and box animations stay visible. */
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-card,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"] .tutorial-card.tutorial-card--hidden-pending {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-dim,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-dim--spotlight {
+  background: rgba(5, 8, 14, 0.06) !important;
+  opacity: 1 !important;
+  pointer-events: none !important;
+  box-shadow: none !important;
+}
+
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-highlight-ring,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-mask,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-spotlight,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden #tutorial-target-proxy-layer,
+body.is-tutorial-step-delivery-box .tutorial-overlay[data-mode="interactive"].tutorial-overlay--card-hidden .tutorial-target-proxy-layer {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* [v7.13.25] Tutorial open-store target size safety
+   Keep the real open-store button at its normal UI size; only the fixed highlight ring may grow. */
+body.is-tutorial-step-open-store .tutorial-target-proxy--open-store {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+body.is-tutorial-step-open-store #bottom-ui {
+  left: max(8px, env(safe-area-inset-left, 0px)) !important;
+  right: max(8px, env(safe-area-inset-right, 0px)) !important;
+  bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  max-width: calc(100vw - 16px) !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+body.is-tutorial-step-open-store #open-store-button,
+body.is-tutorial-step-open-store #open-store-button.primary-start-button,
+body.is-tutorial-step-open-store #open-store-button:hover,
+body.is-tutorial-step-open-store #open-store-button:focus-visible {
+  width: auto !important;
+  max-width: 100% !important;
+  transform: none !important;
+  scale: 1 !important;
+  translate: none !important;
+  position: relative !important;
+  z-index: 9535 !important;
+  pointer-events: auto !important;
+}
+
+body.is-tutorial-step-open-store #open-store-button *,
+body.is-tutorial-step-open-store #open-store-button::before,
+body.is-tutorial-step-open-store #open-store-button::after {
+  transform: none !important;
+  scale: 1 !important;
+  translate: none !important;
+}
+
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  z-index: 9528 !important;
+  pointer-events: none !important;
+  border: 2px solid rgba(255, 218, 72, 0.98) !important;
+  background: rgba(255, 236, 121, 0.08) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 218, 72, 0.22),
+    0 0 14px rgba(255, 204, 36, 0.5) !important;
+  transform: none !important;
+}
+
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-card::after,
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-action-guide::before,
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-dim,
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] #tutorial-target-proxy-layer,
+body.is-tutorial-step-open-store .tutorial-target-proxy-layer {
+  pointer-events: none !important;
+}
+
+/* [v7.13.26] Final STORE-ORDER small-screen viewport containment
+   - 발주 모달 전체를 16:9 작은 화면 안쪽에 고정한다.
+   - 이전 compact restore 블록의 height:auto 때문에 topbar+body가 합산되어 아래로 튀어나가던 문제를 최종 차단한다.
+   - 카드 목록만 내부 스크롤하고, 우측 발주 확정 패널은 화면 안에서 압축/스크롤되도록 둔다. */
+#order-modal.modal:not(.hidden) {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  padding: 10px !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  width: min(94vw, 1120px) !important;
+  max-width: calc(100vw - 20px) !important;
+  height: min(78dvh, 660px) !important;
+  max-height: calc(100dvh - 20px) !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: clamp(7px, 1vw, 12px) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) .order-computer-frame {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) .order-computer-topbar {
+  flex: 0 0 auto !important;
+}
+
+#order-modal.modal:not(.hidden) #order-modal-body,
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: clamp(7px, 0.9vw, 12px) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-card-panel,
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-list-panel {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+  height: 100% !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  align-content: start !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, auto) auto !important;
+  align-content: start !important;
+  gap: clamp(6px, 0.8vw, 10px) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 1100px), (max-height: 680px) {
+  #order-modal.modal:not(.hidden) {
+    padding: 9px !important;
+  }
+
+  #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+    width: min(92vw, 960px) !important;
+    max-width: calc(100vw - 18px) !important;
+    height: min(74dvh, 540px) !important;
+    max-height: calc(100dvh - 18px) !important;
+    padding: 8px !important;
+  }
+
+  #order-modal.modal:not(.hidden) .order-computer-topbar {
+    min-height: 34px !important;
+    padding: 7px 10px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft {
+    padding: 7px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(176px, 23vw, 220px) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    gap: 7px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-list-toolbar {
+    gap: 5px !important;
+    min-height: 0 !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-category-tabs {
+    gap: 5px !important;
+    min-height: 0 !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-category-tab {
+    min-height: 28px !important;
+    padding: 5px 6px !important;
+    font-size: 10px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-category-summary {
+    min-height: 24px !important;
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(4, minmax(96px, 1fr)) !important;
+    gap: 6px !important;
+    padding: 4px 3px 6px 0 !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+    min-height: clamp(150px, 27dvh, 188px) !important;
+    padding: 6px !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-image-box {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-thumb,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-fallback {
+    width: 42px !important;
+    height: 42px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices span,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices b,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-prices strong,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card > .order-product-title,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-product-title {
+    font-size: 10px !important;
+    line-height: 1.12 !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-panel {
+    min-height: 30px !important;
+    overflow: visible !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls {
+    grid-template-columns: 28px minmax(26px, 1fr) 28px !important;
+    gap: 4px !important;
+    min-height: 28px !important;
+    overflow: visible !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-qty-button,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls > strong {
+    width: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header h2 {
+    font-size: 16px !important;
+    line-height: 1.15 !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header p,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header .order-market-note {
+    display: none !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-total-box {
+    gap: 4px !important;
+    margin: 0 !important;
+    padding: 6px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-total-box div {
+    min-height: 26px !important;
+    padding: 4px 5px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-budget-message {
+    margin: 0 !important;
+    padding: 6px !important;
+    font-size: 9.5px !important;
+    line-height: 1.25 !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft #order-confirm-button {
+    min-height: 36px !important;
+    font-size: 12px !important;
+  }
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  #order-modal.modal:not(.hidden) {
+    padding: 8px !important;
+  }
+
+  #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+    width: min(94vw, 900px) !important;
+    max-width: calc(100vw - 16px) !important;
+    height: min(72dvh, 480px) !important;
+    max-height: calc(100dvh - 16px) !important;
+    padding: 7px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(132px, 29vw, 160px) !important;
+    gap: 6px !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(2, minmax(108px, 1fr)) !important;
+  }
+
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row,
+  #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card.order-product-row {
+    min-height: clamp(142px, 36dvh, 170px) !important;
+  }
+}
+
+/* [v7.13.27-order-tutorial-no-scroll]
+   - 첫 영업 튜토리얼의 상품 수량 선택 단계에서는 스크롤이 생기지 않도록
+     튜토리얼 대상 상품만 표시하고 발주창 내부를 고정 레이아웃으로 압축한다.
+   - 일반 발주 화면은 기존처럼 전체 상품 목록/스크롤 구조를 유지한다.
+*/
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+  width: min(94vw, 940px) !important;
+  max-width: calc(100vw - 18px) !important;
+  height: min(76dvh, 520px) !important;
+  max-height: calc(100dvh - 18px) !important;
+  overflow: hidden !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .order-computer-frame,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+  overflow: hidden !important;
+  min-height: 0 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+  grid-template-columns: minmax(0, 1fr) clamp(180px, 24vw, 230px) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-areas: "products sidebar" !important;
+  gap: 8px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar {
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  display: grid !important;
+  grid-template-rows: auto auto auto auto !important;
+  align-content: start !important;
+  gap: 6px !important;
+  overflow: hidden !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header h2 {
+  font-size: 16px !important;
+  line-height: 1.15 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header p,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-sidebar > .order-modal-header .order-market-note {
+  display: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-total-box {
+  gap: 4px !important;
+  margin: 0 !important;
+  padding: 6px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-total-box div {
+  min-height: 24px !important;
+  padding: 4px 5px !important;
+  font-size: 10px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-budget-message {
+  margin: 0 !important;
+  padding: 6px !important;
+  font-size: 9.5px !important;
+  line-height: 1.25 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft #order-confirm-button {
+  min-height: 34px !important;
+  font-size: 12px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-card-panel,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-list-panel {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  grid-template-areas: "cards" !important;
+  overflow: hidden !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-list-toolbar {
+  display: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+  grid-area: cards !important;
+  grid-row: 1 !important;
+  grid-template-columns: repeat(2, minmax(118px, 1fr)) !important;
+  gap: 8px !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  align-content: start !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row[data-tutorial-order-target="false"] {
+  display: none !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row[data-tutorial-order-target="true"] {
+  display: grid !important;
+  min-height: clamp(156px, 34dvh, 218px) !important;
+  height: auto !important;
+  padding: 8px !important;
+  gap: 4px !important;
+  overflow: hidden !important;
+  align-content: start !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-image-box {
+  width: 54px !important;
+  height: 54px !important;
+  min-width: 54px !important;
+  min-height: 54px !important;
+  margin-bottom: 0 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-thumb,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-fallback {
+  width: 46px !important;
+  height: 46px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] > .order-product-title {
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+  max-height: 26px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] > .order-product-stock {
+  font-size: 9.5px !important;
+  line-height: 1.1 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices {
+  gap: 3px !important;
+  min-height: 0 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices span {
+  min-height: 22px !important;
+  padding: 4px 6px !important;
+  font-size: 9.5px !important;
+  line-height: 1 !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices span b,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices span strong {
+  font-size: 9.5px !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-quantity-panel {
+  min-height: 30px !important;
+  padding: 2px 3px 0 !important;
+  overflow: visible !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-quantity-controls {
+  grid-template-columns: 28px minmax(28px, 1fr) 28px !important;
+  gap: 4px !important;
+  min-height: 28px !important;
+  overflow: visible !important;
+}
+
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-qty-button,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-quantity-controls > strong {
+  width: 28px !important;
+  min-width: 28px !important;
+  max-width: 28px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  max-height: 28px !important;
+  padding: 0 !important;
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+    width: min(96vw, 900px) !important;
+    max-width: calc(100vw - 12px) !important;
+    height: min(86dvh, 480px) !important;
+    max-height: calc(100dvh - 12px) !important;
+    padding: 6px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .order-computer-topbar {
+    min-height: 30px !important;
+    padding: 5px 8px !important;
+    font-size: 10px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft {
+    padding: 6px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-draft-layout.order-draft-layout--card {
+    grid-template-columns: minmax(0, 1fr) clamp(126px, 30vw, 156px) !important;
+    gap: 6px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid {
+    grid-template-columns: repeat(2, minmax(98px, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-product-list.order-product-card-grid > article.order-product-card.order-product-row[data-tutorial-order-target="true"] {
+    min-height: clamp(138px, 38dvh, 170px) !important;
+    padding: 6px !important;
+    gap: 3px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-image-box {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-thumb,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-fallback {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-recommend-badge {
+    min-height: 16px !important;
+    padding: 2px 5px !important;
+    font-size: 8px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] > .order-product-title {
+    font-size: 10px !important;
+    max-height: 23px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices span {
+    min-height: 20px !important;
+    padding: 3px 5px !important;
+    font-size: 8.8px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices span b,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-product-prices span strong,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-total-box div,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft .order-budget-message {
+    font-size: 8.8px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-quantity-controls {
+    grid-template-columns: 26px minmax(24px, 1fr) 26px !important;
+    min-height: 26px !important;
+  }
+
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-qty-button,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card[data-tutorial-order-target="true"] .order-quantity-controls > strong {
+    width: 26px !important;
+    min-width: 26px !important;
+    max-width: 26px !important;
+    height: 26px !important;
+    min-height: 26px !important;
+    max-height: 26px !important;
+  }
+}
+
+/* [v7.13.28] STORE-ORDER game-frame bound modal position
+   - 발주 모달이 브라우저 전체 100dvh 기준으로 가운데 정렬되면서 16:9 게임 프레임 아래로 내려가는 문제를 차단한다.
+   - #game-root와 같은 16:9 프레임 크기/위치를 CSS로 재현해 발주창을 게임 화면 안에서만 배치한다.
+   - 튜토리얼 수량 선택 단계도 스크롤 없이 같은 프레임 안에서 위쪽 정렬한다. */
+#order-modal.modal:not(.hidden) {
+  position: fixed !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  width: min(100vw, calc(100dvh * 16 / 9)) !important;
+  height: min(100dvh, calc(100vw * 9 / 16)) !important;
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  padding: clamp(54px, 10.5%, 76px) clamp(10px, 3.5%, 36px) clamp(8px, 1.6%, 14px) !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) .modal-content.order-modal-content,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+  width: 100% !important;
+  max-width: 1120px !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 auto !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) .order-computer-frame,
+#order-modal.modal:not(.hidden) #order-modal-body,
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .order-computer-frame,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft {
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#order-modal.modal:not(.hidden) .order-computer-frame,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .order-computer-frame {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+}
+
+#order-modal.modal:not(.hidden) #order-modal-body,
+#order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body,
+body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft {
+  flex: 1 1 auto !important;
+  height: auto !important;
+}
+
+@media (max-width: 1100px), (max-height: 680px) {
+  #order-modal.modal:not(.hidden) {
+    padding: clamp(46px, 9.5%, 64px) clamp(8px, 2.4%, 24px) clamp(8px, 1.4%, 12px) !important;
+  }
+
+  #order-modal.modal:not(.hidden) .modal-content.order-modal-content,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+    max-width: 980px !important;
+  }
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  #order-modal.modal:not(.hidden) {
+    padding: clamp(38px, 8.5%, 52px) clamp(7px, 1.8%, 16px) 8px !important;
+  }
+
+  #order-modal.modal:not(.hidden) .modal-content.order-modal-content,
+  body.is-tutorial-step-order-quantity #order-modal.modal:not(.hidden) .modal-content.order-modal-content {
+    max-width: 940px !important;
+  }
+}
+
+/* [v7.13.29] Bottom UI transparent backplate cleanup
+   - 하단 행동 버튼/영업 시작 버튼 뒤에 깔리던 반투명 유리판, 잔상, 그림자형 받침을 제거한다.
+   - 버튼 자체의 색/텍스트/아이콘은 유지하고, 뒤쪽 배경처럼 보이는 요소만 제거한다. */
+#bottom-ui,
+#action-dock {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#bottom-ui::before,
+#bottom-ui::after,
+#action-dock::before,
+#action-dock::after {
+  content: none !important;
+  display: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#bottom-ui button,
+.dock-button,
+#start-day-button,
+#end-day-button,
+#upgrade-shortcut-button,
+#shop-shortcut-button,
+.primary-start-button,
+#open-store-button.primary-start-button {
+  outline: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#bottom-ui button::after,
+.dock-button::after,
+#start-day-button::after,
+#end-day-button::after,
+#upgrade-shortcut-button::after,
+#shop-shortcut-button::after,
+.primary-start-button::after,
+#open-store-button.primary-start-button::after {
+  content: none !important;
+  display: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 3D 받침/잔상처럼 보이던 하단 그림자만 제거한다. */
+#bottom-ui button,
+#bottom-ui button:disabled,
+#bottom-ui button:active:not(:disabled),
+.dock-button,
+.dock-button:disabled,
+.primary-start-button,
+.primary-start-button:disabled,
+#open-store-button.primary-start-button,
+#open-store-button.primary-start-button:disabled,
+body.is-tutorial-step-start-day #start-day-button,
+body.is-tutorial-step-start-day #start-day-button:hover,
+body.is-tutorial-step-start-day #start-day-button:focus-visible,
+body.is-tutorial-step-open-store #open-store-button,
+body.is-tutorial-step-open-store #open-store-button.primary-start-button,
+body.is-tutorial-step-open-store #open-store-button:hover,
+body.is-tutorial-step-open-store #open-store-button:focus-visible,
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day,
+body.is-tutorial-step-start-day .tutorial-target-proxy--start-day.dock-button,
+body.is-tutorial-step-open-store .tutorial-target-proxy--open-store,
+body.is-tutorial-step-open-store .tutorial-target-proxy--open-store.primary-start-button {
+  box-shadow: none !important;
+}
+
+/* 튜토리얼 하이라이트는 버튼 뒤 배경판처럼 보이지 않게 테두리만 남긴다. */
+body.is-tutorial-step-start-day .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring,
+body.is-tutorial-step-open-store .tutorial-overlay[data-mode="interactive"] .tutorial-highlight-ring {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* [v7.13.30] Shelf stock warning indicators merged from teammate shelf work */
+.shelf-warning-icons {
+  position: absolute !important;
+  left: 50% !important;
+  top: 8px !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 3px !important;
+  pointer-events: none !important;
+  z-index: 25 !important;
+}
+
+.shelf-warning-icon {
+  width: 8px !important;
+  height: 8px !important;
+  display: block !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  border-radius: 999px !important;
+}
+
+.shelf-warning-icon.is-empty {
+  background: #ff3b30 !important;
+}
+
+.shelf-warning-icon.is-warning {
+  background: #ffc107 !important;
 }
