@@ -5017,8 +5017,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   renderInteractionFeedback() {
     const playerCenter = this.getInteractionPlayerCenter();
+    const isDeliveryBoxSorting = this.isDeliveryBoxSortingInteractionSuppressed();
 
-    this.getInteractionFeedbackTargets().forEach((target) => {
+    if (isDeliveryBoxSorting) {
+      this.clearShelfInteractionFeedback();
+    }
+
+    this.getInteractionFeedbackTargets({ suppressShelf: isDeliveryBoxSorting }).forEach((target) => {
       const node = document.getElementById(target.nodeId);
 
       if (!node || node.hidden) return;
@@ -5039,16 +5044,49 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     });
   },
 
-  getInteractionFeedbackTargets() {
-  const shelfTargets = SHELF_INSTANCES.map((shelf) => {
-    return {
-      nodeId: shelf.nodeId,
-      shelfId: shelf.shelfId,
-      shelfInstanceId: shelf.instanceId,
-      isInteractable: true,
-      fallback: { x: shelf.x, y: shelf.y }
-    };
-  });
+  isDeliveryBoxSortingInteractionSuppressed() {
+    return (
+      GameState.deliveryBoxState === "carrying" ||
+      GameState.player?.carryingBoxType === "arrive"
+    );
+  },
+
+  clearShelfInteractionFeedback() {
+    SHELF_INSTANCES.forEach((shelf) => {
+      this.clearInteractionFeedbackNode(shelf.nodeId);
+    });
+  },
+
+  clearInteractionFeedbackNode(nodeId) {
+    const node = document.getElementById(nodeId);
+
+    if (!node) return;
+
+    node.classList.remove(
+      "interaction-feedback-target",
+      "is-interactable",
+      "is-interaction-ready",
+      "is-click-sparkling"
+    );
+
+    node.querySelectorAll(
+      ":scope > .interaction-effect, :scope > .interaction-glow-ring, :scope > .interaction-finger-tap, :scope > .interaction-click-sparkle"
+    ).forEach((effectNode) => effectNode.remove());
+  },
+
+  getInteractionFeedbackTargets(options = {}) {
+  const shouldSuppressShelf = options.suppressShelf === true;
+  const shelfTargets = shouldSuppressShelf
+    ? []
+    : SHELF_INSTANCES.map((shelf) => {
+      return {
+        nodeId: shelf.nodeId,
+        shelfId: shelf.shelfId,
+        shelfInstanceId: shelf.instanceId,
+        isInteractable: true,
+        fallback: { x: shelf.x, y: shelf.y }
+      };
+    });
 
   return [
     ...shelfTargets,
