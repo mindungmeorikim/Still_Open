@@ -4645,12 +4645,12 @@ button:active {
   position: absolute;
   right: 126px;
   bottom: 86px;
-  z-index: 6;
+  z-index: 120;
   display: flex;
-  width: 112px;
+  width: 72px;
   align-items: center;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   pointer-events: none;
   transition: left 0.22s ease, top 0.22s ease;
 }
@@ -4661,44 +4661,35 @@ button:active {
 
 .staff-character-avatar {
   position: relative;
-  display: grid;
-  width: 58px;
-  height: 58px;
-  place-items: center;
-  border: 3px solid #4f9f78;
-  border-radius: 22px 22px 24px 24px;
-  background:
-    linear-gradient(180deg, #f8fffb 0%, #bfead0 100%);
-  color: var(--tycoon-mint-dark);
-  font-size: 16px;
+  display: block;
+  width: 72px;
+  height: 112px;
+  place-items: initial;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
   font-weight: 950;
-  box-shadow:
-    0 5px 0 rgba(45, 115, 85, 0.22),
-    0 12px 18px rgba(45, 115, 85, 0.14);
+  box-shadow: none;
 }
 
 .staff-character-avatar::before {
-  content: "";
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  width: 30px;
-  height: 12px;
-  transform: translateX(-50%);
-  border-radius: 999px 999px 10px 10px;
-  background: rgba(79, 159, 120, 0.34);
+  display: none;
+  content: none;
 }
 
 .staff-character-avatar::after {
   content: "";
   position: absolute;
   left: 50%;
-  bottom: -10px;
-  width: 48px;
-  height: 10px;
+  bottom: 4px;
+  width: 45px;
+  height: 12px;
   transform: translateX(-50%);
   border-radius: 999px;
-  background: rgba(91, 66, 39, 0.12);
+  background: rgba(0, 0, 0, 0.18);
+  filter: blur(2px);
 }
 
 .staff-character-face {
@@ -4715,27 +4706,20 @@ button:active {
 }
 
 .staff-character-sprite {
-  position: relative;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
   z-index: 1;
-  width: 54px;
-  height: 54px;
+  width: 72px;
+  height: 112px;
   object-fit: contain;
   image-rendering: auto;
-  filter: drop-shadow(0 3px 4px rgba(91, 66, 39, 0.16));
+  transform: translateX(-50%);
+  filter: none;
 }
 
 .staff-character-label {
-  display: grid;
-  width: max-content;
-  max-width: 120px;
-  gap: 2px;
-  padding: 6px 8px;
-  border: 2px solid #6d573e;
-  border-radius: 14px;
-  background: #fffdf7;
-  color: var(--tycoon-ink);
-  text-align: center;
-  box-shadow: 0 4px 0 rgba(91, 66, 39, 0.14);
+  display: none !important;
 }
 
 .staff-character-label strong,
@@ -4767,34 +4751,44 @@ button:active {
 }
 
 #staff-character[data-staff-type="park_junho"] .staff-character-avatar {
-  border-color: #5ea5c8;
-  background:
-    linear-gradient(180deg, #f7fbff 0%, #cfefff 100%);
-  color: #326f91;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
 }
 
 #staff-character[data-staff-type="park_junho"] .staff-character-avatar::before {
-  background: rgba(94, 165, 200, 0.34);
+  display: none;
+  content: none;
 }
 
 #staff-character[data-staff-type="lee_bora"] .staff-character-avatar {
-  border-color: #ff9b8c;
-  background:
-    linear-gradient(180deg, #fff8f3 0%, #ffe2da 100%);
-  color: #a84b3f;
+  border-color: transparent;
+  background: transparent;
+  color: transparent;
 }
 
 #staff-character[data-staff-type="lee_bora"] .staff-character-avatar::before {
-  background: rgba(255, 155, 140, 0.34);
+  display: none;
+  content: none;
 }
 
 @media (max-width: 760px) {
   #staff-character.staff-character {
     right: 104px;
     bottom: 98px;
-    width: 96px;
+    width: 68px;
     transform: scale(0.92);
     transform-origin: right bottom;
+  }
+
+  .staff-character-avatar {
+    width: 68px;
+    height: 104px;
+  }
+
+  .staff-character-sprite {
+    width: 68px;
+    height: 104px;
   }
 
   .staff-character-label {
@@ -4807,7 +4801,7 @@ button:active {
   #staff-character.staff-character {
     right: 96px;
     bottom: 108px;
-    width: 88px;
+    width: 64px;
     transform: scale(0.86);
   }
 }
@@ -21950,7 +21944,7 @@ body.is-title-screen-active #game-root {
 }
 
 #staff-character[data-staff-moving="true"] .staff-character-avatar {
-  animation: staffWalkBob 0.42s ease-in-out infinite;
+  animation: none;
 }
 
 #staff-character[data-staff-moving="true"] .staff-character-sprite {
@@ -26885,7 +26879,7 @@ body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-skip-button {
   height: 38px !important;
   margin: 14px auto 0 !important;
   padding: 0 22px !important;
-  display: flex !important;
+  display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   align-self: center !important;
