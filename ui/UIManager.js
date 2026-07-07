@@ -3483,6 +3483,14 @@ getNearestDebugShelf(point) {
 
     startDayButton.addEventListener("click", (event) => {
       if (!this.guardTutorialAction("day:start-order", event)) return;
+
+      if (this.isOrderDraftShortcutPhase()) {
+        event.preventDefault();
+        event.stopPropagation();
+        this.openOrderDraftFromDock();
+        return;
+      }
+
       EventBus.emit(EVENTS.DAY_START_REQUESTED);
     });
 
@@ -3510,6 +3518,64 @@ getNearestDebugShelf(point) {
         this.showBMContractShopModal();
       });
     }
+  },
+
+  isOrderDraftShortcutPhase() {
+    return GameState.phase === GAME_PHASE.ORDER;
+  },
+
+  hasActiveOrderDelivery() {
+    const deliveredItems = this.getDeliveredItems?.(this.orderDeliveredData) ?? [];
+    const hasUnsortedDeliveredItems = Boolean(
+      this.orderDeliveredData &&
+      !this.orderDeliveredData.isCompleted &&
+      deliveredItems.some((item) => !item.isSorted)
+    );
+
+    return (
+      this.orderModalMode === "waiting" ||
+      this.orderModalMode === "delivery" ||
+      hasUnsortedDeliveredItems ||
+      Boolean(document.getElementById("delivery-box-zone")) ||
+      GameState.deliveryBoxState === "carrying" ||
+      GameState.player?.carryingBoxType === "arrive"
+    );
+  },
+
+  openOrderDraftFromDock() {
+    if (this.isOrderModalVisible?.()) {
+      return;
+    }
+
+    if (this.hasActiveOrderDelivery()) {
+      this.showMessage("이미 접수된 발주가 있어요. 도착한 발주 박스를 정리한 뒤 다시 발주할 수 있습니다.", {
+        duration: 2400
+      });
+      return;
+    }
+
+    this.showOrderModal({
+      day: GameState.day,
+      dailyGoal: GameState.dailyGoal,
+      difficulty: GameState.difficulty,
+      isEndlessMode: GameState.isEndlessMode,
+      dayScenario: GameState.dayScenario,
+      source: "dock_order_reopen"
+    });
+  },
+
+  shouldDisableStartDayButton() {
+    if (this.isOrderDraftShortcutPhase()) {
+      return this.hasActiveOrderDelivery();
+    }
+
+    return [
+      GAME_PHASE.DAY_START,
+      GAME_PHASE.STORE_RUNNING,
+      GAME_PHASE.DAY_END,
+      GAME_PHASE.RESULT,
+      GAME_PHASE.UPGRADE
+    ].includes(GameState.phase);
   },
 
   bindGameEvents() {
@@ -5967,14 +6033,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const shopShortcutButton = document.getElementById("shop-shortcut-button");
 
     if (startDayButton) {
-      startDayButton.disabled = [
-        GAME_PHASE.ORDER,
-        GAME_PHASE.DAY_START,
-        GAME_PHASE.STORE_RUNNING,
-        GAME_PHASE.DAY_END,
-        GAME_PHASE.RESULT,
-        GAME_PHASE.UPGRADE
-      ].includes(GameState.phase);
+      startDayButton.disabled = this.shouldDisableStartDayButton();
     }
 
     if (openStoreButton) {
@@ -9888,7 +9947,15 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       event.preventDefault();
       event.stopPropagation();
       if (!this.guardTutorialAction("order:close", event)) return;
+
+      const wasDraftMode = this.orderModalMode === "draft";
       this.hideOrderModal();
+
+      if (wasDraftMode && this.isOrderDraftShortcutPhase()) {
+        this.showMessage("발주가 아직 확정되지 않았어요. 아래 [발주] 버튼을 눌러 다시 발주창을 열 수 있습니다.", {
+          duration: 2400
+        });
+      }
     };
   },
 

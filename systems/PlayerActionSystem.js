@@ -29,6 +29,7 @@ import { InventorySystem } from "./InventorySystem.js";
 import { BMSystem } from "./BMSystem.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
+import { getShelfInstanceIdByProductId } from "../data/ProductShelfMapData.js";
 
 const STAFF_EVENTS = {
   AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
@@ -210,6 +211,14 @@ export const PlayerActionSystem = {
   bindShelfStockEvents() {
     EventBus.on(SHELF_STOCK_CONSUMED, (data = {}) => {
       this.handleShelfStockConsumed(data);
+    });
+
+    EventBus.on(EVENTS.STOCK_ORGANIZED, (data = {}) => {
+      this.handleOrderShelfAutoFill(data);
+    });
+
+    EventBus.on(EVENTS.STORE_OPENED, () => {
+      this.ensureShelfStocksSeededFromInventory();
     });
   },
 
@@ -561,6 +570,143 @@ export const PlayerActionSystem = {
         ];
       })
     );
+  },
+
+  isTutorialFlowActive() {
+    return Boolean(
+      typeof document !== "undefined" &&
+      document.body?.classList?.contains("is-tutorial-active")
+    );
+  },
+
+  handleOrderShelfAutoFill(data = {}) {
+    if (this.isTutorialFlowActive()) {
+      return;
+    }
+
+    const source = String(data.source ?? "").trim();
+
+    if (source !== "delivery_box_sorted" && source !== "order_delivery_compat") {
+      return;
+    }
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    let changed = false;
+
+    items.forEach((item) => {
+      const didChange = this.applyShelfAutoFillForProduct(item.productId, item.quantity, {
+        mode: "add",
+        reason: "order_stock_organized"
+      });
+
+      changed = changed || didChange;
+    });
+
+    if (changed) {
+      this.syncShelfStocksToGameState("order_stock_organized");
+      EventBus.emit(SHELF_STOCK_CHANGED, {
+        day: GameState.day,
+        success: true,
+        reason: "order_stock_organized",
+        source
+      });
+      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+    }
+  },
+
+  ensureShelfStocksSeededFromInventory() {
+    if (this.isTutorialFlowActive()) {
+      return;
+    }
+
+    const snapshot = InventorySystem.getInventorySnapshot?.() ?? {};
+    const items = Array.isArray(snapshot.items) ? snapshot.items : [];
+
+    if (items.length === 0) {
+      return;
+    }
+
+    let changed = false;
+
+    items.forEach((item) => {
+      const didChange = this.applyShelfAutoFillForProduct(item.productId, item.quantity, {
+        mode: "ensure",
+        reason: "store_open_inventory_seed"
+      });
+
+      changed = changed || didChange;
+    });
+
+    if (changed) {
+      this.syncShelfStocksToGameState("store_open_inventory_seed");
+      EventBus.emit(SHELF_STOCK_CHANGED, {
+        day: GameState.day,
+        success: true,
+        reason: "store_open_inventory_seed",
+        source: "store_opened"
+      });
+      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+    }
+  },
+
+  applyShelfAutoFillForProduct(productId, quantity = 0, options = {}) {
+    const resolvedProductId = this.getResolvedProductId(productId);
+    const safeQuantity = Math.max(0, Math.floor(Number(quantity) || 0));
+
+    if (!resolvedProductId || safeQuantity <= 0) {
+      return false;
+    }
+
+    const product = getProductById(resolvedProductId);
+    const shelfInstanceId = getShelfInstanceIdByProductId(resolvedProductId);
+    const targetShelf = this.getShelfSlot(
+      shelfInstanceId ?? product?.targetShelfInstanceId ?? product?.shelfId
+    );
+
+    if (!targetShelf || !this.isShelfZoneUnlocked(targetShelf)) {
+      return false;
+    }
+
+    const stockKey = targetShelf.instanceId;
+
+    if (!this.shelfStocks[stockKey]) {
+      this.shelfStocks[stockKey] = {
+        products: {}
+      };
+    }
+
+    if (!this.shelfStocks[stockKey].products) {
+      this.shelfStocks[stockKey].products = {};
+    }
+
+    const productStock = this.shelfStocks[stockKey].products[resolvedProductId] ?? {};
+    const capacity = Math.max(
+      1,
+      Math.floor(
+        Number(productStock.maxStock) ||
+        Number(targetShelf.maxStock) ||
+        8
+      )
+    );
+    const currentStock = Math.max(
+      0,
+      Math.floor(Number(productStock.currentStock) || 0)
+    );
+    const nextStock = options.mode === "ensure"
+      ? Math.max(currentStock, Math.min(capacity, safeQuantity))
+      : Math.min(capacity, currentStock + safeQuantity);
+
+    if (nextStock === currentStock) {
+      return false;
+    }
+
+    this.shelfStocks[stockKey].products[resolvedProductId] = {
+      productId: resolvedProductId,
+      currentStock: nextStock,
+      maxStock: capacity
+    };
+
+    return true;
   },
 
   getReservedCarriedQuantity(productId, exceptCustomerId = null) {

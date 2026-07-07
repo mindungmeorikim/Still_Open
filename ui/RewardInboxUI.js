@@ -15,6 +15,22 @@ export const RewardInboxUI = {
   lastMessage: "",
   lastMessageType: "",
 
+  getGameModalHost() {
+    return document.getElementById("game-root") ?? document.body;
+  },
+
+  mountGameModal(modal) {
+    if (!modal) return null;
+
+    const host = this.getGameModalHost();
+
+    if (host && modal.parentElement !== host) {
+      host.appendChild(modal);
+    }
+
+    return modal;
+  },
+
   init() {
     if (this.isInitialized) return;
     this.isInitialized = true;
@@ -113,7 +129,7 @@ export const RewardInboxUI = {
           </div>
         </div>
       `;
-      document.body.appendChild(modal);
+      this.mountGameModal(modal);
     }
 
     this.modal = modal;
