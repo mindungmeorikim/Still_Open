@@ -10,6 +10,7 @@ import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
 import { PRODUCTS, PRODUCT_SHELF_IDS } from "../data/ProductData.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
+import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import {
   EXPANSION_ZONES,
   getPreviousExpansionZone
@@ -41,7 +42,7 @@ const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
-const CLEANING_ZONE_POSITION = Object.freeze({ x: 870, y: 650 });
+const DEFAULT_CLEANING_POINT = Object.freeze(getCleaningPointByZoneId());
 const TUTORIAL_ORDER_TARGET_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const ORDER_VALIDATION_MESSAGES = Object.freeze({
   notEnoughGold: "골드가 부족합니다.",
@@ -69,6 +70,11 @@ const DEFAULT_SANITATION_STATE = Object.freeze({
   isCleaningNeeded: false,
   isCleaning: false,
   cleaningDurationMs: 5000,
+  dirtyZoneId: DEFAULT_CLEANING_POINT.zoneId,
+  dirtySpotId: DEFAULT_CLEANING_POINT.id,
+  activeCleaningPoint: DEFAULT_CLEANING_POINT,
+  unlockedCleaningZoneCount: 1,
+  sanitationPressureMultiplier: 1,
   settlementPenalty: {
     applies: false,
     satisfactionPenalty: 0,
@@ -4238,6 +4244,20 @@ getNearestDebugShelf(point) {
       : GameState.sanitation ?? DEFAULT_SANITATION_STATE;
     const value = Math.max(0, Math.min(100, Math.floor(Number(source.value) || 0)));
 
+    const sourcePoint = source.activeCleaningPoint;
+    const activeCleaningPoint = (
+      sourcePoint &&
+      Number.isFinite(Number(sourcePoint.x)) &&
+      Number.isFinite(Number(sourcePoint.y))
+    )
+      ? {
+        ...DEFAULT_CLEANING_POINT,
+        ...sourcePoint,
+        x: Number(sourcePoint.x),
+        y: Number(sourcePoint.y)
+      }
+      : getCleaningPointByZoneId(source.dirtyZoneId);
+
     return {
       ...DEFAULT_SANITATION_STATE,
       ...source,
@@ -4245,6 +4265,11 @@ getNearestDebugShelf(point) {
       status: source.status ?? this.getSanitationStatus(value),
       isCleaningNeeded: source.isCleaningNeeded === true || value < 100,
       isCleaning: source.isCleaning === true,
+      dirtyZoneId: activeCleaningPoint.zoneId,
+      dirtySpotId: activeCleaningPoint.id,
+      activeCleaningPoint,
+      unlockedCleaningZoneCount: Math.max(1, Math.floor(Number(source.unlockedCleaningZoneCount) || 1)),
+      sanitationPressureMultiplier: Number(source.sanitationPressureMultiplier) || 1,
       settlementPenalty: source.settlementPenalty ?? DEFAULT_SANITATION_STATE.settlementPenalty
     };
   },
@@ -4294,17 +4319,25 @@ getNearestDebugShelf(point) {
     }
 
     const state = this.normalizeSanitationState(this.sanitationState);
+    const activeCleaningPoint = state.activeCleaningPoint ?? DEFAULT_CLEANING_POINT;
     const showTrash = state.value <= 50;
     const showStain = state.isCleaningNeeded || state.value < 100;
 
-    cleaningZone.style.setProperty("left", `${CLEANING_ZONE_POSITION.x}px`, "important");
-    cleaningZone.style.setProperty("top", `${CLEANING_ZONE_POSITION.y}px`, "important");
+    cleaningZone.style.setProperty("left", `${activeCleaningPoint.x}px`, "important");
+    cleaningZone.style.setProperty("top", `${activeCleaningPoint.y}px`, "important");
     cleaningZone.dataset.sanitationStatus = state.status;
+    cleaningZone.dataset.zoneId = activeCleaningPoint.zoneId;
+    cleaningZone.dataset.cleaningSpotId = activeCleaningPoint.id;
+    cleaningZone.setAttribute("aria-label", `${activeCleaningPoint.label} 청소`);
     cleaningZone.classList.toggle("is-cleaning-needed", showStain);
     cleaningZone.classList.toggle("is-cleaning", state.isCleaning === true);
     cleaningZone.classList.toggle("is-warning", state.status === "warning" || state.status === "critical");
     cleaningZone.disabled = state.isCleaning === true;
-    this.ensureCleaningZoneVisuals(cleaningZone, { showStain, showTrash });
+    this.ensureCleaningZoneVisuals(cleaningZone, {
+      showStain,
+      showTrash,
+      label: activeCleaningPoint.label
+    });
   },
 
   ensureCleaningZoneVisuals(cleaningZone, options = {}) {
@@ -4344,7 +4377,7 @@ getNearestDebugShelf(point) {
     setImage("cleaning-sparkle-image", SANITATION_ASSETS.sparkle, true);
 
     const labelNode = ensureChild("cleaning-zone-label");
-    labelNode.textContent = "청소";
+    labelNode.textContent = options.label ? `${options.label} 청소` : "청소";
   },
 
   render() {

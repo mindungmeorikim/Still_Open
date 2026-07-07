@@ -28,6 +28,7 @@ import { CustomerSystem } from "./CustomerSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
 import { BMSystem } from "./BMSystem.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
+import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 
 const STAFF_EVENTS = {
   AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
@@ -138,6 +139,7 @@ export const PlayerActionSystem = {
   cleaningZone: {
     x: 870,
     y: 650,
+    interactionDistance: 130
   },
 
   init() {
@@ -383,9 +385,12 @@ export const PlayerActionSystem = {
   },
 
   isNearCleaningZone() {
-    const distance = this.getDistanceToZone("cleaning-zone", this.cleaningZone);
+    const activeCleaningPoint = this.getActiveCleaningPoint();
+    const distance = this.getDistanceToZone("cleaning-zone", activeCleaningPoint);
+    const interactionDistance =
+      Number(activeCleaningPoint.interactionDistance) || this.interactionDistance;
 
-    return distance !== null && distance <= this.interactionDistance;
+    return distance !== null && distance <= interactionDistance;
   },
 
   getPrimaryInteractionTarget() {
@@ -401,15 +406,20 @@ export const PlayerActionSystem = {
       };
     }
 
-    const cleaningDistance = this.getDistanceToZone("cleaning-zone", this.cleaningZone);
+    const activeCleaningPoint = this.getActiveCleaningPoint();
+    const cleaningDistance = this.getDistanceToZone("cleaning-zone", activeCleaningPoint);
+    const cleaningInteractionDistance =
+      Number(activeCleaningPoint.interactionDistance) || this.interactionDistance;
 
     if (
       cleaningDistance !== null &&
-      cleaningDistance <= this.interactionDistance
+      cleaningDistance <= cleaningInteractionDistance
     ) {
       return {
         type: "cleaning",
-        distance: cleaningDistance
+        distance: cleaningDistance,
+        targetZoneId: activeCleaningPoint.zoneId,
+        dirtySpotId: activeCleaningPoint.id
       };
     }
 
@@ -655,6 +665,27 @@ export const PlayerActionSystem = {
       //: 0;
 
     return Math.max(1, shelfMaxStock);
+  },
+
+  getActiveCleaningPoint() {
+    const sanitationState = GameState.sanitation ?? {};
+    const point = sanitationState.activeCleaningPoint;
+
+    if (
+      point &&
+      Number.isFinite(Number(point.x)) &&
+      Number.isFinite(Number(point.y))
+    ) {
+      return {
+        ...this.cleaningZone,
+        ...point,
+        x: Number(point.x),
+        y: Number(point.y),
+        interactionDistance: Number(point.interactionDistance) || this.cleaningZone.interactionDistance || this.interactionDistance
+      };
+    }
+
+    return getCleaningPointByZoneId(sanitationState.dirtyZoneId);
   },
 
   getDistanceToZone(zoneId, fallback = null) {
@@ -1217,9 +1248,14 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       source: options.source ?? "player_action_system"
     });
 
+    const activeCleaningPoint = this.getActiveCleaningPoint();
+
     EventBus.emit(SANITATION_CLEANING_REQUESTED, {
       day: GameState.day,
       actorType: "player",
+      targetZoneId: activeCleaningPoint.zoneId,
+      dirtyZoneId: activeCleaningPoint.zoneId,
+      dirtySpotId: activeCleaningPoint.id,
       source: options.source ?? "player_action_system"
     });
   },

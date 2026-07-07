@@ -13,6 +13,7 @@ import { InventorySystem } from "./InventorySystem.js";
 import { PlayerActionSystem } from "./PlayerActionSystem.js";
 import { SanitationSystem } from "./SanitationSystem.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
+import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getProductById } from "../data/ProductData.js";
 
 export const STAFF_ASSIST_EVENTS = Object.freeze({
@@ -301,10 +302,15 @@ export const StaffAssistSystem = {
       return null;
     }
 
+    const activeCleaningPoint = this.getActiveCleaningAssistPoint();
+
     return {
       type: "cleaning",
       sanitationValue,
       cleaningTriggerValue,
+      targetCleaningZoneId: activeCleaningPoint.zoneId,
+      targetCleaningSpotId: activeCleaningPoint.id,
+      activeCleaningPoint,
       durationMs: this.getTaskDurationMs("cleaning", BASE_CLEANING_MS)
     };
   },
@@ -385,10 +391,15 @@ export const StaffAssistSystem = {
   },
 
   startCleaningTask(task) {
+    const cleaningAssistPosition = this.getCleaningAssistPosition(task.activeCleaningPoint);
+
     this.moveStaffToState("cleaning", {
       reason: "cleaning_started",
       taskType: "cleaning",
-      position: POSITIONS.cleaningAssist,
+      position: cleaningAssistPosition,
+      direction: cleaningAssistPosition.direction,
+      targetCleaningZoneId: task.targetCleaningZoneId,
+      targetCleaningSpotId: task.targetCleaningSpotId,
       cleaningTriggerValue: task.cleaningTriggerValue,
       taskDurationMs: task.durationMs
     }, () => {
@@ -405,6 +416,8 @@ export const StaffAssistSystem = {
 
         this.incrementStaffDailyCount("todayCleaningHelpCount");
 
+        const cleanedPoint = task.activeCleaningPoint ?? this.getActiveCleaningAssistPoint();
+
         EventBus.emit(EVENTS.CLEANING_COMPLETED, {
           day: GameState.day,
           source: "staff_assist",
@@ -412,10 +425,13 @@ export const StaffAssistSystem = {
           previousValue,
           value: nextValue,
           recoveredAmount: Math.max(0, nextValue - previousValue),
+          cleanedZoneId: cleanedPoint.zoneId,
+          cleanedSpotId: cleanedPoint.id,
+          cleanedPoint,
           state: SanitationSystem.getState?.() ?? GameState.sanitation
         });
 
-        this.emitMessage("청소 보조가 끝났어요.", 2200);
+        this.emitMessage(`${cleanedPoint.label} 청소 보조가 끝났어요.`, 2200);
         this.completeTask({
           type: "cleaning",
           success: true,
@@ -976,6 +992,31 @@ export const StaffAssistSystem = {
     return this.compactMovementPath(rawPath);
   },
 
+  getActiveCleaningAssistPoint() {
+    const sanitationState = SanitationSystem.getState?.() ?? GameState.sanitation ?? {};
+    const point = sanitationState.activeCleaningPoint;
+
+    if (
+      point &&
+      Number.isFinite(Number(point.x)) &&
+      Number.isFinite(Number(point.y))
+    ) {
+      return point;
+    }
+
+    return getCleaningPointByZoneId(sanitationState.dirtyZoneId);
+  },
+
+  getCleaningAssistPosition(point = this.getActiveCleaningAssistPoint()) {
+    const cleaningPoint = point ?? getCleaningPointByZoneId();
+
+    return {
+      x: Number(cleaningPoint.staffX ?? cleaningPoint.x ?? POSITIONS.cleaningAssist.x),
+      y: Number(cleaningPoint.staffY ?? cleaningPoint.y ?? POSITIONS.cleaningAssist.y),
+      direction: cleaningPoint.direction ?? "up_left"
+    };
+  },
+
   getDefaultRoutePoints(status, options = {}) {
     if (status === "idle" && String(options.reason ?? "").includes("arrive_idle")) {
       return [STAFF_ROUTE_POINTS.entryAisle, STAFF_ROUTE_POINTS.mainAisle];
@@ -992,7 +1033,9 @@ export const StaffAssistSystem = {
     }
 
     if (status === "cleaning") {
-      return [STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.cleaningAisle];
+      const targetZoneId = options.targetCleaningZoneId ?? this.getActiveCleaningAssistPoint().zoneId;
+
+      return STAFF_ROUTE_POINTS_BY_ZONE_ID[targetZoneId] ?? [STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.cleaningAisle];
     }
 
     if (status === "returning") {

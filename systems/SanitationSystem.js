@@ -10,6 +10,12 @@
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
+import {
+  CLEANING_ZONE_ORDER,
+  DEFAULT_CLEANING_ZONE_ID,
+  getCleaningPointByZoneId,
+  getUnlockedCleaningZoneIds
+} from "../data/CleaningPointData.js";
 
 export const SANITATION_EVENTS = Object.freeze({
   CHANGED: "SANITATION_CHANGED",
@@ -28,6 +34,8 @@ const CLEANING_DURATION_MS = 5000;
 const WARNING_THRESHOLD = 50;
 const WARNING_RESET_THRESHOLD = 60;
 const SETTLEMENT_SATISFACTION_PENALTY = -5;
+const SANITATION_AREA_PRESSURE_STEP = 0.25;
+const SANITATION_AREA_PRESSURE_MAX = 1.75;
 
 export const SanitationSystem = {
   isInitialized: false,
@@ -38,6 +46,8 @@ export const SanitationSystem = {
   cleaningTimerId: null,
   cleaningDurationMs: CLEANING_DURATION_MS,
   activeCleaningDurationMs: null,
+  dirtyZoneId: DEFAULT_CLEANING_ZONE_ID,
+  dirtySpotId: getCleaningPointByZoneId(DEFAULT_CLEANING_ZONE_ID).id,
   processedDisruptionKeys: new Set(),
 
   init() {
@@ -54,7 +64,8 @@ export const SanitationSystem = {
     EventBus.on(SANITATION_EVENTS.CLEANING_REQUESTED, (data = {}) => {
       this.startCleaning({
         source: data.source ?? "sanitation_cleaning_request",
-        actorType: data.actorType ?? "player"
+        actorType: data.actorType ?? "player",
+        targetZoneId: data.targetZoneId ?? data.dirtyZoneId ?? null
       });
     });
   },
@@ -89,6 +100,8 @@ export const SanitationSystem = {
   },
 
   getState() {
+    const activeCleaningPoint = this.getActiveCleaningPoint();
+
     return {
       value: this.value,
       status: this.getStatus(this.value),
@@ -96,6 +109,11 @@ export const SanitationSystem = {
       isCleaning: this.isCleaning,
       warningArmed: this.warningArmed,
       cleaningDurationMs: this.activeCleaningDurationMs ?? this.cleaningDurationMs,
+      dirtyZoneId: activeCleaningPoint.zoneId,
+      dirtySpotId: activeCleaningPoint.id,
+      activeCleaningPoint,
+      unlockedCleaningZoneCount: this.getUnlockedCleaningZoneIds().length,
+      sanitationPressureMultiplier: this.getAreaPressureMultiplier(),
       settlementPenalty: this.getSettlementPenalty()
     };
   },
@@ -123,6 +141,7 @@ export const SanitationSystem = {
 
     if (nextValue < DEFAULT_SANITATION) {
       this.isCleaningNeeded = true;
+      this.ensureDirtyCleaningPoint(reason);
     }
 
     this.updateWarningState(previousValue, nextValue);
@@ -148,6 +167,10 @@ export const SanitationSystem = {
 
     if (nextValue >= DEFAULT_SANITATION) {
       this.isCleaningNeeded = false;
+      this.clearDirtyCleaningPoint();
+    } else {
+      this.isCleaningNeeded = true;
+      this.advanceDirtyCleaningPoint(reason);
     }
 
     this.updateWarningState(previousValue, nextValue);
@@ -185,18 +208,25 @@ export const SanitationSystem = {
     }
 
     const durationMs = this.getAssistedCleaningDurationMs(this.cleaningDurationMs, options.actorType);
+    const activeCleaningPoint = this.ensureDirtyCleaningPoint(options.targetZoneId ?? options.source ?? "cleaning_started");
 
     this.isCleaning = true;
     this.activeCleaningDurationMs = durationMs;
-    this.emitChanged("cleaning_started", { source: options.source ?? "unknown" });
+    this.emitChanged("cleaning_started", {
+      source: options.source ?? "unknown",
+      activeCleaningPoint
+    });
     EventBus.emit(SANITATION_EVENTS.CLEANING_STARTED, {
       day: this.getCurrentDay(),
       durationMs,
+      dirtyZoneId: activeCleaningPoint.zoneId,
+      dirtySpotId: activeCleaningPoint.id,
+      activeCleaningPoint,
       source: options.source ?? "unknown",
       state: this.getState()
     });
     EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
-      message: "청소 중...",
+      message: `${activeCleaningPoint.label} 청소 중...`,
       duration: durationMs
     });
 
@@ -213,12 +243,20 @@ export const SanitationSystem = {
   completeCleaning(reason = "cleaning_completed") {
     const wasCleaning = this.isCleaning;
     const previousValue = this.value;
+    const cleanedPoint = this.getActiveCleaningPoint();
 
     this.clearCleaningTimer();
     this.value = this.clampSanitation(this.value + CLEANING_RECOVERY);
     this.isCleaning = false;
     this.activeCleaningDurationMs = null;
     this.isCleaningNeeded = this.value < DEFAULT_SANITATION;
+
+    if (this.isCleaningNeeded) {
+      this.advanceDirtyCleaningPoint(reason);
+    } else {
+      this.clearDirtyCleaningPoint();
+    }
+
     this.updateWarningState(previousValue, this.value);
 
     const payload = {
@@ -228,6 +266,10 @@ export const SanitationSystem = {
       previousValue,
       value: this.value,
       recoveredAmount: this.value - previousValue,
+      cleanedZoneId: cleanedPoint.zoneId,
+      cleanedSpotId: cleanedPoint.id,
+      cleanedPoint,
+      activeCleaningPoint: this.getActiveCleaningPoint(),
       state: this.getState()
     };
 
@@ -237,7 +279,7 @@ export const SanitationSystem = {
     });
     EventBus.emit(SANITATION_EVENTS.CLEANING_COMPLETED, payload);
     EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
-      message: "청소 완료!",
+      message: `${cleanedPoint.label} 청소 완료!`,
       duration: 2600
     });
     this.emitChanged(reason, {
@@ -258,6 +300,7 @@ export const SanitationSystem = {
     this.isCleaningNeeded = false;
     this.isCleaning = false;
     this.activeCleaningDurationMs = null;
+    this.clearDirtyCleaningPoint();
     this.warningArmed = true;
     this.processedDisruptionKeys.clear();
     this.emitChanged("reset");
@@ -276,6 +319,12 @@ export const SanitationSystem = {
     this.value = this.clampSanitation(restoredValue, DEFAULT_SANITATION);
     this.isCleaningNeeded = sourceData.isCleaningNeeded === true ||
       (sourceData.isCleaningNeeded !== false && this.value < DEFAULT_SANITATION);
+    this.setDirtyCleaningPoint(sourceData.dirtyZoneId ?? sourceData.activeCleaningPoint?.zoneId ?? DEFAULT_CLEANING_ZONE_ID);
+    if (this.isCleaningNeeded) {
+      this.ensureDirtyCleaningPoint(sourceData.dirtyZoneId ?? "hydrate");
+    } else {
+      this.clearDirtyCleaningPoint();
+    }
     this.isCleaning = sourceData.isCleaning === true && this.isCleaningNeeded;
     this.warningArmed = sourceData.warningArmed === undefined
       ? this.value >= WARNING_RESET_THRESHOLD
@@ -307,6 +356,11 @@ export const SanitationSystem = {
       isCleaningNeeded: this.isCleaningNeeded,
       isCleaning: this.isCleaning,
       warningArmed: this.warningArmed,
+      dirtyZoneId: this.getActiveCleaningPoint().zoneId,
+      dirtySpotId: this.getActiveCleaningPoint().id,
+      activeCleaningPoint: this.getActiveCleaningPoint(),
+      unlockedCleaningZoneCount: this.getUnlockedCleaningZoneIds().length,
+      sanitationPressureMultiplier: this.getAreaPressureMultiplier(),
       processedDisruptionKeys: [...this.processedDisruptionKeys].slice(-30)
     };
   },
@@ -333,12 +387,15 @@ export const SanitationSystem = {
     this.processedDisruptionKeys.add(key);
 
     const eventPenalty = Math.floor(Number(data.sanitationPenalty) || 0);
-    const penalty = Math.max(CUSTOMER_MESS_PENALTY, eventPenalty);
+    const basePenalty = Math.max(CUSTOMER_MESS_PENALTY, eventPenalty);
+    const pressureMultiplier = this.getAreaPressureMultiplier();
+    const penalty = Math.max(basePenalty, Math.ceil(basePenalty * pressureMultiplier));
+    const dirtyPoint = this.ensureDirtyCleaningPoint(key);
     const result = this.decreaseSanitation(penalty, reason);
 
     if (result.changed) {
       EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
-        message: `진상 손님이 매장을 어지럽혔습니다. 위생 -${penalty}`,
+        message: `${dirtyPoint.label}이 어질러졌습니다. 위생 -${penalty}`,
         duration: 3200
       });
     }
@@ -438,9 +495,103 @@ export const SanitationSystem = {
       isCleaning: state.isCleaning,
       warningArmed: state.warningArmed,
       cleaningDurationMs: state.cleaningDurationMs,
+      dirtyZoneId: state.dirtyZoneId,
+      dirtySpotId: state.dirtySpotId,
+      activeCleaningPoint: state.activeCleaningPoint,
+      unlockedCleaningZoneCount: state.unlockedCleaningZoneCount,
+      sanitationPressureMultiplier: state.sanitationPressureMultiplier,
       settlementPenalty: state.settlementPenalty,
       processedDisruptionKeys: [...this.processedDisruptionKeys].slice(-30)
     };
+  },
+
+  getUnlockedCleaningZoneIds() {
+    return getUnlockedCleaningZoneIds(GameState.expansion?.unlockedZoneIds);
+  },
+
+  getAreaPressureMultiplier() {
+    const unlockedCount = Math.max(1, this.getUnlockedCleaningZoneIds().length);
+    const multiplier = 1 + (unlockedCount - 1) * SANITATION_AREA_PRESSURE_STEP;
+
+    return Math.min(SANITATION_AREA_PRESSURE_MAX, Number(multiplier.toFixed(2)));
+  },
+
+  getActiveCleaningPoint() {
+    const unlockedZoneIds = this.getUnlockedCleaningZoneIds();
+    const zoneId = unlockedZoneIds.includes(this.dirtyZoneId)
+      ? this.dirtyZoneId
+      : unlockedZoneIds[0] ?? DEFAULT_CLEANING_ZONE_ID;
+
+    return getCleaningPointByZoneId(zoneId);
+  },
+
+  setDirtyCleaningPoint(zoneId = DEFAULT_CLEANING_ZONE_ID) {
+    const unlockedZoneIds = this.getUnlockedCleaningZoneIds();
+    const normalizedZoneId = unlockedZoneIds.includes(zoneId)
+      ? zoneId
+      : unlockedZoneIds[0] ?? DEFAULT_CLEANING_ZONE_ID;
+    const point = getCleaningPointByZoneId(normalizedZoneId);
+
+    this.dirtyZoneId = point.zoneId;
+    this.dirtySpotId = point.id;
+
+    return point;
+  },
+
+  clearDirtyCleaningPoint() {
+    return this.setDirtyCleaningPoint(DEFAULT_CLEANING_ZONE_ID);
+  },
+
+  ensureDirtyCleaningPoint(seed = "dirty") {
+    const unlockedZoneIds = this.getUnlockedCleaningZoneIds();
+
+    if (this.isCleaningNeeded && unlockedZoneIds.includes(this.dirtyZoneId)) {
+      return this.getActiveCleaningPoint();
+    }
+
+    const zoneId = this.pickDirtyZoneId(seed, unlockedZoneIds);
+
+    return this.setDirtyCleaningPoint(zoneId);
+  },
+
+  advanceDirtyCleaningPoint(seed = "cleaning_completed") {
+    const unlockedZoneIds = this.getUnlockedCleaningZoneIds();
+
+    if (unlockedZoneIds.length <= 1) {
+      return this.setDirtyCleaningPoint(unlockedZoneIds[0] ?? DEFAULT_CLEANING_ZONE_ID);
+    }
+
+    const currentIndex = unlockedZoneIds.indexOf(this.dirtyZoneId);
+    const nextIndex = currentIndex >= 0
+      ? (currentIndex + 1) % unlockedZoneIds.length
+      : this.getStableIndexFromSeed(seed, unlockedZoneIds.length);
+
+    return this.setDirtyCleaningPoint(unlockedZoneIds[nextIndex]);
+  },
+
+  pickDirtyZoneId(seed = "dirty", unlockedZoneIds = this.getUnlockedCleaningZoneIds()) {
+    const allowedZoneIds = unlockedZoneIds.length > 0
+      ? unlockedZoneIds
+      : [DEFAULT_CLEANING_ZONE_ID];
+    const explicitZoneId = CLEANING_ZONE_ORDER.find((zoneId) => String(seed ?? "").includes(zoneId));
+
+    if (explicitZoneId && allowedZoneIds.includes(explicitZoneId)) {
+      return explicitZoneId;
+    }
+
+    return allowedZoneIds[this.getStableIndexFromSeed(seed, allowedZoneIds.length)];
+  },
+
+  getStableIndexFromSeed(seed = "dirty", modulo = 1) {
+    const safeModulo = Math.max(1, Math.floor(Number(modulo) || 1));
+    const text = String(seed ?? "dirty");
+    let hash = 0;
+
+    for (let index = 0; index < text.length; index += 1) {
+      hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+    }
+
+    return hash % safeModulo;
   },
 
   createMutationResult(changed, reason, amount, previousValue) {
