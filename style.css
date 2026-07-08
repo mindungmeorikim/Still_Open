@@ -27720,3 +27720,79 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
   left: calc(610px + var(--queue-x)) !important;
   top: calc(445px + var(--queue-y)) !important;
 }
+
+/* ========================================================================== */
+/* [v7.13.72] Delivery Box X Position + Counter Feedback Background Guard      */
+/* 발주 박스는 Y축을 유지하고 X축만 왼쪽으로 50px 이동한다.                   */
+/* 계산대의 상호작용 보조 레이어/버튼 잔상이 다시 생기지 않도록 최종 차단한다. */
+/* ========================================================================== */
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone {
+  left: 518px !important;
+  top: 615px !important;
+}
+
+#counter-zone,
+#store-interaction-layer > #counter-zone,
+#counter-zone.interaction-feedback-target,
+#counter-zone.is-interaction-ready,
+#counter-zone.is-click-sparkling,
+#store-interaction-layer > #counter-zone.interaction-feedback-target,
+#store-interaction-layer > #counter-zone.is-interaction-ready,
+#store-interaction-layer > #counter-zone.is-click-sparkling {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background-color: transparent !important;
+  background-image: var(--counter-zone-asset) !important;
+  background-repeat: no-repeat !important;
+  background-position: 13px 13px !important;
+  background-size: 82px 85px !important;
+}
+
+#counter-zone > .interaction-effect,
+#counter-zone > .interaction-glow-ring,
+#counter-zone > .interaction-finger-tap,
+#counter-zone > .interaction-click-sparkle,
+#counter-zone > .asset-object-effect,
+#counter-zone.interaction-feedback-target > .interaction-effect,
+#counter-zone.is-interaction-ready > .interaction-effect,
+#counter-zone.is-click-sparkling > .interaction-effect,
+#store-interaction-layer > #counter-zone > .interaction-effect,
+#store-interaction-layer > #counter-zone > .interaction-glow-ring,
+#store-interaction-layer > #counter-zone > .interaction-finger-tap,
+#store-interaction-layer > #counter-zone > .interaction-click-sparkle,
+#store-interaction-layer > #counter-zone > .asset-object-effect,
+#store-interaction-layer > #counter-zone.interaction-feedback-target > .interaction-effect,
+#store-interaction-layer > #counter-zone.is-interaction-ready > .interaction-effect,
+#store-interaction-layer > #counter-zone.is-click-sparkling > .interaction-effect {
+  content: none !important;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: 0 !important;
+  max-height: 0 !important;
+  background: none !important;
+  background-image: none !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  animation: none !important;
+  pointer-events: none !important;
+}

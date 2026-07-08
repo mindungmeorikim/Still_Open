@@ -132,9 +132,9 @@ export const PlayerActionSystem = {
   },
 
   deliveryBoxZone: {
-    x: 568,
+    x: 518,
     y: 615,
-    standX: 560,
+    standX: 510,
     standY: 630
   },
 

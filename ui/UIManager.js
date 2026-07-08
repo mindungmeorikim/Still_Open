@@ -5172,6 +5172,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     this.clearInteractionFeedbackNode("delivery-box-zone");
+    this.clearInteractionFeedbackNode("counter-zone");
 
     const playerCenter = this.getInteractionPlayerCenter();
 
@@ -5179,6 +5180,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       const node = document.getElementById(target.nodeId);
 
       if (!node || node.hidden) return;
+
+      if (node.dataset.interactionFeedbackDisabled === "true") {
+        this.clearInteractionFeedbackNode(target.nodeId);
+        return;
+      }
 
       this.ensureInteractionFeedbackNodes(node);
       this.bindInteractionFeedbackNode(node);
@@ -5361,7 +5367,12 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   bindInteractionFeedbackNode(node) {
-    if (!node || node.id === "delivery-box-zone" || node.dataset.interactionFeedbackBound === "true") {
+    if (
+      !node ||
+      node.id === "delivery-box-zone" ||
+      node.dataset.interactionFeedbackDisabled === "true" ||
+      node.dataset.interactionFeedbackBound === "true"
+    ) {
       return;
     }
 
@@ -5379,6 +5390,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const node = document.getElementById(nodeId);
 
     if (!node) return;
+
+    if (node.dataset.interactionFeedbackDisabled === "true") {
+      this.clearInteractionFeedbackNode(nodeId);
+      return;
+    }
 
     this.ensureInteractionFeedbackNodes(node);
     node.classList.remove("is-click-sparkling");
@@ -7568,6 +7584,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (counterZone) {
       counterZone.dataset.playerAction = "checkout";
       counterZone.dataset.counterAssetReady = "true";
+      counterZone.dataset.interactionFeedbackDisabled = "true";
+      this.clearInteractionFeedbackNode("counter-zone");
       counterZone.setAttribute("role", "button");
       counterZone.setAttribute("tabindex", "0");
     }
