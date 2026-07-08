@@ -1,0 +1,12 @@
+260708 23:30 팀 최신 작업본 기준 충돌 범위 정확 병합 패치
+
+적용 파일:
+- data/ShelfPlacementData.js
+- data/CollisionData.js
+
+기준:
+- 진열대/냉장고/온장고/신선매대 위치 및 충돌 범위는 collision_range_latest_files.zip의 값을 그대로 사용
+- 손님 좌표/CustomerSystem.js/PlayerMovementSystem.js/UIManager.js/CleaningPointData.js는 수정하지 않음
+
+주의:
+- 이 패치는 전체 프로젝트가 아니라 최신 작업본에 덮어쓸 수정 파일만 포함합니다.
