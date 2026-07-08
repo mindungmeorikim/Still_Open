@@ -36,18 +36,15 @@ export const MobileUI = {
     root.className = "mobile-controls";
 
     root.innerHTML = `
-      <div id="mobile-joystick" class="mobile-joystick">
+      <div id="mobile-joystick" class="mobile-joystick" aria-label="이동 조이스틱">
         <div id="mobile-joystick-base" class="mobile-joystick-base">
           <div id="mobile-joystick-thumb" class="mobile-joystick-thumb"></div>
         </div>
       </div>
-
-      <button id="mobile-interact-button" class="mobile-interact-button" type="button">
-        상호작용
-      </button>
     `;
 
-    document.body.appendChild(root);
+    const gameRoot = document.getElementById("game-root");
+    (gameRoot || document.body).appendChild(root);
     this.root = root;
   },
 };

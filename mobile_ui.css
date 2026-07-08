@@ -1,29 +1,58 @@
 /* mobile-ui.css */
 
+/*
+  [v8.0.29] mobile input fix
+  - 모바일 조작 UI는 #game-root 기준으로 배치한다.
+  - 조이스틱은 어떤 화면 비율에서도 완전한 원형을 유지한다.
+  - 오른쪽 상호작용 버튼은 제거하고 오브젝트 직접 터치를 사용한다.
+*/
+
+#game-root {
+  position: relative;
+}
+
 .mobile-controls {
-  position: fixed;
-  inset: 0;
   pointer-events: none;
-  z-index: 99999;
+  z-index: 700;
+  touch-action: none;
+  user-select: none;
+}
+
+#game-root > .mobile-controls {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body > .mobile-controls {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: min(100vw, calc(100dvh * 16 / 9));
+  height: min(100dvh, calc(100vw * 9 / 16));
+  transform: translate(-50%, -50%);
 }
 
 .mobile-joystick {
   position: absolute;
-  left: 28px;
-  bottom: 28px;
-  width: 120px;
-  height: 120px;
+  left: clamp(14px, 2.2%, 24px);
+  bottom: clamp(72px, 13%, 104px);
+  width: clamp(84px, 10.5vmin, 112px);
+  aspect-ratio: 1 / 1;
+  height: auto;
   pointer-events: auto;
 }
 
 .mobile-joystick-base {
   position: relative;
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.24);
-  border: 3px solid rgba(255, 255, 255, 0.55);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 3px solid rgba(255, 255, 255, 0.48);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
   backdrop-filter: blur(4px);
 }
 
@@ -31,38 +60,26 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
+  width: 45%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  border-radius: 9999px;
   transform: translate(-50%, -50%);
-  background: rgba(255, 255, 255, 0.85);
-  border: 2px solid rgba(80, 80, 80, 0.25);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+  background: rgba(255, 255, 255, 0.84);
+  border: 2px solid rgba(80, 80, 80, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
-.mobile-interact-button {
-  position: absolute;
-  right: 28px;
-  bottom: 42px;
-  width: 108px;
-  height: 108px;
-  border-radius: 50%;
-  border: none;
-  pointer-events: auto;
-
-  font-size: 16px;
-  font-weight: 700;
-  color: #333;
-
-  background: rgba(255, 235, 130, 0.92);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+.mobile-interact-button,
+#mobile-interact-button {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
 }
 
-.mobile-interact-button:active {
-  transform: scale(0.94);
-}
-
-.mobile-controls,
 .mobile-joystick,
 .mobile-joystick-base,
 .mobile-joystick-thumb,

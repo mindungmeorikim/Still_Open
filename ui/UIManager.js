@@ -243,6 +243,7 @@ export const UIManager = {
     minZoom: 0.45,
     fullZoom: 0.55,
     focusZoom: 1.55,
+    followZoom: 1.08,
     maxZoom: 2.2,
     isDragging: false,
     wasDragging: false,
@@ -252,6 +253,11 @@ export const UIManager = {
     startY: 0,
     pinchStartDistance: 0,
     pinchStartZoom: 1.55,
+    followTargetX: null,
+    followTargetY: null,
+    followMode: null,
+    followRafId: null,
+    followLastTimestamp: 0,
     resizeTimerId: null
   },
 
@@ -3729,6 +3735,7 @@ renderDebugCollisionBoxes() {
     EventBus.on(PLAYER_POSITION_CHANGED, () => {
       this.renderPlayer();
       this.renderInteractionFeedback();
+      this.followPlayerCamera();
     });
 
     EventBus.on(PLAYER_DIALOGUE_REQUESTED, (data = {}) => {
@@ -4757,7 +4764,7 @@ renderDebugCollisionBoxes() {
     if (!cleaningZone) {
       cleaningZone = document.createElement("button");
       cleaningZone.id = "cleaning-zone";
-      cleaningZone.className = "cleaning-zone";
+      cleaningZone.className = "cleaning-zone interaction-feedback-target";
       cleaningZone.type = "button";
       cleaningZone.dataset.playerAction = "cleaning";
       cleaningZone.setAttribute("aria-label", "청소 구역");
@@ -4765,6 +4772,10 @@ renderDebugCollisionBoxes() {
     } else if (cleaningZone.parentElement !== interactionLayer) {
       interactionLayer.appendChild(cleaningZone);
     }
+
+    cleaningZone.classList.add("interaction-feedback-target");
+    cleaningZone.dataset.playerAction = "cleaning";
+    cleaningZone.setAttribute("role", "button");
 
     const state = this.normalizeSanitationState(this.sanitationState);
     const activeCleaningPoint = state.activeCleaningPoint ?? DEFAULT_CLEANING_POINT;
@@ -5786,14 +5797,18 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   queueInitialCameraFocus() {
-    const focusBasic = () => {
-      this.focusStoreSpace("zone_basic");
+    const focusInitial = () => {
+      const didFocusPlayer = this.followPlayerCamera({ force: true });
+
+      if (!didFocusPlayer) {
+        this.focusStoreSpace("zone_basic");
+      }
     };
 
     window.requestAnimationFrame(() => {
-      focusBasic();
-      window.setTimeout(focusBasic, 80);
-      window.setTimeout(focusBasic, 260);
+      focusInitial();
+      window.setTimeout(focusInitial, 80);
+      window.setTimeout(focusInitial, 260);
     });
   },
 
@@ -6941,6 +6956,362 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     });
   },
 
+  followPlayerCamera(options = {}) {
+    const followContext = this.getPlayerCameraFollowContext();
+
+    if (!followContext || !this.shouldFollowPlayerCamera(options, followContext)) {
+      return false;
+    }
+
+    const target = this.getPlayerCameraTargetForContext(followContext, { applyZoom: true });
+
+    if (!target) {
+      return false;
+    }
+
+    const playerZoneId = this.getStoreZoneIdAtWorldPoint(
+      followContext.playerPoint.x,
+      followContext.playerPoint.y
+    );
+
+    if (playerZoneId) {
+      this.currentFocusedZoneId = playerZoneId;
+    }
+
+    this.worldCamera.followMode = followContext.mode;
+
+    if (options.force === true) {
+      this.cancelSmoothPlayerCameraFollow();
+      this.worldCamera.followMode = followContext.mode;
+      this.worldCamera.x = target.camera.x;
+      this.worldCamera.y = target.camera.y;
+      this.updateWorldCameraTransform();
+      return true;
+    }
+
+    this.worldCamera.followTargetX = target.camera.x;
+    this.worldCamera.followTargetY = target.camera.y;
+    this.startSmoothPlayerCameraFollow();
+
+    return true;
+  },
+
+  startSmoothPlayerCameraFollow() {
+    if (this.worldCamera.followRafId !== null) {
+      return;
+    }
+
+    this.worldCamera.followLastTimestamp = 0;
+
+    const step = (timestamp = 0) => {
+      this.worldCamera.followRafId = null;
+
+      if (
+        this.worldCamera.isDragging ||
+        this.worldCamera.pinchStartDistance > 0 ||
+        this.worldCamera.followTargetX === null ||
+        this.worldCamera.followTargetY === null
+      ) {
+        this.cancelSmoothPlayerCameraFollow();
+        return;
+      }
+
+      const elapsedMs = this.worldCamera.followLastTimestamp > 0
+        ? Math.min(48, Math.max(8, timestamp - this.worldCamera.followLastTimestamp))
+        : 16;
+
+      this.worldCamera.followLastTimestamp = timestamp || performance.now();
+
+      /*
+        프레임 시간 기반 보간.
+        기존처럼 한 번에 툭 이동하지 않고 목표 좌표까지 천천히 따라가게 한다.
+      */
+      const smoothFactor = 1 - Math.pow(0.88, elapsedMs / 16);
+      const nextX = this.worldCamera.x + (this.worldCamera.followTargetX - this.worldCamera.x) * smoothFactor;
+      const nextY = this.worldCamera.y + (this.worldCamera.followTargetY - this.worldCamera.y) * smoothFactor;
+      const dx = this.worldCamera.followTargetX - nextX;
+      const dy = this.worldCamera.followTargetY - nextY;
+
+      if (Math.abs(dx) < 0.6 && Math.abs(dy) < 0.6) {
+        this.worldCamera.x = this.worldCamera.followTargetX;
+        this.worldCamera.y = this.worldCamera.followTargetY;
+        this.worldCamera.followTargetX = null;
+        this.worldCamera.followTargetY = null;
+        this.updateWorldCameraTransform();
+        return;
+      }
+
+      this.worldCamera.x = nextX;
+      this.worldCamera.y = nextY;
+      this.updateWorldCameraTransform();
+      this.worldCamera.followRafId = window.requestAnimationFrame(step);
+    };
+
+    this.worldCamera.followRafId = window.requestAnimationFrame(step);
+  },
+
+  cancelSmoothPlayerCameraFollow() {
+    if (this.worldCamera.followRafId !== null) {
+      window.cancelAnimationFrame(this.worldCamera.followRafId);
+    }
+
+    this.worldCamera.followRafId = null;
+    this.worldCamera.followTargetX = null;
+    this.worldCamera.followTargetY = null;
+    this.worldCamera.followLastTimestamp = 0;
+  },
+
+  shouldFollowPlayerCamera(options = {}, followContext = null) {
+    if (!GameState.player) return false;
+
+    const viewport = document.getElementById("store-area");
+    const worldMap = document.getElementById("store-world-map");
+
+    if (!viewport || !worldMap) return false;
+
+    if (this.worldCamera.isDragging || this.worldCamera.pinchStartDistance > 0) {
+      return false;
+    }
+
+    if (options.force === true) {
+      return true;
+    }
+
+    const context = followContext || this.getPlayerCameraFollowContext();
+
+    if (!context) return false;
+
+    if (context.mode === "store_center") {
+      const target = this.getPlayerCameraTargetForContext(context, { applyZoom: false });
+
+      if (!target) return false;
+
+      return (
+        this.worldCamera.followMode !== context.mode ||
+        Math.abs(target.camera.x - this.worldCamera.x) > 2 ||
+        Math.abs(target.camera.y - this.worldCamera.y) > 2
+      );
+    }
+
+    const playerFocusPoint = context.focusPoint;
+
+    if (!playerFocusPoint) return false;
+
+    const target = this.getPlayerCameraTargetForContext(context, { applyZoom: false });
+
+    if (!target) return false;
+
+    /*
+      [v8.0.34] 확장 구역이 열린 뒤에는 매장 중심 고정보다 플레이어 추적이 편하다.
+      - basic 단칸 매장: 매장 중심 고정으로 화면 흔들림 최소화
+      - 확장 매장: 플레이어 중심 목표 좌표를 계속 갱신하되 부드러운 보간으로 따라감
+      - 입구/창고 바깥: 기존처럼 화면 가장자리에서만 보정
+    */
+    if (context.mode === "expanded_player") {
+      return (
+        this.worldCamera.followMode !== context.mode ||
+        Math.abs(target.camera.x - this.worldCamera.x) > 6 ||
+        Math.abs(target.camera.y - this.worldCamera.y) > 6
+      );
+    }
+
+    const screenX = playerFocusPoint.x * this.worldCamera.zoom + this.worldCamera.x;
+    const screenY = playerFocusPoint.y * this.worldCamera.zoom + this.worldCamera.y;
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 560;
+    const safeArea = this.getStoreCameraSafeArea(viewportWidth, viewportHeight);
+    const marginX = Math.max(44, safeArea.width * 0.2);
+    const marginY = Math.max(42, safeArea.height * 0.18);
+
+    return (
+      this.worldCamera.followMode !== context.mode ||
+      screenX < safeArea.left + marginX ||
+      screenX > safeArea.left + safeArea.width - marginX ||
+      screenY < safeArea.top + marginY ||
+      screenY > safeArea.top + safeArea.height - marginY
+    );
+  },
+
+  getPlayerCameraFollowContext() {
+    const playerPoint = this.getPlayerCameraFootPoint() || this.getPlayerCameraFocusPoint();
+
+    if (!playerPoint) return null;
+
+    const playerFocusPoint = this.getPlayerCameraFocusPoint();
+
+    if (this.isPlayerInsideUnlockedStoreFloor(playerPoint)) {
+      const unlockedStoreZoneCount = this.getUnlockedStoreZoneCount();
+
+      if (unlockedStoreZoneCount >= 2 && playerFocusPoint) {
+        return {
+          mode: "expanded_player",
+          focusPoint: playerFocusPoint,
+          playerPoint
+        };
+      }
+
+      const storeFocusPoint = this.getUnlockedStoreCenterCameraFocusPoint();
+
+      if (storeFocusPoint) {
+        return {
+          mode: "store_center",
+          focusPoint: storeFocusPoint,
+          playerPoint
+        };
+      }
+    }
+
+    return {
+      mode: "player_head",
+      focusPoint: playerFocusPoint,
+      playerPoint
+    };
+  },
+
+  getUnlockedStoreZoneCount() {
+    return this.getExpansionZoneViewModels(this.expansionState)
+      .filter((zone) => zone.isUnlocked || zone.level === 1)
+      .length;
+  },
+
+  getPlayerCameraTargetForContext(followContext = null, options = {}) {
+    const viewport = document.getElementById("store-area");
+    const context = followContext || this.getPlayerCameraFollowContext();
+
+    if (!viewport || !context?.focusPoint) return null;
+
+    const viewportWidth = viewport.clientWidth || 960;
+    const viewportHeight = viewport.clientHeight || 560;
+    const safeArea = this.getStoreCameraSafeArea(viewportWidth, viewportHeight);
+    const targetScreenX = safeArea.left + safeArea.width / 2;
+
+    const targetScreenY = context.mode === "store_center"
+      ? safeArea.top + safeArea.height * 0.52
+      : context.mode === "expanded_player"
+        ? safeArea.top + safeArea.height * 0.54
+        : Math.min(
+            viewportHeight - Math.max(96, viewportHeight * 0.18),
+            safeArea.top + safeArea.height * 0.62
+          );
+
+    const minimumFollowZoom = Math.max(
+      this.getWorldCoverZoom(),
+      Number(this.worldCamera.followZoom) || 1.08
+    );
+    const requestedZoom = Math.max(Number(this.worldCamera.zoom) || 0, minimumFollowZoom);
+    const zoom = options.applyZoom === true
+      ? this.setStoreCameraZoom(requestedZoom, false)
+      : Math.min(this.worldCamera.maxZoom, Math.max(this.getStoreCameraMinZoom(), requestedZoom));
+    const camera = this.getClampedWorldCameraPosition(
+      Math.round(targetScreenX - context.focusPoint.x * zoom),
+      Math.round(targetScreenY - context.focusPoint.y * zoom),
+      zoom
+    );
+
+    return {
+      camera,
+      zoom
+    };
+  },
+
+  getPlayerCameraFootPoint() {
+    if (!GameState.player) return null;
+
+    const playerNode = document.getElementById("player-zone");
+    const playerWidth = playerNode?.offsetWidth || 58;
+    const playerHeight = playerNode?.offsetHeight || 102;
+
+    return {
+      x: (Number(GameState.player.x) || 0) + playerWidth / 2,
+      y: (Number(GameState.player.y) || 0) + playerHeight * 0.86
+    };
+  },
+
+  isPlayerInsideUnlockedStoreFloor(point = null) {
+    if (!point) return false;
+
+    const worldMap = document.getElementById("store-world-map");
+    const worldWidth = Number(worldMap?.offsetWidth) || 1672;
+    const worldHeight = Number(worldMap?.offsetHeight) || 941;
+    const unlockedZones = this.getExpansionZoneViewModels(this.expansionState)
+      .filter((zone) => zone.isUnlocked || zone.level === 1);
+
+    return unlockedZones.some((zone) => {
+      const bounds = Array.isArray(zone.movementBounds) ? zone.movementBounds : [];
+
+      return bounds.some((bound) => {
+        const x = Number(bound.x) * worldWidth;
+        const y = Number(bound.y) * worldHeight;
+        const width = Number(bound.width) * worldWidth;
+        const height = Number(bound.height) * worldHeight;
+
+        return (
+          point.x >= x &&
+          point.x <= x + width &&
+          point.y >= y &&
+          point.y <= y + height
+        );
+      });
+    });
+  },
+
+  getUnlockedStoreCenterCameraFocusPoint() {
+    const unlockedZones = this.getExpansionZoneViewModels(this.expansionState)
+      .filter((zone) => zone.isUnlocked || zone.level === 1)
+      .map((zone) => this.getSpaceSceneViewModel(zone));
+
+    if (unlockedZones.length <= 0) return null;
+
+    const minX = Math.min(...unlockedZones.map((scene) => scene.x));
+    const maxX = Math.max(...unlockedZones.map((scene) => scene.x + scene.width));
+    const minY = Math.min(...unlockedZones.map((scene) => scene.y));
+    const maxY = Math.max(...unlockedZones.map((scene) => scene.y + scene.height));
+
+    return {
+      x: (minX + maxX) / 2,
+      y: (minY + maxY) / 2 - 18
+    };
+  },
+
+  getPlayerCameraFocusPoint() {
+    if (!GameState.player) return null;
+
+    const playerNode = document.getElementById("player-zone");
+    const playerWidth = playerNode?.offsetWidth || 58;
+    const playerHeight = playerNode?.offsetHeight || 102;
+
+    /*
+      [v8.0.32] 카메라 추적 기준점을 플레이어 몸 중앙/발쪽이 아니라 머리쪽으로 이동한다.
+      - 기존 0.72는 캐릭터 하단에 가까워 카메라가 플레이어 몸통/발 기준으로 따라왔다.
+      - 0.30은 현재 58x102 캐릭터 에셋 기준 얼굴/머리 쪽에 가까운 지점이다.
+      - 상호작용 판정은 getInteractionPlayerCenter()를 그대로 쓰므로 이동/계산/진열 판정에는 영향 없음.
+    */
+    return {
+      x: (Number(GameState.player.x) || 0) + playerWidth / 2,
+      y: (Number(GameState.player.y) || 0) + playerHeight * 0.3
+    };
+  },
+
+  getStoreZoneIdAtWorldPoint(worldX, worldY) {
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const matchedZone = zoneStates
+      .map((zone) => ({
+        zone,
+        scene: this.getSpaceSceneViewModel(zone)
+      }))
+      .filter(({ scene }) => {
+        return (
+          worldX >= scene.x &&
+          worldX <= scene.x + scene.width &&
+          worldY >= scene.y &&
+          worldY <= scene.y + scene.height
+        );
+      })
+      .sort((first, second) => Number(second.scene.depth) - Number(first.scene.depth))[0]?.zone;
+
+    return matchedZone?.id ?? null;
+  },
+
   handleStoreCameraWheel(event) {
     event.preventDefault();
 
@@ -6954,11 +7325,12 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (event.button !== undefined && event.button !== 0) return;
 
     const isBlockedTarget = event.target.closest?.(
-      ".store-expansion-popover, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, button[data-player-action]"
+      ".store-expansion-popover, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, #cleaning-zone, .cleaning-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, button[data-player-action]"
     );
 
     if (isBlockedTarget) return;
 
+    this.cancelSmoothPlayerCameraFollow();
     this.worldCamera.isDragging = true;
     this.worldCamera.wasDragging = false;
     this.worldCamera.dragStartX = event.clientX;
@@ -6996,7 +7368,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   handleStoreCameraViewportClick(event) {
     const isBlockedTarget = event.target.closest?.(
-      ".store-expansion-popover, .store-space-popover-trigger, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, #message-panel, #top-ui, #bottom-ui, button[data-player-action]"
+      ".store-expansion-popover, .store-space-popover-trigger, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, #cleaning-zone, .cleaning-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, #message-panel, #top-ui, #bottom-ui, button[data-player-action]"
     );
 
     if (isBlockedTarget || this.worldCamera.wasDragging) {
@@ -7073,6 +7445,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (event.touches.length !== 2) return;
 
     event.preventDefault();
+    this.cancelSmoothPlayerCameraFollow();
     this.worldCamera.isDragging = false;
     this.worldCamera.pinchStartDistance = this.getPinchDistance(event.touches);
     this.worldCamera.pinchStartZoom = this.worldCamera.zoom;
@@ -7283,35 +7656,57 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   clampWorldCamera() {
+    const clampedCamera = this.getClampedWorldCameraPosition(
+      this.worldCamera.x,
+      this.worldCamera.y,
+      this.worldCamera.zoom
+    );
+
+    this.worldCamera.zoom = clampedCamera.zoom;
+    this.worldCamera.x = clampedCamera.x;
+    this.worldCamera.y = clampedCamera.y;
+  },
+
+  getClampedWorldCameraPosition(cameraX = this.worldCamera.x, cameraY = this.worldCamera.y, cameraZoom = this.worldCamera.zoom) {
     const viewport = document.getElementById("store-area");
     const worldMap = document.getElementById("store-world-map");
 
-    if (!viewport || !worldMap) return;
-
-    const minZoom = this.getStoreCameraMinZoom();
-
-    if (this.worldCamera.zoom < minZoom) {
-      this.worldCamera.zoom = minZoom;
+    if (!viewport || !worldMap) {
+      return {
+        x: cameraX,
+        y: cameraY,
+        zoom: cameraZoom
+      };
     }
 
-    const scaledWidth = worldMap.offsetWidth * this.worldCamera.zoom;
-    const scaledHeight = worldMap.offsetHeight * this.worldCamera.zoom;
+    const minZoom = this.getStoreCameraMinZoom();
+    const safeZoom = Math.max(Number(cameraZoom) || minZoom, minZoom);
+    const scaledWidth = worldMap.offsetWidth * safeZoom;
+    const scaledHeight = worldMap.offsetHeight * safeZoom;
     const viewportWidth = viewport.clientWidth || 960;
     const viewportHeight = viewport.clientHeight || 560;
     const minX = Math.min(0, viewportWidth - scaledWidth);
     const minY = Math.min(0, viewportHeight - scaledHeight);
+    let nextX = Number(cameraX) || 0;
+    let nextY = Number(cameraY) || 0;
 
     if (scaledWidth <= viewportWidth) {
-      this.worldCamera.x = Math.round((viewportWidth - scaledWidth) / 2);
+      nextX = Math.round((viewportWidth - scaledWidth) / 2);
     } else {
-      this.worldCamera.x = Math.min(0, Math.max(minX, this.worldCamera.x));
+      nextX = Math.min(0, Math.max(minX, nextX));
     }
 
     if (scaledHeight <= viewportHeight) {
-      this.worldCamera.y = Math.round((viewportHeight - scaledHeight) / 2);
+      nextY = Math.round((viewportHeight - scaledHeight) / 2);
     } else {
-      this.worldCamera.y = Math.min(0, Math.max(minY, this.worldCamera.y));
+      nextY = Math.min(0, Math.max(minY, nextY));
     }
+
+    return {
+      x: nextX,
+      y: nextY,
+      zoom: safeZoom
+    };
   },
 
   renderStoreCameraControls(zoneStates = []) {

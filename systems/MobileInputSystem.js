@@ -3,8 +3,8 @@
 
   역할
   - 모바일 조이스틱 입력 처리
-  - PlayerMovementSystem의 keys 값에 모바일 방향 입력 전달
-  - 상호작용 버튼 터치 시 E키 입력과 동일하게 처리
+  - 키보드 WASD 입력과 충돌하지 않도록 PlayerMovementSystem.mobileInput에만 모바일 방향 입력 전달
+  - 상호작용은 별도 버튼 없이 계산대/진열대/청소 오브젝트 직접 터치로 처리
 */
 
 import { PlayerMovementSystem } from "./PlayerMovementSystem.js";
@@ -13,7 +13,6 @@ import { PlayerActionSystem } from "./PlayerActionSystem.js";
 export const MobileInputSystem = {
   joystickBase: null,
   joystickThumb: null,
-  interactButton: null,
 
   isInitialized: false,
   isDragging: false,
@@ -34,14 +33,12 @@ export const MobileInputSystem = {
 
     this.joystickBase = document.getElementById("mobile-joystick-base");
     this.joystickThumb = document.getElementById("mobile-joystick-thumb");
-    this.interactButton = document.getElementById("mobile-interact-button");
 
     if (!this.joystickBase || !this.joystickThumb) {
       return;
     }
 
     this.bindJoystickEvents();
-    this.bindInteractButtonEvents();
   },
 
   bindJoystickEvents() {
@@ -51,6 +48,7 @@ export const MobileInputSystem = {
 
       this.joystickBase.setPointerCapture?.(event.pointerId);
       this.updateJoystickByPointer(event);
+      this.applyMobileMovementToPlayer();
 
       event.preventDefault();
     });
@@ -60,6 +58,7 @@ export const MobileInputSystem = {
       if (event.pointerId !== this.activeTouchId) return;
 
       this.updateJoystickByPointer(event);
+      this.applyMobileMovementToPlayer();
       event.preventDefault();
     });
 
@@ -74,17 +73,6 @@ export const MobileInputSystem = {
       if (event.pointerId !== this.activeTouchId) return;
 
       this.resetJoystick();
-      event.preventDefault();
-    });
-  },
-
-  bindInteractButtonEvents() {
-    if (!this.interactButton) {
-      return;
-    }
-
-    this.interactButton.addEventListener("pointerdown", (event) => {
-      this.triggerKeyboardInteract();
       event.preventDefault();
     });
   },
@@ -126,22 +114,33 @@ export const MobileInputSystem = {
       this.joystickThumb.style.transform = "translate(-50%, -50%)";
     }
 
-    this.clearPlayerMovementKeys();
+    this.clearMobileMovementInput();
   },
 
   update() {
     if (PlayerActionSystem.isPlayerBusy) {
       this.moveX = 0;
       this.moveY = 0;
-      this.clearPlayerMovementKeys();
+      this.clearMobileMovementInput();
       return;
     }
 
-    this.applyMobileMovementToPlayerKeys();
+    this.applyMobileMovementToPlayer();
   },
 
-  applyMobileMovementToPlayerKeys() {
+  applyMobileMovementToPlayer() {
+    if (typeof PlayerMovementSystem?.setMobileInput === "function") {
+      PlayerMovementSystem.setMobileInput(this.moveX, this.moveY);
+      return;
+    }
+
+    // 구버전 fallback: setMobileInput이 없는 작업본에서도 조이스틱은 동작하게 유지한다.
+    // 단, 최신 패치에서는 PlayerMovementSystem.mobileInput을 사용하므로 WASD와 충돌하지 않는다.
     if (!PlayerMovementSystem?.keys) {
+      return;
+    }
+
+    if (!this.isDragging && this.moveX === 0 && this.moveY === 0) {
       return;
     }
 
@@ -151,35 +150,9 @@ export const MobileInputSystem = {
     PlayerMovementSystem.keys.down = this.moveY > this.deadZone;
   },
 
-  clearPlayerMovementKeys() {
-    if (!PlayerMovementSystem?.keys) {
-      return;
+  clearMobileMovementInput() {
+    if (typeof PlayerMovementSystem?.clearMobileInput === "function") {
+      PlayerMovementSystem.clearMobileInput();
     }
-
-    PlayerMovementSystem.keys.left = false;
-    PlayerMovementSystem.keys.right = false;
-    PlayerMovementSystem.keys.up = false;
-    PlayerMovementSystem.keys.down = false;
-  },
-
-  triggerKeyboardInteract() {
-    const keydownEvent = new KeyboardEvent("keydown", {
-      key: " ",
-      code: "Space",
-      keyCode: 32,
-      which: 32,
-      bubbles: true
-    });
-
-    const keyupEvent = new KeyboardEvent("keyup", {
-      key: " ",
-      code: "Space",
-      keyCode: 32,
-      which: 32,
-      bubbles: true
-    });
-
-    window.dispatchEvent(keydownEvent);
-    window.dispatchEvent(keyupEvent);
   }
-};  
+};

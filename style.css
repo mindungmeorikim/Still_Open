@@ -28085,3 +28085,25 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
 #staff-character.staff-character[data-assist-status="idle"] .staff-carrying-box {
   animation: none !important;
 }
+
+
+/* ========================================================================== */
+/* [v8.0.30] Player Follow Camera + Cleaning Touch Final Override             */
+/* - 청소 구역은 store-interaction-layer 아래에서도 직접 터치 입력을 받는다.   */
+/* - 청소 내부 이미지/라벨은 버튼 클릭을 가로막지 않는다.                    */
+/* ========================================================================== */
+#store-interaction-layer > #cleaning-zone.cleaning-zone,
+#cleaning-zone.cleaning-zone {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+#cleaning-zone.cleaning-zone *,
+#store-interaction-layer > #cleaning-zone.cleaning-zone * {
+  pointer-events: none !important;
+}
+
+#store-interaction-layer > #cleaning-zone.cleaning-zone:disabled,
+#cleaning-zone.cleaning-zone:disabled {
+  pointer-events: none !important;
+}

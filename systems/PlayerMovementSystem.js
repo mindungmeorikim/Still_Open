@@ -33,6 +33,24 @@ export const PlayerMovementSystem = {
     right: false
   },
 
+  mobileInput: {
+    x: 0,
+    y: 0
+  },
+
+  setMobileInput(x = 0, y = 0) {
+    const nextX = Number(x);
+    const nextY = Number(y);
+
+    this.mobileInput.x = Number.isFinite(nextX) ? this.clamp(nextX, -1, 1) : 0;
+    this.mobileInput.y = Number.isFinite(nextY) ? this.clamp(nextY, -1, 1) : 0;
+  },
+
+  clearMobileInput() {
+    this.mobileInput.x = 0;
+    this.mobileInput.y = 0;
+  },
+
   defaultPlayer: {
     x: 610,
     y: 640,
@@ -140,6 +158,7 @@ export const PlayerMovementSystem = {
     this.keys.down = false;
     this.keys.left = false;
     this.keys.right = false;
+    this.clearMobileInput();
   },
 
   handleKeyChange(event, isPressed) {
@@ -190,6 +209,14 @@ export const PlayerMovementSystem = {
     if (this.keys.right) moveX += 1;
     if (this.keys.up) moveY -= 1;
     if (this.keys.down) moveY += 1;
+
+    // 모바일 조이스틱 입력은 키보드 WASD 상태와 분리해서 합산한다.
+    // 기존처럼 조이스틱이 PlayerMovementSystem.keys를 매 프레임 덮어쓰면
+    // 조이스틱이 중앙에 있을 때 WASD 입력까지 false로 밀어버리는 문제가 생긴다.
+    moveX += Number(this.mobileInput.x) || 0;
+    moveY += Number(this.mobileInput.y) || 0;
+    moveX = this.clamp(moveX, -1, 1);
+    moveY = this.clamp(moveY, -1, 1);
 
     if (moveX === 0 && moveY === 0) {
       return;

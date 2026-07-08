@@ -66,6 +66,8 @@ export const PlayerActionSystem = {
   pendingNuisanceCheckoutCustomerIds: new Set(),
   actionMessageTimerId: null,
   cleaningCountdownTimerId: null,
+  lastPointerActionSignature: null,
+  lastPointerActionTimeStamp: 0,
   shelfStocks: {},
 
   shelf: {
@@ -255,6 +257,10 @@ export const PlayerActionSystem = {
   },
 
   bindPointerActions() {
+    document.addEventListener("pointerup", (event) => {
+      this.handlePointerAction(event);
+    });
+
     document.addEventListener("click", (event) => {
       this.handlePointerAction(event);
     });
@@ -1680,6 +1686,10 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
 
     if (!actionType) return;
 
+    if (this.isDuplicatePointerAction(event, actionNode, actionType)) {
+      return;
+    }
+
     if (this.isCustomerEventModalInteractionLocked()) {
       event.preventDefault?.();
       event.stopPropagation?.();
@@ -1729,6 +1739,30 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     if (this.isCheckoutAction(actionType)) {
       this.handleCheckoutAction();
     }
+  },
+
+  isDuplicatePointerAction(event, actionNode, actionType) {
+    const eventTimeStamp = Number(event?.timeStamp) || 0;
+    const actionSignature = [
+      actionType,
+      actionNode.id ?? "",
+      actionNode.dataset.shelfInstanceId ?? "",
+      actionNode.dataset.shelfId ?? "",
+      actionNode.dataset.cleaningSpotId ?? ""
+    ].join(":");
+
+    if (
+      actionSignature === this.lastPointerActionSignature &&
+      eventTimeStamp > 0 &&
+      this.lastPointerActionTimeStamp > 0 &&
+      Math.abs(eventTimeStamp - this.lastPointerActionTimeStamp) < 220
+    ) {
+      return true;
+    }
+
+    this.lastPointerActionSignature = actionSignature;
+    this.lastPointerActionTimeStamp = eventTimeStamp;
+    return false;
   },
 
   isCheckoutAction(actionType) {
