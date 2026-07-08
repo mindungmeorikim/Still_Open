@@ -11,6 +11,7 @@ import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { InventorySystem } from "./InventorySystem.js";
 import { PlayerActionSystem } from "./PlayerActionSystem.js";
+import { CustomerSystem } from "./CustomerSystem.js";
 import { SanitationSystem } from "./SanitationSystem.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
@@ -44,11 +45,20 @@ const STAFF_IDLE_CLEANING_TOOL_OFFSET = Object.freeze({ x: -35, y: 12, direction
 const STAFF_ROUTE_POINTS = Object.freeze({
   entryAisle: Object.freeze({ x: 500, y: 645 }),
   mainAisle: Object.freeze({ x: 520, y: 640 }),
+  // 계산대 앞 손님 대기열이 있을 때 알바가 줄을 관통하지 않도록 아래쪽 통로로 우회하는 지점입니다.
+  counterQueueBypassAisle: Object.freeze({ x: 735, y: 620 }),
+  // 플레이어가 발주 박스 정리 시 서는 위치를 기준으로 한 입구 바깥 물류 경유지입니다.
+  deliveryBoxAisle: Object.freeze({ x: 510, y: 630 }),
   warehouseAisle: Object.freeze({ x: 340, y: 610 }),
   cleaningAisle: Object.freeze({ x: 760, y: 640 }),
+  lowerRightAisle: Object.freeze({ x: 760, y: 640 }),
   zone1Aisle: Object.freeze({ x: 515, y: 610 }),
   zone2Aisle: Object.freeze({ x: 700, y: 430 }),
   zone3Aisle: Object.freeze({ x: 925, y: 565 }),
+  zone3LowerAisle: Object.freeze({ x: 900, y: 675 }),
+  zone3RightAisle: Object.freeze({ x: 1040, y: 690 }),
+  zone4LowerAisle: Object.freeze({ x: 1180, y: 680 }),
+  zone4ApproachAisle: Object.freeze({ x: 1230, y: 600 }),
   zone4Aisle: Object.freeze({ x: 1085, y: 430 })
 });
 
@@ -66,6 +76,22 @@ const STAFF_FOOT_COLLISION_BOX = Object.freeze({
   offsetX: -14,
   offsetY: -8
 });
+const STAFF_COUNTER_CUSTOMER_COLLISION_BOX = Object.freeze({
+  width: 74,
+  height: 34,
+  offsetX: -12,
+  offsetY: 48
+});
+const STAFF_CUSTOMER_COLLISION_BOX = Object.freeze({
+  // 손님 PNG 49x87 기준 발밑/몸통 하단만 막는다.
+  // 전체 이미지를 막으면 말풍선/머리 쪽까지 과하게 충돌해서 알바가 멈출 수 있다.
+  width: 54,
+  height: 30,
+  offsetX: -3,
+  offsetY: 52
+});
+const STAFF_COUNTER_QUEUE_BASE_POSITION = Object.freeze({ x: 610, y: 445 });
+const STAFF_COUNTER_QUEUE_OFFSET = Object.freeze({ x: -18, y: 18 });
 const STAFF_DEFAULT_STAND_FOOT_OFFSET = Object.freeze({ x: 0, y: 54, direction: "up" });
 
 // 각 진열대의 interaction 좌표는 플레이어/알바가 실제로 접근해야 하는 기준점입니다.
@@ -79,16 +105,16 @@ const STAFF_STAND_FOOT_OFFSETS_BY_SHELF_INSTANCE_ID = Object.freeze({
   zone2_fresh_shelf_1: Object.freeze({ x: -5, y: 104, direction: "up_left" }),
 
   zone3_basic_shelf_1: Object.freeze({ x: 5, y: 66, direction: "up_left" }),
-  zone3_basic_shelf_2: Object.freeze({ x: 5, y: 66, direction: "up_left" }),
+  zone3_basic_shelf_2: Object.freeze({ x: 30, y: 86, direction: "up_left" }),
   zone3_fridge_1: Object.freeze({ x: -5, y: 30, direction: "up" }),
   zone3_fridge_2: Object.freeze({ x: 0, y: 42, direction: "up_left" }),
   zone3_fresh_shelf_1: Object.freeze({ x: 0, y: 56, direction: "up" }),
 
-  zone4_fridge_1: Object.freeze({ x: -5, y: 96, direction: "up_left" }),
-  zone4_fridge_2: Object.freeze({ x: -5, y: 96, direction: "up_left" }),
-  zone4_fresh_shelf_1: Object.freeze({ x: -10, y: 106, direction: "up_left" }),
+  zone4_fridge_1: Object.freeze({ x: -5, y: 190, direction: "up_left" }),
+  zone4_fridge_2: Object.freeze({ x: 60, y: 140, direction: "up_left" }),
+  zone4_fresh_shelf_1: Object.freeze({ x: -10, y: 145, direction: "up_left" }),
   zone4_fresh_shelf_2: Object.freeze({ x: -10, y: 106, direction: "up_left" }),
-  zone4_warmer_1: Object.freeze({ x: -5, y: 62, direction: "up_left" })
+  zone4_warmer_1: Object.freeze({ x: 15, y: 62, direction: "up_left" })
 });
 
 const STATUS_LABELS = Object.freeze({
@@ -465,16 +491,33 @@ export const StaffAssistSystem = {
     this.moveStaffToState("warehouse", {
       reason: "shelf_prepare_started",
       taskType: "shelf",
-      label: "진열 보충 준비 중",
+      label: "창고로 재고 가지러 가는 중",
       position: POSITIONS.warehouseAssist,
+      routePoints: this.getStaffIdleToWarehouseRoutePoints(),
+      direction: "up_left",
+      carryingBoxType: null,
       targetShelfInstanceId: task.shelf.instanceId,
       productId: task.productId,
       taskDurationMs: task.prepDurationMs
     }, () => {
+      this.setWarehouseBoxVisualState("open");
+      this.updateState("warehouse", {
+        reason: "shelf_prepare_picking_stock",
+        taskType: "shelf",
+        label: "창고에서 재고 꺼내는 중",
+        position: POSITIONS.warehouseAssist,
+        direction: "up_left",
+        carryingBoxType: null,
+        targetShelfInstanceId: task.shelf.instanceId,
+        productId: task.productId,
+        taskDurationMs: task.prepDurationMs
+      });
+
       this.setTaskTimer(() => {
         const refreshedTask = this.refreshShelfTask(task);
 
         if (!refreshedTask || refreshedTask.restockAmount <= 0) {
+          this.setWarehouseBoxVisualState("closed");
           this.requestNoStockGuide(task.productId);
           this.completeTask({
             type: "shelf",
@@ -486,17 +529,35 @@ export const StaffAssistSystem = {
         }
 
         const shelfAssistPosition = this.getShelfAssistPosition(refreshedTask.shelf);
+        const carryingBoxType = this.getCarryingBoxTypeForProduct(refreshedTask.productId);
 
+        this.setWarehouseBoxVisualState("closed");
         this.moveStaffToState("shelf", {
           reason: "shelf_refill_started",
           taskType: "shelf",
+          label: "재고 들고 진열대로 이동 중",
           position: shelfAssistPosition,
+          routePoints: this.getStaffWarehouseToShelfRoutePoints(refreshedTask.shelf),
           direction: shelfAssistPosition.direction,
+          carryingBoxType,
           targetShelfInstanceId: refreshedTask.shelf.instanceId,
           targetShelfZoneId: refreshedTask.shelf.zoneId,
           productId: refreshedTask.productId,
           taskDurationMs: refreshedTask.refillDurationMs
         }, () => {
+          this.updateState("shelf", {
+            reason: "shelf_refill_working",
+            taskType: "shelf",
+            label: "진열대 보충 중",
+            position: shelfAssistPosition,
+            direction: shelfAssistPosition.direction,
+            carryingBoxType,
+            targetShelfInstanceId: refreshedTask.shelf.instanceId,
+            targetShelfZoneId: refreshedTask.shelf.zoneId,
+            productId: refreshedTask.productId,
+            taskDurationMs: refreshedTask.refillDurationMs
+          });
+
           this.setTaskTimer(() => {
             const result = this.completeShelfRefill(refreshedTask);
 
@@ -611,7 +672,8 @@ export const StaffAssistSystem = {
     this.moveStaffToState("returning", {
       reason: "task_finished",
       taskType: result.type ?? null,
-      position: this.getIdlePosition()
+      position: this.getIdlePosition(),
+      carryingBoxType: null
     }, () => {
       this.setTaskTimer(() => {
         this.isWorking = false;
@@ -619,7 +681,8 @@ export const StaffAssistSystem = {
         this.updateState("idle", {
           reason: "task_cooldown",
           lastTaskType: result.type ?? null,
-          position: this.getIdlePosition()
+          position: this.getIdlePosition(),
+          carryingBoxType: null
         });
         this.scheduleNextCheck(this.getCooldownMs());
       }, RETURNING_SETTLE_DELAY_MS);
@@ -1030,9 +1093,10 @@ export const StaffAssistSystem = {
 
   isStaffPositionBlocked(position = {}) {
     const footRect = this.getStaffFootCollisionRect(position);
-    const collisionRects = getStoreObjectCollisionRects(
-      GameState.expansion?.unlockedZoneIds
-    );
+    const collisionRects = [
+      ...getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds),
+      ...this.getCustomerCollisionRects()
+    ];
 
     return collisionRects.some((rect) => {
       return this.doRectsOverlap(footRect, rect);
@@ -1060,6 +1124,163 @@ export const StaffAssistSystem = {
       first.y < second.y + second.height &&
       first.y + first.height > second.y
     );
+  },
+
+  getActiveCounterQueueCustomers() {
+    if (typeof CustomerSystem.getRenderableCustomers !== "function") {
+      return [];
+    }
+
+    return CustomerSystem.getRenderableCustomers().filter((customer) => {
+      return (
+        customer &&
+        customer.currentZone === "counter" &&
+        customer.status !== "leaving" &&
+        customer.isSatisfied !== true
+      );
+    });
+  },
+
+  hasActiveCounterQueueCustomers() {
+    return this.getActiveCounterQueueCustomers().length > 0;
+  },
+
+  getCounterQueueAvoidanceRoutePoints() {
+    if (!this.hasActiveCounterQueueCustomers()) {
+      return [];
+    }
+
+    return [STAFF_ROUTE_POINTS.counterQueueBypassAisle];
+  },
+
+  getCustomerCollisionRects() {
+    const domRects = this.getCustomerDomCollisionRects();
+
+    if (domRects.length > 0) {
+      return domRects;
+    }
+
+    return this.getCustomerFallbackCollisionRects();
+  },
+
+  getCustomerDomCollisionRects() {
+    if (typeof document === "undefined") {
+      return [];
+    }
+
+    const nodes = [
+      ...document.querySelectorAll(
+        "#store-interaction-layer .customer-npc, #customer-layer .customer-npc"
+      )
+    ];
+    const uniqueNodes = [...new Set(nodes)];
+
+    return uniqueNodes
+      .filter((node) => {
+        return node instanceof HTMLElement && node.offsetParent !== null;
+      })
+      .map((node) => {
+        const x = Number(node.offsetLeft);
+        const y = Number(node.offsetTop);
+
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          return null;
+        }
+
+        const isCounterCustomer = node.classList.contains("customer-zone-counter");
+        const box = isCounterCustomer
+          ? STAFF_COUNTER_CUSTOMER_COLLISION_BOX
+          : STAFF_CUSTOMER_COLLISION_BOX;
+
+        return {
+          x: x + box.offsetX,
+          y: y + box.offsetY,
+          width: box.width,
+          height: box.height
+        };
+      })
+      .filter(Boolean);
+  },
+
+  getCustomerFallbackCollisionRects() {
+    return [
+      ...this.getCounterCustomerFallbackCollisionRects(),
+      ...this.getShelfCustomerFallbackCollisionRects()
+    ];
+  },
+
+  getCounterCustomerFallbackCollisionRects() {
+    const counterCustomers = this.getActiveCounterQueueCustomers();
+
+    return counterCustomers.map((customer, index) => {
+      const rawQueueIndex = Number(customer.queueOrder);
+      const queueIndex = Number.isFinite(rawQueueIndex)
+        ? Math.max(0, Math.min(index, 3))
+        : Math.max(0, Math.min(index, 3));
+      const x = STAFF_COUNTER_QUEUE_BASE_POSITION.x + STAFF_COUNTER_QUEUE_OFFSET.x * queueIndex;
+      const y = STAFF_COUNTER_QUEUE_BASE_POSITION.y + STAFF_COUNTER_QUEUE_OFFSET.y * queueIndex;
+
+      return {
+        x: x + STAFF_COUNTER_CUSTOMER_COLLISION_BOX.offsetX,
+        y: y + STAFF_COUNTER_CUSTOMER_COLLISION_BOX.offsetY,
+        width: STAFF_COUNTER_CUSTOMER_COLLISION_BOX.width,
+        height: STAFF_COUNTER_CUSTOMER_COLLISION_BOX.height
+      };
+    });
+  },
+
+  getShelfCustomerFallbackCollisionRects() {
+    const renderableCustomers = this.getRenderableObstacleCustomers();
+
+    return renderableCustomers
+      .filter((customer) => {
+        return customer.currentZone !== "counter";
+      })
+      .map((customer) => {
+        const position = this.getFallbackCustomerWorldPosition(customer);
+
+        if (!position) {
+          return null;
+        }
+
+        return {
+          x: position.x + STAFF_CUSTOMER_COLLISION_BOX.offsetX,
+          y: position.y + STAFF_CUSTOMER_COLLISION_BOX.offsetY,
+          width: STAFF_CUSTOMER_COLLISION_BOX.width,
+          height: STAFF_CUSTOMER_COLLISION_BOX.height
+        };
+      })
+      .filter(Boolean);
+  },
+
+  getRenderableObstacleCustomers() {
+    if (typeof CustomerSystem.getRenderableCustomers !== "function") {
+      return [];
+    }
+
+    return CustomerSystem.getRenderableCustomers().filter((customer) => {
+      return (
+        customer &&
+        customer.status !== "leaving" &&
+        customer.isSatisfied !== true &&
+        customer.hasReportedLeft !== true
+      );
+    });
+  },
+
+  getFallbackCustomerWorldPosition(customer = {}) {
+    const targetX = Number(customer.targetX);
+    const targetY = Number(customer.targetY);
+
+    if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
+      return { x: targetX, y: targetY };
+    }
+
+    if (customer.currentZone === "door") {
+      return { x: POSITIONS.entry.x, y: POSITIONS.entry.y };
+    }
+
+    return null;
   },
 
   createMovementPath(status, options = {}, targetPosition = POSITIONS.idle) {
@@ -1118,6 +1339,146 @@ export const StaffAssistSystem = {
     return POSITIONS[status] ?? this.getIdlePosition();
   },
 
+  getStaffIdleToWarehouseRoutePoints() {
+    // 알바 진열 보충 전용: 청소 대기 위치에서 바로 창고로 꺾지 않고,
+    // 입구로 나간 뒤 플레이어의 발주 박스 정리 동선과 같은 물류 통로를 탄다.
+    // 계산대에 손님 대기열이 있으면 줄을 관통하지 않도록 하단 우회점을 먼저 탄다.
+    return [
+      STAFF_ROUTE_POINTS.lowerRightAisle,
+      ...this.getCounterQueueAvoidanceRoutePoints(),
+      STAFF_ROUTE_POINTS.mainAisle,
+      STAFF_ROUTE_POINTS.entryAisle,
+      POSITIONS.entry,
+      this.getDeliveryBoxRoutePoint(),
+      STAFF_ROUTE_POINTS.warehouseAisle
+    ];
+  },
+
+  getStaffWarehouseToStoreRoutePoints() {
+    // 창고에서 입구로 돌아오는 구간은 위 경로의 물류 통로를 그대로 반대로 사용한다.
+    // 매장 안에 들어온 뒤 계산대 대기 손님이 있으면 하단 우회점으로 빠진 다음 진열대로 간다.
+    return [
+      STAFF_ROUTE_POINTS.warehouseAisle,
+      this.getDeliveryBoxRoutePoint(),
+      POSITIONS.entry,
+      STAFF_ROUTE_POINTS.entryAisle,
+      STAFF_ROUTE_POINTS.mainAisle,
+      ...this.getCounterQueueAvoidanceRoutePoints()
+    ];
+  },
+
+  getStaffWarehouseToShelfRoutePoints(shelf = {}) {
+    return [
+      ...this.getStaffWarehouseToStoreRoutePoints(),
+      ...this.getShelfApproachRoutePoints(shelf)
+    ];
+  },
+
+  getShelfApproachRoutePoints(shelf = {}) {
+    const targetZoneId = shelf.zoneId ?? this.getShelfZoneIdByInstanceId(shelf.instanceId);
+
+    if (targetZoneId === "zone_basic") {
+      return [STAFF_ROUTE_POINTS.zone1Aisle];
+    }
+
+    if (targetZoneId === "zone_extra_shelf") {
+      return [
+        STAFF_ROUTE_POINTS.lowerRightAisle,
+        STAFF_ROUTE_POINTS.zone2Aisle
+      ];
+    }
+
+    if (targetZoneId === "zone_cold_food") {
+      return [
+        STAFF_ROUTE_POINTS.lowerRightAisle,
+        STAFF_ROUTE_POINTS.zone3Aisle
+      ];
+    }
+
+    if (targetZoneId === "zone_premium_store") {
+      return [
+        STAFF_ROUTE_POINTS.lowerRightAisle,
+        STAFF_ROUTE_POINTS.zone3LowerAisle,
+        STAFF_ROUTE_POINTS.zone3RightAisle,
+        STAFF_ROUTE_POINTS.zone4LowerAisle,
+        STAFF_ROUTE_POINTS.zone4ApproachAisle
+      ];
+    }
+
+    return [STAFF_ROUTE_POINTS.lowerRightAisle];
+  },
+
+  getStaffCleaningRoutePoints(targetZoneId = "zone_basic") {
+    // 알바가 청소 스팟으로 이동할 때도 계산대/진열대/손님을 가로지르지 않게
+    // 보충 동선과 같은 하단 통로를 먼저 탄 뒤 구역별 접근점으로 들어간다.
+    const commonSafeRoute = [
+      STAFF_ROUTE_POINTS.mainAisle,
+      ...this.getCounterQueueAvoidanceRoutePoints(),
+      STAFF_ROUTE_POINTS.lowerRightAisle
+    ];
+
+    if (targetZoneId === "zone_basic") {
+      return [
+        ...commonSafeRoute,
+        STAFF_ROUTE_POINTS.zone1Aisle
+      ];
+    }
+
+    if (targetZoneId === "zone_extra_shelf") {
+      return [
+        ...commonSafeRoute,
+        STAFF_ROUTE_POINTS.zone2Aisle
+      ];
+    }
+
+    if (targetZoneId === "zone_cold_food") {
+      return [
+        ...commonSafeRoute,
+        STAFF_ROUTE_POINTS.zone3Aisle
+      ];
+    }
+
+    if (targetZoneId === "zone_premium_store") {
+      return [
+        ...commonSafeRoute,
+        STAFF_ROUTE_POINTS.zone3LowerAisle,
+        STAFF_ROUTE_POINTS.zone3RightAisle,
+        STAFF_ROUTE_POINTS.zone4LowerAisle,
+        STAFF_ROUTE_POINTS.zone4ApproachAisle
+      ];
+    }
+
+    return commonSafeRoute;
+  },
+
+  getDeliveryBoxRoutePoint() {
+    const deliveryBoxZone = PlayerActionSystem.deliveryBoxZone ?? {};
+    const fallback = STAFF_ROUTE_POINTS.deliveryBoxAisle;
+
+    return this.normalizePoint({
+      x: Number.isFinite(Number(deliveryBoxZone.standX))
+        ? Number(deliveryBoxZone.standX)
+        : fallback.x,
+      y: Number.isFinite(Number(deliveryBoxZone.standY))
+        ? Number(deliveryBoxZone.standY)
+        : fallback.y
+    }, fallback);
+  },
+
+  getCarryingBoxTypeForProduct(productId) {
+    if (typeof PlayerActionSystem.getCarryingBoxTypeForProduct === "function") {
+      return PlayerActionSystem.getCarryingBoxTypeForProduct(productId);
+    }
+
+    return "basic";
+  },
+
+  setWarehouseBoxVisualState(state = "closed") {
+    if (typeof PlayerActionSystem.setWarehouseBoxState === "function") {
+      PlayerActionSystem.setWarehouseBoxState(state === "open" ? "open" : "closed");
+    }
+  },
+
   getDefaultRoutePoints(status, options = {}) {
     if (status === "idle" && String(options.reason ?? "").includes("arrive_idle")) {
       return [STAFF_ROUTE_POINTS.entryAisle, STAFF_ROUTE_POINTS.mainAisle];
@@ -1136,11 +1497,15 @@ export const StaffAssistSystem = {
     if (status === "cleaning") {
       const targetZoneId = options.targetCleaningZoneId ?? this.getActiveCleaningAssistPoint().zoneId;
 
-      return STAFF_ROUTE_POINTS_BY_ZONE_ID[targetZoneId] ?? [STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.cleaningAisle];
+      return this.getStaffCleaningRoutePoints(targetZoneId);
     }
 
     if (status === "returning") {
-      return [STAFF_ROUTE_POINTS.mainAisle];
+      return [
+        STAFF_ROUTE_POINTS.mainAisle,
+        ...this.getCounterQueueAvoidanceRoutePoints(),
+        STAFF_ROUTE_POINTS.lowerRightAisle
+      ];
     }
 
     return [];
@@ -1422,6 +1787,7 @@ export const StaffAssistSystem = {
       cooldownMs: this.getCooldownMs(),
       cooldownRemainingMs,
       taskDurationMs: Math.max(0, Math.floor(Number(options.taskDurationMs) || 0)),
+      carryingBoxType: options.carryingBoxType ?? null,
       cleaningTriggerValue: options.cleaningTriggerValue ?? null,
       attendanceStatus: hasOption("attendanceStatus") ? options.attendanceStatus : this.state.attendanceStatus ?? null,
       attendanceLevel: hasOption("attendanceLevel") ? options.attendanceLevel : this.state.attendanceLevel ?? null,
