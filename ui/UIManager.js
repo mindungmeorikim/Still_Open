@@ -130,12 +130,13 @@ const STAFF_ASSIST_EVENTS = Object.freeze({
   MESSAGE_REQUESTED: "STAFF_ASSIST_MESSAGE_REQUESTED"
 });
 const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
+const STAFF_ENTRY_SPAWN_Y_OFFSET = 70;
 
 const DEFAULT_STAFF_ASSIST_STATE = Object.freeze({
   status: "off_duty",
   label: "출근 대기 중",
   x: 577,
-  y: 612,
+  y: 720,
   direction: "down",
   isMoving: false
 });
@@ -217,6 +218,7 @@ export const UIManager = {
   inventorySnapshot: null,
   pendingStaffHireData: null,
   staffAssistState: { ...DEFAULT_STAFF_ASSIST_STATE },
+  staffEntryVisualLockDay: null,
   sanitationState: { ...DEFAULT_SANITATION_STATE },
   notificationTimerId: null,
   isWorldCameraBound: false,
@@ -3798,6 +3800,10 @@ renderDebugCollisionBoxes() {
   },
 
   bindStaffEvents() {
+    EventBus.on(STAFF_SHIFT_ENTRY_REQUESTED, (data = {}) => {
+      this.prepareStaffEntryVisualReset(data);
+    });
+
     EventBus.on(STAFF_EVENTS.HIRE_OFFERED, (data = {}) => {
       this.pendingStaffHireData = data;
 
@@ -3822,6 +3828,10 @@ renderDebugCollisionBoxes() {
         this.getStaffAssistSummarySignature(nextAssistState);
 
       this.staffAssistState = nextAssistState;
+
+      if (nextAssistState.status === "entering") {
+        this.staffEntryVisualLockDay = null;
+      }
 
       if (shouldRenderSummary) {
         this.renderStaffSummary(data.staff ?? GameState.staff);
@@ -5806,6 +5816,74 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     return staffSummary;
   },
 
+  prepareStaffEntryVisualReset(data = {}) {
+    const lockDay = Math.max(1, Math.floor(Number(data.day ?? GameState.day) || GameState.day || 1));
+    const entryPosition = this.getStaffEntrySpawnPosition();
+
+    this.staffEntryVisualLockDay = lockDay;
+    this.staffAssistState = this.normalizeStaffAssistState({
+      ...DEFAULT_STAFF_ASSIST_STATE,
+      status: "off_duty",
+      label: STAFF_ASSIST_STATUS_LABELS.off_duty,
+      x: entryPosition.x,
+      y: entryPosition.y,
+      direction: "down_left",
+      isMoving: false
+    });
+    this.snapStaffCharacterToEntry({ hide: true });
+  },
+
+  getStaffEntrySpawnPosition() {
+    const entranceZone = document.getElementById("entrance-zone");
+
+    if (!entranceZone) {
+      return {
+        x: DEFAULT_STAFF_ASSIST_STATE.x,
+        y: DEFAULT_STAFF_ASSIST_STATE.y
+      };
+    }
+
+    const computed = window.getComputedStyle(entranceZone);
+    const x = Number.parseFloat(computed.left);
+    const y = Number.parseFloat(computed.top);
+
+    return {
+      x: Number.isFinite(x) ? Math.round(x) : DEFAULT_STAFF_ASSIST_STATE.x,
+      y: Number.isFinite(y)
+        ? Math.round(y + STAFF_ENTRY_SPAWN_Y_OFFSET)
+        : DEFAULT_STAFF_ASSIST_STATE.y
+    };
+  },
+
+  snapStaffCharacterToEntry({ hide = true } = {}) {
+    const staffCharacter = this.createStaffCharacter();
+
+    if (!staffCharacter) {
+      return;
+    }
+
+    const entryPosition = this.getStaffEntrySpawnPosition();
+
+    staffCharacter.style.setProperty("left", `${entryPosition.x}px`, "important");
+    staffCharacter.style.setProperty("top", `${entryPosition.y}px`, "important");
+    staffCharacter.style.setProperty("right", "auto", "important");
+    staffCharacter.style.setProperty("bottom", "auto", "important");
+    staffCharacter.dataset.assistStatus = "off_duty";
+    staffCharacter.dataset.staffMoving = "false";
+
+    if (hide) {
+      staffCharacter.hidden = true;
+      staffCharacter.removeAttribute("aria-label");
+    }
+  },
+
+  isStaffEntryVisualLocked(assistState = this.staffAssistState) {
+    return (
+      this.staffEntryVisualLockDay === GameState.day &&
+      assistState.status !== "entering"
+    );
+  },
+
   normalizeStaffAssistState(state = GameState.staffAssist) {
     const source = state && typeof state === "object"
       ? state
@@ -5987,7 +6065,40 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const baseStats = hired?.stats || { warehouse: 0, shelf: 0, cleaning: 0 };
     const ability = GameState.bm?.staffAbilityUpgrade?.abilities || {};
     const assistState = this.getStaffAssistState();
+    const setStaffCharacterPosition = (state = assistState) => {
+      const x = Number.isFinite(Number(state.x)) ? Math.round(Number(state.x)) : DEFAULT_STAFF_ASSIST_STATE.x;
+      const y = Number.isFinite(Number(state.y)) ? Math.round(Number(state.y)) : DEFAULT_STAFF_ASSIST_STATE.y;
+
+      staffCharacter.style.setProperty("left", `${x}px`, "important");
+      staffCharacter.style.setProperty("top", `${y}px`, "important");
+      staffCharacter.style.setProperty("right", "auto", "important");
+      staffCharacter.style.setProperty("bottom", "auto", "important");
+    };
+
+    if (GameState.phase !== GAME_PHASE.STORE_RUNNING) {
+      this.staffEntryVisualLockDay = null;
+      setStaffCharacterPosition({
+        ...DEFAULT_STAFF_ASSIST_STATE,
+        direction: "down_left"
+      });
+      staffCharacter.hidden = true;
+      staffCharacter.dataset.assistStatus = "off_duty";
+      staffCharacter.dataset.staffMoving = "false";
+      staffCharacter.removeAttribute("aria-label");
+      return;
+    }
+
+    if (this.isStaffEntryVisualLocked(assistState)) {
+      this.snapStaffCharacterToEntry({ hide: true });
+      return;
+    }
+
+    if (assistState.status === "entering") {
+      this.staffEntryVisualLockDay = null;
+    }
+
     if (assistState.status === "off_duty") {
+      setStaffCharacterPosition(assistState);
       staffCharacter.hidden = true;
       staffCharacter.dataset.assistStatus = assistState.status;
       staffCharacter.dataset.staffMoving = "false";
@@ -6001,19 +6112,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const cleaningStat = Math.min(5, Number(baseStats.cleaning || 0) + Number(ability.cleaning || 0));
     const statSummary = `창고 ${warehouseStat}/5 · 진열대 ${shelfStat}/5 · 청소 ${cleaningStat}/5`;
 
-    staffCharacter.hidden = false;
     staffCharacter.dataset.staffType = String(hired.id ?? "staff");
     staffCharacter.dataset.assistStatus = assistState.status;
     staffCharacter.dataset.staffMoving = assistState.isMoving ? "true" : "false";
     staffCharacter.dataset.staffDirection = assistDirection;
-    staffCharacter.style.setProperty("left", `${assistState.x}px`, "important");
-    staffCharacter.style.setProperty("top", `${assistState.y}px`, "important");
-    staffCharacter.style.setProperty("right", "auto", "important");
-    staffCharacter.style.setProperty("bottom", "auto", "important");
+    setStaffCharacterPosition(assistState);
     staffCharacter.setAttribute(
       "aria-label",
       `${staffName} ${staffType}, ${assistState.label}`
     );
+    staffCharacter.hidden = false;
 
     let avatar = staffCharacter.querySelector(":scope > .staff-character-avatar");
 

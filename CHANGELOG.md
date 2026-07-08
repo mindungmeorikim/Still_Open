@@ -1,3 +1,114 @@
+## [v7.13.69] Checkout Customer Queue X Position Third Fine Tune
+- Changed: 계산대 대기 손님 줄의 Y축은 유지하고 X축만 20px 오른쪽으로 조정했습니다.
+- Preserved: 계산대 상호작용키, 충돌 영역, 플레이어/알바 이동 좌표는 변경하지 않았습니다.
+
+## [v7.13.66] Checkout Customer Queue X Position Second Fine Tune
+
+### Changed
+- 손님 계산대 대기열의 기준 X좌표를 이전 조정 폭만큼 한 번 더 왼쪽으로 이동했습니다.
+- Y좌표는 그대로 유지해 대기열 높이는 바꾸지 않았습니다.
+
+### Maintained
+- 계산대 상호작용키, 계산대 충돌 영역, 플레이어/알바 이동 좌표는 변경하지 않았습니다.
+
+## [v7.13.65] Checkout Customer Queue X Position Fine Tune
+
+### Changed
+- 손님 계산대 대기열의 기준 X좌표를 왼쪽으로 조정해 계산대 이미지보다 왼쪽 앞쪽에 줄 서도록 수정했습니다.
+
+### Maintained
+- 계산대 상호작용키, 계산대 충돌 영역, 플레이어/알바 이동 좌표는 변경하지 않았습니다.
+
+## [v7.13.64] Checkout Customer Queue Position Fine Tune
+
+### Changed
+- 손님 계산대 대기열 기준 좌표를 입구 쪽에서 계산대 앞쪽 통로로 다시 이동했습니다.
+- 대기열은 기존처럼 뒤 손님이 왼쪽 아래로 이어지는 `--queue-x/--queue-y` 오프셋 구조를 유지합니다.
+
+### Maintained
+- 계산대 상호작용키/클릭 가능 영역은 변경하지 않았습니다.
+- 계산대 충돌 영역, 플레이어 이동 좌표, 알바 이동 좌표는 변경하지 않았습니다.
+
+## [v7.13.63] Checkout Counter NPC Collision Guard
+
+### Fixed
+- 손님 계산대 대기 위치를 계산대 이미지 위가 아니라 계산대 앞쪽 통로로 내려, 손님이 계산대 위에 서 있는 것처럼 보이는 현상을 수정했습니다.
+- 계산대 충돌 영역을 실제 계산대 PNG 표시 크기에 맞춰 확장해, 캐릭터 발 위치가 계산대 이미지를 통과하지 않도록 보정했습니다.
+- 알바 이동 중 발 위치 기준 충돌 검사를 추가해 계산대 영역을 통과하지 않도록 보호했습니다.
+
+### Maintained
+- 계산대 상호작용 오브젝트와 상호작용키 동작은 유지했습니다.
+- 계산대 클릭/키 입력 가능 영역은 제거하지 않았습니다.
+- 플레이어/상품/청소/창고 좌표는 변경하지 않았습니다.
+
+## [v7.13.62] Checkout Counter Interaction Effect Cleanup
+
+### Fixed
+- 계산대 주변에 남아 보이던 연한 사각 배경을 제거했습니다.
+- PNG 투명 여백이 아니라 `interaction-effect` 보조 레이어에서 보이던 잔상이므로, 계산대에 한해 해당 레이어를 완전히 숨겼습니다.
+
+### Unchanged
+- 계산대 상호작용 좌표와 클릭 가능 영역은 변경하지 않았습니다.
+- 플레이어/손님/알바 이동 좌표는 변경하지 않았습니다.
+
+
+## [v7.13.61] Checkout Counter Transparent Canvas Cleanup
+- Changed: `assets/objects/checkout_counter/checkout_counter.png`의 외곽 투명 캔버스를 잘라내 계산대 이미지만 표시되도록 정리했습니다.
+- Changed: `style.css` 최종 override에 계산대 배경/테두리/의사요소/상호작용 이펙트 잔상을 차단하는 규칙을 추가했습니다.
+- Maintained: 계산대 상호작용 좌표와 클릭 가능 영역, 플레이어/손님/알바 이동 좌표는 변경하지 않았습니다.
+
+## [v7.13.60] Staff Entry Spawn Lower Adjustment
+- Changed: 알바 출근 소환 위치를 입구 이미지보다 아래쪽으로 내려, 매장 밖에서 안으로 들어오는 느낌이 나도록 조정했습니다.
+- Changed: UIManager의 실제 입구 에셋 좌표 참조값에도 Y축 추가 오프셋을 적용해, DOM 스냅 위치와 StaffAssistSystem 출근 시작 좌표가 어긋나지 않도록 맞췄습니다.
+- Maintained: 알바 청소 대기 위치, 창고/진열대/청소 작업 좌표, 플레이어/손님 좌표는 변경하지 않았습니다.
+
+## [v7.13.59] Staff Entry Spawn Align With Entrance Marker
+- Changed: 알바 출근 시작 좌표를 입구 이미지 에셋 좌표와 일치하도록 조정했습니다.
+- Changed: UIManager의 알바 기본/스냅 좌표가 하드코딩된 이전 입구 좌표 대신 실제 #entrance-zone 좌표를 우선 참조하도록 보강했습니다.
+- Fixed: 영업 시작 순간 알바가 매장 안 위치에 먼저 보였다가 입구로 튀어 보이는 현상을 줄이기 위해 기본 소환 기준을 입구 에셋 위치로 통일했습니다.
+
+## [v7.13.56] Staff Entry Visual Reset
+
+## [v7.13.58] Staff Entry Spawn Guard + Favicon
+- Fixed: 영업 시작 시 알바 캐릭터가 이전 매장 대기 위치에 잠깐 보였다가 입구로 튀는 것처럼 보이는 현상을 막기 위해 `STAFF_SHIFT_ENTRY_REQUESTED` 순간에 알바 DOM을 먼저 입구 좌표로 숨김 스냅 처리했습니다.
+- Fixed: 영업 중이 아닌 단계에서는 알바 캐릭터가 화면에 남아 보이지 않도록 렌더 가드를 추가했습니다.
+- Fixed: 알바 정보 갱신 이벤트가 영업 중에 다시 들어와도 이미 출근/근무 중이면 입구부터 재입장하지 않도록 보호했습니다.
+- Added: 개발 콘솔의 `/favicon.ico 404` 경고를 없애기 위한 기본 favicon 파일을 추가했습니다.
+
+
+## [v7.13.57] Staff Entry Transition Guard
+
+### Fixed
+- 영업 시작 시 알바 캐릭터가 기존 매장 안 대기 위치에서 입구로 되감기 이동하는 것처럼 보이던 CSS 좌표 transition 문제를 차단했습니다.
+- 알바 이동은 기존 StaffAssistSystem의 requestAnimationFrame 좌표 갱신만 사용하도록 유지했습니다.
+
+### Unchanged
+- 알바 출근 경로, 청소 대기 위치, 창고/진열대/청소 작업 좌표는 변경하지 않았습니다.
+
+
+### Fixed
+- 영업 시작 시 알바 캐릭터가 이전 매장 내부 위치에 잠깐 보였다가 입구로 되돌아가는 것처럼 보일 수 있는 렌더 순서를 보정했습니다.
+- 알바가 `off_duty`로 숨겨질 때도 DOM 좌표를 입구/현재 상태 좌표로 먼저 맞춰, 다음 출근 렌더에서 이전 대기 위치가 노출되지 않도록 수정했습니다.
+
+### Maintained
+- 알바 출근 경로, 청소 대기 위치, 창고/진열대/청소 작업 좌표, 플레이어/손님 좌표는 변경하지 않았습니다.
+
+## [v7.13.55] Staff Cleaning Idle Position Fine Tune
+
+### Changed
+- 청소 도구함 기준 알바 대기 위치를 이전 조정폭만큼 한 번 더 아래로 내려, 청소 에셋 옆에 더 자연스럽게 서도록 수정했습니다.
+
+### Maintained
+- 청소 상호작용 좌표, 청소 에셋 위치, 실제 청소 작업 위치(`staffX/staffY`), 창고/진열대/플레이어 이동 좌표는 변경하지 않았습니다.
+
+## [v7.13.54] Staff Cleaning Idle Position Adjustment
+
+### Changed
+- 청소 도구함 기준 알바 대기 위치 오프셋을 조정해 알바가 청소 에셋 옆에 자연스럽게 서도록 수정했습니다.
+
+### Maintained
+- 청소 상호작용 좌표, 청소 에셋 위치, 실제 청소 작업 위치(`staffX/staffY`), 창고/진열대/플레이어 이동 좌표는 변경하지 않았습니다.
+
 ## [v7.13.53] BM SDK Guard Merge
 
 ### Added
@@ -2756,3 +2867,38 @@
 
 ### Maintained
 - 알바 이동 루트, F8 좌표 모드, 플레이어 이동, 발주/도착 박스, 튜토리얼 흐름은 추가 수정하지 않았습니다.
+
+## [v7.13.67] Checkout Customer Queue Y Position Fine Tune
+
+### Changed
+- 손님 계산대 대기열의 X좌표는 유지하고, Y좌표만 계산대 앞쪽까지 위로 조정했습니다.
+
+### Maintained
+- 계산대 상호작용키, 충돌 영역, 플레이어/알바 이동 좌표는 수정하지 않았습니다.
+## [v7.13.68] Checkout Customer Queue Y Position Second Fine Tune
+
+### Changed
+- 손님 계산대 대기열의 X좌표는 유지하고, Y좌표만 30px 더 위로 조정했습니다.
+
+### Maintained
+- 계산대 상호작용키, 충돌 영역, 플레이어/알바 이동 좌표는 수정하지 않았습니다.
+
+
+## [v7.13.70] Checkout Customer Queue X Position Fourth Fine Tune
+
+### Changed
+- 손님 계산대 대기열의 Y좌표는 고정하고, X좌표만 40px 더 오른쪽으로 조정했습니다.
+
+### Maintained
+- 계산대 상호작용키, 충돌 영역, 플레이어/알바 이동 좌표는 수정하지 않았습니다.
+
+## [v7.13.71] Checkout Customer Queue X Position Fifth Fine Tune
+
+### Changed
+- 손님 계산대 대기열의 Y축은 `445px`로 고정한 상태에서 X축만 오른쪽으로 35px 추가 조정했습니다.
+- 최종 계산대 대기열 기준 좌표를 `left: 610px`, `top: 445px`로 설정했습니다.
+
+### Unchanged
+- 계산대 상호작용키/클릭 영역은 변경하지 않았습니다.
+- 계산대 충돌 영역은 변경하지 않았습니다.
+- 플레이어/알바 이동 좌표는 변경하지 않았습니다.

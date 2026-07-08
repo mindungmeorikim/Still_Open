@@ -34,10 +34,12 @@ const OBJECT_TYPE_COLLISION_PRESETS = Object.freeze({
 const COUNTER_COLLISION_RECT = Object.freeze({
   id: "counter-zone",
   kind: "counter",
-  x: 620,
-  y: 555,
-  width: 72,
-  height: 42
+  // 계산대는 화면에 보이는 PNG 이미지 크기 기준으로 막는다.
+  // 기존 값은 하단 일부만 막아서 손님/알바가 계산대 위에 선 것처럼 보일 수 있었다.
+  x: 608,
+  y: 512,
+  width: 96,
+  height: 88
 });
 
 function isShelfZoneUnlocked(shelf, unlockedZoneIds = []) {

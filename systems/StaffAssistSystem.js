@@ -15,6 +15,7 @@ import { SanitationSystem } from "./SanitationSystem.js";
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getProductById } from "../data/ProductData.js";
+import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 
 export const STAFF_ASSIST_EVENTS = Object.freeze({
   STATE_CHANGED: "STAFF_ASSIST_STATE_CHANGED",
@@ -27,7 +28,7 @@ const BM_STATE_CHANGED = "BM_STATE_CHANGED";
 const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 
 const POSITIONS = Object.freeze({
-  entry: Object.freeze({ x: 577, y: 612 }),
+  entry: Object.freeze({ x: 577, y: 720 }),
   // fallback 좌표입니다. 실제 알바 대기 위치는 getIdlePosition()에서 청소 도구함 좌표를 기준으로 계산합니다.
   idle: Object.freeze({ x: 895, y: 548 }),
   warehouseAssist: Object.freeze({ x: 285, y: 575 }),
@@ -36,7 +37,7 @@ const POSITIONS = Object.freeze({
 
 // 청소 도구함 기준 알바 대기 오프셋입니다.
 // 청소 도구함/청소 포인트 좌표가 바뀌면 알바도 같은 기준점 옆으로 따라붙습니다.
-const STAFF_IDLE_CLEANING_TOOL_OFFSET = Object.freeze({ x: 25, y: -102, direction: "down_left" });
+const STAFF_IDLE_CLEANING_TOOL_OFFSET = Object.freeze({ x: -35, y: 12, direction: "down_right" });
 
 // F8 좌표 모드에서 쓰는 월드 좌표 기준 알바 이동 경유지입니다.
 // 화면 비율/카메라 줌이 바뀌어도 월드 좌표만 따라가도록 StaffAssistSystem 내부에서만 사용합니다.
@@ -59,6 +60,12 @@ const STAFF_ROUTE_POINTS_BY_ZONE_ID = Object.freeze({
 });
 
 const STAFF_CHARACTER_ANCHOR = Object.freeze({ x: 56, y: 58 });
+const STAFF_FOOT_COLLISION_BOX = Object.freeze({
+  width: 28,
+  height: 16,
+  offsetX: -14,
+  offsetY: -8
+});
 const STAFF_DEFAULT_STAND_FOOT_OFFSET = Object.freeze({ x: 0, y: 54, direction: "up" });
 
 // 각 진열대의 interaction 좌표는 플레이어/알바가 실제로 접근해야 하는 기준점입니다.
@@ -212,6 +219,13 @@ export const StaffAssistSystem = {
 
     EventBus.on(STAFF_STATE_CHANGED, () => {
       if (this.canAssistInCurrentPhase()) {
+        // 이미 출근 중/근무 중인 상태에서 알바 정보 갱신 이벤트가 다시 들어오면
+        // 입구부터 재입장시키지 않는다. 이 재입장이 매장 안에서 입구로 튀는 것처럼 보였다.
+        if (this.state.status !== "off_duty") {
+          this.scheduleNextCheck(this.isWorking ? this.getCheckIntervalMs() : 900);
+          return;
+        }
+
         this.enterStoreFromEntrance("staff_state_changed");
         return;
       }
@@ -971,12 +985,18 @@ export const StaffAssistSystem = {
         return;
       }
 
-      const nextX = currentX + (dx / remainingDistance) * frameSpeed;
-      const nextY = currentY + (dy / remainingDistance) * frameSpeed;
+      const rawNextX = currentX + (dx / remainingDistance) * frameSpeed;
+      const rawNextY = currentY + (dy / remainingDistance) * frameSpeed;
+      const safeNextPosition = this.getCollisionSafeStaffPosition(
+        currentX,
+        currentY,
+        rawNextX,
+        rawNextY
+      );
 
       this.updateState(status, {
         ...options,
-        position: { x: nextX, y: nextY },
+        position: safeNextPosition,
         direction: this.getDirectionFromMovement(dx, dy, movementDirection),
         isMoving: true
       });
@@ -985,6 +1005,61 @@ export const StaffAssistSystem = {
     };
 
     this.moveRafId = window.requestAnimationFrame(step);
+  },
+
+  getCollisionSafeStaffPosition(currentX, currentY, nextX, nextY) {
+    const nextPosition = { x: nextX, y: nextY };
+
+    if (!this.isStaffPositionBlocked(nextPosition)) {
+      return nextPosition;
+    }
+
+    const horizontalSlide = { x: nextX, y: currentY };
+    const verticalSlide = { x: currentX, y: nextY };
+
+    if (!this.isStaffPositionBlocked(horizontalSlide)) {
+      return horizontalSlide;
+    }
+
+    if (!this.isStaffPositionBlocked(verticalSlide)) {
+      return verticalSlide;
+    }
+
+    return { x: currentX, y: currentY };
+  },
+
+  isStaffPositionBlocked(position = {}) {
+    const footRect = this.getStaffFootCollisionRect(position);
+    const collisionRects = getStoreObjectCollisionRects(
+      GameState.expansion?.unlockedZoneIds
+    );
+
+    return collisionRects.some((rect) => {
+      return this.doRectsOverlap(footRect, rect);
+    });
+  },
+
+  getStaffFootCollisionRect(position = {}) {
+    const x = Number(position.x) || 0;
+    const y = Number(position.y) || 0;
+    const footCenterX = x + STAFF_CHARACTER_ANCHOR.x;
+    const footCenterY = y + STAFF_CHARACTER_ANCHOR.y;
+
+    return {
+      x: footCenterX + STAFF_FOOT_COLLISION_BOX.offsetX,
+      y: footCenterY + STAFF_FOOT_COLLISION_BOX.offsetY,
+      width: STAFF_FOOT_COLLISION_BOX.width,
+      height: STAFF_FOOT_COLLISION_BOX.height
+    };
+  },
+
+  doRectsOverlap(first, second) {
+    return (
+      first.x < second.x + second.width &&
+      first.x + first.width > second.x &&
+      first.y < second.y + second.height &&
+      first.y + first.height > second.y
+    );
   },
 
   createMovementPath(status, options = {}, targetPosition = POSITIONS.idle) {
