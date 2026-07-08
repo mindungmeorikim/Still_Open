@@ -1,3 +1,8 @@
+## [v7.13.75] Staff Warehouse Assist Position Sync
+- Fixed: 알바생이 창고에 도착할 때 임의의 `warehouseAssist` 좌표를 쓰지 않고, 창고 박스 기준 상호작용 도착 좌표(`PlayerActionSystem.warehouseZone.standX/standY`)를 사용하도록 맞췄습니다.
+- Changed: 창고 도착/재고 꺼내기 상태가 같은 창고 박스 기준 좌표를 공유하도록 정리했습니다.
+- Preserved: 알바 진열 보충 루트, 계산대 대기 손님 회피, 청소 이동 회피, 창고 박스 열림/닫힘, 재고 들기 표시는 유지했습니다.
+
 ## [v7.13.74] Staff Restock Route Counter Queue Avoidance
 - Changed: 알바생이 진열대 보충을 위해 창고를 왕복할 때 계산대 대기 손님이 있으면 하단 우회 경유점을 추가로 타도록 보완했습니다.
 - Fixed: 계산대에서 손님이 대기 중일 때 알바가 손님 줄을 관통하는 것처럼 보일 수 있는 상황을 막기 위해 손님 대기열을 동적 충돌 대상으로 포함했습니다.

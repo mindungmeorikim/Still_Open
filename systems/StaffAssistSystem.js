@@ -32,7 +32,8 @@ const POSITIONS = Object.freeze({
   entry: Object.freeze({ x: 577, y: 720 }),
   // fallback 좌표입니다. 실제 알바 대기 위치는 getIdlePosition()에서 청소 도구함 좌표를 기준으로 계산합니다.
   idle: Object.freeze({ x: 895, y: 548 }),
-  warehouseAssist: Object.freeze({ x: 285, y: 575 }),
+  // fallback 좌표입니다. 실제 창고 도착 위치는 PlayerActionSystem.warehouseZone의 standX/standY를 기준으로 계산합니다.
+  warehouseAssist: Object.freeze({ x: 250, y: 580 }),
   cleaningAssist: Object.freeze({ x: 895, y: 548 })
 });
 
@@ -488,11 +489,13 @@ export const StaffAssistSystem = {
   },
 
   startShelfTask(task) {
+    const warehouseAssistPosition = this.getWarehouseAssistPosition();
+
     this.moveStaffToState("warehouse", {
       reason: "shelf_prepare_started",
       taskType: "shelf",
       label: "창고로 재고 가지러 가는 중",
-      position: POSITIONS.warehouseAssist,
+      position: warehouseAssistPosition,
       routePoints: this.getStaffIdleToWarehouseRoutePoints(),
       direction: "up_left",
       carryingBoxType: null,
@@ -505,7 +508,7 @@ export const StaffAssistSystem = {
         reason: "shelf_prepare_picking_stock",
         taskType: "shelf",
         label: "창고에서 재고 꺼내는 중",
-        position: POSITIONS.warehouseAssist,
+        position: warehouseAssistPosition,
         direction: "up_left",
         carryingBoxType: null,
         targetShelfInstanceId: task.shelf.instanceId,
@@ -1336,7 +1339,39 @@ export const StaffAssistSystem = {
       return this.getIdlePosition();
     }
 
+    if (status === "warehouse") {
+      return this.getWarehouseAssistPosition();
+    }
+
     return POSITIONS[status] ?? this.getIdlePosition();
+  },
+
+  getWarehouseAssistPosition() {
+    const warehouseZone = PlayerActionSystem.warehouseZone ?? {};
+    const fallback = POSITIONS.warehouseAssist;
+
+    // 창고 박스 이미지 자체의 left/top 좌표가 아니라,
+    // 플레이어가 창고 박스를 정리할 때 쓰는 같은 상호작용 도착 좌표(standX/standY)를 사용합니다.
+    // 이렇게 해야 알바가 박스 이미지와 어긋난 임의 좌표가 아니라 창고 박스 기준 위치에 도착합니다.
+    if (
+      Number.isFinite(Number(warehouseZone.standX)) &&
+      Number.isFinite(Number(warehouseZone.standY))
+    ) {
+      return this.normalizePoint({
+        x: Number(warehouseZone.standX),
+        y: Number(warehouseZone.standY),
+        direction: "up_left"
+      }, fallback);
+    }
+
+    if (typeof PlayerActionSystem.getPlayerStandPositionForZone === "function") {
+      return this.normalizePoint(
+        PlayerActionSystem.getPlayerStandPositionForZone("warehouse-box-zone", warehouseZone),
+        fallback
+      );
+    }
+
+    return this.normalizePoint(fallback, fallback);
   },
 
   getStaffIdleToWarehouseRoutePoints() {
