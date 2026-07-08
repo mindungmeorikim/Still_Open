@@ -63,6 +63,10 @@ const PEAK_COUPON_REVENUE_MULTIPLIER = 1.5;
 const STAFF_ABILITY_UPGRADE_DIAMOND_PRICE = 80;
 const STAFF_ABILITY_MAX_TOTAL_UPGRADES = 5;
 const STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS = 7;
+const PAYMENT_SDK_READY = false;
+const AD_SDK_READY = false;
+const PAYMENT_SDK_NOT_CONNECTED_MESSAGE = "결제 SDK가 연결되지 않아 현재 유료 다이아 구매를 진행할 수 없습니다.";
+const AD_SDK_NOT_CONNECTED_MESSAGE = "광고 SDK가 연결되지 않아 현재 광고 보상을 받을 수 없습니다.";
 
 const DIAMOND_PRODUCTS = Object.freeze([
   Object.freeze({ id: "diamond_100", name: "다이아 100개", priceWon: 1000, diamondAmount: 100, discountRate: 0 }),
@@ -233,14 +237,17 @@ export const BMSystem = {
     const bm = this.ensureBMState();
     const product = DIAMOND_PRODUCTS.find((item) => item.id === productId);
     if (!product) return this.fail("invalid_product", "존재하지 않는 다이아 상품입니다.");
-    const currencyResult = EconomySystem.addDiamond(product.diamondAmount, "diamond_product_purchase_test", {
+    if (!this.isPaymentSdkReady()) {
+      return this.fail("payment_sdk_not_connected", PAYMENT_SDK_NOT_CONNECTED_MESSAGE, { product });
+    }
+    const currencyResult = EconomySystem.addDiamond(product.diamondAmount, "diamond_product_purchase", {
       source: "bm_shop",
       productId: product.id,
       walletBucket: "paid"
     });
     if (!currencyResult.success) return this.failCurrency(currencyResult, "다이아 지급에 실패했습니다.", { product });
     bm.purchasedDiamondProductIds.push(product.id);
-    return this.ok("diamond_product_purchased", `${product.name} 테스트 구매 완료`, { product, amount: product.diamondAmount, currencyResult });
+    return this.ok("diamond_product_purchased", `${product.name} 구매 완료`, { product, amount: product.diamondAmount, currencyResult });
   },
 
   purchaseGoldProduct(productId) {
@@ -273,12 +280,21 @@ export const BMSystem = {
     const bm = this.ensureBMState();
     const claimKey = this.getAdRewardClaimKey(reward.id);
     const claimed = bm.freeRechargeClaims[claimKey] === true;
+    const usesSkipTicket = bm.adSkipTickets > 0;
+    const isAdAvailable = usesSkipTicket || this.isAdSdkReady();
     return {
       ...reward,
       isClaimed: claimed,
-      canClaim: !claimed,
-      usesSkipTicket: bm.adSkipTickets > 0,
-      buttonText: claimed ? "수령 완료" : bm.adSkipTickets > 0 ? "스킵권으로 받기" : "광고 보기(테스트)"
+      canClaim: !claimed && isAdAvailable,
+      usesSkipTicket,
+      isAdSdkReady: this.isAdSdkReady(),
+      buttonText: claimed
+        ? "수령 완료"
+        : usesSkipTicket
+          ? "스킵권으로 받기"
+          : this.isAdSdkReady()
+            ? "광고 보기"
+            : "SDK 미연결"
     };
   },
 
@@ -289,6 +305,9 @@ export const BMSystem = {
     const claimKey = this.getAdRewardClaimKey(reward.id);
     if (bm.freeRechargeClaims[claimKey] === true) return this.fail("already_claimed", "오늘 이미 받은 광고 보상입니다.");
     const usedSkipTicket = bm.adSkipTickets > 0;
+    if (!usedSkipTicket && !this.isAdSdkReady()) {
+      return this.fail("ad_sdk_not_connected", AD_SDK_NOT_CONNECTED_MESSAGE, { reward });
+    }
 
     let currencyResult = null;
     if (reward.rewardType === "diamond") {
@@ -699,6 +718,7 @@ export const BMSystem = {
       contractShopProducts: this.getShopUnlockedContractProducts().map((p) => this.createContractProductPayload(p)),
       nextContractUnlockProducts: this.getNextContractUnlockProducts().map((p) => this.createContractProductPayload(p)),
       premiumProducts: this.getPremiumProducts().map((p) => this.createPremiumProductPayload(p)),
+      sdk: this.getSdkState(),
       contractUnlockSkip: this.getContractUnlockSkipState(),
       peakCoupon: this.getPeakCouponState(),
       freeRecharge: this.getAdRewards(),
@@ -715,6 +735,9 @@ export const BMSystem = {
   getPremiumProducts() { return PRODUCTS.filter((p) => p.isPremiumBM); },
   getContractUnlockSkipState() { const v = this.validateContractUnlockSkip(); return { priceDiamond: CONTRACT_UNLOCK_SKIP_DIAMOND_PRICE, cooldownDays: CONTRACT_UNLOCK_SKIP_COOLDOWN_DAYS, canUse: v.success, reason: v.reason, message: v.message, nextProducts: this.getNextContractUnlockProducts().map((p) => this.createContractProductPayload(p)) }; },
   getPeakCouponState() { const bm = this.ensureBMState(); const v = this.validatePeakCouponUse(); return { priceDiamond: PEAK_COUPON_DIAMOND_PRICE, purchasePriceDiamond: this.getPeakCouponPurchasePrice(), discountActive: bm.peakCouponDiscountDay === GameState.day && bm.peakCouponDiscountUsedDay !== GameState.day, durationSeconds: PEAK_COUPON_DURATION_SECONDS, revenueMultiplier: PEAK_COUPON_REVENUE_MULTIPLIER, ownedCount: bm.peakTimeCoupons, usedDay: bm.peakCouponUsedDay, isActive: bm.peakCouponActive, canUse: v.success, reason: v.reason, message: v.message }; },
+  isPaymentSdkReady() { return PAYMENT_SDK_READY === true; },
+  isAdSdkReady() { return AD_SDK_READY === true; },
+  getSdkState() { return { paymentReady: this.isPaymentSdkReady(), adReady: this.isAdSdkReady() }; },
 
   createContractProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, contractCost: product.contractCost, unlockDay: product.unlockDay, isOwned: this.hasProductContract(product.id), isShopUnlocked: this.isContractShopUnlocked(product.id) } : null; },
   createPremiumProductPayload(product) { return product ? { productId: product.id, productName: this.getProductDisplayName(product), baseName: product.name, requiredZoneId: product.requiredZoneId, displayCategory: product.displayCategory, shelfId: product.shelfId, diamondPrice: product.diamondPrice, isPurchased: this.isPremiumProductPurchased(product.id), isZoneUnlocked: this.isZoneUnlocked(product.requiredZoneId) } : null; },

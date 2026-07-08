@@ -8,8 +8,15 @@ import { EVENTS } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 
 const AUDIO_BASE_PATH = "./assets/audio/";
+const AUDIO_SETTINGS_KEY = "today_normal_open_settings_v1";
 const CUSTOMER_RANDOM_EVENT_TRIGGERED = "CUSTOMER_RANDOM_EVENT_TRIGGERED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
+const DEFAULT_AUDIO_SETTINGS = Object.freeze({
+  bgmEnabled: true,
+  sfxEnabled: true,
+  bgmVolume: 1,
+  sfxVolume: 1
+});
 
 const BGM = {
   title: { src: "bgm_title_loop.mp3", volume: 0.38 },
@@ -40,6 +47,16 @@ function getDiamondBalance() {
   return Math.max(0, Math.floor(Number(GameState.bm?.diamond) || 0));
 }
 
+function normalizeVolume(value, fallback = 1) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return fallback;
+  }
+
+  return Math.min(1, Math.max(0, numberValue));
+}
+
 export const AudioSystem = {
   bgmAudio: {},
   sfxAudio: {},
@@ -48,6 +65,7 @@ export const AudioSystem = {
   isInitialized: false,
   isUnlocked: false,
   isMuted: false,
+  settings: { ...DEFAULT_AUDIO_SETTINGS },
   lastSfxPlayedAt: {},
   lastDiamondBalance: 0,
 
@@ -55,6 +73,7 @@ export const AudioSystem = {
     if (this.isInitialized) return;
     this.isInitialized = true;
     this.lastDiamondBalance = getDiamondBalance();
+    this.settings = this.loadSettings();
 
     this.prepareAudio();
     this.bindUnlockEvents();
@@ -69,14 +88,14 @@ export const AudioSystem = {
       const audio = new Audio(toAudioPath(config.src));
       audio.loop = true;
       audio.preload = "auto";
-      audio.volume = config.volume;
+      audio.volume = this.getBgmVolume(config);
       this.bgmAudio[key] = audio;
     });
 
     Object.entries(SFX).forEach(([key, config]) => {
       const audio = new Audio(toAudioPath(config.src));
       audio.preload = "auto";
-      audio.volume = config.volume;
+      audio.volume = this.getSfxVolume(config);
       this.sfxAudio[key] = audio;
     });
   },
@@ -165,6 +184,11 @@ export const AudioSystem = {
 
     this.pendingBgmKey = key;
 
+    if (!this.settings.bgmEnabled) {
+      this.stopCurrentBgm();
+      return;
+    }
+
     if (!this.isUnlocked) return;
 
     if (this.currentBgmKey === key) {
@@ -181,7 +205,7 @@ export const AudioSystem = {
     if (!audio) return;
 
     audio.currentTime = 0;
-    audio.volume = BGM[key].volume;
+    audio.volume = this.getBgmVolume(BGM[key]);
     audio.play()
       .then(() => {
         this.currentBgmKey = key;
@@ -204,7 +228,7 @@ export const AudioSystem = {
   },
 
   playSfx(key, options = {}) {
-    if (!SFX[key] || this.isMuted || !this.isUnlocked) return;
+    if (!SFX[key] || this.isMuted || !this.isUnlocked || !this.settings.sfxEnabled) return;
 
     const now = Date.now();
     const throttleMs = Number(options.throttleMs) || 0;
@@ -221,7 +245,7 @@ export const AudioSystem = {
       if (!baseAudio) return;
 
       const audio = baseAudio.cloneNode(true);
-      audio.volume = SFX[key].volume;
+      audio.volume = this.getSfxVolume(SFX[key]);
       audio.play().catch(() => {});
     };
 
@@ -244,6 +268,108 @@ export const AudioSystem = {
 
     if (this.pendingBgmKey) {
       this.playBgm(this.pendingBgmKey);
+    }
+  },
+
+  getBgmVolume(config = {}) {
+    return normalizeVolume(config.volume, 1) * normalizeVolume(this.settings.bgmVolume, 1);
+  },
+
+  getSfxVolume(config = {}) {
+    return normalizeVolume(config.volume, 1) * normalizeVolume(this.settings.sfxVolume, 1);
+  },
+
+  getSettings() {
+    return { ...this.settings };
+  },
+
+  setBgmEnabled(isEnabled) {
+    this.applySettings({ bgmEnabled: !!isEnabled });
+  },
+
+  setSfxEnabled(isEnabled) {
+    this.applySettings({ sfxEnabled: !!isEnabled });
+  },
+
+  setBgmVolume(volume) {
+    this.applySettings({ bgmVolume: normalizeVolume(volume, this.settings.bgmVolume) });
+  },
+
+  setSfxVolume(volume) {
+    this.applySettings({ sfxVolume: normalizeVolume(volume, this.settings.sfxVolume) });
+  },
+
+  applySettings(partialSettings = {}) {
+    this.settings = this.normalizeSettings({
+      ...this.settings,
+      ...partialSettings
+    });
+    this.saveSettings();
+    this.updateAudioVolumes();
+
+    if (!this.settings.bgmEnabled) {
+      this.stopCurrentBgm();
+      return;
+    }
+
+    if (this.pendingBgmKey && !this.isMuted) {
+      this.playBgm(this.pendingBgmKey);
+    }
+  },
+
+  updateAudioVolumes() {
+    Object.entries(this.bgmAudio).forEach(([key, audio]) => {
+      if (audio && BGM[key]) {
+        audio.volume = this.getBgmVolume(BGM[key]);
+      }
+    });
+
+    Object.entries(this.sfxAudio).forEach(([key, audio]) => {
+      if (audio && SFX[key]) {
+        audio.volume = this.getSfxVolume(SFX[key]);
+      }
+    });
+  },
+
+  normalizeSettings(settings = {}) {
+    return {
+      bgmEnabled: settings.bgmEnabled !== false,
+      sfxEnabled: settings.sfxEnabled !== false,
+      bgmVolume: normalizeVolume(settings.bgmVolume, DEFAULT_AUDIO_SETTINGS.bgmVolume),
+      sfxVolume: normalizeVolume(settings.sfxVolume, DEFAULT_AUDIO_SETTINGS.sfxVolume)
+    };
+  },
+
+  loadSettings() {
+    if (typeof window === "undefined" || !window.localStorage) {
+      return { ...DEFAULT_AUDIO_SETTINGS };
+    }
+
+    try {
+      const rawSettings = window.localStorage.getItem(AUDIO_SETTINGS_KEY);
+      const savedSettings = rawSettings ? JSON.parse(rawSettings) : {};
+
+      return this.normalizeSettings(savedSettings?.audio ?? savedSettings);
+    } catch (error) {
+      console.warn("[AudioSystem] 오디오 설정을 불러오지 못했습니다.", error);
+      return { ...DEFAULT_AUDIO_SETTINGS };
+    }
+  },
+
+  saveSettings() {
+    if (typeof window === "undefined" || !window.localStorage) return;
+
+    try {
+      const rawSettings = window.localStorage.getItem(AUDIO_SETTINGS_KEY);
+      const savedSettings = rawSettings ? JSON.parse(rawSettings) : {};
+      const nextSettings = {
+        ...(savedSettings && typeof savedSettings === "object" ? savedSettings : {}),
+        audio: this.getSettings()
+      };
+
+      window.localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify(nextSettings));
+    } catch (error) {
+      console.warn("[AudioSystem] 오디오 설정을 저장하지 못했습니다.", error);
     }
   }
 };

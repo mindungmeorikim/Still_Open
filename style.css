@@ -15133,6 +15133,56 @@ body.is-title-screen-active #game-root {
   cursor: not-allowed !important;
 }
 
+.settings-audio-row {
+  align-items: stretch !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.settings-audio-toggle,
+.settings-volume-control {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.settings-audio-toggle input {
+  flex: 0 0 auto !important;
+}
+
+.settings-volume-control {
+  align-items: stretch !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.settings-volume-control span {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+.settings-volume-control output {
+  color: #2f8191 !important;
+  font-variant-numeric: tabular-nums !important;
+}
+
+.settings-option-row .settings-volume-control input[type="range"] {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 22px !important;
+  cursor: pointer !important;
+}
+
+.settings-option-row .settings-volume-control input[type="range"]:disabled {
+  cursor: not-allowed !important;
+}
+
 @media (max-width: 620px) {
   #title-screen {
     padding: 18px 14px !important;

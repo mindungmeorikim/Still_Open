@@ -27,6 +27,7 @@ import {
   getWarehouseBoxAsset
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
+import { AudioSystem } from "../systems/AudioSystem.js";
 import { CURRENCY_EVENTS } from "../systems/EconomySystem.js";
 import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
 import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
@@ -2866,14 +2867,26 @@ export const UIManager = {
           </div>
 
           <div class="settings-option-list">
-            <label class="settings-option-row">
-              <span>효과음</span>
-              <input type="checkbox" checked disabled />
-            </label>
-            <label class="settings-option-row">
-              <span>배경음</span>
-              <input type="checkbox" checked disabled />
-            </label>
+            <div class="settings-option-row settings-audio-row">
+              <label class="settings-audio-toggle">
+                <span>효과음</span>
+                <input id="settings-sfx-enabled" type="checkbox" />
+              </label>
+              <label class="settings-volume-control">
+                <span>효과음 볼륨 <output id="settings-sfx-volume-value">100%</output></span>
+                <input id="settings-sfx-volume" type="range" min="0" max="100" step="5" />
+              </label>
+            </div>
+            <div class="settings-option-row settings-audio-row">
+              <label class="settings-audio-toggle">
+                <span>배경음</span>
+                <input id="settings-bgm-enabled" type="checkbox" />
+              </label>
+              <label class="settings-volume-control">
+                <span>배경음 볼륨 <output id="settings-bgm-volume-value">100%</output></span>
+                <input id="settings-bgm-volume" type="range" min="0" max="100" step="5" />
+              </label>
+            </div>
           </div>
         </div>
       `;
@@ -2890,10 +2903,42 @@ export const UIManager = {
     if (!this.settingsModal) return;
 
     const closeButton = document.getElementById("settings-close-button");
+    const sfxEnabledInput = document.getElementById("settings-sfx-enabled");
+    const bgmEnabledInput = document.getElementById("settings-bgm-enabled");
+    const sfxVolumeInput = document.getElementById("settings-sfx-volume");
+    const bgmVolumeInput = document.getElementById("settings-bgm-volume");
 
     if (closeButton) {
       closeButton.onclick = () => {
         this.hideSettingsModal();
+      };
+    }
+
+    if (sfxEnabledInput) {
+      sfxEnabledInput.onchange = () => {
+        AudioSystem.setSfxEnabled(sfxEnabledInput.checked);
+        this.syncSettingsAudioControls();
+      };
+    }
+
+    if (bgmEnabledInput) {
+      bgmEnabledInput.onchange = () => {
+        AudioSystem.setBgmEnabled(bgmEnabledInput.checked);
+        this.syncSettingsAudioControls();
+      };
+    }
+
+    if (sfxVolumeInput) {
+      sfxVolumeInput.oninput = () => {
+        AudioSystem.setSfxVolume((Number(sfxVolumeInput.value) || 0) / 100);
+        this.syncSettingsAudioControls();
+      };
+    }
+
+    if (bgmVolumeInput) {
+      bgmVolumeInput.oninput = () => {
+        AudioSystem.setBgmVolume((Number(bgmVolumeInput.value) || 0) / 100);
+        this.syncSettingsAudioControls();
       };
     }
 
@@ -2915,6 +2960,49 @@ export const UIManager = {
         }
       });
     }
+
+    this.syncSettingsAudioControls();
+  },
+
+  syncSettingsAudioControls() {
+    const settings = AudioSystem.getSettings();
+    const sfxEnabledInput = document.getElementById("settings-sfx-enabled");
+    const bgmEnabledInput = document.getElementById("settings-bgm-enabled");
+    const sfxVolumeInput = document.getElementById("settings-sfx-volume");
+    const bgmVolumeInput = document.getElementById("settings-bgm-volume");
+    const sfxVolumeValue = document.getElementById("settings-sfx-volume-value");
+    const bgmVolumeValue = document.getElementById("settings-bgm-volume-value");
+
+    const sfxPercent = Math.round((Number(settings.sfxVolume) || 0) * 100);
+    const bgmPercent = Math.round((Number(settings.bgmVolume) || 0) * 100);
+
+    if (sfxEnabledInput) {
+      sfxEnabledInput.checked = settings.sfxEnabled !== false;
+    }
+
+    if (bgmEnabledInput) {
+      bgmEnabledInput.checked = settings.bgmEnabled !== false;
+    }
+
+    if (sfxVolumeInput) {
+      sfxVolumeInput.value = String(sfxPercent);
+      sfxVolumeInput.disabled = settings.sfxEnabled === false;
+    }
+
+    if (bgmVolumeInput) {
+      bgmVolumeInput.value = String(bgmPercent);
+      bgmVolumeInput.disabled = settings.bgmEnabled === false;
+    }
+
+    if (sfxVolumeValue) {
+      sfxVolumeValue.value = `${sfxPercent}%`;
+      sfxVolumeValue.textContent = `${sfxPercent}%`;
+    }
+
+    if (bgmVolumeValue) {
+      bgmVolumeValue.value = `${bgmPercent}%`;
+      bgmVolumeValue.textContent = `${bgmPercent}%`;
+    }
   },
 
   openSettingsModal(source = "ingame") {
@@ -2924,6 +3012,7 @@ export const UIManager = {
 
     this.settingsModal.dataset.source = source;
     this.setElementHiddenSafely(this.settingsModal, false);
+    this.syncSettingsAudioControls();
     this.prepareUiImageButtons(this.settingsModal);
 
     window.requestAnimationFrame(() => {
