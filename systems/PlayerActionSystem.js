@@ -115,7 +115,7 @@ export const PlayerActionSystem = {
   },
 
   interactionDistance: 100,
-  checkoutInteractionDistance: 75,
+  checkoutInteractionDistance: 90,
   restockDuration: 5000,
   
   restockTimerId: null,
@@ -133,16 +133,16 @@ export const PlayerActionSystem = {
   },
 
   deliveryBoxZone: {
-    x: 518,
+    x: 478,
     y: 615,
-    standX: 510,
+    standX: 470,
     standY: 630
   },
 
   cleaningZone: {
     x: 735,
-    y: 520,
-    interactionDistance: 100
+    y: 490,
+    interactionDistance: 55
   },
 
   init() {
@@ -555,6 +555,48 @@ export const PlayerActionSystem = {
       return emptyShelfTarget;
     }
 
+    const counterTarget = this.getCounterInteractionTarget();
+
+    // 계산대와 청소 구역이 가까운 1구역에서는 계산 손님이 대기 중일 때
+    // 청소보다 계산을 우선한다.
+    if (counterTarget && this.hasCheckoutReadyCustomer()) {
+      return counterTarget;
+    }
+
+    const cleaningTarget = this.getCleaningInteractionTarget();
+
+    if (counterTarget) {
+      return counterTarget;
+    }
+
+    if (cleaningTarget) {
+      return cleaningTarget;
+    }
+
+    return shelfTargets[0] ?? null;
+  },
+
+  getCounterInteractionTarget() {
+    const counterDistance = this.getDistanceToZone("counter-zone", null);
+
+    if (
+      counterDistance !== null &&
+      counterDistance <= this.getCounterInteractionDistance()
+    ) {
+      return {
+        type: "counter",
+        distance: counterDistance
+      };
+    }
+
+    return null;
+  },
+
+  getCleaningInteractionTarget() {
+    if (!this.isCleaningActionAvailable()) {
+      return null;
+    }
+
     const activeCleaningPoint = this.getActiveCleaningPoint();
     const cleaningDistance = this.getDistanceToZone("cleaning-zone", activeCleaningPoint);
     const cleaningInteractionDistance =
@@ -572,19 +614,29 @@ export const PlayerActionSystem = {
       };
     }
 
-    const counterDistance = this.getDistanceToZone("counter-zone", null);
+    return null;
+  },
 
-    if (
-      counterDistance !== null &&
-      counterDistance <= this.getCounterInteractionDistance()
-    ) {
-      return {
-        type: "counter",
-        distance: counterDistance
-      };
-    }
+  isCleaningActionAvailable() {
+    const sanitationState = GameState.sanitation ?? {};
+    const value = Math.max(0, Math.min(100, Math.floor(Number(sanitationState.value) || 100)));
 
-    return shelfTargets[0] ?? null;
+    return (
+      sanitationState.isCleaning === true ||
+      sanitationState.isCleaningNeeded === true ||
+      value < 100
+    );
+  },
+
+  hasCheckoutReadyCustomer() {
+    const customer = CustomerSystem.getCheckoutCustomerPayload?.();
+
+    return Boolean(
+      customer &&
+      customer.status === "waiting" &&
+      customer.currentZone === "counter" &&
+      customer.carriedProductId
+    );
   },
 
   isShelfZoneUnlocked(shelf) {
@@ -1536,6 +1588,11 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
 
     if (isStaffCleaningActive) {
       this.showActionMessage("알바생이 청소 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    if (!this.isCleaningActionAvailable()) {
+      this.showActionMessage("지금은 청소할 곳이 없습니다.");
       return;
     }
 

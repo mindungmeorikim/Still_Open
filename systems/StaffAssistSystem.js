@@ -18,9 +18,9 @@ import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getProductById } from "../data/ProductData.js";
 import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 import {
-  arePointsInWalkableAreas,
   getStoreWalkableAreas,
-  isPointInCenterProbeWalkableArea
+  isPointInCenterProbeWalkableArea,
+  isPointInWalkableAreas
 } from "../data/WalkableAreaData.js";
 
 export const STAFF_ASSIST_EVENTS = Object.freeze({
@@ -34,7 +34,7 @@ const BM_STATE_CHANGED = "BM_STATE_CHANGED";
 const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 
 const POSITIONS = Object.freeze({
-  entry: Object.freeze({ x: 537, y: 680 }),
+  entry: Object.freeze({ x: 537, y: 640 }),
   // fallback 좌표입니다. 실제 알바 대기 위치는 getIdlePosition()에서 청소 도구함 좌표를 기준으로 계산합니다.
   idle: Object.freeze({ x: 895, y: 548 }),
   // fallback 좌표입니다. 실제 창고 도착 위치는 PlayerActionSystem.warehouseZone의 standX/standY를 기준으로 계산합니다.
@@ -82,11 +82,20 @@ const STAFF_FOOT_COLLISION_BOX = Object.freeze({
   offsetX: -14,
   offsetY: -8
 });
-const STAFF_WALKABLE_PROBE = Object.freeze({
-  // 플레이어와 같은 방식으로 발 주변 가로 라인을 검사해 외곽 벽을 타지 않게 한다.
-  // 경로 연결부가 끊기지 않도록 몸통 전체가 아니라 발판 중심선만 검사한다.
-  halfWidth: 21,
-  upperOffsetY: 5
+// 이동 가능 영역은 발 중심점 1개만 보지만,
+// 계산대/진열대 같은 매장 오브젝트는 하단 몸통 폭까지 막아야
+// 알바가 오브젝트 위를 넘어다니는 것처럼 보이지 않는다.
+const STAFF_OBJECT_COLLISION_BOX = Object.freeze({
+  width: 46,
+  height: 24,
+  offsetX: -23,
+  offsetY: -18
+});
+const STAFF_OBJECT_COLLISION_PADDING_BY_KIND = Object.freeze({
+  counter: Object.freeze({ x: 16, y: 10 }),
+  shelf: Object.freeze({ x: 6, y: 8 }),
+  cleaning_tools: Object.freeze({ x: 4, y: 4 }),
+  warehouse_box: Object.freeze({ x: 4, y: 4 })
 });
 const STAFF_COUNTER_CUSTOMER_COLLISION_BOX = Object.freeze({
   width: 74,
@@ -149,8 +158,14 @@ const BASE_SHELF_REFILL_MS = 5600;
 const BASE_CLEANING_MS = 7000;
 const CHECKING_DELAY_MS = 700;
 const RETURNING_SETTLE_DELAY_MS = 420;
-const STAFF_MOVE_SPEED = 3.2;
+const STAFF_MOVE_SPEED = 1.05;
 const STAFF_MOVE_FRAME_MS = 16;
+const STAFF_MOVE_MAX_FRAME_SCALE = 1.0;
+const STAFF_ROUTE_SKIP_DISTANCE = 16;
+const STAFF_ARRIVAL_SNAP_DISTANCE = 1.25;
+const STAFF_ENTRY_START_DELAY_MS = 180;
+const STAFF_ENTRY_ESCAPE_STATUS = "entering";
+const STAFF_ENTRY_CHECK_DELAY_MS = 900;
 const CLEANING_RECOVERY = 25;
 const PRODUCT_NO_STOCK_MESSAGE_COOLDOWN_MS = 15000;
 const GLOBAL_GUIDE_MESSAGE_COOLDOWN_MS = 5000;
@@ -917,21 +932,64 @@ export const StaffAssistSystem = {
     const attendanceFields = this.getAttendanceStateFields();
     this.updateState("entering", {
       reason,
+      label: STATUS_LABELS.entering,
       position: POSITIONS.entry,
       direction: "down_left",
       isMoving: false,
       ...attendanceFields
     });
 
-    this.moveStaffToState("idle", {
-      reason: `${reason}_arrive_idle`,
-      position: this.getIdlePosition(),
-      label: STATUS_LABELS.idle,
+    // 입구 좌표가 화면에 한 프레임 이상 보인 뒤, 출근 경로를 따라 걸어서 대기 위치로 이동시킨다.
+    // 상태를 바로 idle로 바꾸면 UI가 청소 도구 옆 대기 좌표로 순간 스냅된 것처럼 보일 수 있다.
+    this.setTaskTimer(() => {
+      if (!this.hasHiredStaff() || !this.canAssistInCurrentPhase()) {
+        return;
+      }
+
+      if (this.state.status !== "entering") {
+        return;
+      }
+
+      this.moveStaffFromEntryToIdle(reason, attendanceFields);
+    }, STAFF_ENTRY_START_DELAY_MS);
+  },
+
+  moveStaffFromEntryToIdle(reason = "enter_store", attendanceFields = {}) {
+    const idlePosition = this.getIdlePosition();
+    const entryPath = this.compactMovementPath([
+      STAFF_ROUTE_POINTS.entryAisle,
+      STAFF_ROUTE_POINTS.mainAisle,
+      STAFF_ROUTE_POINTS.lowerRightAisle,
+      idlePosition
+    ]);
+    const arriveIdle = () => {
+      const nextIdlePosition = this.getIdlePosition();
+
+      this.updateState("idle", {
+        reason: `${reason}_arrived_idle`,
+        label: STATUS_LABELS.idle,
+        position: nextIdlePosition,
+        direction: nextIdlePosition.direction ?? "down",
+        isMoving: false,
+        ...attendanceFields
+      });
+      this.cooldownUntilMs = this.getNowMs() + STAFF_ENTRY_CHECK_DELAY_MS;
+      this.scheduleNextCheck(STAFF_ENTRY_CHECK_DELAY_MS);
+    };
+
+    if (entryPath.length <= 0) {
+      arriveIdle();
+      return;
+    }
+
+    this.moveStaffAlongPath("entering", {
+      reason: `${reason}_walking_in`,
+      label: STATUS_LABELS.entering,
+      direction: idlePosition.direction ?? "down",
+      taskType: null,
+      carryingBoxType: null,
       ...attendanceFields
-    }, () => {
-      this.cooldownUntilMs = this.getNowMs() + 900;
-      this.scheduleNextCheck(900);
-    });
+    }, entryPath, arriveIdle);
   },
 
   returnToIdle(reason = "return_to_idle") {
@@ -952,6 +1010,29 @@ export const StaffAssistSystem = {
       options.position ?? this.getDefaultPositionForStatus(status),
       this.getDefaultPositionForStatus("idle")
     );
+    const idlePosition = this.getDefaultPositionForStatus("idle");
+    const currentPosition = this.normalizePoint(
+      { x: this.state.x, y: this.state.y },
+      idlePosition
+    );
+    const directDistance = this.getPointDistance(
+      currentPosition.x,
+      currentPosition.y,
+      targetPosition.x,
+      targetPosition.y
+    );
+
+    // 이미 목표 위치 근처에 있는데 기본 경유 루트를 타면 청소/복귀 시
+    // 알바가 멀리 휙 나갔다가 다시 돌아오는 것처럼 보인다.
+    // 가까운 목적지는 경유지 없이 바로 정착시켜 대기 흔들림도 줄인다.
+    if (directDistance <= STAFF_ROUTE_SKIP_DISTANCE) {
+      this.moveStaffDirectToState(status, {
+        ...options,
+        position: targetPosition
+      }, onArrive);
+      return;
+    }
+
     const movementPath = this.createMovementPath(status, options, targetPosition);
 
     if (movementPath.length <= 1) {
@@ -1005,7 +1086,7 @@ export const StaffAssistSystem = {
 
     this.cancelStaffMovement();
 
-    if (distance <= STAFF_MOVE_SPEED) {
+    if (distance <= STAFF_ARRIVAL_SNAP_DISTANCE) {
       this.updateState(status, {
         ...options,
         position: { x: targetX, y: targetY },
@@ -1040,7 +1121,10 @@ export const StaffAssistSystem = {
 
       const nowMs = this.getNowMs();
       const elapsedFrameMs = Math.max(STAFF_MOVE_FRAME_MS, nowMs - lastFrameAtMs);
-      const frameScale = elapsedFrameMs / STAFF_MOVE_FRAME_MS;
+      const frameScale = Math.min(
+        STAFF_MOVE_MAX_FRAME_SCALE,
+        elapsedFrameMs / STAFF_MOVE_FRAME_MS
+      );
       const currentX = Number(this.state.x) || startX;
       const currentY = Number(this.state.y) || startY;
       const dx = targetX - currentX;
@@ -1068,7 +1152,8 @@ export const StaffAssistSystem = {
         currentX,
         currentY,
         rawNextX,
-        rawNextY
+        rawNextY,
+        status
       );
 
       this.updateState(status, {
@@ -1084,10 +1169,24 @@ export const StaffAssistSystem = {
     this.moveRafId = window.requestAnimationFrame(step);
   },
 
-  getCollisionSafeStaffPosition(currentX, currentY, nextX, nextY) {
+  getCollisionSafeStaffPosition(currentX, currentY, nextX, nextY, status = null) {
+    const currentPosition = { x: currentX, y: currentY };
     const nextPosition = { x: nextX, y: nextY };
 
     if (!this.isStaffPositionBlocked(nextPosition)) {
+      return nextPosition;
+    }
+
+    // 출근 시작점은 매장 바깥 입구 연출용 좌표라 walkable area 바깥일 수 있다.
+    // 이때 일반 차단 판정을 그대로 걸면 입구에서 한 프레임도 전진하지 못하고
+    // 걷기 애니메이션만 반복되어 흔들리는 것처럼 보인다.
+    // entering 상태에서 현재 위치가 이미 막힌 좌표라면, 첫 실내 경유지까지는
+    // 작은 보폭으로 빠져나오게 허용한다.
+    if (
+      status === STAFF_ENTRY_ESCAPE_STATUS &&
+      !this.isStaffPositionInsideWalkableArea(currentPosition) &&
+      !this.isStaffPositionOverlappingStoreObject(currentPosition)
+    ) {
       return nextPosition;
     }
 
@@ -1110,14 +1209,35 @@ export const StaffAssistSystem = {
       return true;
     }
 
-    const footRect = this.getStaffFootCollisionRect(position);
-    const collisionRects = [
-      ...getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds)
-    ];
+    return this.isStaffPositionOverlappingStoreObject(position);
+  },
+
+  isStaffPositionOverlappingStoreObject(position = {}) {
+    const objectProbeRect = this.getStaffObjectCollisionRect(position);
+    const collisionRects = this.getStaffStoreObjectCollisionRects();
 
     return collisionRects.some((rect) => {
-      return this.doRectsOverlap(footRect, rect);
+      return this.doRectsOverlap(objectProbeRect, rect);
     });
+  },
+
+  getStaffStoreObjectCollisionRects() {
+    return getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds)
+      .map((rect) => this.expandCollisionRectForStaff(rect));
+  },
+
+  expandCollisionRectForStaff(rect = {}) {
+    const padding = STAFF_OBJECT_COLLISION_PADDING_BY_KIND[rect.kind] ?? Object.freeze({ x: 0, y: 0 });
+    const paddingX = Math.max(0, Number(padding.x) || 0);
+    const paddingY = Math.max(0, Number(padding.y) || 0);
+
+    return {
+      ...rect,
+      x: Math.round((Number(rect.x) || 0) - paddingX),
+      y: Math.round((Number(rect.y) || 0) - paddingY),
+      width: Math.max(0, Math.round((Number(rect.width) || 0) + paddingX * 2)),
+      height: Math.max(0, Math.round((Number(rect.height) || 0) + paddingY * 2))
+    };
   },
 
   isStaffPositionInsideWalkableArea(position = {}) {
@@ -1129,11 +1249,11 @@ export const StaffAssistSystem = {
 
     const movementPoint = this.getStaffMovementPoint(position);
 
-    if (isPointInCenterProbeWalkableArea(movementPoint, walkableAreas)) {
-      return true;
-    }
-
-    return arePointsInWalkableAreas(this.getStaffWalkableProbePoints(position), walkableAreas);
+    // 알바는 플레이어처럼 직접 조작되는 캐릭터가 아니라 정해진 경유 좌표를 따라 이동한다.
+    // 발 주변 다중 포인트를 모두 검사하면 좁은 입구/통로 경계에서 계속 걸려 흔들릴 수 있으므로,
+    // 이동 가능 영역 판정은 발 중심점 1개만 사용한다.
+    return isPointInCenterProbeWalkableArea(movementPoint, walkableAreas)
+      || isPointInWalkableAreas(movementPoint, walkableAreas);
   },
 
   getStaffMovementPoint(position = {}) {
@@ -1141,22 +1261,6 @@ export const StaffAssistSystem = {
       x: (Number(position.x) || 0) + STAFF_CHARACTER_ANCHOR.x,
       y: (Number(position.y) || 0) + STAFF_CHARACTER_ANCHOR.y
     };
-  },
-
-  getStaffWalkableProbePoints(position = {}) {
-    const movementPoint = this.getStaffMovementPoint(position);
-    const halfWidth = Math.max(
-      STAFF_FOOT_COLLISION_BOX.width / 2,
-      Number(STAFF_WALKABLE_PROBE.halfWidth) || STAFF_FOOT_COLLISION_BOX.width / 2
-    );
-    const upperOffsetY = Math.max(0, Number(STAFF_WALKABLE_PROBE.upperOffsetY) || 0);
-
-    return [
-      movementPoint,
-      { x: movementPoint.x - halfWidth, y: movementPoint.y },
-      { x: movementPoint.x + halfWidth, y: movementPoint.y },
-      { x: movementPoint.x, y: movementPoint.y - upperOffsetY }
-    ];
   },
 
   getStaffFootCollisionRect(position = {}) {
@@ -1170,6 +1274,20 @@ export const StaffAssistSystem = {
       y: footCenterY + STAFF_FOOT_COLLISION_BOX.offsetY,
       width: STAFF_FOOT_COLLISION_BOX.width,
       height: STAFF_FOOT_COLLISION_BOX.height
+    };
+  },
+
+  getStaffObjectCollisionRect(position = {}) {
+    const x = Number(position.x) || 0;
+    const y = Number(position.y) || 0;
+    const footCenterX = x + STAFF_CHARACTER_ANCHOR.x;
+    const footCenterY = y + STAFF_CHARACTER_ANCHOR.y;
+
+    return {
+      x: footCenterX + STAFF_OBJECT_COLLISION_BOX.offsetX,
+      y: footCenterY + STAFF_OBJECT_COLLISION_BOX.offsetY,
+      width: STAFF_OBJECT_COLLISION_BOX.width,
+      height: STAFF_OBJECT_COLLISION_BOX.height
     };
   },
 

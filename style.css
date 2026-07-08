@@ -28065,3 +28065,23 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
   opacity: 0 !important;
   pointer-events: none !important;
 }
+
+
+/* ========================================================================== */
+/* [v7.14.01] Staff Smooth Movement + Idle Stillness Guard                    */
+/* - 알바가 대기 중일 때 걷기/보조 도구 흔들림 애니메이션이 남지 않도록 차단한다. */
+/* - 좌표 이동은 StaffAssistSystem의 requestAnimationFrame 갱신만 사용한다.       */
+/* ========================================================================== */
+#staff-character.staff-character[data-staff-moving="false"] .staff-character-avatar,
+#staff-character.staff-character[data-staff-moving="false"] .staff-character-sprite,
+#staff-character.staff-character[data-staff-moving="false"] .staff-cleaning-tool,
+#staff-character.staff-character[data-staff-moving="false"] .staff-carrying-box {
+  animation: none !important;
+}
+
+#staff-character.staff-character[data-assist-status="idle"] .staff-character-avatar,
+#staff-character.staff-character[data-assist-status="idle"] .staff-character-sprite,
+#staff-character.staff-character[data-assist-status="idle"] .staff-cleaning-tool,
+#staff-character.staff-character[data-assist-status="idle"] .staff-carrying-box {
+  animation: none !important;
+}

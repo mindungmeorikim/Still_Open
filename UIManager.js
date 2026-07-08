@@ -13,6 +13,12 @@ import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 import {
+  WALKABLE_WORLD_SIZE,
+  getNearestPointInWalkableAreas,
+  getStoreWalkableAreas,
+  isPointInWalkableAreas
+} from "../data/WalkableAreaData.js";
+import {
   EXPANSION_ZONES,
   getPreviousExpansionZone
 } from "../data/ExpansionData.js";
@@ -47,15 +53,33 @@ const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const DEFAULT_CLEANING_POINT = Object.freeze(getCleaningPointByZoneId());
 const CUSTOMER_ENTRY_ROUTE_STEP_MS = 640;
-const CUSTOMER_ENTRY_ROUTE_SPLIT_X = 700;
 const CUSTOMER_ENTRY_ENTRANCE_POINT = Object.freeze({ x: 537, y: 650 });
-const CUSTOMER_ENTRY_LEFT_WAYPOINTS = Object.freeze([
-  CUSTOMER_ENTRY_ENTRANCE_POINT
-]);
-const CUSTOMER_ENTRY_RIGHT_WAYPOINTS = Object.freeze([
-  CUSTOMER_ENTRY_ENTRANCE_POINT,
-  Object.freeze({ x: 735, y: 625 })
-]);
+const CUSTOMER_ENTRY_STORE_GATE_POINT = Object.freeze({ x: 610, y: 620 });
+const CUSTOMER_ENTRY_ROUTE_WAYPOINTS_BY_ZONE = Object.freeze({
+  zone_basic: Object.freeze([
+    CUSTOMER_ENTRY_ENTRANCE_POINT,
+    CUSTOMER_ENTRY_STORE_GATE_POINT
+  ]),
+  zone_extra_shelf: Object.freeze([
+    CUSTOMER_ENTRY_ENTRANCE_POINT,
+    CUSTOMER_ENTRY_STORE_GATE_POINT,
+    Object.freeze({ x: 650, y: 500 }),
+    Object.freeze({ x: 720, y: 400 })
+  ]),
+  zone_cold_food: Object.freeze([
+    CUSTOMER_ENTRY_ENTRANCE_POINT,
+    CUSTOMER_ENTRY_STORE_GATE_POINT,
+    Object.freeze({ x: 725, y: 620 }),
+    Object.freeze({ x: 850, y: 560 })
+  ]),
+  zone_premium_store: Object.freeze([
+    CUSTOMER_ENTRY_ENTRANCE_POINT,
+    CUSTOMER_ENTRY_STORE_GATE_POINT,
+    Object.freeze({ x: 720, y: 500 }),
+    Object.freeze({ x: 930, y: 410 }),
+    Object.freeze({ x: 1050, y: 360 })
+  ])
+});
 const CUSTOMER_ENTRY_ROUTE_TRANSITION = `left ${CUSTOMER_ENTRY_ROUTE_STEP_MS}ms ease-in-out, top ${CUSTOMER_ENTRY_ROUTE_STEP_MS}ms ease-in-out, transform 200ms ease, background 200ms ease, border-color 200ms ease`;
 const TUTORIAL_ORDER_TARGET_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
@@ -4234,7 +4258,8 @@ renderDebugCollisionBoxes() {
     const offsetX = (index % 3) * 12;
     const finalPosition = {
       x: position.x + offsetX,
-      y: position.y
+      y: position.y,
+      routeZoneId: position.routeZoneId
     };
     const routeKey = this.getCustomerEntryRouteKey(customer, finalPosition);
 
@@ -4272,7 +4297,7 @@ renderDebugCollisionBoxes() {
   },
 
   runCustomerEntryRoute(customerNode, customer, finalPosition, index = 0, routeKey = "") {
-    const routePoints = this.getCustomerEntryRoutePoints(finalPosition, index);
+    const routePoints = this.getCustomerEntryRoutePoints(finalPosition, index, customer);
 
     this.clearCustomerEntryRoute(customerNode);
     customerNode.dataset.customerEntryRouteKey = routeKey;
@@ -4298,29 +4323,25 @@ renderDebugCollisionBoxes() {
     });
   },
 
-  getCustomerEntryRoutePoints(finalPosition, index = 0) {
-    const laneOffsetX = (index % 3) * 10;
-    const laneOffsetY = (index % 2) * 6;
-    const baseWaypoints = finalPosition.x >= CUSTOMER_ENTRY_ROUTE_SPLIT_X
-      ? CUSTOMER_ENTRY_RIGHT_WAYPOINTS
-      : CUSTOMER_ENTRY_LEFT_WAYPOINTS;
+  getCustomerEntryRoutePoints(finalPosition, index = 0, customer = {}) {
+    const laneOffsetX = (index % 3) * 8;
+    const laneOffsetY = (index % 2) * 5;
+    const movementAreas = this.getCustomerWalkableAreas();
+    const routeZoneId = finalPosition.routeZoneId ?? this.getCustomerRouteZoneId(customer, finalPosition);
+    const baseWaypoints = CUSTOMER_ENTRY_ROUTE_WAYPOINTS_BY_ZONE[routeZoneId]
+      ?? CUSTOMER_ENTRY_ROUTE_WAYPOINTS_BY_ZONE.zone_basic;
     const waypoints = baseWaypoints.map((waypoint, waypointIndex) => {
-      if (waypointIndex === 0) {
-        return {
-          x: waypoint.x,
-          y: waypoint.y
-        };
-      }
+      const rawPoint = waypointIndex === 0
+        ? { x: waypoint.x, y: waypoint.y }
+        : { x: waypoint.x + laneOffsetX, y: waypoint.y + laneOffsetY };
 
-      return {
-        x: waypoint.x + laneOffsetX,
-        y: waypoint.y + laneOffsetY
-      };
+      return this.getCustomerSafeWalkablePosition(rawPoint, movementAreas);
     });
+    const safeFinalPosition = this.getCustomerSafeWalkablePosition(finalPosition, movementAreas);
 
     return [
       ...waypoints,
-      finalPosition
+      safeFinalPosition
     ];
   },
 
@@ -4347,19 +4368,20 @@ renderDebugCollisionBoxes() {
       return null;
     }
 
+    const shelfInstance = SHELF_INSTANCES.find((shelf) => {
+      return shelf.instanceId === customer.targetShelfInstanceId;
+    });
+    const routeZoneId = shelfInstance?.zoneId ?? this.getCustomerRouteZoneId(customer);
+    const movementAreas = this.getCustomerWalkableAreas();
     const targetX = Number(customer.targetX);
     const targetY = Number(customer.targetY);
 
     if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
       return {
-        x: targetX,
-        y: targetY
+        ...this.getCustomerSafeWalkablePosition({ x: targetX, y: targetY }, movementAreas),
+        routeZoneId
       };
     }
-
-    const shelfInstance = SHELF_INSTANCES.find((shelf) => {
-      return shelf.instanceId === customer.targetShelfInstanceId;
-    });
 
     if (
       shelfInstance &&
@@ -4367,12 +4389,72 @@ renderDebugCollisionBoxes() {
       Number.isFinite(Number(shelfInstance.standY))
     ) {
       return {
-        x: Number(shelfInstance.standX),
-        y: Number(shelfInstance.standY)
+        ...this.getCustomerSafeWalkablePosition({
+          x: Number(shelfInstance.standX),
+          y: Number(shelfInstance.standY)
+        }, movementAreas),
+        routeZoneId
       };
     }
 
     return null;
+  },
+
+  getCustomerRouteZoneId(customer = {}, position = {}) {
+    const shelfInstance = SHELF_INSTANCES.find((shelf) => {
+      return shelf.instanceId === customer.targetShelfInstanceId;
+    });
+
+    if (shelfInstance?.zoneId) {
+      return shelfInstance.zoneId;
+    }
+
+    const x = Number(position.x ?? customer.targetX);
+    const y = Number(position.y ?? customer.targetY);
+
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      if (x >= 1010 && y <= 500) return "zone_premium_store";
+      if (x >= 780 && y >= 430) return "zone_cold_food";
+      if (x >= 600 && y <= 440) return "zone_extra_shelf";
+    }
+
+    return "zone_basic";
+  },
+
+  getCustomerWalkableAreas() {
+    return getStoreWalkableAreas(
+      GameState.expansion?.unlockedZoneIds,
+      this.getCustomerWalkableWorldSize()
+    );
+  },
+
+  getCustomerWalkableWorldSize() {
+    const storeArea = document.getElementById("store-area") ?? document.getElementById("store-interaction-layer");
+    const width = Number(storeArea?.offsetWidth || storeArea?.clientWidth);
+    const height = Number(storeArea?.offsetHeight || storeArea?.clientHeight);
+
+    return {
+      width: Number.isFinite(width) && width > 0 ? width : WALKABLE_WORLD_SIZE.width,
+      height: Number.isFinite(height) && height > 0 ? height : WALKABLE_WORLD_SIZE.height
+    };
+  },
+
+  getCustomerSafeWalkablePosition(position = {}, movementAreas = this.getCustomerWalkableAreas()) {
+    const point = {
+      x: Number(position.x) || 0,
+      y: Number(position.y) || 0
+    };
+
+    if (isPointInWalkableAreas(point, movementAreas)) {
+      return point;
+    }
+
+    const nearestPoint = getNearestPointInWalkableAreas(point, movementAreas);
+
+    return {
+      x: Math.round(Number(nearestPoint.x) || point.x),
+      y: Math.round(Number(nearestPoint.y) || point.y)
+    };
   },
 
   renderCustomerNodeContent(customerNode, customer) {

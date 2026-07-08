@@ -16,7 +16,7 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
     y: 490,
     staffX: 700,
     staffY: 502,
-    interactionDistance: 55
+    interactionDistance: 100
   }),
   [CLEANING_ZONE_IDS.ZONE_2]: Object.freeze({
     id: "zone2_cleaning_spot",
