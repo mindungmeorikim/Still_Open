@@ -27880,3 +27880,188 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
   }
 }
 
+
+
+/* ========================================================================== */
+/* [v7.13.80] Warehouse/Cleaning Tool Obstacle Additions                     */
+/* 기존 오브젝트 차단 범위는 유지하고, 청소 도구함 비주얼만 작게 재배치한다. */
+/* ========================================================================== */
+#store-interaction-layer > #cleaning-zone.cleaning-zone,
+#cleaning-zone.cleaning-zone {
+  width: 78px !important;
+  height: 66px !important;
+  transform: translate(-50%, -76%) !important;
+  z-index: 39 !important;
+}
+
+#cleaning-zone.cleaning-zone .cleaning-zone-glow {
+  left: 18px !important;
+  right: 18px !important;
+  bottom: 6px !important;
+  height: 18px !important;
+  filter: blur(6px) !important;
+}
+
+#cleaning-zone.cleaning-zone .cleaning-tools-image {
+  left: 20px !important;
+  bottom: 9px !important;
+  width: 42px !important;
+  height: 46px !important;
+  z-index: 3 !important;
+}
+
+#cleaning-zone.cleaning-zone .cleaning-stain-image {
+  left: 6px !important;
+  bottom: 2px !important;
+  width: 52px !important;
+  height: 28px !important;
+}
+
+#cleaning-zone.cleaning-zone .cleaning-trash-image {
+  right: 5px !important;
+  bottom: 5px !important;
+  width: 34px !important;
+  height: 42px !important;
+}
+
+#cleaning-zone.cleaning-zone .cleaning-sparkle-image {
+  width: 42px !important;
+  height: 42px !important;
+}
+
+#cleaning-zone.cleaning-zone .cleaning-zone-label {
+  bottom: -11px !important;
+  padding: 2px 7px !important;
+  font-size: 10px !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #store-interaction-layer > #cleaning-zone.cleaning-zone,
+  #cleaning-zone.cleaning-zone {
+    width: 72px !important;
+    height: 60px !important;
+  }
+
+  #cleaning-zone.cleaning-zone .cleaning-tools-image {
+    width: 38px !important;
+    height: 42px !important;
+  }
+}
+
+
+/* ========================================================================== */
+/* [v7.13.81] Entrance + Delivery Box X Shift Final Override                  */
+/* - 입구 표시 이미지와 입구 기준 X 좌표를 왼쪽으로 40px 이동한다.              */
+/* - 발주 박스는 Y축을 유지하고 X축만 왼쪽으로 40px 이동한다.                   */
+/* ========================================================================== */
+#entrance-zone,
+#store-interaction-layer > #entrance-zone {
+  left: 537px !important;
+}
+
+#store-interaction-layer > #delivery-box-zone.delivery-box-zone,
+#delivery-box-zone.delivery-box-zone {
+  left: 478px !important;
+  top: 615px !important;
+}
+
+
+/* ========================================================================== */
+/* [v7.13.83] Customer Door Spawn Entrance Alignment                          */
+/* - 손님이 문밖 CSS 좌표에서 먼저 찍혔다가 내려오는 현상을 막는다.             */
+/* - 손님 door 상태 시작점도 입구 이미지 좌표와 동일하게 맞춘다.                */
+/* ========================================================================== */
+#store-interaction-layer .customer-zone-door,
+.customer-zone-door {
+  left: 537px !important;
+  top: 650px !important;
+}
+
+
+/* ========================================================================== */
+/* [v7.13.85] Cleaning Label Hidden Final Override                            */
+/* - 청소 도구 앞의 텍스트 라벨을 숨기고, 청소 비주얼만 남긴다.                 */
+/* - 청소 좌표/상호작용/충돌 범위는 변경하지 않는다.                           */
+/* ========================================================================== */
+#cleaning-zone.cleaning-zone .cleaning-zone-label,
+#store-interaction-layer > #cleaning-zone.cleaning-zone .cleaning-zone-label {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+
+/* ========================================================================== */
+/* [v7.13.86] Cleaning Label Simplified Final Override                        */
+/* - 숨김 처리했던 청소 라벨을 다시 표시하고, 문구는 "주변 청소"만 노출한다.    */
+/* - 청소 좌표/상호작용/충돌 범위는 변경하지 않는다.                           */
+/* ========================================================================== */
+#cleaning-zone.cleaning-zone .cleaning-zone-label,
+#store-interaction-layer > #cleaning-zone.cleaning-zone .cleaning-zone-label {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: -13px !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 3px 9px !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  transform: translateX(-50%) !important;
+  z-index: 5 !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(52, 137, 93, 0.34) !important;
+  color: #2c6b4e !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+  box-shadow: 0 3px 0 rgba(45, 93, 65, 0.14) !important;
+}
+
+
+/* ========================================================================== */
+/* [v7.13.87] Cleaning Label + Player Entrance Y Final Override               */
+/* - 청소 라벨은 숨기지 않고 표시 상태를 보장한다. 문구는 UIManager/Data에서 주변 청소로 고정한다. */
+/* - 플레이어 시작 좌표는 JS에서 X 유지, Y만 입구 근처로 내린다.                */
+/* ========================================================================== */
+#cleaning-zone.cleaning-zone .cleaning-zone-label,
+#store-interaction-layer > #cleaning-zone.cleaning-zone .cleaning-zone-label {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: max-content !important;
+  min-width: 0 !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 3px 9px !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+
+/* ========================================================================== */
+/* [v7.13.98] Hide Expansion Placeholder Hotspots                             */
+/* - 확장 구역 개발용 "오브젝트 에셋 연결 예정" 말풍선을 플레이 화면에서 제거한다. */
+/* ========================================================================== */
+.expansion-space-hotspot,
+#extra-shelf-placeholder-zone,
+#cold-food-placeholder-zone,
+#premium-placeholder-zone {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

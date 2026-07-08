@@ -42,6 +42,29 @@ const COUNTER_COLLISION_RECT = Object.freeze({
   height: 88
 });
 
+// v7.13.80 추가 오브젝트 차단 범위
+// 기존 계산대/진열대/냉장고 충돌값은 절대 변경하지 않고,
+// 창고 박스와 청소 도구함만 별도 고정 충돌 박스로 추가한다.
+const WAREHOUSE_BOX_COLLISION_RECT = Object.freeze({
+  id: "warehouse-box-collision",
+  kind: "warehouse_box",
+  sourceId: "warehouse-box-zone",
+  x: 226,
+  y: 592,
+  width: 64,
+  height: 54
+});
+
+const CLEANING_TOOLS_COLLISION_RECT = Object.freeze({
+  id: "cleaning-tools-collision",
+  kind: "cleaning_tools",
+  sourceId: "cleaning-zone",
+  x: 716,
+  y: 483,
+  width: 42,
+  height: 46
+});
+
 function isShelfZoneUnlocked(shelf, unlockedZoneIds = []) {
   if (!shelf?.zoneId) return true;
   if (shelf.zoneId === "zone_basic") return true;
@@ -80,6 +103,8 @@ export function getStoreObjectCollisionRects(unlockedZoneIds = []) {
 
   return [
     COUNTER_COLLISION_RECT,
+    WAREHOUSE_BOX_COLLISION_RECT,
+    CLEANING_TOOLS_COLLISION_RECT,
     ...shelfCollisionRects
   ];
 }

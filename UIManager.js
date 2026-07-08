@@ -7780,61 +7780,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       counterZone.setAttribute("tabindex", "0");
     }
 
-    const expansionHotspots = {
-      zone_extra_shelf: {
-        id: "extra-shelf-placeholder-zone",
-        className: "extra-shelf-placeholder-zone",
-        label: "추가 진열대",
-        description: "오브젝트 에셋 연결 예정"
-      },
-      zone_cold_food: {
-        id: "cold-food-placeholder-zone",
-        className: "cold-food-placeholder-zone",
-        label: "냉장·도시락",
-        description: "오브젝트 에셋 연결 예정"
-      },
-      zone_premium_store: {
-        id: "premium-placeholder-zone",
-        className: "premium-placeholder-zone",
-        label: "프리미엄 구역",
-        description: "오브젝트 에셋 연결 예정"
-      }
-    };
-
-    zoneStates
-      .filter((zone) => zone.level > 1)
-      .forEach((zone) => {
-        const config = expansionHotspots[zone.id];
-
-        if (!config) return;
-
-        let hotspot = document.getElementById(config.id);
-
-        if (!hotspot) {
-          hotspot = document.createElement("button");
-          hotspot.id = config.id;
-          hotspot.className = `expansion-space-hotspot ${config.className}`;
-          hotspot.type = "button";
-          interactionLayer.appendChild(hotspot);
-        } else if (hotspot.parentElement !== interactionLayer) {
-          interactionLayer.appendChild(hotspot);
-        }
-
-        hotspot.dataset.zoneId = zone.id;
-        hotspot.disabled = !zone.isUnlocked;
-        hotspot.hidden = !zone.isUnlocked;
-        hotspot.innerHTML = `
-          <strong>${config.label}</strong>
-          <span>${config.description}</span>
-        `;
-        hotspot.onclick = (event) => {
-          event.stopPropagation();
-
-          if (!zone.isUnlocked) return;
-
-          this.showMessage(`${zone.name} 오브젝트 기능은 에셋 연결 후 활성화됩니다.`);
-        };
-      });
+    // [v7.13.98] 확장 구역의 개발용 안내 핫스팟은 플레이 화면에 노출하지 않는다.
+    // 구역별 실제 오브젝트/충돌/이동 가능 영역은 별도 데이터로 유지하고,
+    // "오브젝트 에셋 연결 예정" 말풍선만 제거한다.
+    [
+      "extra-shelf-placeholder-zone",
+      "cold-food-placeholder-zone",
+      "premium-placeholder-zone"
+    ].forEach((hotspotId) => {
+      document.getElementById(hotspotId)?.remove();
+    });
   },
 
   closeStoreExpansionPopover() {

@@ -17,11 +17,6 @@ import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getProductById } from "../data/ProductData.js";
 import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
-import {
-  arePointsInWalkableAreas,
-  getStoreWalkableAreas,
-  isPointInCenterProbeWalkableArea
-} from "../data/WalkableAreaData.js";
 
 export const STAFF_ASSIST_EVENTS = Object.freeze({
   STATE_CHANGED: "STAFF_ASSIST_STATE_CHANGED",
@@ -34,7 +29,7 @@ const BM_STATE_CHANGED = "BM_STATE_CHANGED";
 const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
 
 const POSITIONS = Object.freeze({
-  entry: Object.freeze({ x: 537, y: 680 }),
+  entry: Object.freeze({ x: 537, y: 720 }),
   // fallback 좌표입니다. 실제 알바 대기 위치는 getIdlePosition()에서 청소 도구함 좌표를 기준으로 계산합니다.
   idle: Object.freeze({ x: 895, y: 548 }),
   // fallback 좌표입니다. 실제 창고 도착 위치는 PlayerActionSystem.warehouseZone의 standX/standY를 기준으로 계산합니다.
@@ -81,12 +76,6 @@ const STAFF_FOOT_COLLISION_BOX = Object.freeze({
   height: 16,
   offsetX: -14,
   offsetY: -8
-});
-const STAFF_WALKABLE_PROBE = Object.freeze({
-  // 플레이어와 같은 방식으로 발 주변 가로 라인을 검사해 외곽 벽을 타지 않게 한다.
-  // 경로 연결부가 끊기지 않도록 몸통 전체가 아니라 발판 중심선만 검사한다.
-  halfWidth: 21,
-  upperOffsetY: 5
 });
 const STAFF_COUNTER_CUSTOMER_COLLISION_BOX = Object.freeze({
   width: 74,
@@ -1106,10 +1095,6 @@ export const StaffAssistSystem = {
   },
 
   isStaffPositionBlocked(position = {}) {
-    if (!this.isStaffPositionInsideWalkableArea(position)) {
-      return true;
-    }
-
     const footRect = this.getStaffFootCollisionRect(position);
     const collisionRects = [
       ...getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds)
@@ -1118,45 +1103,6 @@ export const StaffAssistSystem = {
     return collisionRects.some((rect) => {
       return this.doRectsOverlap(footRect, rect);
     });
-  },
-
-  isStaffPositionInsideWalkableArea(position = {}) {
-    const walkableAreas = getStoreWalkableAreas(GameState.expansion?.unlockedZoneIds);
-
-    if (walkableAreas.length === 0) {
-      return true;
-    }
-
-    const movementPoint = this.getStaffMovementPoint(position);
-
-    if (isPointInCenterProbeWalkableArea(movementPoint, walkableAreas)) {
-      return true;
-    }
-
-    return arePointsInWalkableAreas(this.getStaffWalkableProbePoints(position), walkableAreas);
-  },
-
-  getStaffMovementPoint(position = {}) {
-    return {
-      x: (Number(position.x) || 0) + STAFF_CHARACTER_ANCHOR.x,
-      y: (Number(position.y) || 0) + STAFF_CHARACTER_ANCHOR.y
-    };
-  },
-
-  getStaffWalkableProbePoints(position = {}) {
-    const movementPoint = this.getStaffMovementPoint(position);
-    const halfWidth = Math.max(
-      STAFF_FOOT_COLLISION_BOX.width / 2,
-      Number(STAFF_WALKABLE_PROBE.halfWidth) || STAFF_FOOT_COLLISION_BOX.width / 2
-    );
-    const upperOffsetY = Math.max(0, Number(STAFF_WALKABLE_PROBE.upperOffsetY) || 0);
-
-    return [
-      movementPoint,
-      { x: movementPoint.x - halfWidth, y: movementPoint.y },
-      { x: movementPoint.x + halfWidth, y: movementPoint.y },
-      { x: movementPoint.x, y: movementPoint.y - upperOffsetY }
-    ];
   },
 
   getStaffFootCollisionRect(position = {}) {

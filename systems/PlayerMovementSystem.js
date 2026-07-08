@@ -16,6 +16,12 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS } from "../core/Constants.js";
 import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
+import {
+  arePointsInWalkableAreas,
+  getNearestPointInWalkableAreas,
+  getStoreWalkableAreas,
+  isPointInCenterProbeWalkableArea
+} from "../data/WalkableAreaData.js";
 
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 
@@ -29,7 +35,7 @@ export const PlayerMovementSystem = {
 
   defaultPlayer: {
     x: 610,
-    y: 548,
+    y: 640,
     speed: 4,
     direction: "down"
   },
@@ -43,6 +49,13 @@ export const PlayerMovementSystem = {
     width: 24,
     height: 14,
     offsetY: 6
+  },
+
+  playerWalkableProbe: {
+    // 이동 가능 영역은 발 중앙점 하나가 아니라 발 주변 가로 라인을 함께 검사한다.
+    // 오브젝트 충돌 박스와는 별개이며, 벽 외곽에 몸이 붙어 보이는 현상을 줄이기 위한 시각 보정값이다.
+    halfWidth: 22,
+    upperOffsetY: 6
   },
 
   isInitialized: false,
@@ -62,12 +75,32 @@ export const PlayerMovementSystem = {
       return;
     }
 
+    const sourcePlayer = GameState.player;
+    const shouldSnapLegacyStart = this.isLegacyStartPosition(sourcePlayer);
+
     GameState.player = {
       ...this.defaultPlayer,
-      ...GameState.player
+      ...sourcePlayer
     };
 
+    if (shouldSnapLegacyStart) {
+      GameState.player.x = this.defaultPlayer.x;
+      GameState.player.y = this.defaultPlayer.y;
+    }
+
     this.clampPlayerToAllowedMovement(GameState.player);
+    EventBus.emit(PLAYER_POSITION_CHANGED, GameState);
+  },
+
+  isLegacyStartPosition(player = {}) {
+    const x = Math.round(Number(player.x));
+    const y = Math.round(Number(player.y));
+
+    return (
+      (x === 600 && y === 705) ||
+      (x === 610 && y === 548) ||
+      (x === 610 && y === 650)
+    );
   },
 
   bindKeyboardEvents() {
@@ -172,20 +205,22 @@ export const PlayerMovementSystem = {
     const nextX = currentX + moveX * moveSpeed;
     const nextY = currentY + moveY * moveSpeed;
 
-    player.x = nextX;
+    const storeSize = this.getStoreAreaSize();
+    const playerSize = this.getPlayerSize();
+    const movementAreas = this.getAllowedMovementAreas(storeSize);
+
+    player.x = this.clamp(nextX, 0, storeSize.width - playerSize.width);
     player.y = currentY;
-    this.clampPlayerToAllowedMovement(player);
-    if (this.isPlayerCollidingWithStoreObject(player)) {
+    if (this.isPlayerPositionBlocked(player, movementAreas)) {
       player.x = currentX;
     }
 
-    player.y = nextY;
-    this.clampPlayerToAllowedMovement(player);
-    if (this.isPlayerCollidingWithStoreObject(player)) {
+    player.y = this.clamp(nextY, 0, storeSize.height - playerSize.height);
+    if (this.isPlayerPositionBlocked(player, movementAreas)) {
       player.y = currentY;
     }
 
-    this.clampPlayerToAllowedMovement(player);
+    this.clampPlayerToWorldBounds(player, storeSize, playerSize);
 
     EventBus.emit(PLAYER_POSITION_CHANGED, GameState);
   },
@@ -206,34 +241,147 @@ export const PlayerMovementSystem = {
   clampPlayerToAllowedMovement(player) {
     const storeSize = this.getStoreAreaSize();
     const playerSize = this.getPlayerSize();
-    const movementRects = this.getAllowedMovementRects(storeSize);
-    const playerCenter = {
-      x: player.x + playerSize.width / 2,
-      y: player.y + playerSize.height / 2
-    };
+    const movementAreas = this.getAllowedMovementAreas(storeSize);
 
-    const isInsideAllowedRect = movementRects.some((rect) => {
-      return this.isPointInsideRect(playerCenter, rect);
-    });
+    this.clampPlayerToWorldBounds(player, storeSize, playerSize);
 
-    if (isInsideAllowedRect) {
-      player.x = this.clamp(player.x, 0, storeSize.width - playerSize.width);
-      player.y = this.clamp(player.y, 0, storeSize.height - playerSize.height);
+    if (this.isPlayerInsideAllowedMovement(player, movementAreas)) {
       return;
     }
 
-    const nearestPoint = this.getNearestPointInRects(playerCenter, movementRects);
+    const movementPoint = this.getPlayerMovementPoint(player);
+    const nearestPoint = getNearestPointInWalkableAreas(movementPoint, movementAreas);
+    const movementOffset = this.getPlayerMovementPointOffset();
 
     player.x = this.clamp(
-      nearestPoint.x - playerSize.width / 2,
+      nearestPoint.x - movementOffset.x,
       0,
       storeSize.width - playerSize.width
     );
     player.y = this.clamp(
-      nearestPoint.y - playerSize.height / 2,
+      nearestPoint.y - movementOffset.y,
       0,
       storeSize.height - playerSize.height
     );
+
+    const nearestValidPosition = this.findNearestValidPlayerPosition(
+      player,
+      movementAreas,
+      storeSize,
+      playerSize
+    );
+
+    player.x = nearestValidPosition.x;
+    player.y = nearestValidPosition.y;
+  },
+
+  clampPlayerToWorldBounds(player, storeSize = this.getStoreAreaSize(), playerSize = this.getPlayerSize()) {
+    player.x = this.clamp(player.x, 0, storeSize.width - playerSize.width);
+    player.y = this.clamp(player.y, 0, storeSize.height - playerSize.height);
+  },
+
+  isPlayerPositionBlocked(player = GameState.player, movementAreas = this.getAllowedMovementAreas(this.getStoreAreaSize())) {
+    return (
+      !this.isPlayerInsideAllowedMovement(player, movementAreas) ||
+      this.isPlayerCollidingWithStoreObject(player)
+    );
+  },
+
+  isPlayerInsideAllowedMovement(player = GameState.player, movementAreas = this.getAllowedMovementAreas(this.getStoreAreaSize())) {
+    const movementPoint = this.getPlayerMovementPoint(player);
+
+    if (isPointInCenterProbeWalkableArea(movementPoint, movementAreas)) {
+      return true;
+    }
+
+    return arePointsInWalkableAreas(this.getPlayerWalkableProbePoints(player), movementAreas);
+  },
+
+  getPlayerWalkableProbePoints(player = GameState.player) {
+    const movementPoint = this.getPlayerMovementPoint(player);
+    const playerSize = this.getPlayerSize();
+    const halfWidth = this.clamp(
+      Number(this.playerWalkableProbe.halfWidth) || 0,
+      Math.max(8, Number(this.playerFootCollisionBox.width) / 2 || 8),
+      Math.max(8, playerSize.width / 2 - 3)
+    );
+    const upperOffsetY = Math.max(0, Number(this.playerWalkableProbe.upperOffsetY) || 0);
+
+    return [
+      movementPoint,
+      { x: movementPoint.x - halfWidth, y: movementPoint.y },
+      { x: movementPoint.x + halfWidth, y: movementPoint.y },
+      { x: movementPoint.x, y: movementPoint.y - upperOffsetY }
+    ];
+  },
+
+  findNearestValidPlayerPosition(player, movementAreas, storeSize, playerSize) {
+    const basePosition = {
+      x: this.clamp(Number(player?.x) || 0, 0, storeSize.width - playerSize.width),
+      y: this.clamp(Number(player?.y) || 0, 0, storeSize.height - playerSize.height)
+    };
+    const candidatePlayer = {
+      ...player,
+      ...basePosition
+    };
+
+    if (this.isPlayerInsideAllowedMovement(candidatePlayer, movementAreas)) {
+      return basePosition;
+    }
+
+    const scanSteps = [4, 8, 12, 16, 24, 32, 44, 56, 72];
+    const directions = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1]
+    ];
+
+    for (const step of scanSteps) {
+      for (const [directionX, directionY] of directions) {
+        const candidate = {
+          x: this.clamp(basePosition.x + directionX * step, 0, storeSize.width - playerSize.width),
+          y: this.clamp(basePosition.y + directionY * step, 0, storeSize.height - playerSize.height)
+        };
+        const testPlayer = {
+          ...player,
+          ...candidate
+        };
+
+        if (this.isPlayerInsideAllowedMovement(testPlayer, movementAreas)) {
+          return candidate;
+        }
+      }
+    }
+
+    return basePosition;
+  },
+
+  getPlayerMovementPoint(player = GameState.player) {
+    const movementOffset = this.getPlayerMovementPointOffset();
+
+    return {
+      x: (Number(player?.x) || 0) + movementOffset.x,
+      y: (Number(player?.y) || 0) + movementOffset.y
+    };
+  },
+
+  getPlayerMovementPointOffset() {
+    const playerSize = this.getPlayerSize();
+    const footHeight = Math.min(
+      playerSize.height,
+      Number(this.playerFootCollisionBox.height) || 12
+    );
+    const offsetY = Number(this.playerFootCollisionBox.offsetY) || 0;
+
+    return {
+      x: playerSize.width / 2,
+      y: playerSize.height - offsetY - footHeight / 2
+    };
   },
 
   getStoreAreaSize() {
@@ -288,14 +436,17 @@ export const PlayerMovementSystem = {
     });
   },
 
-  getAllowedMovementRects(storeSize) {
-    const movementBounds = Array.isArray(GameState.expansion?.movementBounds)
-      ? GameState.expansion.movementBounds
-      : [];
+  getAllowedMovementAreas(storeSize) {
+    const movementAreas = getStoreWalkableAreas(
+      GameState.expansion?.unlockedZoneIds,
+      storeSize
+    );
 
-    if (movementBounds.length === 0) {
+    if (movementAreas.length === 0) {
       return [
         {
+          id: "fallback_full_store",
+          kind: "rect",
           x: 0,
           y: 0,
           width: storeSize.width,
@@ -304,19 +455,7 @@ export const PlayerMovementSystem = {
       ];
     }
 
-    return movementBounds.map((bound) => {
-      const x = this.toRatio(bound.x);
-      const y = this.toRatio(bound.y);
-      const width = this.toRatio(bound.width, 1);
-      const height = this.toRatio(bound.height, 1);
-
-      return {
-        x: x * storeSize.width,
-        y: y * storeSize.height,
-        width: width * storeSize.width,
-        height: height * storeSize.height
-      };
-    });
+    return movementAreas;
   },
 
   getNearestPointInRects(point, rects) {

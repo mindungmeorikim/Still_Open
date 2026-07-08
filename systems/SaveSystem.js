@@ -435,9 +435,10 @@ export const SaveSystem = {
       sanitation: this.createDefaultSanitationSnapshot(),
       staff: null,
       player: {
-        x: 600,
-        y: 705,
-        speed: 4
+        x: 610,
+        y: 640,
+        speed: 4,
+        direction: "down"
       },
       expansion: {
         unlockedZoneIds: ["zone_basic"],
@@ -558,6 +559,40 @@ export const SaveSystem = {
     };
   },
 
+  normalizePlayerSnapshot(player = {}, defaultPlayer = { x: 610, y: 640, speed: 4, direction: "down" }) {
+    const source = player && typeof player === "object" ? this.deepClone(player) : {};
+    const nextPlayer = {
+      ...defaultPlayer,
+      ...source
+    };
+    const x = Number(nextPlayer.x);
+    const y = Number(nextPlayer.y);
+    const roundedX = Math.round(x);
+    const roundedY = Math.round(y);
+    const isLegacyStartPosition =
+      (roundedX === 600 && roundedY === 705) ||
+      (roundedX === 610 && roundedY === 548) ||
+      (roundedX === 610 && roundedY === 650);
+
+    if (isLegacyStartPosition) {
+      nextPlayer.x = defaultPlayer.x;
+      nextPlayer.y = defaultPlayer.y;
+    } else {
+      nextPlayer.x = Number.isFinite(x) ? x : defaultPlayer.x;
+      nextPlayer.y = Number.isFinite(y) ? y : defaultPlayer.y;
+    }
+
+    const speed = Number(nextPlayer.speed);
+    nextPlayer.speed = Number.isFinite(speed) && speed > 0
+      ? speed
+      : defaultPlayer.speed;
+    nextPlayer.direction = nextPlayer.direction
+      ? String(nextPlayer.direction)
+      : defaultPlayer.direction;
+
+    return nextPlayer;
+  },
+
   applyGameStateSnapshot(snapshot = {}) {
     const defaultSnapshot = this.createDefaultGameStateSnapshot();
     const nextState = {
@@ -601,7 +636,10 @@ export const SaveSystem = {
       nextState.sanitation ?? defaultSnapshot.sanitation
     );
     GameState.expansion = this.deepClone(nextState.expansion ?? defaultSnapshot.expansion);
-    GameState.player = this.deepClone(nextState.player ?? defaultSnapshot.player);
+    GameState.player = this.normalizePlayerSnapshot(
+      nextState.player ?? defaultSnapshot.player,
+      defaultSnapshot.player
+    );
 
     if (nextState.upgradeEffects) {
       GameState.upgradeEffects = this.deepClone(nextState.upgradeEffects);

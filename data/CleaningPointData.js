@@ -11,17 +11,17 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
   [CLEANING_ZONE_IDS.ZONE_1]: Object.freeze({
     id: "zone1_cleaning_spot",
     zoneId: CLEANING_ZONE_IDS.ZONE_1,
-    label: "1구역 계산대 주변",
-    x: 785,
-    y: 475,
-    staffX: 755,
-    staffY: 475,
+    label: "주변",
+    x: 735,
+    y: 520,
+    staffX: 700,
+    staffY: 532,
     interactionDistance: 100
   }),
   [CLEANING_ZONE_IDS.ZONE_2]: Object.freeze({
     id: "zone2_cleaning_spot",
     zoneId: CLEANING_ZONE_IDS.ZONE_2,
-    label: "2구역 진열대 주변",
+    label: "주변",
     x: 720,
     y: 430,
     staffX: 690,
@@ -31,7 +31,7 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
   [CLEANING_ZONE_IDS.ZONE_3]: Object.freeze({
     id: "zone3_cleaning_spot",
     zoneId: CLEANING_ZONE_IDS.ZONE_3,
-    label: "3구역 냉장 코너",
+    label: "주변",
     x: 980,
     y: 610,
     staffX: 940,
@@ -41,7 +41,7 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
   [CLEANING_ZONE_IDS.ZONE_4]: Object.freeze({
     id: "zone4_cleaning_spot",
     zoneId: CLEANING_ZONE_IDS.ZONE_4,
-    label: "4구역 프리미엄 코너",
+    label: "주변",
     x: 1160,
     y: 420,
     staffX: 1125,
