@@ -27796,3 +27796,87 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
   animation: none !important;
   pointer-events: none !important;
 }
+
+/* ========================================================================== */
+/* [v7.13.79] Staff carried stock box compact hand-held visual                 */
+/* 알바가 진열대 보충 재고를 들고 이동할 때 원본 박스 에셋 크기가 그대로 노출되지 */
+/* 않도록, 알바 캐릭터 손 주변의 작은 소품 크기로 최종 고정한다.              */
+/* ========================================================================== */
+#staff-character.staff-character .staff-character-avatar > .staff-carrying-box {
+  position: absolute !important;
+  right: 3px !important;
+  bottom: 33px !important;
+  z-index: 5 !important;
+  display: block !important;
+  width: 27px !important;
+  height: 23px !important;
+  transform: rotate(-7deg) !important;
+  transform-origin: 50% 80% !important;
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+#staff-character.staff-character[data-staff-direction*="left"] .staff-character-avatar > .staff-carrying-box {
+  right: auto !important;
+  left: 2px !important;
+  transform: rotate(7deg) !important;
+}
+
+#staff-character.staff-character[data-staff-direction="up"] .staff-character-avatar > .staff-carrying-box,
+#staff-character.staff-character[data-staff-direction="down"] .staff-character-avatar > .staff-carrying-box {
+  left: 50% !important;
+  right: auto !important;
+  bottom: 31px !important;
+  transform: translateX(-50%) rotate(-4deg) !important;
+}
+
+#staff-character.staff-character .staff-character-avatar > .staff-carrying-box img {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  filter: drop-shadow(0 3px 3px rgba(70, 48, 28, 0.26)) !important;
+  -webkit-user-drag: none !important;
+}
+
+#staff-character.staff-character[data-staff-moving="true"] .staff-character-avatar > .staff-carrying-box {
+  animation: staffCarryStockBoxBob 0.42s ease-in-out infinite !important;
+}
+
+#staff-character.staff-character[data-staff-moving="true"][data-staff-direction*="left"] .staff-character-avatar > .staff-carrying-box {
+  animation-name: staffCarryStockBoxBobLeft !important;
+}
+
+#staff-character.staff-character[data-staff-moving="true"][data-staff-direction="up"] .staff-character-avatar > .staff-carrying-box,
+#staff-character.staff-character[data-staff-moving="true"][data-staff-direction="down"] .staff-character-avatar > .staff-carrying-box {
+  animation-name: staffCarryStockBoxBobCenter !important;
+}
+
+@keyframes staffCarryStockBoxBob {
+  0%, 100% {
+    transform: rotate(-7deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-7deg) translateY(-2px);
+  }
+}
+
+@keyframes staffCarryStockBoxBobLeft {
+  0%, 100% {
+    transform: rotate(7deg) translateY(0);
+  }
+  50% {
+    transform: rotate(7deg) translateY(-2px);
+  }
+}
+
+@keyframes staffCarryStockBoxBobCenter {
+  0%, 100% {
+    transform: translateX(-50%) rotate(-4deg) translateY(0);
+  }
+  50% {
+    transform: translateX(-50%) rotate(-4deg) translateY(-2px);
+  }
+}
+
