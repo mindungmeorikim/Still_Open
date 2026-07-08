@@ -6072,6 +6072,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       staffCharacter.removeAttribute("data-staff-type");
       staffCharacter.removeAttribute("data-assist-status");
       staffCharacter.removeAttribute("data-staff-moving");
+      staffCharacter.removeAttribute("data-carrying-box");
       staffCharacter.removeAttribute("aria-label");
       return;
     }
@@ -6100,6 +6101,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       staffCharacter.hidden = true;
       staffCharacter.dataset.assistStatus = "off_duty";
       staffCharacter.dataset.staffMoving = "false";
+      staffCharacter.dataset.carryingBox = "";
       staffCharacter.removeAttribute("aria-label");
       return;
     }
@@ -6118,6 +6120,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       staffCharacter.hidden = true;
       staffCharacter.dataset.assistStatus = assistState.status;
       staffCharacter.dataset.staffMoving = "false";
+      staffCharacter.dataset.carryingBox = "";
       staffCharacter.removeAttribute("aria-label");
       return;
     }
@@ -6132,6 +6135,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     staffCharacter.dataset.assistStatus = assistState.status;
     staffCharacter.dataset.staffMoving = assistState.isMoving ? "true" : "false";
     staffCharacter.dataset.staffDirection = assistDirection;
+    staffCharacter.dataset.carryingBox = assistState.carryingBoxType ?? "";
     setStaffCharacterPosition(assistState);
     staffCharacter.setAttribute(
       "aria-label",
@@ -6186,6 +6190,36 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const shouldShowCleaningTool = assistState.status === "cleaning";
     staffCharacter.dataset.cleaningTool = shouldShowCleaningTool ? "true" : "false";
     cleaningTool.hidden = !shouldShowCleaningTool;
+
+    let carryingBox = avatar.querySelector(":scope > .staff-carrying-box");
+    const carryingBoxType = assistState.carryingBoxType ?? null;
+    const carryingBoxImagePath = carryingBoxType ? getWarehouseBoxAsset(carryingBoxType) : null;
+
+    if (!carryingBoxImagePath) {
+      carryingBox?.remove();
+    } else {
+      if (!carryingBox) {
+        carryingBox = document.createElement("span");
+        carryingBox.className = "staff-carrying-box";
+        carryingBox.setAttribute("aria-hidden", "true");
+        avatar.appendChild(carryingBox);
+      }
+
+      let carryingBoxImage = carryingBox.querySelector("img");
+
+      if (!carryingBoxImage) {
+        carryingBoxImage = document.createElement("img");
+        carryingBoxImage.alt = "";
+        carryingBoxImage.loading = "eager";
+        carryingBoxImage.decoding = "async";
+        carryingBoxImage.draggable = false;
+        carryingBox.appendChild(carryingBoxImage);
+      }
+
+      if (carryingBoxImage.getAttribute("src") !== carryingBoxImagePath) {
+        carryingBoxImage.src = carryingBoxImagePath;
+      }
+    }
 
     let label = staffCharacter.querySelector(":scope > .staff-character-label");
 
@@ -10393,7 +10427,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const warehouseCapacity = BMSystem.getWarehouseCapacity();
     const currentWarehouseStock = Math.max(0, Math.floor(Number(this.inventorySnapshot?.totalQuantity) || 0));
     const isOverWarehouseCapacity = currentWarehouseStock + totalQuantity > warehouseCapacity;
-    const isZeroOrderBlocked = totalQuantity <= 0;
+    const isZeroOrderBlocked = totalQuantity <= 0 && !this.isZeroQuantityOrderAllowed();
     const dayScenario = this.pendingOrderPhaseData?.dayScenario ?? {};
     const recommendedProductIds = this.getRecommendedProductIdSet(dayScenario);
     const tutorialOrderTargetProductIds = new Set(
@@ -10576,6 +10610,12 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }, 0);
   },
 
+  isZeroQuantityOrderAllowed(day = GameState.day) {
+    const dayNumber = Math.floor(Number(day) || 1);
+
+    return dayNumber >= 2;
+  },
+
   canIncreaseOrderQuantity(productId, products = this.getOrderableProducts()) {
     const product = products.find((candidate) => candidate.id === productId);
 
@@ -10634,6 +10674,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       return ORDER_VALIDATION_MESSAGES.emptyOrder;
     }
 
+    if (totalQuantity <= 0 && this.isZeroQuantityOrderAllowed()) {
+      return `발주 없이 진행합니다. 창고 ${currentWarehouseStock}/${warehouseCapacity}개`;
+    }
+
     return `창고 ${currentWarehouseStock + totalQuantity}/${warehouseCapacity}개`;
   },
 
@@ -10652,7 +10696,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const spendableMoney = this.getOrderSpendableMoney();
     const isOverBudget = totalCost > spendableMoney;
     const isOverWarehouseCapacity = currentWarehouseStock + totalQuantity > warehouseCapacity;
-    const isZeroOrderBlocked = totalQuantity <= 0;
+    const isZeroOrderBlocked = totalQuantity <= 0 && !this.isZeroQuantityOrderAllowed();
     const shouldDisableConfirm = isOverBudget || isZeroOrderBlocked || isOverWarehouseCapacity;
 
     const setText = (selector, value) => {
@@ -10842,6 +10886,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     if (totalQuantity <= 0) {
+      if (this.isZeroQuantityOrderAllowed()) {
+        return {
+          isAvailable: true,
+          message: "발주 없이 진행할 수 있습니다."
+        };
+      }
+
       return {
         isAvailable: false,
         message: ORDER_VALIDATION_MESSAGES.emptyOrder

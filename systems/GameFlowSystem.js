@@ -612,7 +612,11 @@ export const GameFlowSystem = {
       GameState.phase = GAME_PHASE.DAY_START;
     }
 
-    UIManager.showMessage("재고 정리 완료! 첫 진열대가 자동으로 채워졌습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요.");
+    const readyMessage = data.source === "empty_order"
+      ? data.message ?? "발주 없이 준비를 완료했습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요."
+      : "재고 정리 완료! 첫 진열대가 자동으로 채워졌습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요.";
+
+    UIManager.showMessage(readyMessage);
     UIManager.render();
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);

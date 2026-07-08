@@ -187,6 +187,11 @@ export const OrderSystem = {
 
     const orderId = `order-${GameState.day}-${this.orderSequence}`;
 
+    if (orderValidation.isEmptyOrder || items.length === 0) {
+      this.completeEmptyOrder(data, orderId, availableMoney);
+      return;
+    }
+
     if (totalCost > 0) {
       EventBus.emit(EVENTS.COST_CHANGED, {
         day: GameState.day,
@@ -364,6 +369,41 @@ export const OrderSystem = {
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
+  isZeroQuantityOrderAllowed(day = GameState.day) {
+    const dayNumber = this.toDayNumber(day, GameState.day);
+
+    return dayNumber >= 2;
+  },
+
+  completeEmptyOrder(data = {}, orderId = null, availableMoney = this.getAvailableMoney()) {
+    this.pendingDelivery = null;
+    this.clearDeliveryTimer();
+
+    EventBus.emit(EVENTS.ORDER_DELIVERED, {
+      day: GameState.day,
+      orderId,
+      items: [],
+      totalCost: 0,
+      isArrived: true,
+      isCompleted: true,
+      reason: "empty_order",
+      source: data.source ?? "empty_order",
+      message: "발주 없이 오늘 영업 준비를 진행합니다.",
+      remainingMoney: availableMoney
+    });
+
+    EventBus.emit(EVENTS.STOCK_ORGANIZED, {
+      day: GameState.day,
+      orderId,
+      items: [],
+      totalCost: 0,
+      source: "empty_order",
+      message: "발주 없이 준비를 완료했습니다. 영업 시작 버튼을 눌러주세요."
+    });
+
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
   validateConfirmedOrderItems(data = {}) {
     const requestedItems = Array.isArray(data.items) ? data.items : [];
     const positiveItems = requestedItems.filter((item) => {
@@ -371,6 +411,29 @@ export const OrderSystem = {
     });
 
     if (positiveItems.length === 0) {
+      if (this.isZeroQuantityOrderAllowed(data.day ?? GameState.day)) {
+        const availableMoney = this.getAvailableMoney();
+        const inventorySnapshot = InventorySystem.getInventorySnapshot?.() ?? {};
+        const currentWarehouseStock = Math.max(0, Math.floor(Number(inventorySnapshot.totalQuantity) || 0));
+        const warehouseCapacity = BMSystem.getWarehouseCapacity();
+
+        return {
+          isAvailable: true,
+          reason: null,
+          details: {
+            requestedItems,
+            isEmptyOrder: true
+          },
+          items: [],
+          totalCost: 0,
+          availableMoney,
+          orderQuantity: 0,
+          currentWarehouseStock,
+          warehouseCapacity,
+          isEmptyOrder: true
+        };
+      }
+
       return {
         isAvailable: false,
         reason: "empty_order",
@@ -420,6 +483,29 @@ export const OrderSystem = {
     const orderQuantity = items.reduce((total, item) => total + item.quantity, 0);
 
     if (orderQuantity <= 0) {
+      if (this.isZeroQuantityOrderAllowed(data.day ?? GameState.day)) {
+        const availableMoney = this.getAvailableMoney();
+        const inventorySnapshot = InventorySystem.getInventorySnapshot?.() ?? {};
+        const currentWarehouseStock = Math.max(0, Math.floor(Number(inventorySnapshot.totalQuantity) || 0));
+        const warehouseCapacity = BMSystem.getWarehouseCapacity();
+
+        return {
+          isAvailable: true,
+          reason: null,
+          details: {
+            requestedItems,
+            isEmptyOrder: true
+          },
+          items: [],
+          totalCost: 0,
+          availableMoney,
+          orderQuantity: 0,
+          currentWarehouseStock,
+          warehouseCapacity,
+          isEmptyOrder: true
+        };
+      }
+
       return {
         isAvailable: false,
         reason: "empty_order",
