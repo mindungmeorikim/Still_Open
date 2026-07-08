@@ -70,6 +70,13 @@ const nuisanceEventEffectKeys = new Set();
 const nuisanceTimeoutEffectKeys = new Set();
 let isCustomerEventFlowStarting = false;
 
+function setCustomerEventModalActive(isActive) {
+  document.body?.classList?.toggle(
+    "is-customer-event-modal-active",
+    isActive === true
+  );
+}
+
 function createCustomerEventEffectKey(payload = {}, suffix = "effect") {
   return [
     payload.day ?? GameState.day,
@@ -134,10 +141,12 @@ function showCustomerEventCandidate() {
     applyNuisanceEventEntranceEffects(payload);
     CustomerSystem.pauseCustomerWaitTime();
     GameFlowSystem.pauseDayTimer();
+    setCustomerEventModalActive(true);
 
     UIManager.showCustomerEventModal(
       payload,
       () => {
+        setCustomerEventModalActive(false);
         CustomerSystem.resumeCustomerWaitTime();
         GameFlowSystem.resumeDayTimer();
       },
@@ -158,6 +167,7 @@ function showCustomerEventCandidate() {
     isCustomerEventFlowStarting = false;
   } catch (error) {
     isCustomerEventFlowStarting = false;
+    setCustomerEventModalActive(false);
     CustomerSystem.resumeCustomerWaitTime();
     GameFlowSystem.resumeDayTimer();
     throw error;

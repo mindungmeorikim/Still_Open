@@ -269,7 +269,22 @@ export const PlayerActionSystem = {
     }, true);
   },
 
+  isCustomerEventModalInteractionLocked() {
+    return Boolean(
+      document.body?.classList?.contains("is-customer-event-modal-active")
+    );
+  },
+
   handleKeyboardAction(event) {
+  if (this.isCustomerEventModalInteractionLocked()) {
+    if (this.isInteractionKey(event)) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
+    return;
+  }
+
   if (this.isPlayerBusy) {
     const blockedKeys = [
       "ArrowUp",
@@ -325,6 +340,10 @@ export const PlayerActionSystem = {
   },
 
   handlePrimaryInteractionAction() {
+    if (this.isCustomerEventModalInteractionLocked()) {
+      return;
+    }
+
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
@@ -378,30 +397,108 @@ export const PlayerActionSystem = {
 
     if (!GameState.player) return;
 
-    const shelf = this.getShelfSlot(options.shelfInstanceId ?? options.shelfId);
+    let shelf = this.getShelfSlot(options.shelfInstanceId ?? options.shelfId);
 
     if (!this.isNearShelf(shelf)) {
       this.showActionMessage("진열대에 더 가까이 가야 합니다.");
       return;
     }
 
-    const capacity = this.getShelfCapacityForSlot(shelf);
+    let capacity = this.getShelfCapacityForSlot(shelf);
+    let currentStock = this.getShelfCurrentStock(shelf);
 
-    if (shelf.currentStock > 0) {
-      this.showActionMessage(
-        `아직 상품이 남아 있습니다. (${shelf.currentStock}/${capacity})`
-      );
-      return;
+    if (currentStock > 0) {
+      const restockableShelf = this.findNearbyRestockableShelf(shelf.instanceId);
+
+      if (restockableShelf) {
+        shelf = restockableShelf;
+        capacity = this.getShelfCapacityForSlot(shelf);
+        currentStock = this.getShelfCurrentStock(shelf);
+      } else {
+        this.showActionMessage(
+          `아직 상품이 남아 있습니다. (${currentStock}/${capacity})`
+        );
+        return;
+      }
     }
 
-    const availableWarehouseStock = this.getAvailableWarehouseStock(shelf.productId);
+    let availableWarehouseStock = this.getAvailableWarehouseStock(shelf.productId);
 
     if (availableWarehouseStock <= 0) {
-      this.showActionMessage("창고에 입고된 재고가 없습니다. 먼저 발주 물류를 정리해주세요.");
-      return;
+      const restockableShelf = this.findNearbyRestockableShelf(shelf.instanceId);
+
+      if (restockableShelf) {
+        shelf = restockableShelf;
+        capacity = this.getShelfCapacityForSlot(shelf);
+        currentStock = this.getShelfCurrentStock(shelf);
+        availableWarehouseStock = this.getAvailableWarehouseStock(shelf.productId);
+      } else {
+        this.showActionMessage("창고에 입고된 재고가 없습니다. 먼저 발주 물류를 정리해주세요.");
+        return;
+      }
     }
 
     this.startShelfRestock(shelf);
+  },
+
+  getShelfCurrentStock(shelf = this.shelf) {
+    return Math.max(
+      0,
+      Math.floor(Number(shelf?.currentStock) || 0)
+    );
+  },
+
+  getNearbyShelfTargets() {
+    return this.getShelfSlots()
+      .map((shelf) => {
+        const distance = this.getDistanceToZone(shelf.nodeId, shelf);
+        const interactionDistance =
+          Number(shelf.interactionDistance) || this.interactionDistance;
+        const productId = this.getResolvedProductId(shelf.productId);
+        const currentStock = this.getShelfCurrentStock(shelf);
+        const availableWarehouseStock = this.getAvailableWarehouseStock(productId);
+
+        return {
+          type: "shelf",
+          shelf,
+          shelfId: shelf.shelfId,
+          shelfInstanceId: shelf.instanceId,
+          productId,
+          currentStock,
+          availableWarehouseStock,
+          interactionDistance,
+          distance,
+          isEmpty: currentStock <= 0,
+          isRestockable: currentStock <= 0 && availableWarehouseStock > 0
+        };
+      })
+      .filter((target) => (
+        target.distance !== null &&
+        target.distance <= target.interactionDistance
+      ));
+  },
+
+  getShelfInteractionPriority(target = {}) {
+    if (target.isRestockable) {
+      return 0;
+    }
+
+    if (target.isEmpty) {
+      return 1;
+    }
+
+    return 2;
+  },
+
+  findNearbyRestockableShelf(excludedShelfInstanceId = null) {
+    const restockableTarget = this.getNearbyShelfTargets()
+      .filter((target) => (
+        target.isRestockable &&
+        (!excludedShelfInstanceId || target.shelfInstanceId !== excludedShelfInstanceId)
+      ))
+      .sort((first, second) => first.distance - second.distance)[0];
+
+    return restockableTarget?.shelf ?? null;
   },
 
   isNearShelf(shelf = this.shelf) {
@@ -461,24 +558,18 @@ export const PlayerActionSystem = {
       };
     }
 
-    const shelfTargets = this.getShelfSlots()
-      .map((shelf) => ({
-        type: "shelf",
-        shelfId: shelf.shelfId,
-        shelfInstanceId: shelf.instanceId,
-        interactionDistance: shelf.interactionDistance,
-        distance: this.getDistanceToZone(shelf.nodeId, shelf)
-     }))
-      .filter((target) => {
-        const interactionDistance =
-          Number(target.interactionDistance) || this.interactionDistance;
+    const shelfTargets = this.getNearbyShelfTargets()
+      .sort((first, second) => {
+        const priorityGap =
+          this.getShelfInteractionPriority(first) -
+          this.getShelfInteractionPriority(second);
 
-        return (
-          target.distance !== null &&
-          target.distance <= interactionDistance
-        );
-      })
-      .sort((first, second) => first.distance - second.distance);
+        if (priorityGap !== 0) {
+          return priorityGap;
+        }
+
+        return first.distance - second.distance;
+      });
 
     return shelfTargets[0] ?? null;
   },
@@ -1519,6 +1610,12 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
 
     if (!actionType) return;
 
+    if (this.isCustomerEventModalInteractionLocked()) {
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      return;
+    }
+
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
@@ -1676,6 +1773,10 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   },
 
   completeCheckout(checkoutPayload = {}, options = {}) {
+    if (!this.validateCheckoutStockBeforeComplete(checkoutPayload, options)) {
+      return null;
+    }
+
     EventBus.emit(EVENTS.CHECKOUT_COMPLETED, checkoutPayload);
 
     if (typeof options.successMessage === "function") {
@@ -1685,6 +1786,38 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     if (options.actorType === "staff") {
       this.emitStaffAutoCheckoutResult(true, options, null, checkoutPayload);
     }
+  },
+
+  validateCheckoutStockBeforeComplete(checkoutPayload = {}, options = {}) {
+    const productId = this.getResolvedProductId(checkoutPayload.productId);
+    const quantity = Math.max(1, Math.floor(Number(checkoutPayload.quantity) || 1));
+    const availableQuantity = Math.max(
+      0,
+      Math.floor(Number(InventorySystem.getStockQuantity?.(productId)) || 0)
+    );
+
+    if (productId && availableQuantity >= quantity) {
+      return true;
+    }
+
+    CustomerSystem.handleStockShortageForCustomer?.(
+      checkoutPayload.customerId,
+      "checkout_stock_shortage"
+    );
+
+    this.showActionMessage("계산 직전 재고가 부족해 판매를 취소했습니다.");
+    console.warn("[PlayerActionSystem] 계산 직전 재고 부족으로 계산을 차단했습니다.", {
+      customerId: checkoutPayload.customerId,
+      productId,
+      requestedQuantity: quantity,
+      availableQuantity
+    });
+
+    if (options.actorType === "staff") {
+      this.emitStaffAutoCheckoutResult(false, options, "checkout_stock_shortage", checkoutPayload);
+    }
+
+    return false;
   },
 
   emitStaffAutoCheckoutResult(success, request = {}, reason = null, checkoutPayload = null) {
@@ -1778,6 +1911,28 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       this.showActionMessage("실제 판매 상품을 찾을 수 없습니다.");
       console.warn("[PlayerActionSystem] 실제 판매 상품을 찾을 수 없습니다.", {
         productId: availableProduct.id
+      });
+
+      return null;
+    }
+
+    const checkoutAvailableQuantity = Math.max(
+      0,
+      Math.floor(Number(InventorySystem.getStockQuantity?.(product.id)) || 0)
+    );
+
+    if (checkoutAvailableQuantity < quantity) {
+      CustomerSystem.handleStockShortageForCustomer?.(
+        customer.customerId,
+        "checkout_stock_shortage"
+      );
+
+      this.showActionMessage("계산 가능한 재고가 부족합니다.");
+      console.warn("[PlayerActionSystem] 계산 payload 생성 전 재고 부족으로 계산을 차단했습니다.", {
+        customerId: customer.customerId,
+        productId: product.id,
+        requestedQuantity: quantity,
+        availableQuantity: checkoutAvailableQuantity
       });
 
       return null;

@@ -1097,8 +1097,7 @@ export const StaffAssistSystem = {
   isStaffPositionBlocked(position = {}) {
     const footRect = this.getStaffFootCollisionRect(position);
     const collisionRects = [
-      ...getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds),
-      ...this.getCustomerCollisionRects()
+      ...getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds)
     ];
 
     return collisionRects.some((rect) => {
@@ -1376,29 +1375,22 @@ export const StaffAssistSystem = {
 
   getStaffIdleToWarehouseRoutePoints() {
     // 알바 진열 보충 전용: 청소 대기 위치에서 바로 창고로 꺾지 않고,
-    // 입구로 나간 뒤 플레이어의 발주 박스 정리 동선과 같은 물류 통로를 탄다.
-    // 계산대에 손님 대기열이 있으면 줄을 관통하지 않도록 하단 우회점을 먼저 탄다.
+    // 입구 방향 통로를 경유해 창고 상호작용 위치로 이동한다.
+    // 손님 NPC는 알바 충돌 대상으로 보지 않고, 계산대/진열대 등 매장 오브젝트만 회피한다.
     return [
-      STAFF_ROUTE_POINTS.lowerRightAisle,
-      ...this.getCounterQueueAvoidanceRoutePoints(),
       STAFF_ROUTE_POINTS.mainAisle,
       STAFF_ROUTE_POINTS.entryAisle,
-      POSITIONS.entry,
-      this.getDeliveryBoxRoutePoint(),
-      STAFF_ROUTE_POINTS.warehouseAisle
+      this.getDeliveryBoxRoutePoint()
     ];
   },
 
   getStaffWarehouseToStoreRoutePoints() {
-    // 창고에서 입구로 돌아오는 구간은 위 경로의 물류 통로를 그대로 반대로 사용한다.
-    // 매장 안에 들어온 뒤 계산대 대기 손님이 있으면 하단 우회점으로 빠진 다음 진열대로 간다.
+    // 창고에서 매장으로 돌아오는 구간은 입구 방향 통로를 거쳐 진열대로 이동한다.
+    // 손님 NPC 충돌은 무시하고 매장 오브젝트 충돌만 유지한다.
     return [
-      STAFF_ROUTE_POINTS.warehouseAisle,
       this.getDeliveryBoxRoutePoint(),
-      POSITIONS.entry,
       STAFF_ROUTE_POINTS.entryAisle,
-      STAFF_ROUTE_POINTS.mainAisle,
-      ...this.getCounterQueueAvoidanceRoutePoints()
+      STAFF_ROUTE_POINTS.mainAisle
     ];
   },
 

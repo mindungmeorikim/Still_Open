@@ -89,6 +89,19 @@ export const PlayerMovementSystem = {
     );
   },
 
+  isCustomerEventModalMovementLocked() {
+    return Boolean(
+      document.body?.classList?.contains("is-customer-event-modal-active")
+    );
+  },
+
+  isMovementLocked() {
+    return (
+      this.isTutorialMovementLocked() ||
+      this.isCustomerEventModalMovementLocked()
+    );
+  },
+
   clearMovementKeys() {
     this.keys.up = false;
     this.keys.down = false;
@@ -115,7 +128,7 @@ export const PlayerMovementSystem = {
     if (isMovementKey) {
       event.preventDefault();
 
-      if (this.isTutorialMovementLocked()) {
+      if (this.isMovementLocked()) {
         this.clearMovementKeys();
         event.stopPropagation?.();
         event.stopImmediatePropagation?.();
@@ -129,7 +142,7 @@ export const PlayerMovementSystem = {
       this.initializePlayer();
     }
 
-    if (this.isTutorialMovementLocked()) {
+    if (this.isMovementLocked()) {
       this.clearMovementKeys();
       return;
     }

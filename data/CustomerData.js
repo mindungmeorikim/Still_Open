@@ -216,7 +216,13 @@ export const CUSTOMER_TYPES = [
     patience: 25,
     spendBias: 0.7,
     preferredProductIds: [],
-    eventChance: 0.3
+    eventChance: 0.3,
+    entryDialogues: [
+      "여기 알바 누구야?",
+      "나 오늘 기분 별로니까 빨리 처리해요.",
+      "이 매장 책임자 불러도 되죠?",
+      "내가 단골인데 이런 대접 처음이네."
+    ]
   }
 ];
 

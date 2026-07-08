@@ -64,6 +64,7 @@ export const CustomerSystem = {
   spawnedCustomerCount: 0,
   counterQueueOrderCounter: 0,
   inventoryByProductId: {},
+  pendingPickupQuantitiesByProductId: {},
 
   init() {
     EventBus.on(EVENTS.STORE_OPENED, () => {
@@ -119,6 +120,7 @@ export const CustomerSystem = {
     this.targetSpawnCount = 0;
     this.spawnedCustomerCount = 0;
     this.counterQueueOrderCounter = 0;
+    this.pendingPickupQuantitiesByProductId = {};
     this.isCustomerFlowPaused = false;
     this.isWaitTimePaused = false;
   },
@@ -282,11 +284,17 @@ export const CustomerSystem = {
 
     this.customerIdCounter += 1;
 
+    const entryDialogueText = this.pickCustomerEntryDialogue(
+      customerType,
+      this.customerIdCounter
+    );
+
     return {
       id: `customer-${GameState.day}-${this.customerIdCounter}`,
 
       typeId: customerType.id,
       typeName: customerType.name,
+      entryDialogueText,
 
       patience: customerType.patience,
       spendBias: customerType.spendBias,
@@ -322,19 +330,25 @@ export const CustomerSystem = {
   },
 
   applyNuisanceSpawnEffects(customer) {
-    if (!customer || customer.typeId !== "difficult" || customer.nuisanceEffectApplied === true) {
-      return customer;
+    // 진상 손님의 멘탈 페널티는 입장 시점이 아니라
+    // 계산대 이벤트 모달이 실제로 열릴 때 main.js에서 1회만 적용한다.
+    return customer;
+  },
+
+  pickCustomerEntryDialogue(customerType = {}, seedValue = 0) {
+    const dialogues = Array.isArray(customerType.entryDialogues)
+      ? customerType.entryDialogues.filter((dialogue) => {
+          return String(dialogue ?? "").trim().length > 0;
+        })
+      : [];
+
+    if (dialogues.length === 0) {
+      return null;
     }
 
-    GameState.mental = Math.max(
-      0,
-      Math.min(100, (Number(GameState.mental) || 0) - NUISANCE_CUSTOMER_MENTAL_PENALTY)
-    );
+    const seed = Math.max(0, Math.floor(Number(seedValue) || 0));
 
-    return {
-      ...customer,
-      nuisanceEffectApplied: true
-    };
+    return dialogues[seed % dialogues.length];
   },
 
   pickCustomerType() {
@@ -494,6 +508,8 @@ export const CustomerSystem = {
 
     let changed = false;
 
+    this.pendingPickupQuantitiesByProductId = {};
+
     this.customers = this.customers.map((customer) => {
       if (customer.status === CUSTOMER_STATUS.ENTERING) {
         changed = true;
@@ -536,6 +552,8 @@ export const CustomerSystem = {
 
       return customer;
     });
+
+    this.pendingPickupQuantitiesByProductId = {};
 
     if (changed) {
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -734,6 +752,8 @@ export const CustomerSystem = {
         }, "wanted_product_out_of_stock");
       }
 
+      this.reservePickupQuantity(carriedProduct.id, 1);
+
       this.consumeShelfStockForProduct(carriedProduct.id, 1, {
         customerId: customer.id,
         shelfInstanceId: carriedProduct.shelfInstanceId ?? customer.targetShelfInstanceId ?? null
@@ -797,10 +817,9 @@ export const CustomerSystem = {
         const stockQuantity = Number(
           this.inventoryByProductId[product.id]?.quantity
         ) || 0;
-        const reservedQuantity = this.getReservedCarriedQuantity(
-          product.id,
-          customerId
-        );
+        const reservedQuantity =
+          this.getReservedCarriedQuantity(product.id, customerId) +
+          this.getPendingPickupQuantity(product.id);
         const inventoryAvailableQuantity = Math.max(0, stockQuantity - reservedQuantity);
         const shelfAvailability = this.getShelfAvailabilityForProduct(product.id);
 
@@ -900,6 +919,33 @@ export const CustomerSystem = {
       customerId: options.customerId ?? null,
       source: "customer_pickup"
     });
+  },
+
+  getPendingPickupQuantity(productId) {
+    const resolvedProductId = String(productId ?? "").trim().replace(/-/g, "_");
+
+    if (!resolvedProductId) {
+      return 0;
+    }
+
+    return Math.max(
+      0,
+      Math.floor(Number(this.pendingPickupQuantitiesByProductId[resolvedProductId]) || 0)
+    );
+  },
+
+  reservePickupQuantity(productId, quantity = 1) {
+    const resolvedProductId = String(productId ?? "").trim().replace(/-/g, "_");
+    const safeQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+
+    if (!resolvedProductId) {
+      return 0;
+    }
+
+    const nextQuantity = this.getPendingPickupQuantity(resolvedProductId) + safeQuantity;
+    this.pendingPickupQuantitiesByProductId[resolvedProductId] = nextQuantity;
+
+    return nextQuantity;
   },
 
   getReservedCarriedQuantity(productId, exceptCustomerId = null) {
@@ -1153,6 +1199,7 @@ export const CustomerSystem = {
       customerId: customer.id,
       customerTypeId: customer.typeId,
       customerTypeName: customer.typeName,
+      entryDialogueText: customer.entryDialogueText ?? null,
 
       wantedProductId: customer.wantedProductId,
       wantedProductName: customer.wantedProductName,
@@ -1183,6 +1230,7 @@ export const CustomerSystem = {
       customerId: customer.id,
       typeId: customer.typeId,
       typeName: customer.typeName,
+      entryDialogueText: customer.entryDialogueText ?? null,
       wantedProductId: customer.wantedProductId,
       wantedProductName: customer.wantedProductName,
       carriedProductId: customer.carriedProductId ?? null,
@@ -1430,6 +1478,58 @@ export const CustomerSystem = {
     return updatedCustomer;
   },
 
+  getGuaranteedNuisanceEventTargetCustomer() {
+    const candidates = this.getWaitingCustomers()
+      .filter((customer) => {
+        return (
+          customer.typeId === "difficult" &&
+          RandomEventSystem.getGuaranteedNuisanceEventsForCustomer(
+            customer,
+            GameState.day
+          ).length > 0
+        );
+      })
+      .sort((first, second) => {
+        const firstOrder = Number(first.queueOrder);
+        const secondOrder = Number(second.queueOrder);
+        const firstSortOrder = Number.isFinite(firstOrder)
+          ? firstOrder
+          : Number.POSITIVE_INFINITY;
+        const secondSortOrder = Number.isFinite(secondOrder)
+          ? secondOrder
+          : Number.POSITIVE_INFINITY;
+
+        return firstSortOrder - secondSortOrder;
+      });
+
+    return candidates[0] ?? null;
+  },
+
+  createGuaranteedNuisanceEventPayload() {
+    const customer = this.getGuaranteedNuisanceEventTargetCustomer();
+
+    if (!customer) {
+      return null;
+    }
+
+    const eventCandidates = RandomEventSystem.getGuaranteedNuisanceEventsForCustomer(
+      customer,
+      GameState.day
+    );
+
+    for (const eventDetail of eventCandidates) {
+      const eventCustomer =
+        this.markCustomerNuisanceEvent(customer.id, eventDetail) ?? customer;
+      const payload = RandomEventSystem.createEventPayload(eventCustomer, eventDetail);
+
+      if (payload) {
+        return payload;
+      }
+    }
+
+    return null;
+  },
+
   getRandomEventTargetCustomer() {
     const candidates = this.getWaitingCustomers().filter((customer) => {
       return this.getAvailableEventsForCustomer(customer).length > 0;
@@ -1439,6 +1539,12 @@ export const CustomerSystem = {
   },
 
   createRandomEventCandidatePayload() {
+    const guaranteedNuisancePayload = this.createGuaranteedNuisanceEventPayload();
+
+    if (guaranteedNuisancePayload) {
+      return guaranteedNuisancePayload;
+    }
+
     const customer = this.getRandomEventTargetCustomer();
 
     if (!customer) {

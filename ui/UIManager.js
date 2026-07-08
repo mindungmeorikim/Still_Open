@@ -4480,6 +4480,17 @@ renderDebugCollisionBoxes() {
       };
     }
 
+    if (customer.status === "entering" && customer.entryDialogueText) {
+      return {
+        dialogueText: customer.entryDialogueText,
+        options: {
+          productName: customer.wantedProductName,
+          productImagePath: null,
+          context: "entry"
+        }
+      };
+    }
+
     if (customer.currentZone !== "counter" || !customer.wantedProductName) {
       return null;
     }
@@ -6484,10 +6495,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       : Object.values(this.inventoryByProductId).reduce((sum, item) => {
           return sum + (Number(item?.quantity) || 0);
         }, 0);
-    const unlockedZoneCount = Array.isArray(GameState.expansion?.unlockedZoneIds)
-      ? GameState.expansion.unlockedZoneIds.length
-      : 1;
-    const stockCapacity = 40 + Math.max(0, unlockedZoneCount - 1) * 20;
+    const stockCapacity = Math.max(
+      0,
+      Math.floor(Number(BMSystem.getWarehouseCapacity?.()) || 60)
+    );
 
     stockInfo.textContent =
       `재고 ${resolvedTotalQuantity.toLocaleString("ko-KR")}/${stockCapacity.toLocaleString("ko-KR")}`;

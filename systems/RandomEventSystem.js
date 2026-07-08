@@ -353,6 +353,75 @@ export const RandomEventSystem = {
     return getAvailableEventDetails(day, customer.typeId, eventType);
   },
 
+  isNuisanceEventDetail(eventDetail = {}) {
+    return (
+      eventDetail?.isNuisance === true ||
+      eventDetail?.type === CUSTOMER_EVENT_TYPES.NEGATIVE
+    );
+  },
+
+  dedupeEventDetails(eventDetails = []) {
+    const seenIds = new Set();
+    const deduped = [];
+
+    eventDetails.forEach((eventDetail) => {
+      if (!eventDetail?.id || seenIds.has(eventDetail.id)) {
+        return;
+      }
+
+      seenIds.add(eventDetail.id);
+      deduped.push(eventDetail);
+    });
+
+    return deduped;
+  },
+
+  getGuaranteedNuisanceEventsForCustomer(customer, day = this.getCurrentDay()) {
+    if (!customer?.typeId) {
+      return [];
+    }
+
+    this.resetDailyStateIfNeeded(day);
+
+    if (!this.canRollForCustomer(customer, day)) {
+      return [];
+    }
+
+    const unlockedNuisanceEvents = this.getAvailableEventsForCustomer(
+      customer,
+      day,
+      CUSTOMER_EVENT_TYPES.NEGATIVE
+    ).filter((eventDetail) => {
+      return this.isNuisanceEventDetail(eventDetail);
+    });
+
+    const fallbackNuisanceEvents = CUSTOMER_EVENT_DETAILS.filter((eventDetail) => {
+      return (
+        Array.isArray(eventDetail.allowedTypeIds) &&
+        eventDetail.allowedTypeIds.includes(customer.typeId) &&
+        this.isNuisanceEventDetail(eventDetail) &&
+        Array.isArray(eventDetail.choices) &&
+        eventDetail.choices.length > 0
+      );
+    });
+
+    const candidates = this.dedupeEventDetails([
+      ...unlockedNuisanceEvents,
+      ...fallbackNuisanceEvents
+    ]);
+    const candidatesWithoutLast = candidates.filter((eventDetail) => {
+      return eventDetail.id !== this.lastEventId;
+    });
+
+    return candidatesWithoutLast.length > 0 ? candidatesWithoutLast : candidates;
+  },
+
+  pickGuaranteedNuisanceEventForCustomer(customer, day = this.getCurrentDay()) {
+    return this.pickWeightedEvent(
+      this.getGuaranteedNuisanceEventsForCustomer(customer, day)
+    );
+  },
+
   getFilteredEventsByType(customer, eventType, day = this.getCurrentDay()) {
     return this.getAvailableEventsForCustomer(customer, day, eventType).filter((eventDetail) => {
       return eventDetail.id !== this.lastEventId;
