@@ -38,7 +38,8 @@ import { RewardInboxUI } from "./RewardInboxUI.js";
 import { BM_ASSETS } from "../data/BMAssetMap.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
-const INTERACTION_FEEDBACK_DISTANCE = 120;
+const INTERACTION_FEEDBACK_DISTANCE = 100;
+const COUNTER_INTERACTION_FEEDBACK_DISTANCE = 75;
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
@@ -5378,7 +5379,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         shelfId: shelf.shelfId,
         shelfInstanceId: shelf.instanceId,
         isInteractable: true,
-        fallback: { x: shelf.x, y: shelf.y }
+        distance: Number(shelf.interactionDistance) || INTERACTION_FEEDBACK_DISTANCE,
+        fallback: {
+          x: shelf.x,
+          y: shelf.y,
+          interactionX: shelf.interactionX,
+          interactionY: shelf.interactionY
+        }
       };
     });
 
@@ -5386,7 +5393,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     ...shelfTargets,
     {
       nodeId: "counter-zone",
-      isInteractable: true
+      isInteractable: true,
+      distance: COUNTER_INTERACTION_FEEDBACK_DISTANCE
     }
   ];
 },
@@ -5407,6 +5415,17 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   getInteractionTargetCenter(node, fallback = null) {
+    if (
+      fallback &&
+      Number.isFinite(Number(fallback.interactionX)) &&
+      Number.isFinite(Number(fallback.interactionY))
+    ) {
+      return {
+        x: Number(fallback.interactionX),
+        y: Number(fallback.interactionY)
+      };
+    }
+
     if (!node) {
       return fallback;
     }

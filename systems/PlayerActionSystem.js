@@ -114,7 +114,8 @@ export const PlayerActionSystem = {
     stock: 0
   },
 
-  interactionDistance: 120,
+  interactionDistance: 100,
+  checkoutInteractionDistance: 75,
   restockDuration: 5000,
   
   restockTimerId: null,
@@ -141,7 +142,7 @@ export const PlayerActionSystem = {
   cleaningZone: {
     x: 785,
     y: 470,
-    interactionDistance: 130
+    interactionDistance: 100
   },
 
   init() {
@@ -513,10 +514,14 @@ export const PlayerActionSystem = {
     return distance !== null && distance <= interactionDistance;
   },
 
+  getCounterInteractionDistance() {
+    return Math.max(40, Number(this.checkoutInteractionDistance) || 75);
+  },
+
   isNearCounter() {
     const distance = this.getDistanceToZone("counter-zone", null);
 
-    return distance !== null && distance <= this.interactionDistance;
+    return distance !== null && distance <= this.getCounterInteractionDistance();
   },
 
   isNearCleaningZone() {
@@ -529,16 +534,25 @@ export const PlayerActionSystem = {
   },
 
   getPrimaryInteractionTarget() {
-    const counterDistance = this.getDistanceToZone("counter-zone", null);
+    const shelfTargets = this.getNearbyShelfTargets()
+      .sort((first, second) => {
+        const priorityGap =
+          this.getShelfInteractionPriority(first) -
+          this.getShelfInteractionPriority(second);
 
-    if (
-      counterDistance !== null &&
-      counterDistance <= this.interactionDistance
-    ) {
-      return {
-        type: "counter",
-        distance: counterDistance
-      };
+        if (priorityGap !== 0) {
+          return priorityGap;
+        }
+
+        return first.distance - second.distance;
+      });
+
+    const emptyShelfTarget = shelfTargets.find((target) => {
+      return target.isRestockable || target.isEmpty;
+    });
+
+    if (emptyShelfTarget) {
+      return emptyShelfTarget;
     }
 
     const activeCleaningPoint = this.getActiveCleaningPoint();
@@ -558,18 +572,17 @@ export const PlayerActionSystem = {
       };
     }
 
-    const shelfTargets = this.getNearbyShelfTargets()
-      .sort((first, second) => {
-        const priorityGap =
-          this.getShelfInteractionPriority(first) -
-          this.getShelfInteractionPriority(second);
+    const counterDistance = this.getDistanceToZone("counter-zone", null);
 
-        if (priorityGap !== 0) {
-          return priorityGap;
-        }
-
-        return first.distance - second.distance;
-      });
+    if (
+      counterDistance !== null &&
+      counterDistance <= this.getCounterInteractionDistance()
+    ) {
+      return {
+        type: "counter",
+        distance: counterDistance
+      };
+    }
 
     return shelfTargets[0] ?? null;
   },
@@ -1637,8 +1650,15 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       return;
     }
 
-    if (this.isCheckoutAction(actionType) && !this.tryLockCheckoutInput()) {
-      return;
+    if (this.isCheckoutAction(actionType)) {
+      if (!this.isNearCounter()) {
+        this.showActionMessage("계산대에 더 가까이 가야 합니다.");
+        return;
+      }
+
+      if (!this.tryLockCheckoutInput()) {
+        return;
+      }
     }
 
     EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {

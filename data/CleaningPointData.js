@@ -26,7 +26,7 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
     y: 430,
     staffX: 690,
     staffY: 430,
-    interactionDistance: 140
+    interactionDistance: 100
   }),
   [CLEANING_ZONE_IDS.ZONE_3]: Object.freeze({
     id: "zone3_cleaning_spot",
@@ -36,7 +36,7 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
     y: 610,
     staffX: 940,
     staffY: 595,
-    interactionDistance: 145
+    interactionDistance: 100
   }),
   [CLEANING_ZONE_IDS.ZONE_4]: Object.freeze({
     id: "zone4_cleaning_spot",
@@ -46,7 +46,7 @@ export const CLEANING_POINTS_BY_ZONE_ID = Object.freeze({
     y: 420,
     staffX: 1125,
     staffY: 415,
-    interactionDistance: 145
+    interactionDistance: 100
   })
 });
 

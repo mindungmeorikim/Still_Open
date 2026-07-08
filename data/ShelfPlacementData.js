@@ -19,7 +19,7 @@ export const SHELF_INSTANCES = [
     standY: 420,
     interactionX: 545,
     interactionY: 545,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
     facing: OBJECT_FACINGS.RIGHT
   },
@@ -37,7 +37,7 @@ export const SHELF_INSTANCES = [
     standY: 505,
     interactionX: 430,
     interactionY: 630,
-    interactionDistance: 170,
+    interactionDistance: 115,
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
     facing: OBJECT_FACINGS.RIGHT
   },
@@ -55,7 +55,7 @@ export const SHELF_INSTANCES = [
     standY: 280,
     interactionX: 760,
     interactionY: 280,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
     facing: OBJECT_FACINGS.RIGHT
   },
@@ -73,7 +73,7 @@ export const SHELF_INSTANCES = [
     standY: 360,
     interactionX: 670,
     interactionY: 360,
-    interactionDistance: 170,
+    interactionDistance: 115,
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
     facing: OBJECT_FACINGS.RIGHT
   },
@@ -91,7 +91,7 @@ export const SHELF_INSTANCES = [
     standY: 295,
     interactionX: 855,
     interactionY: 295,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -109,7 +109,7 @@ export const SHELF_INSTANCES = [
     standY: 475,
     interactionX: 895,
     interactionY: 475,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -127,7 +127,7 @@ export const SHELF_INSTANCES = [
     standY: 485,
     interactionX: 990,
     interactionY: 485,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.DISPLAY_STAND,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -145,7 +145,7 @@ export const SHELF_INSTANCES = [
     standY: 690,
     interactionX: 1020,
     interactionY: 690,
-    interactionDistance: 170,
+    interactionDistance: 115,
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -163,7 +163,7 @@ export const SHELF_INSTANCES = [
     standY: 580,
     interactionX: 1110,
     interactionY: 580,
-    interactionDistance: 170,
+    interactionDistance: 115,
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -181,7 +181,7 @@ export const SHELF_INSTANCES = [
     standY: 605,
     interactionX: 940,
     interactionY: 605,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -199,7 +199,7 @@ export const SHELF_INSTANCES = [
     standY: 310,
     interactionX: 1040,
     interactionY: 310,
-    interactionDistance: 170,
+    interactionDistance: 115,
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -217,7 +217,7 @@ export const SHELF_INSTANCES = [
     standY: 320,
     interactionX: 1135,
     interactionY: 320,
-    interactionDistance: 170,
+    interactionDistance: 115,
     objectType: STOCK_VISUAL_OBJECT_TYPES.BEVERAGE_FRIDGE,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -235,7 +235,7 @@ export const SHELF_INSTANCES = [
     standY: 325,
     interactionX: 1230,
     interactionY: 325,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -253,7 +253,7 @@ export const SHELF_INSTANCES = [
     standY: 335,
     interactionX: 1315,
     interactionY: 335,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.FRESH_SHELF,
     facing: OBJECT_FACINGS.LEFT
   },
@@ -271,7 +271,7 @@ export const SHELF_INSTANCES = [
     standY: 465,
     interactionX: 1180,
     interactionY: 465,
-    interactionDistance: 160,
+    interactionDistance: 105,
     objectType: STOCK_VISUAL_OBJECT_TYPES.FOOD_WARMER,
     facing: OBJECT_FACINGS.LEFT
   }
