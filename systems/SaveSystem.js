@@ -24,7 +24,8 @@ import { RewardInboxSystem, REWARD_INBOX_EVENTS } from "./RewardInboxSystem.js";
 
 const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
-const SAVE_VERSION = "v7.6.0";
+const SAVE_VERSION = "v7.6.1";
+const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
 const INFINITE_MODE_START_DAY = GAME_CONFIG.MAX_STORY_DAY + 1;
 const BASIC_BM_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const SAVEABLE_PHASES = new Set([
@@ -243,6 +244,10 @@ export const SaveSystem = {
     this.applyExpansionSnapshot(saveData.expansion);
     this.applyExternalProgressSnapshots(saveData.gameState);
 
+    const runtimeSnapshot = this.createRuntimeSnapshotForLoad(saveData);
+    this.applyRuntimeSnapshots(runtimeSnapshot);
+
+    EventBus.emit(SAVE_GAME_LOADED, runtimeSnapshot);
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
     return {
@@ -279,6 +284,7 @@ export const SaveSystem = {
     DailyRewardSystem.resetForNewGame(GameState.bmWallet);
     this.applyInventorySnapshot({ lots: [], lotSequence: 0, initializedProductIds: [] });
     this.applyExpansionSnapshot({ unlockedZoneIds: ["zone_basic"], constructionZoneId: null });
+    this.resetRuntimeSnapshotsForNewRun();
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
@@ -306,6 +312,7 @@ export const SaveSystem = {
       unlockedZoneIds: ["zone_basic"],
       constructionZoneId: null
     });
+    this.resetRuntimeSnapshotsForNewRun();
 
     this.isResettingNewGame = false;
 
@@ -366,6 +373,11 @@ export const SaveSystem = {
       gameState: this.createGameStateSnapshot(),
       inventory: this.createInventorySnapshot(),
       expansion: this.createExpansionSnapshot(),
+      flow: this.createFlowSnapshot(),
+      order: this.createOrderSnapshot(),
+      shelfStocks: this.createShelfStocksSnapshot(),
+      boxState: this.createBoxStateSnapshot(),
+      upgradeFlow: this.createUpgradeFlowSnapshot(),
       settings: this.readSettings()
     };
   },
@@ -440,6 +452,9 @@ export const SaveSystem = {
         speed: 4,
         direction: "down"
       },
+      shelfStocks: {},
+      orderSnapshot: this.createDefaultOrderSnapshot(),
+      upgradeFlow: this.createDefaultUpgradeFlowSnapshot(),
       expansion: {
         unlockedZoneIds: ["zone_basic"],
         movementBounds: [],
@@ -593,6 +608,286 @@ export const SaveSystem = {
     return nextPlayer;
   },
 
+  createFlowSnapshot() {
+    const source = GameState.flowSnapshot && typeof GameState.flowSnapshot === "object"
+      ? GameState.flowSnapshot
+      : {};
+    const inferredOrderReadyDay = GameState.phase === GAME_PHASE.DAY_START
+      ? GameState.day
+      : source.orderReadyDay;
+
+    return this.normalizeFlowSnapshot({
+      ...source,
+      orderReadyDay: inferredOrderReadyDay,
+      remainingDaySeconds: source.remainingDaySeconds ?? GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS,
+      isStoreOpen: false,
+      savedPhase: GameState.phase
+    });
+  },
+
+  createDefaultFlowSnapshot() {
+    return {
+      orderReadyDay: null,
+      remainingDaySeconds: GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS,
+      isStoreOpen: false,
+      isClosing: false,
+      isDayTimerPaused: false,
+      staffAutoCheckoutElapsedSeconds: 0,
+      savedPhase: GAME_PHASE.READY
+    };
+  },
+
+  normalizeFlowSnapshot(snapshot = {}) {
+    const defaults = this.createDefaultFlowSnapshot();
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const remainingDaySeconds = Math.max(
+      0,
+      Math.floor(Number(source.remainingDaySeconds ?? defaults.remainingDaySeconds) || defaults.remainingDaySeconds)
+    );
+
+    return {
+      ...defaults,
+      orderReadyDay: this.toNullablePositiveInteger(source.orderReadyDay),
+      remainingDaySeconds,
+      isStoreOpen: source.isStoreOpen === true,
+      isClosing: source.isClosing === true,
+      isDayTimerPaused: source.isDayTimerPaused === true,
+      staffAutoCheckoutElapsedSeconds: this.toNonNegativeInteger(source.staffAutoCheckoutElapsedSeconds),
+      savedPhase: source.savedPhase ?? defaults.savedPhase
+    };
+  },
+
+  createOrderSnapshot() {
+    const source = GameState.orderSnapshot && typeof GameState.orderSnapshot === "object"
+      ? GameState.orderSnapshot
+      : this.createDefaultOrderSnapshot();
+
+    return this.normalizeOrderSnapshot(source);
+  },
+
+  createDefaultOrderSnapshot() {
+    return {
+      orderSequence: 0,
+      pendingDelivery: null
+    };
+  },
+
+  normalizeOrderSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+
+    return {
+      orderSequence: this.toNonNegativeInteger(source.orderSequence),
+      pendingDelivery: this.normalizePendingDeliverySnapshot(source.pendingDelivery)
+    };
+  },
+
+  normalizePendingDeliverySnapshot(snapshot = null) {
+    if (!snapshot || typeof snapshot !== "object") {
+      return null;
+    }
+
+    const orderId = String(snapshot.orderId ?? "").trim();
+    const day = this.toPositiveInteger(snapshot.day, GameState.day || 1);
+    const items = Array.isArray(snapshot.items)
+      ? snapshot.items
+          .map((item) => {
+            const productId = String(item?.productId ?? "").trim().replace(/-/g, "_");
+            const quantity = this.toNonNegativeInteger(item?.quantity);
+
+            if (!productId || quantity <= 0) {
+              return null;
+            }
+
+            return {
+              ...this.deepClone(item),
+              productId,
+              quantity,
+              isSorted: item?.isSorted === true
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    if (!orderId || items.length === 0) {
+      return null;
+    }
+
+    const isFullySorted = items.every((item) => item.isSorted === true);
+
+    if (isFullySorted || snapshot.isCompleted === true) {
+      return null;
+    }
+
+    return {
+      orderId,
+      day,
+      items,
+      totalCost: this.toNonNegativeInteger(snapshot.totalCost),
+      isArrived: snapshot.isArrived === true
+    };
+  },
+
+  createShelfStocksSnapshot() {
+    return this.normalizeShelfStocksSnapshot(GameState.shelfStocks ?? {});
+  },
+
+  normalizeShelfStocksSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const normalizedEntries = Object.entries(source)
+      .map(([instanceId, stock]) => {
+        const resolvedInstanceId = String(instanceId ?? "").trim();
+        const products = stock?.products && typeof stock.products === "object"
+          ? stock.products
+          : {};
+        const normalizedProducts = Object.fromEntries(
+          Object.entries(products)
+            .map(([productId, productStock]) => {
+              const resolvedProductId = String(productId ?? productStock?.productId ?? "").trim().replace(/-/g, "_");
+              const currentStock = this.toNonNegativeInteger(productStock?.currentStock);
+              const maxStock = this.toPositiveInteger(productStock?.maxStock, 8);
+
+              if (!resolvedProductId) {
+                return null;
+              }
+
+              return [
+                resolvedProductId,
+                {
+                  productId: resolvedProductId,
+                  currentStock: Math.min(currentStock, maxStock),
+                  maxStock
+                }
+              ];
+            })
+            .filter(Boolean)
+        );
+
+        if (!resolvedInstanceId) {
+          return null;
+        }
+
+        return [
+          resolvedInstanceId,
+          {
+            products: normalizedProducts,
+            shelfId: stock?.shelfId ?? null,
+            reason: stock?.reason ?? "save_snapshot"
+          }
+        ];
+      })
+      .filter(Boolean);
+
+    return Object.fromEntries(normalizedEntries);
+  },
+
+  createBoxStateSnapshot() {
+    return this.normalizeBoxStateSnapshot({
+      warehouseBoxState: GameState.warehouseBoxState,
+      deliveryBoxState: GameState.deliveryBoxState,
+      deliveryBoxInteractionSuppressed: GameState.deliveryBoxInteractionSuppressed,
+      warehouseBoxPosition: GameState.warehouseBoxPosition,
+      playerCarryingBoxType: GameState.player?.carryingBoxType ?? null
+    });
+  },
+
+  normalizeBoxStateSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const positionSource = source.warehouseBoxPosition && typeof source.warehouseBoxPosition === "object"
+      ? source.warehouseBoxPosition
+      : null;
+
+    return {
+      warehouseBoxState: source.warehouseBoxState === "open" ? "open" : "closed",
+      deliveryBoxState: source.deliveryBoxState === "carrying" ? "carrying" : null,
+      deliveryBoxInteractionSuppressed: source.deliveryBoxInteractionSuppressed === true,
+      warehouseBoxPosition: positionSource
+        ? {
+            x: Number(positionSource.x) || 210,
+            y: Number(positionSource.y) || 575,
+            width: Number(positionSource.width) || 120,
+            height: Number(positionSource.height) || 90,
+            interactionDistance: Number(positionSource.interactionDistance) || 120
+          }
+        : null,
+      playerCarryingBoxType: source.playerCarryingBoxType ? String(source.playerCarryingBoxType) : null
+    };
+  },
+
+  createUpgradeFlowSnapshot() {
+    const source = GameState.upgradeFlow && typeof GameState.upgradeFlow === "object"
+      ? GameState.upgradeFlow
+      : this.createDefaultUpgradeFlowSnapshot();
+
+    return this.normalizeUpgradeFlowSnapshot(source);
+  },
+
+  createDefaultUpgradeFlowSnapshot() {
+    return {
+      lastResultData: null,
+      isUpgradeSelected: false,
+      selectedUpgrade: null
+    };
+  },
+
+  normalizeUpgradeFlowSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+
+    return {
+      lastResultData: source.lastResultData ? this.deepClone(source.lastResultData) : null,
+      isUpgradeSelected: source.isUpgradeSelected === true,
+      selectedUpgrade: source.selectedUpgrade ? this.deepClone(source.selectedUpgrade) : null
+    };
+  },
+
+  createRuntimeSnapshotForLoad(saveData = {}) {
+    return {
+      reason: "save_loaded",
+      saveData,
+      gameState: saveData.gameState ?? {},
+      flow: this.normalizeFlowSnapshot(saveData.flow ?? saveData.gameState?.flowSnapshot ?? {}),
+      order: this.normalizeOrderSnapshot(saveData.order ?? saveData.gameState?.orderSnapshot ?? {}),
+      shelfStocks: this.normalizeShelfStocksSnapshot(saveData.shelfStocks ?? saveData.gameState?.shelfStocks ?? {}),
+      boxState: this.normalizeBoxStateSnapshot(saveData.boxState ?? saveData.gameState?.boxState ?? {}),
+      upgradeFlow: this.normalizeUpgradeFlowSnapshot(saveData.upgradeFlow ?? saveData.gameState?.upgradeFlow ?? {})
+    };
+  },
+
+  applyRuntimeSnapshots(runtimeSnapshot = {}) {
+    GameState.flowSnapshot = this.normalizeFlowSnapshot(runtimeSnapshot.flow);
+    GameState.orderSnapshot = this.normalizeOrderSnapshot(runtimeSnapshot.order);
+    GameState.shelfStocks = this.normalizeShelfStocksSnapshot(runtimeSnapshot.shelfStocks);
+    GameState.upgradeFlow = this.normalizeUpgradeFlowSnapshot(runtimeSnapshot.upgradeFlow);
+
+    const boxState = this.normalizeBoxStateSnapshot(runtimeSnapshot.boxState);
+    GameState.warehouseBoxState = boxState.warehouseBoxState;
+    GameState.deliveryBoxState = boxState.deliveryBoxState;
+    GameState.deliveryBoxInteractionSuppressed = boxState.deliveryBoxInteractionSuppressed;
+
+    if (boxState.warehouseBoxPosition) {
+      GameState.warehouseBoxPosition = boxState.warehouseBoxPosition;
+    }
+
+    if (!GameState.player || typeof GameState.player !== "object") {
+      GameState.player = { x: 610, y: 640, speed: 4, direction: "down" };
+    }
+
+    GameState.player.carryingBoxType = boxState.playerCarryingBoxType;
+  },
+
+  resetRuntimeSnapshotsForNewRun() {
+    GameState.flowSnapshot = this.createDefaultFlowSnapshot();
+    GameState.orderSnapshot = this.createDefaultOrderSnapshot();
+    GameState.shelfStocks = {};
+    GameState.upgradeFlow = this.createDefaultUpgradeFlowSnapshot();
+    GameState.warehouseBoxState = "closed";
+    GameState.deliveryBoxState = null;
+    GameState.deliveryBoxInteractionSuppressed = false;
+
+    if (GameState.player && typeof GameState.player === "object") {
+      delete GameState.player.carryingBoxType;
+    }
+  },
+
   applyGameStateSnapshot(snapshot = {}) {
     const defaultSnapshot = this.createDefaultGameStateSnapshot();
     const nextState = {
@@ -640,6 +935,9 @@ export const SaveSystem = {
       nextState.player ?? defaultSnapshot.player,
       defaultSnapshot.player
     );
+    GameState.shelfStocks = this.normalizeShelfStocksSnapshot(nextState.shelfStocks ?? GameState.shelfStocks ?? {});
+    GameState.orderSnapshot = this.normalizeOrderSnapshot(nextState.orderSnapshot ?? GameState.orderSnapshot ?? this.createDefaultOrderSnapshot());
+    GameState.upgradeFlow = this.normalizeUpgradeFlowSnapshot(nextState.upgradeFlow ?? GameState.upgradeFlow ?? this.createDefaultUpgradeFlowSnapshot());
 
     if (nextState.upgradeEffects) {
       GameState.upgradeEffects = this.deepClone(nextState.upgradeEffects);
@@ -1010,6 +1308,9 @@ export const SaveSystem = {
       warningArmed: false,
       cleaningDurationMs: 5000,
       warningThreshold: 50,
+      dirtyZoneId: null,
+      dirtySpotId: null,
+      activeCleaningPoint: null,
       settlementPenalty: -5,
       processedDisruptionKeys: []
     };
@@ -1041,6 +1342,9 @@ export const SaveSystem = {
       warningArmed: source.warningArmed === true,
       cleaningDurationMs: this.toPositiveInteger(source.cleaningDurationMs, defaults.cleaningDurationMs),
       warningThreshold,
+      dirtyZoneId: source.dirtyZoneId ?? source.activeCleaningPoint?.zoneId ?? defaults.dirtyZoneId ?? null,
+      dirtySpotId: source.dirtySpotId ?? source.activeCleaningPoint?.id ?? defaults.dirtySpotId ?? null,
+      activeCleaningPoint: source.activeCleaningPoint ? this.deepClone(source.activeCleaningPoint) : null,
       settlementPenalty: Number.isFinite(Number(source.settlementPenalty))
         ? Math.floor(Number(source.settlementPenalty))
         : defaults.settlementPenalty,
@@ -1055,6 +1359,8 @@ export const SaveSystem = {
     const bm = gameState.bm ?? {};
     const sanitation = this.normalizeSanitationSnapshot(gameState.sanitation);
     const todayStats = gameState.todayStats ?? {};
+    const orderSnapshot = this.normalizeOrderSnapshot(saveData.order ?? gameState.orderSnapshot ?? {});
+    const shelfStocks = this.normalizeShelfStocksSnapshot(saveData.shelfStocks ?? gameState.shelfStocks ?? {});
     const unlockedZoneIds = Array.isArray(expansion.unlockedZoneIds)
       ? expansion.unlockedZoneIds
       : Array.isArray(gameState.expansion?.unlockedZoneIds)
@@ -1076,6 +1382,12 @@ export const SaveSystem = {
     const hasTodayProgress = Object.values(todayStats).some((value) => {
       return Number.isFinite(Number(value)) && Number(value) !== 0;
     });
+    const hasPendingOrder = orderSnapshot.pendingDelivery !== null;
+    const hasShelfStockProgress = Object.values(shelfStocks).some((stock) => {
+      return Object.values(stock.products ?? {}).some((productStock) => {
+        return this.toNonNegativeInteger(productStock.currentStock) > 0;
+      });
+    });
     const hasSanitationProgress =
       sanitation.value !== 100 ||
       sanitation.isCleaningNeeded === true ||
@@ -1092,6 +1404,8 @@ export const SaveSystem = {
       hasDailyRewardProgress ||
       hasRewardClaimsProgress ||
       hasRewardInboxProgress ||
+      hasPendingOrder ||
+      hasShelfStockProgress ||
       hasSanitationProgress ||
       hasTodayProgress
     );

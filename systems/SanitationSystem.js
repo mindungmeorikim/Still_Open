@@ -27,6 +27,7 @@ export const SANITATION_EVENTS = Object.freeze({
   CUSTOMER_EVENT_TRIGGERED: "CUSTOMER_RANDOM_EVENT_TRIGGERED"
 });
 
+const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
 const DEFAULT_SANITATION = 100;
 const CLEANING_RECOVERY = 25;
 const CUSTOMER_MESS_PENALTY = 5;
@@ -44,6 +45,7 @@ export const SanitationSystem = {
   isCleaning: false,
   warningArmed: true,
   cleaningTimerId: null,
+  cleaningRemainingMs: 0,
   cleaningDurationMs: CLEANING_DURATION_MS,
   activeCleaningDurationMs: null,
   currentCleaningActorType: null,
@@ -58,7 +60,15 @@ export const SanitationSystem = {
     this.hydrate(GameState.sanitation);
     this.bindCustomerEvents();
     this.bindCleaningRequests();
+    this.bindSaveEvents();
     this.emitChanged("init");
+  },
+
+  bindSaveEvents() {
+    EventBus.on(SAVE_GAME_LOADED, (data = {}) => {
+      const savedSanitation = data.gameState?.sanitation ?? GameState.sanitation;
+      this.hydrate(savedSanitation);
+    });
   },
 
   bindCleaningRequests() {
@@ -462,19 +472,39 @@ export const SanitationSystem = {
 
   scheduleCleaningCompletion(durationMs = this.activeCleaningDurationMs ?? this.cleaningDurationMs) {
     const safeDurationMs = Math.max(1000, Math.floor(Number(durationMs) || this.cleaningDurationMs));
+    const tickMs = 250;
 
-    this.activeCleaningDurationMs = safeDurationMs;
     this.clearCleaningTimer();
-    this.cleaningTimerId = window.setTimeout(() => {
+    this.activeCleaningDurationMs = safeDurationMs;
+    this.cleaningRemainingMs = safeDurationMs;
+    this.cleaningTimerId = window.setInterval(() => {
+      if (this.isGamePaused()) {
+        return;
+      }
+
+      this.cleaningRemainingMs = Math.max(0, this.cleaningRemainingMs - tickMs);
+
+      if (this.cleaningRemainingMs > 0) {
+        return;
+      }
+
+      window.clearInterval(this.cleaningTimerId);
       this.cleaningTimerId = null;
+      this.cleaningRemainingMs = 0;
       this.completeCleaning();
-    }, safeDurationMs);
+    }, tickMs);
+  },
+
+  isGamePaused() {
+    return Boolean(document.body?.classList?.contains("is-game-paused"));
   },
 
   getStaffAssistPower(type = "cleaning") {
     const staff = GameState.staff?.hired;
+    const unpaidWage = Math.max(0, Math.floor(Number(GameState.staff?.unpaidWage) || 0));
+    const isWageSuspended = unpaidWage > 0 || GameState.staff?.wageSuspended === true;
 
-    if (!staff) {
+    if (!staff || isWageSuspended) {
       return 0;
     }
 
@@ -498,10 +528,14 @@ export const SanitationSystem = {
   },
 
   clearCleaningTimer() {
-    if (!this.cleaningTimerId) return;
+    if (!this.cleaningTimerId) {
+      this.cleaningRemainingMs = 0;
+      return;
+    }
 
-    window.clearTimeout(this.cleaningTimerId);
+    window.clearInterval(this.cleaningTimerId);
     this.cleaningTimerId = null;
+    this.cleaningRemainingMs = 0;
   },
 
   emitChanged(reason = "unknown", detail = {}) {

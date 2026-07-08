@@ -120,6 +120,64 @@ export const NUISANCE_CUSTOMER_ASSET_VARIANTS = deepFreeze({
   CUSTOMER_REFUND_VILLAIN: ["trouble_return_refund"]
 });
 
+export const NUISANCE_CUSTOMER_ASSET_VARIANT_IDS = Object.freeze(
+  Array.from(
+    new Set(
+      Object.values(NUISANCE_CUSTOMER_ASSET_VARIANTS)
+        .flat()
+        .map((variantId) => String(variantId ?? "").trim())
+        .filter(Boolean)
+    )
+  )
+);
+
+export const NUISANCE_CUSTOMER_PROFILE_IDS = Object.freeze(
+  Object.keys(NUISANCE_CUSTOMER_ASSET_VARIANTS)
+);
+
+export function isNuisanceCustomerAssetVariantId(variantId) {
+  const normalizedVariantId = String(variantId ?? "").trim();
+
+  return NUISANCE_CUSTOMER_ASSET_VARIANT_IDS.includes(normalizedVariantId);
+}
+
+export function getNuisanceProfileIds() {
+  return [...NUISANCE_CUSTOMER_PROFILE_IDS];
+}
+
+export function getNuisanceProfileIdForAssetVariantId(variantId) {
+  const normalizedVariantId = String(variantId ?? "").trim();
+
+  if (!normalizedVariantId) {
+    return null;
+  }
+
+  return (
+    NUISANCE_CUSTOMER_PROFILE_IDS.find((profileId) => {
+      return (NUISANCE_CUSTOMER_ASSET_VARIANTS[profileId] ?? []).includes(
+        normalizedVariantId
+      );
+    }) ?? null
+  );
+}
+
+export function getNuisanceAssetVariantIdForProfile(profileId, seedSource = "") {
+  const normalizedProfileId = String(profileId ?? "").trim();
+  const variants = NUISANCE_CUSTOMER_ASSET_VARIANTS[normalizedProfileId] ?? [];
+
+  if (variants.length === 0) {
+    return null;
+  }
+
+  return variants[getStableIndex(`${normalizedProfileId}|${seedSource}`, variants.length)] ?? null;
+}
+
+// Backward-compatible alias for older CustomerSystem patches.
+// Some patch files import getNuisanceVariantIdForProfile without the "Asset" segment.
+export function getNuisanceVariantIdForProfile(profileId, seedSource = "") {
+  return getNuisanceAssetVariantIdForProfile(profileId, seedSource);
+}
+
 function getStableIndex(seedSource, length) {
   const safeLength = Math.max(0, Number(length) || 0);
 
@@ -187,6 +245,14 @@ export function getCustomerAssetDirection(customer = {}) {
 }
 
 export function getCustomerAssetVariantId(customer = {}) {
+  const explicitVariantId = String(
+    customer.nuisanceAssetVariantId ?? customer.assetVariantId ?? customer.variantId ?? ""
+  ).trim();
+
+  if (explicitVariantId && CUSTOMER_ASSET_VARIANTS[explicitVariantId]) {
+    return explicitVariantId;
+  }
+
   const nuisanceProfileId = customer.nuisanceProfileId ?? null;
   const nuisanceVariants = nuisanceProfileId
     ? NUISANCE_CUSTOMER_ASSET_VARIANTS[nuisanceProfileId]

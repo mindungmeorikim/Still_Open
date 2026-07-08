@@ -20,8 +20,10 @@ import {
   ASSET_PATHS,
   OBJECT_FACINGS,
   STOCK_VISUAL_OBJECT_TYPES,
+  getCustomerAssetDirection,
   getCustomerAssetPath,
   getCustomerAssetVariantId,
+  normalizeCustomerAssetDirection,
   getObjectVisualAsset,
   getStaffAssetPath,
   getWarehouseBoxAsset
@@ -134,7 +136,8 @@ const STAFF_EVENTS = {
   HIRE_OFFERED: "STAFF_HIRE_OFFERED",
   HIRED: "STAFF_HIRED",
   HIRE_SKIPPED: "STAFF_HIRE_SKIPPED",
-  STATE_CHANGED: "STAFF_STATE_CHANGED"
+  STATE_CHANGED: "STAFF_STATE_CHANGED",
+  UNPAID_WAGE_PAYMENT_REQUESTED: "STAFF_UNPAID_WAGE_PAYMENT_REQUESTED"
 };
 
 const STAFF_ASSIST_EVENTS = Object.freeze({
@@ -199,6 +202,7 @@ export const UIManager = {
   orderModal: null,
   bmContractShopModal: null,
   bmPurchaseConfirmModal: null,
+  bmShopResultModal: null,
   bmShopActiveTab: "recommend",
   bmShopRenderRafId: null,
   staffHireModal: null,
@@ -3837,6 +3841,7 @@ renderDebugCollisionBoxes() {
     EventBus.on(STAFF_EVENTS.STATE_CHANGED, (data = {}) => {
       this.renderStaffSummary(data.staff);
       this.renderStaffCharacter(data.staff);
+      this.requestBMContractShopRender();
     });
 
     EventBus.on(STAFF_ASSIST_EVENTS.STATE_CHANGED, (data = {}) => {
@@ -3994,7 +3999,13 @@ renderDebugCollisionBoxes() {
     });
 
     EventBus.on(BM_EVENTS.CONTRACT_PURCHASED, (data = {}) => {
-      this.showMessage(data.message ?? "판매권 구매 완료!");
+      this.showBMShopResultModal({
+        title: "구매 성공!",
+        message: data.message ?? "판매권 구매가 완료되었습니다.",
+        variant: "purchase",
+        productId: data.productId,
+        confirmText: "확인"
+      });
       this.requestBMContractShopRender();
       this.renderProductCards();
     });
@@ -4005,7 +4016,13 @@ renderDebugCollisionBoxes() {
     });
 
     EventBus.on(BM_EVENTS.PREMIUM_PRODUCT_PURCHASED, (data = {}) => {
-      this.showMessage(data.message ?? "프리미엄 상품 구매 완료!");
+      this.showBMShopResultModal({
+        title: "구매 성공!",
+        message: data.message ?? "프리미엄 상품 구매가 완료되었습니다.",
+        variant: "purchase",
+        productId: data.productId,
+        confirmText: "확인"
+      });
       this.requestBMContractShopRender();
       this.renderProductCards();
     });
@@ -4016,7 +4033,13 @@ renderDebugCollisionBoxes() {
     });
 
     EventBus.on(BM_EVENTS.CONTRACT_UNLOCK_SKIPPED, (data = {}) => {
-      this.showMessage(data.message ?? "판매권 해금 대기일을 스킵했습니다.");
+      this.showBMShopResultModal({
+        title: "스킵 성공!",
+        message: data.message ?? "판매권 해금 대기일을 스킵했습니다.",
+        variant: "purchase",
+        imagePath: BM_ASSETS.icons?.skipTicket ?? BM_ASSETS.rewardIcons.reward,
+        confirmText: "확인"
+      });
       this.requestBMContractShopRender();
       this.renderProductCards();
     });
@@ -4052,7 +4075,7 @@ renderDebugCollisionBoxes() {
       BM_EVENTS.STAFF_ABILITY_UPGRADED
     ].forEach((eventName) => {
       EventBus.on(eventName, (data = {}) => {
-        this.showMessage(data.message ?? "상점 구매가 완료되었습니다.");
+        this.showBMShopResultModal(this.createBMShopResultOptions(eventName, data));
         this.requestBMContractShopRender();
         this.renderProductCards();
         this.renderInventorySummary();
@@ -4229,10 +4252,13 @@ renderDebugCollisionBoxes() {
       this.clearCustomerEntryRoute(customerNode);
 
       if (customer.currentZone === "door") {
-        this.setCustomerNodePosition(customerNode, CUSTOMER_ENTRY_ENTRANCE_POINT);
+        this.setCustomerNodePosition(customerNode, CUSTOMER_ENTRY_ENTRANCE_POINT, {
+          customer
+        });
         return;
       }
 
+      this.setCustomerNodeDirection(customerNode, getCustomerAssetDirection(customer));
       customerNode.style.removeProperty("left");
       customerNode.style.removeProperty("top");
       return;
@@ -4258,7 +4284,9 @@ renderDebugCollisionBoxes() {
     }
 
     this.clearCustomerEntryRoute(customerNode);
-    this.setCustomerNodePosition(customerNode, finalPosition);
+    this.setCustomerNodePosition(customerNode, finalPosition, {
+      customer
+    });
   },
 
   getCustomerEntryRouteKey(customer, finalPosition) {
@@ -4288,21 +4316,55 @@ renderDebugCollisionBoxes() {
     customerNode.classList.add("customer-entry-routing");
     customerNode.style.setProperty("transition", CUSTOMER_ENTRY_ROUTE_TRANSITION, "important");
 
-    this.setCustomerNodePosition(customerNode, routePoints[0]);
+    this.setCustomerNodePosition(customerNode, routePoints[0], {
+      customer
+    });
 
-    customerNode._customerEntryRouteTimers = routePoints.slice(1).map((routePoint, routeIndex) => {
-      return window.setTimeout(() => {
-        this.setCustomerNodePosition(customerNode, routePoint);
+    customerNode._customerEntryRouteTimers = [];
 
-        if (routeIndex === routePoints.length - 2) {
+    const scheduleRouteStep = (routePointIndex) => {
+      const timerId = window.setTimeout(() => {
+        customerNode._customerEntryRouteTimers = Array.isArray(customerNode._customerEntryRouteTimers)
+          ? customerNode._customerEntryRouteTimers.filter((entryTimerId) => entryTimerId !== timerId)
+          : [];
+
+        if (
+          customerNode.dataset.customerEntryRouteActive !== "true" ||
+          customerNode.dataset.customerEntryRouteKey !== routeKey
+        ) {
+          return;
+        }
+
+        if (document.body?.classList?.contains("is-game-paused")) {
+          scheduleRouteStep(routePointIndex);
+          return;
+        }
+
+        const routePoint = routePoints[routePointIndex];
+
+        this.setCustomerNodePosition(customerNode, routePoint, {
+          customer
+        });
+        this.renderCustomerNodeContent(customerNode, customer);
+
+        if (routePointIndex >= routePoints.length - 1) {
           customerNode.dataset.customerEntryRouteActive = "false";
           customerNode.dataset.customerEntryRouteCompleted = routeKey;
           customerNode.classList.remove("customer-entry-routing");
           customerNode.style.removeProperty("transition");
           customerNode._customerEntryRouteTimers = [];
+          return;
         }
-      }, CUSTOMER_ENTRY_ROUTE_STEP_MS * (routeIndex + 1));
-    });
+
+        scheduleRouteStep(routePointIndex + 1);
+      }, CUSTOMER_ENTRY_ROUTE_STEP_MS);
+
+      customerNode._customerEntryRouteTimers.push(timerId);
+    };
+
+    if (routePoints.length > 1) {
+      scheduleRouteStep(1);
+    }
   },
 
   getCustomerEntryRoutePoints(finalPosition, index = 0) {
@@ -4344,9 +4406,120 @@ renderDebugCollisionBoxes() {
     customerNode.style.removeProperty("transition");
   },
 
-  setCustomerNodePosition(customerNode, position) {
-    customerNode.style.setProperty("left", `${position.x}px`, "important");
-    customerNode.style.setProperty("top", `${position.y}px`, "important");
+  setCustomerNodePosition(customerNode, position, options = {}) {
+    if (!customerNode || !position) {
+      return;
+    }
+
+    const nextPosition = {
+      x: Number(position.x),
+      y: Number(position.y)
+    };
+
+    if (!Number.isFinite(nextPosition.x) || !Number.isFinite(nextPosition.y)) {
+      return;
+    }
+
+    const previousPosition = this.getCustomerNodeStoredPosition(customerNode);
+    const fallbackDirection = this.getCustomerNodeVisualDirection(
+      customerNode,
+      options.customer ?? null
+    );
+    const nextDirection = this.getCustomerDirectionFromMovement(
+      previousPosition,
+      nextPosition,
+      fallbackDirection
+    );
+
+    this.setCustomerNodeDirection(customerNode, nextDirection);
+    customerNode.dataset.customerVisualX = String(nextPosition.x);
+    customerNode.dataset.customerVisualY = String(nextPosition.y);
+    customerNode.style.setProperty("left", `${nextPosition.x}px`, "important");
+    customerNode.style.setProperty("top", `${nextPosition.y}px`, "important");
+  },
+
+  getCustomerNodeStoredPosition(customerNode) {
+    if (!customerNode) {
+      return null;
+    }
+
+    const datasetX = Number(customerNode.dataset.customerVisualX);
+    const datasetY = Number(customerNode.dataset.customerVisualY);
+
+    if (Number.isFinite(datasetX) && Number.isFinite(datasetY)) {
+      return {
+        x: datasetX,
+        y: datasetY
+      };
+    }
+
+    const styleX = Number.parseFloat(customerNode.style.left);
+    const styleY = Number.parseFloat(customerNode.style.top);
+
+    if (Number.isFinite(styleX) && Number.isFinite(styleY)) {
+      return {
+        x: styleX,
+        y: styleY
+      };
+    }
+
+    return null;
+  },
+
+  getCustomerDirectionFromMovement(fromPosition, toPosition, fallbackDirection = "down") {
+    const normalizedFallback = normalizeCustomerAssetDirection(fallbackDirection);
+
+    if (!fromPosition || !toPosition) {
+      return normalizedFallback;
+    }
+
+    const dx = Number(toPosition.x) - Number(fromPosition.x);
+    const dy = Number(toPosition.y) - Number(fromPosition.y);
+
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) {
+      return normalizedFallback;
+    }
+
+    if (Math.hypot(dx, dy) < 2) {
+      return normalizedFallback;
+    }
+
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+    if (angle >= -22.5 && angle < 22.5) return "right";
+    if (angle >= 22.5 && angle < 67.5) return "down_right";
+    if (angle >= 67.5 && angle < 112.5) return "down";
+    if (angle >= 112.5 && angle < 157.5) return "down_left";
+    if (angle >= 157.5 || angle < -157.5) return "left";
+    if (angle >= -157.5 && angle < -112.5) return "up_left";
+    if (angle >= -112.5 && angle < -67.5) return "up";
+    if (angle >= -67.5 && angle < -22.5) return "up_right";
+
+    return normalizedFallback;
+  },
+
+  getCustomerNodeVisualDirection(customerNode, customer = null) {
+    const datasetDirection = customerNode?.dataset?.customerVisualDirection;
+
+    if (datasetDirection) {
+      return normalizeCustomerAssetDirection(datasetDirection);
+    }
+
+    return normalizeCustomerAssetDirection(
+      customer?.direction ?? getCustomerAssetDirection(customer ?? {})
+    );
+  },
+
+  setCustomerNodeDirection(customerNode, direction = "down") {
+    if (!customerNode) {
+      return "down";
+    }
+
+    const normalizedDirection = normalizeCustomerAssetDirection(direction);
+    customerNode.dataset.customerVisualDirection = normalizedDirection;
+    customerNode.dataset.customerDirection = normalizedDirection;
+
+    return normalizedDirection;
   },
 
   getCustomerTargetPosition(customer) {
@@ -4383,11 +4556,13 @@ renderDebugCollisionBoxes() {
   },
 
   renderCustomerNodeContent(customerNode, customer) {
-    const assetPath = getCustomerAssetPath(customer);
+    const visualDirection = this.getCustomerNodeVisualDirection(customerNode, customer);
+    const assetPath = getCustomerAssetPath(customer, visualDirection);
     const assetVariantId = getCustomerAssetVariantId(customer);
     const displayText = this.getCustomerDisplayText(customer);
 
     customerNode.dataset.customerAsset = assetVariantId;
+    customerNode.dataset.customerDirection = visualDirection;
     customerNode.dataset.nuisanceProfileId = customer.nuisanceProfileId ?? "";
 
     this.syncCustomerSprite(customerNode, customer, assetPath, displayText);
@@ -6116,6 +6291,24 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     ].join("|");
   },
 
+  getStaffUnpaidWage(staffState = GameState.staff) {
+    return Math.max(0, Math.floor(Number(staffState?.unpaidWage) || 0));
+  },
+
+  isStaffWageSuspended(staffState = GameState.staff) {
+    return this.getStaffUnpaidWage(staffState) > 0 || staffState?.wageSuspended === true;
+  },
+
+  getStaffWageStatusText(staffState = GameState.staff) {
+    const unpaidWage = this.getStaffUnpaidWage(staffState);
+
+    if (unpaidWage <= 0) {
+      return "임금 정상";
+    }
+
+    return `임금 미지급 ₩${unpaidWage.toLocaleString("ko-KR")}`;
+  },
+
   getStaffAssistDirection(status = "idle") {
     const directionMap = {
       off_duty: "down_left",
@@ -6155,6 +6348,20 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const stats = hired.stats ?? {};
     const staffUpgrade = GameState.bm?.staffAbilityUpgrade?.abilities ?? {};
     const assistState = this.getStaffAssistState();
+    const unpaidWage = this.getStaffUnpaidWage(staffState);
+    const isWageSuspended = this.isStaffWageSuspended(staffState);
+
+    if (isWageSuspended) {
+      summary.hidden = false;
+      status.textContent = `${hired.name} 임금 미지급`;
+      body.innerHTML = `
+        <span>${hired.type}</span>
+        <span>출근 보류</span>
+        <span>미지급 임금 ₩${unpaidWage.toLocaleString("ko-KR")}</span>
+        <span>상점 &gt; 성장에서 임금을 납부하면 다시 출근합니다.</span>
+      `;
+      return;
+    }
 
     if (assistState.status === "off_duty") {
       summary.hidden = true;
@@ -9576,6 +9783,176 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     this.bmPurchaseConfirmModal.classList.add("hidden");
   },
 
+  createBMShopResultModal() {
+    if (document.getElementById("bm-shop-result-modal")) {
+      this.bmShopResultModal = document.getElementById("bm-shop-result-modal");
+      return;
+    }
+
+    const modal = document.createElement("div");
+
+    modal.id = "bm-shop-result-modal";
+    modal.className = "bm-shop-result-modal hidden";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "bm-shop-result-title");
+    modal.innerHTML = `
+      <div class="bm-shop-result-content">
+        <div id="bm-shop-result-badge" class="bm-shop-result-badge" aria-hidden="true">✓</div>
+        <h2 id="bm-shop-result-title">구매 성공!</h2>
+        <div id="bm-shop-result-body" class="bm-shop-result-body"></div>
+        <button id="bm-shop-result-ok" class="bm-shop-result-ok" type="button">확인</button>
+      </div>
+    `;
+
+    const shopContent = this.bmContractShopModal?.querySelector?.(".bm-shop-modern-content, .bm-contract-shop-content");
+    if (shopContent) {
+      shopContent.appendChild(modal);
+    } else {
+      document.body.appendChild(modal);
+    }
+
+    this.bmShopResultModal = modal;
+  },
+
+  createBMShopResultOptions(eventName, data = {}) {
+    const upgradeEvents = new Set([
+      BM_EVENTS.WAREHOUSE_UPGRADED,
+      BM_EVENTS.SHELF_UPGRADED,
+      BM_EVENTS.PRODUCT_UPGRADED,
+      BM_EVENTS.STAFF_ABILITY_UPGRADED
+    ]);
+    const isUpgrade = upgradeEvents.has(eventName);
+    const productId = data.productId ?? data.product?.id ?? null;
+    const product = productId ? PRODUCTS.find((item) => item.id === productId) : null;
+
+    if (isUpgrade) {
+      return {
+        title: "업그레이드 성공!",
+        message: data.message ?? "업그레이드가 완료되었습니다.",
+        variant: "upgrade",
+        productId,
+        product,
+        imagePath: this.getBMShopResultUpgradeImagePath(eventName, data),
+        confirmText: "확인"
+      };
+    }
+
+    if (eventName === BM_EVENTS.AD_REWARD_CLAIMED) {
+      return {
+        title: "보상 수령 성공!",
+        message: data.message ?? "보상을 받았습니다.",
+        variant: "reward",
+        imagePath: this.getBMShopResultRewardImagePath(data),
+        confirmText: "확인"
+      };
+    }
+
+    return {
+      title: "구매 성공!",
+      message: data.message ?? "상점 구매가 완료되었습니다.",
+      variant: "purchase",
+      productId,
+      product,
+      imagePath: this.getBMShopResultPurchaseImagePath(eventName, data),
+      confirmText: "확인"
+    };
+  },
+
+  getBMShopResultPurchaseImagePath(eventName, data = {}) {
+    const productId = data.productId ?? data.product?.id ?? null;
+    const product = productId ? PRODUCTS.find((item) => item.id === productId) : null;
+
+    if (product?.imagePath) return product.imagePath;
+    if (data.product?.imagePath) return data.product.imagePath;
+    if (eventName === BM_EVENTS.PEAK_COUPON_PURCHASED) return BM_ASSETS.coupons.peakTime;
+    if (eventName === BM_EVENTS.DIAMOND_PRODUCT_PURCHASED) return BM_ASSETS.currency?.diamond ?? BM_ASSETS.rewardIcons.diamond;
+    if (eventName === BM_EVENTS.GOLD_PRODUCT_PURCHASED) return BM_ASSETS.currency?.gold ?? BM_ASSETS.rewardIcons.gold;
+
+    return data.imagePath ?? BM_ASSETS.rewardIcons.reward;
+  },
+
+  getBMShopResultUpgradeImagePath(eventName, data = {}) {
+    if (data.imagePath) return data.imagePath;
+    if (eventName === BM_EVENTS.WAREHOUSE_UPGRADED) return BM_ASSETS.upgrades.storage.expansion;
+    if (eventName === BM_EVENTS.SHELF_UPGRADED) return BM_ASSETS.upgrades.shelf.upgrade;
+    if (eventName === BM_EVENTS.STAFF_ABILITY_UPGRADED) return BM_ASSETS.staff.upgrade;
+    if (eventName === BM_EVENTS.PRODUCT_UPGRADED) {
+      const productId = data.productId ?? data.product?.id ?? null;
+      const product = productId ? PRODUCTS.find((item) => item.id === productId) : null;
+      return product?.imagePath ?? BM_ASSETS.popups.productUpgrade ?? BM_ASSETS.rewardIcons.reward;
+    }
+
+    return BM_ASSETS.rewardIcons.reward;
+  },
+
+  getBMShopResultRewardImagePath(data = {}) {
+    const rewardType = data.reward?.rewardType ?? data.rewardType ?? "";
+
+    if (rewardType === "diamond") return BM_ASSETS.currency?.diamond ?? BM_ASSETS.rewardIcons.reward;
+    if (rewardType === "gold") return BM_ASSETS.currency?.gold ?? BM_ASSETS.rewardIcons.reward;
+    if (rewardType === "peakCouponDiscount") return BM_ASSETS.coupons.peakTime;
+
+    return data.reward?.imagePath ?? data.imagePath ?? BM_ASSETS.rewardIcons.reward;
+  },
+
+  showBMShopResultModal(options = {}) {
+    if (!this.bmContractShopModal) {
+      this.createBMContractShopModal();
+    }
+
+    if (!this.bmShopResultModal) {
+      this.createBMShopResultModal();
+    }
+
+    const modal = this.bmShopResultModal;
+    const title = document.getElementById("bm-shop-result-title");
+    const badge = document.getElementById("bm-shop-result-badge");
+    const body = document.getElementById("bm-shop-result-body");
+    const okButton = document.getElementById("bm-shop-result-ok");
+
+    if (!modal || !title || !body || !okButton) {
+      this.showMessage(options.message ?? options.title ?? "처리가 완료되었습니다.");
+      return;
+    }
+
+    const productId = options.productId ?? options.product?.id ?? null;
+    const product = options.product ?? (productId ? PRODUCTS.find((item) => item.id === productId) : null);
+    const displayName = options.displayName ?? (product ? BMSystem.getProductDisplayName(product) : options.itemName ?? "");
+    const imagePath = options.imagePath ?? product?.imagePath ?? BM_ASSETS.rewardIcons.reward;
+    const variant = options.variant ?? "purchase";
+    const message = String(options.message ?? "처리가 완료되었습니다.").trim();
+
+    title.textContent = options.title ?? "구매 성공!";
+    if (badge) {
+      badge.textContent = variant === "upgrade" ? "UP" : "✓";
+    }
+
+    body.innerHTML = `
+      <article class="bm-shop-result-card ${variant ? `bm-shop-result-card--${variant}` : ""}">
+        <span class="bm-shop-result-image-box">
+          <img src="${imagePath}" alt="${displayName || options.title || "상점 결과"}" draggable="false" loading="eager" decoding="async" onerror="this.hidden=true;" />
+        </span>
+        <div class="bm-shop-result-copy">
+          ${displayName ? `<strong>${displayName}</strong>` : ""}
+          <p>${message}</p>
+        </div>
+      </article>
+    `;
+
+    okButton.textContent = options.confirmText ?? "확인";
+    okButton.onclick = () => this.hideBMShopResultModal();
+
+    modal.classList.remove("hidden");
+    this.focusElementSafely(okButton);
+  },
+
+  hideBMShopResultModal() {
+    if (!this.bmShopResultModal) return;
+
+    this.bmShopResultModal.classList.add("hidden");
+  },
+
   createBMContractShopModal() {
     if (document.getElementById("bm-contract-shop-modal")) {
       this.bmContractShopModal = document.getElementById("bm-contract-shop-modal");
@@ -9659,6 +10036,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   hideBMContractShopModal() {
     if (!this.bmContractShopModal) return;
 
+    this.hideBMShopResultModal();
     this.bmContractShopModal.classList.add("hidden");
   },
 
@@ -10267,22 +10645,44 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   createBMStaffUpgradeMarkup(state = {}) {
     const abilities = state.abilities ?? {};
-    const canUpgrade = state.canUpgrade === true;
+    const unpaidWage = this.getStaffUnpaidWage(GameState.staff);
+    const hasUnpaidWage = unpaidWage > 0 || GameState.staff?.wageSuspended === true;
+    const canPayUnpaidWage = hasUnpaidWage && GameState.money >= unpaidWage;
+    const hasStaff = state.hasStaff === true || BMSystem.hasHiredStaff?.() === true;
+    const blockReason = state.blockReason ?? BMSystem.getStaffAbilityUpgradeBlockReason?.() ?? null;
+    const canUpgrade = state.canUpgrade === true && !hasUnpaidWage && hasStaff;
+    const statusText = hasUnpaidWage
+      ? this.getStaffWageStatusText(GameState.staff)
+      : canUpgrade
+        ? "강화 가능"
+        : blockReason?.message ?? (hasStaff ? `다음 가능 Day ${state.nextAvailableDay ?? "-"}` : "고용된 알바 필요");
     const labels = [
       ["warehouse", "창고"],
       ["shelf", "진열대"],
       ["cleaning", "청소"]
     ];
+    const unpaidWageMarkup = hasUnpaidWage
+      ? `
+        <div class="bm-staff-unpaid-wage-panel">
+          <strong>임금 미지급으로 출근 보류</strong>
+          <span>미지급 임금 ₩${unpaidWage.toLocaleString("ko-KR")}</span>
+          <button class="bm-staff-unpaid-wage-pay-button" type="button" ${canPayUnpaidWage ? "" : "disabled"}>
+            ${canPayUnpaidWage ? "미지급 임금 납부" : "골드 부족"}
+          </button>
+        </div>
+      `
+      : "";
 
     return `
-      <article class="bm-contract-shop-card bm-tool-card bm-staff-upgrade-card">
+      <article class="bm-contract-shop-card bm-tool-card bm-staff-upgrade-card ${hasUnpaidWage ? "is-wage-suspended" : ""}">
         ${this.createBMAssetImageMarkup(BM_ASSETS.staff.upgrade, "알바 강화")}
         <div class="bm-contract-product-copy">
           <strong>알바 강화권</strong>
           <span>80다이아 · 원하는 분야 1칸 강화 · 총 ${state.totalCount ?? 0}/${state.maxTotal ?? 5}</span>
-          <small>강화한 분야의 창고/진열/청소 작업 시간이 짧아집니다.</small>
-          <em>${canUpgrade ? "강화 가능" : GameState.staff?.hired ? `다음 가능 Day ${state.nextAvailableDay ?? "-"}` : "고용된 알바 필요"}</em>
+          <small>${hasUnpaidWage ? "임금 납부 전에는 알바가 출근하지 않습니다." : "강화한 분야의 창고/진열/청소 작업 시간이 짧아집니다."}</small>
+          <em>${statusText}</em>
         </div>
+        ${unpaidWageMarkup}
         <div class="bm-tool-actions bm-staff-upgrade-actions">
           ${labels.map(([key, label]) => `
             <button class="bm-staff-upgrade-button" type="button" data-ability-key="${key}" ${canUpgrade ? "" : "disabled"}>${label} +1 (${Number(abilities[key] || 0)})</button>
@@ -10689,6 +11089,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   bindBMStaffUpgradeButtons() {
+    document.querySelectorAll(".bm-staff-unpaid-wage-pay-button").forEach((button) => {
+      button.onclick = () => {
+        if (button.disabled) return;
+
+        EventBus.emit(STAFF_EVENTS.UNPAID_WAGE_PAYMENT_REQUESTED, {
+          day: GameState.day
+        });
+      };
+    });
+
     document.querySelectorAll(".bm-staff-upgrade-button").forEach((button) => {
       button.onclick = () => {
         if (button.disabled) return;
@@ -11811,16 +12221,36 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const infiniteGameOverNotice = this.createInfiniteGameOverResultNotice(
       resultData.infiniteGameOver
     );
+    const staffWagePaid = Number(staffResult.wagePaid ?? staffResult.wageSettlement?.paidAmount ?? staffResult.wageCost ?? 0) || 0;
+    const staffUnpaidWage = Number(staffResult.unpaidWage ?? staffResult.wageSettlement?.unpaidAmount ?? 0) || 0;
+    const staffTotalUnpaidWage = Number(staffResult.totalUnpaidWage ?? staffResult.wageSettlement?.totalUnpaidWage ?? 0) || 0;
+    const staffSuspended = staffResult.suspended === true || staffResult.wagePaymentStatus === "suspended";
     const staffResultRows = staffResult.hired
       ? `
-        <div class="result-row result-row-staff">
+        <div class="result-row result-row-staff ${staffSuspended ? "is-warning" : ""}">
           <span>알바 보조</span>
-          <strong>${staffResult.name} 창고/진열/청소</strong>
+          <strong>${staffSuspended ? `${staffResult.name} 임금 미지급으로 출근 보류` : `${staffResult.name} 창고/진열/청소`}</strong>
         </div>
         <div class="result-row result-row-staff">
           <span>알바 인건비</span>
           <strong>-₩${Number(staffResult.wageCost || 0).toLocaleString("ko-KR")}</strong>
         </div>
+        <div class="result-row result-row-staff">
+          <span>지급된 인건비</span>
+          <strong>₩${staffWagePaid.toLocaleString("ko-KR")}</strong>
+        </div>
+        ${staffUnpaidWage > 0 ? `
+          <div class="result-row result-row-staff is-warning">
+            <span>미지급 임금</span>
+            <strong>₩${staffUnpaidWage.toLocaleString("ko-KR")} 발생 · 다음 Day 출근 보류</strong>
+          </div>
+        ` : ""}
+        ${staffTotalUnpaidWage > 0 && staffUnpaidWage <= 0 ? `
+          <div class="result-row result-row-staff is-warning">
+            <span>누적 미지급 임금</span>
+            <strong>₩${staffTotalUnpaidWage.toLocaleString("ko-KR")} · 납부 전까지 출근 보류</strong>
+          </div>
+        ` : ""}
       `
       : "";
     const sanitation = resultData.sanitation ?? resultData.sanitationPenalty?.sanitation ?? null;

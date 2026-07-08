@@ -383,10 +383,8 @@ export const RandomEventSystem = {
 
     this.resetDailyStateIfNeeded(day);
 
-    if (!this.canRollForCustomer(customer, day)) {
-      return [];
-    }
-
+    // 진상 보장 이벤트는 일반 랜덤 이벤트의 1회 roll/canRoll 제한과 분리한다.
+    // 이미 일반 이벤트 판정을 시도한 손님이어도, 진상 계산대 도착 전용 모달은 100% 보장되어야 한다.
     const unlockedNuisanceEvents = this.getAvailableEventsForCustomer(
       customer,
       day,
@@ -565,10 +563,12 @@ export const RandomEventSystem = {
     this.markCustomerEventTriggered(customer);
   },
 
-  createEventPayload(customer, eventDetail) {
+  createEventPayload(customer, eventDetail, options = {}) {
     if (!customer || !eventDetail) {
       return null;
     }
+
+    const forceEnableChoices = options.forceEnableChoices === true;
 
     const detail =
       getCustomerEventDetail(eventDetail.id) ??
@@ -584,8 +584,9 @@ export const RandomEventSystem = {
       ? detail.choices.map((choice) => {
           const missingRequirements =
             this.getMissingProductInventoryRequirements(choice);
-          const disabled =
+          const stockBlocked =
             this.isChoiceBlockedByMissingProductStock(choice);
+          const disabled = forceEnableChoices ? false : stockBlocked;
 
           return {
             choiceId: choice.id,
@@ -594,6 +595,7 @@ export const RandomEventSystem = {
             disabled,
             disabledReason: disabled ? "필요 재고 부족" : null,
             missingRequirements,
+            forcedEnabled: forceEnableChoices && stockBlocked,
             resultTitle: choice.resultTitle,
             customerReaction: choice.customerReaction,
             playerThought: choice.playerThought,
@@ -609,9 +611,9 @@ export const RandomEventSystem = {
 
     if (
       choices.length === 0 ||
-      choices.every((choice) => {
+      (!forceEnableChoices && choices.every((choice) => {
         return choice.disabled === true;
-      })
+      }))
     ) {
       return null;
     }

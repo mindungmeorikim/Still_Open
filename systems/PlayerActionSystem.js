@@ -37,6 +37,7 @@ const STAFF_EVENTS = {
 };
 
 const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
+const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
@@ -68,6 +69,7 @@ export const PlayerActionSystem = {
   cleaningCountdownTimerId: null,
   lastPointerActionSignature: null,
   lastPointerActionTimeStamp: 0,
+  pauseAwareActionTimerIds: new Set(),
   shelfStocks: {},
 
   shelf: {
@@ -111,6 +113,7 @@ export const PlayerActionSystem = {
   },
 
   activeShelfId: PRODUCT_SHELF_IDS.BASIC,
+  activeRestockTarget: null,
 
   warehouse: {
     stock: 0
@@ -164,6 +167,10 @@ export const PlayerActionSystem = {
       this.resetTutorialPracticeActions();
     });
 
+    EventBus.on(SAVE_GAME_LOADED, (data = {}) => {
+      this.hydrateSaveSnapshot(data);
+    });
+
     this.getShelfSlots();
     this.syncShelfStocksToGameState("init");
   },
@@ -179,9 +186,12 @@ export const PlayerActionSystem = {
       this.cleaningCountdownTimerId = null;
     }
 
+    this.clearPauseAwareActionTimers();
+
     this.isPlayerBusy = false;
     this.restockRemainingSeconds = 0;
     this.restockPhase = null;
+    this.activeRestockTarget = null;
     this.setDeliveryBoxInteractionSuppressed(false);
     this.setCarryingBoxType(null);
     this.setDeliveryBoxState(null);
@@ -199,6 +209,116 @@ export const PlayerActionSystem = {
     if (!GameState.warehouseBoxState) {
       GameState.warehouseBoxState = "closed";
     }
+  },
+
+  hydrateSaveSnapshot(data = {}) {
+    if (this.restockTimerId) {
+      clearInterval(this.restockTimerId);
+      this.restockTimerId = null;
+    }
+
+    if (this.autoMoveTimerId) {
+      clearInterval(this.autoMoveTimerId);
+      this.autoMoveTimerId = null;
+    }
+
+    this.clearPauseAwareActionTimers();
+
+    this.isPlayerBusy = false;
+    this.restockRemainingSeconds = 0;
+    this.restockPhase = null;
+    this.activeRestockTarget = null;
+
+    const shelfStocks = data.shelfStocks ?? data.saveData?.shelfStocks ?? GameState.shelfStocks ?? {};
+    this.shelfStocks = this.normalizeShelfStocksForRuntime(shelfStocks);
+
+    const boxState = data.boxState ?? data.saveData?.boxState ?? {};
+    this.applyLoadedBoxState(boxState);
+
+    this.getShelfSlots();
+    this.syncShelfStocksToGameState("save_loaded");
+  },
+
+  normalizeShelfStocksForRuntime(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+
+    return Object.fromEntries(
+      Object.entries(source)
+        .map(([instanceId, stock]) => {
+          const resolvedInstanceId = String(instanceId ?? "").trim();
+          const products = stock?.products && typeof stock.products === "object"
+            ? stock.products
+            : {};
+          const normalizedProducts = Object.fromEntries(
+            Object.entries(products)
+              .map(([productId, productStock]) => {
+                const resolvedProductId = this.getResolvedProductId(
+                  productStock?.productId ?? productId
+                );
+                const maxStock = Math.max(
+                  1,
+                  Math.floor(Number(productStock?.maxStock) || 8)
+                );
+                const currentStock = Math.min(
+                  maxStock,
+                  Math.max(0, Math.floor(Number(productStock?.currentStock) || 0))
+                );
+
+                if (!resolvedProductId) {
+                  return null;
+                }
+
+                return [
+                  resolvedProductId,
+                  {
+                    productId: resolvedProductId,
+                    currentStock,
+                    maxStock
+                  }
+                ];
+              })
+              .filter(Boolean)
+          );
+
+          if (!resolvedInstanceId) {
+            return null;
+          }
+
+          return [
+            resolvedInstanceId,
+            {
+              products: normalizedProducts,
+              shelfId: stock?.shelfId ?? null,
+              reason: "save_loaded"
+            }
+          ];
+        })
+        .filter(Boolean)
+    );
+  },
+
+  applyLoadedBoxState(boxState = {}) {
+    const source = boxState && typeof boxState === "object" ? boxState : {};
+
+    GameState.warehouseBoxPosition = source.warehouseBoxPosition
+      ? {
+          ...this.warehouseZone,
+          ...source.warehouseBoxPosition
+        }
+      : {
+          ...this.warehouseZone
+        };
+
+    if (!GameState.player || typeof GameState.player !== "object") {
+      GameState.player = { x: 610, y: 640, speed: 4, direction: "down" };
+    }
+
+    // 저장 직전 물류 정리/보충 자동 이동 중이었다면 이어하기 후 stuck을 막기 위해
+    // 박스 들기/상호작용 억제 상태는 안전한 대기 상태로 되돌린다.
+    GameState.player.carryingBoxType = null;
+    GameState.deliveryBoxState = null;
+    GameState.deliveryBoxInteractionSuppressed = false;
+    GameState.warehouseBoxState = source.warehouseBoxState === "open" ? "open" : "closed";
   },
 
   bindStaffAutoCheckoutEvents() {
@@ -282,8 +402,21 @@ export const PlayerActionSystem = {
     );
   },
 
+  isGamePausedInteractionLocked() {
+    return Boolean(
+      document.body?.classList?.contains("is-game-paused")
+    );
+  },
+
+  isInteractionLocked() {
+    return (
+      this.isCustomerEventModalInteractionLocked() ||
+      this.isGamePausedInteractionLocked()
+    );
+  },
+
   handleKeyboardAction(event) {
-  if (this.isCustomerEventModalInteractionLocked()) {
+  if (this.isInteractionLocked()) {
     if (this.isInteractionKey(event)) {
       event.preventDefault();
       event.stopPropagation();
@@ -347,7 +480,7 @@ export const PlayerActionSystem = {
   },
 
   handlePrimaryInteractionAction() {
-    if (this.isCustomerEventModalInteractionLocked()) {
+    if (this.isInteractionLocked()) {
       return;
     }
 
@@ -366,7 +499,8 @@ export const PlayerActionSystem = {
     if (target.type === "shelf") {
       this.handleShelfRestockAction({
         shelfId: target.shelfId,
-        shelfInstanceId: target.shelfInstanceId
+        shelfInstanceId: target.shelfInstanceId,
+        productId: target.productId
       });
       return;
     }
@@ -400,52 +534,45 @@ export const PlayerActionSystem = {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
-    } 
+    }
 
     if (!GameState.player) return;
 
-    let shelf = this.getShelfSlot(options.shelfInstanceId ?? options.shelfId);
+    const requestedShelf = this.getShelfSlot(options.shelfInstanceId ?? options.shelfId);
 
-    if (!this.isNearShelf(shelf)) {
+    if (!this.isNearShelf(requestedShelf)) {
       this.showActionMessage("진열대에 더 가까이 가야 합니다.");
       return;
     }
 
-    let capacity = this.getShelfCapacityForSlot(shelf);
-    let currentStock = this.getShelfCurrentStock(shelf);
+    let restockTarget = this.findBestRestockTargetForShelf(requestedShelf, options.productId);
 
-    if (currentStock > 0) {
-      const restockableShelf = this.findNearbyRestockableShelf(shelf.instanceId);
+    if (!this.isRestockTargetReady(restockTarget)) {
+      const nearbyRestockTarget = this.findBestNearbyRestockTarget(requestedShelf.instanceId);
 
-      if (restockableShelf) {
-        shelf = restockableShelf;
-        capacity = this.getShelfCapacityForSlot(shelf);
-        currentStock = this.getShelfCurrentStock(shelf);
-      } else {
-        this.showActionMessage(
-          `아직 상품이 남아 있습니다. (${currentStock}/${capacity})`
-        );
-        return;
+      if (nearbyRestockTarget) {
+        restockTarget = nearbyRestockTarget;
       }
     }
 
-    let availableWarehouseStock = this.getAvailableWarehouseStock(shelf.productId);
-
-    if (availableWarehouseStock <= 0) {
-      const restockableShelf = this.findNearbyRestockableShelf(shelf.instanceId);
-
-      if (restockableShelf) {
-        shelf = restockableShelf;
-        capacity = this.getShelfCapacityForSlot(shelf);
-        currentStock = this.getShelfCurrentStock(shelf);
-        availableWarehouseStock = this.getAvailableWarehouseStock(shelf.productId);
-      } else {
-        this.showActionMessage("창고에 입고된 재고가 없습니다. 먼저 발주 물류를 정리해주세요.");
-        return;
-      }
+    if (!restockTarget) {
+      this.showActionMessage("보충할 수 있는 상품을 찾지 못했습니다.");
+      return;
     }
 
-    this.startShelfRestock(shelf);
+    if (restockTarget.currentStock > 0) {
+      this.showActionMessage(
+        `아직 상품이 남아 있습니다. (${restockTarget.currentStock}/${restockTarget.capacity})`
+      );
+      return;
+    }
+
+    if (restockTarget.availableWarehouseStock <= 0) {
+      this.showActionMessage("창고에 입고된 재고가 없습니다. 먼저 발주 물류를 정리해주세요.");
+      return;
+    }
+
+    this.startShelfRestock(restockTarget);
   },
 
   getShelfCurrentStock(shelf = this.shelf) {
@@ -455,30 +582,103 @@ export const PlayerActionSystem = {
     );
   },
 
+  getProductIdsForShelfSlot(shelf = this.shelf) {
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
+    const stockProductIds = Object.keys(targetShelf.products ?? {});
+    const configuredProductIds = PRODUCTS
+      .filter((product) => product.targetShelfInstanceId === targetShelf.instanceId)
+      .map((product) => product.id);
+    const defaultProductId = this.getDefaultProductIdForShelf(targetShelf);
+
+    return [
+      ...stockProductIds,
+      ...configuredProductIds,
+      defaultProductId
+    ]
+      .map((productId) => this.getResolvedProductId(productId))
+      .filter(Boolean)
+      .filter((productId, index, productIds) => productIds.indexOf(productId) === index);
+  },
+
+  getProductStockForShelf(shelf = this.shelf, productId = null) {
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
+    const resolvedProductId = this.getResolvedProductId(
+      productId ?? targetShelf.productId ?? this.getDefaultProductIdForShelf(targetShelf)
+    );
+    const storedStock = targetShelf.products?.[resolvedProductId] ??
+      this.shelfStocks[targetShelf.instanceId]?.products?.[resolvedProductId] ??
+      null;
+    const capacity = Math.max(
+      1,
+      Math.floor(
+        Number(storedStock?.maxStock) ||
+        Number(targetShelf.maxStock) ||
+        8
+      )
+    );
+
+    return {
+      productId: resolvedProductId,
+      currentStock: Math.max(0, Math.floor(Number(storedStock?.currentStock) || 0)),
+      maxStock: capacity
+    };
+  },
+
+  createShelfRestockTarget(shelf = this.shelf, productId = null) {
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
+    const resolvedProductId = this.getResolvedProductId(
+      productId ?? targetShelf.productId ?? this.getDefaultProductIdForShelf(targetShelf)
+    );
+
+    if (!targetShelf || !resolvedProductId) {
+      return null;
+    }
+
+    const productStock = this.getProductStockForShelf(targetShelf, resolvedProductId);
+    const capacity = Math.max(1, Math.floor(Number(productStock.maxStock) || 8));
+    const currentStock = Math.max(0, Math.floor(Number(productStock.currentStock) || 0));
+    const availableWarehouseStock = this.getAvailableWarehouseStock(resolvedProductId);
+    const distance = this.getDistanceToZone(targetShelf.nodeId, targetShelf);
+    const interactionDistance =
+      Number(targetShelf.interactionDistance) || this.interactionDistance;
+
+    return {
+      type: "shelf",
+      shelf: targetShelf,
+      shelfId: targetShelf.shelfId,
+      shelfInstanceId: targetShelf.instanceId,
+      productId: resolvedProductId,
+      productStock,
+      currentStock,
+      capacity,
+      availableWarehouseStock,
+      interactionDistance,
+      distance,
+      isEmpty: currentStock <= 0,
+      isFull: currentStock >= capacity,
+      isRestockable: currentStock <= 0 && availableWarehouseStock > 0
+    };
+  },
+
+  getRestockCandidatesForShelf(shelf = this.shelf) {
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
+
+    return this.getProductIdsForShelfSlot(targetShelf)
+      .map((productId) => this.createShelfRestockTarget(targetShelf, productId))
+      .filter(Boolean);
+  },
+
   getNearbyShelfTargets() {
     return this.getShelfSlots()
-      .map((shelf) => {
-        const distance = this.getDistanceToZone(shelf.nodeId, shelf);
-        const interactionDistance =
-          Number(shelf.interactionDistance) || this.interactionDistance;
-        const productId = this.getResolvedProductId(shelf.productId);
-        const currentStock = this.getShelfCurrentStock(shelf);
-        const availableWarehouseStock = this.getAvailableWarehouseStock(productId);
-
-        return {
-          type: "shelf",
-          shelf,
-          shelfId: shelf.shelfId,
-          shelfInstanceId: shelf.instanceId,
-          productId,
-          currentStock,
-          availableWarehouseStock,
-          interactionDistance,
-          distance,
-          isEmpty: currentStock <= 0,
-          isRestockable: currentStock <= 0 && availableWarehouseStock > 0
-        };
-      })
+      .flatMap((shelf) => this.getRestockCandidatesForShelf(shelf))
       .filter((target) => (
         target.distance !== null &&
         target.distance <= target.interactionDistance
@@ -494,18 +694,77 @@ export const PlayerActionSystem = {
       return 1;
     }
 
-    return 2;
+    if (!target.isFull) {
+      return 2;
+    }
+
+    return 3;
   },
 
-  findNearbyRestockableShelf(excludedShelfInstanceId = null) {
-    const restockableTarget = this.getNearbyShelfTargets()
+  sortRestockTargets(first = {}, second = {}) {
+    const priorityGap =
+      this.getShelfInteractionPriority(first) -
+      this.getShelfInteractionPriority(second);
+
+    if (priorityGap !== 0) {
+      return priorityGap;
+    }
+
+    const firstDistance = Number(first.distance);
+    const secondDistance = Number(second.distance);
+
+    if (Number.isFinite(firstDistance) && Number.isFinite(secondDistance)) {
+      const distanceGap = firstDistance - secondDistance;
+
+      if (distanceGap !== 0) {
+        return distanceGap;
+      }
+    }
+
+    return String(first.productId ?? "").localeCompare(String(second.productId ?? ""));
+  },
+
+  findBestRestockTargetForShelf(shelf = this.shelf, preferredProductId = null) {
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
+    const candidates = this.getRestockCandidatesForShelf(targetShelf);
+    const resolvedPreferredProductId = this.getResolvedProductId(preferredProductId);
+
+    if (resolvedPreferredProductId) {
+      const preferredCandidate = candidates.find((candidate) => (
+        candidate.productId === resolvedPreferredProductId
+      ));
+
+      if (preferredCandidate) {
+        return preferredCandidate;
+      }
+    }
+
+    return candidates
+      .slice()
+      .sort((first, second) => this.sortRestockTargets(first, second))[0] ?? null;
+  },
+
+  isRestockTargetReady(target = null) {
+    return Boolean(
+      target &&
+      target.currentStock <= 0 &&
+      target.availableWarehouseStock > 0
+    );
+  },
+
+  findBestNearbyRestockTarget(excludedShelfInstanceId = null) {
+    return this.getNearbyShelfTargets()
       .filter((target) => (
         target.isRestockable &&
         (!excludedShelfInstanceId || target.shelfInstanceId !== excludedShelfInstanceId)
       ))
-      .sort((first, second) => first.distance - second.distance)[0];
+      .sort((first, second) => this.sortRestockTargets(first, second))[0] ?? null;
+  },
 
-    return restockableTarget?.shelf ?? null;
+  findNearbyRestockableShelf(excludedShelfInstanceId = null) {
+    return this.findBestNearbyRestockTarget(excludedShelfInstanceId)?.shelf ?? null;
   },
 
   isNearShelf(shelf = this.shelf) {
@@ -541,17 +800,7 @@ export const PlayerActionSystem = {
 
   getPrimaryInteractionTarget() {
     const shelfTargets = this.getNearbyShelfTargets()
-      .sort((first, second) => {
-        const priorityGap =
-          this.getShelfInteractionPriority(first) -
-          this.getShelfInteractionPriority(second);
-
-        if (priorityGap !== 0) {
-          return priorityGap;
-        }
-
-        return first.distance - second.distance;
-      });
+      .sort((first, second) => this.sortRestockTargets(first, second));
 
     const emptyShelfTarget = shelfTargets.find((target) => {
       return target.isRestockable || target.isEmpty;
@@ -1322,9 +1571,25 @@ export const PlayerActionSystem = {
     return Math.max(0, totalStock - reservedCarriedStock);
   },
 
-  startShelfRestock(shelf = this.shelf) {
-  const targetShelf = this.getShelfSlot(shelf.instanceId ?? shelf.shelfInstanceId ?? shelf.shelfId);
-  this.activeShelfId = targetShelf.shelfId;
+  startShelfRestock(restockTarget = this.findBestRestockTargetForShelf(this.shelf)) {
+  const target = restockTarget?.productId
+    ? restockTarget
+    : this.findBestRestockTargetForShelf(restockTarget);
+
+  if (!this.isRestockTargetReady(target)) {
+    this.showActionMessage("보충할 수 있는 상품을 찾지 못했습니다.");
+    return;
+  }
+
+  const targetShelf = this.getShelfSlot(target.shelfInstanceId ?? target.shelf?.instanceId ?? target.shelfId);
+  const productId = this.getResolvedProductId(target.productId);
+
+  this.activeShelfId = targetShelf.instanceId;
+  this.activeRestockTarget = {
+    shelfInstanceId: targetShelf.instanceId,
+    shelfId: targetShelf.shelfId,
+    productId
+  };
   this.isPlayerBusy = true;
   this.setCarryingBoxType(null);
 
@@ -1335,7 +1600,7 @@ export const PlayerActionSystem = {
       phase: "warehouse",
       message: "창고에서 상품을 꺼내는 중입니다",
       onComplete: () => {
-        this.setCarryingBoxType(this.getCarryingBoxTypeForProduct(targetShelf.productId));
+        this.setCarryingBoxType(this.getCarryingBoxTypeForProduct(productId));
         this.showActionMessage("진열대로 이동 중입니다.");
 
         this.movePlayerToShelf(targetShelf, () => {
@@ -1343,7 +1608,7 @@ export const PlayerActionSystem = {
             phase: "shelf",
             message: "진열대에 상품을 채우는 중입니다",
             onComplete: () => {
-              this.completeShelfRestock(targetShelf);
+              this.completeShelfRestock(this.activeRestockTarget);
             }
           });
         });
@@ -1369,6 +1634,10 @@ movePlayerToPosition(targetPosition, onComplete) {
   }
 
   this.autoMoveTimerId = setInterval(() => {
+    if (this.isGamePausedInteractionLocked()) {
+      return;
+    }
+
     const dx = targetX - GameState.player.x;
     const dy = targetY - GameState.player.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -1448,8 +1717,17 @@ movePlayerToCleaningZone(onComplete) {
 startTimedRestockPhase({ phase, message, onComplete }) {
   this.restockPhase = phase;
   const durationMs = this.getAssistedActionDurationMs(phase, this.restockDuration);
-  this.restockRemainingSeconds = Math.ceil(durationMs / 1000);
+  const tickMs = 250;
+  let remainingMs = durationMs;
+  let lastDisplayedSeconds = Math.ceil(remainingMs / 1000);
   const usesWarehouseBox = phase === "warehouse" || phase === "delivery";
+
+  if (this.restockTimerId) {
+    clearInterval(this.restockTimerId);
+    this.restockTimerId = null;
+  }
+
+  this.restockRemainingSeconds = lastDisplayedSeconds;
 
   if (usesWarehouseBox) {
     this.setWarehouseBoxState("open");
@@ -1458,19 +1736,28 @@ startTimedRestockPhase({ phase, message, onComplete }) {
   this.showActionMessage(`${message}... ${this.restockRemainingSeconds}초`);
 
   this.restockTimerId = setInterval(() => {
-    this.restockRemainingSeconds -= 1;
-
-    if (this.restockRemainingSeconds > 0) {
-      this.showActionMessage(`${message}... ${this.restockRemainingSeconds}초`);
-    }
-  }, 1000);
-
-  setTimeout(() => {
-    if (this.restockTimerId) {
-      clearInterval(this.restockTimerId);
-      this.restockTimerId = null;
+    if (this.isGamePausedInteractionLocked()) {
+      return;
     }
 
+    remainingMs = Math.max(0, remainingMs - tickMs);
+    const nextDisplayedSeconds = Math.ceil(remainingMs / 1000);
+
+    if (nextDisplayedSeconds !== lastDisplayedSeconds) {
+      lastDisplayedSeconds = nextDisplayedSeconds;
+      this.restockRemainingSeconds = nextDisplayedSeconds;
+
+      if (this.restockRemainingSeconds > 0) {
+        this.showActionMessage(`${message}... ${this.restockRemainingSeconds}초`);
+      }
+    }
+
+    if (remainingMs > 0) {
+      return;
+    }
+
+    clearInterval(this.restockTimerId);
+    this.restockTimerId = null;
     this.restockRemainingSeconds = 0;
 
     if (usesWarehouseBox) {
@@ -1478,13 +1765,15 @@ startTimedRestockPhase({ phase, message, onComplete }) {
     }
 
     onComplete?.();
-  }, durationMs);
+  }, tickMs);
 },
 
 getStaffAssistPower(type = "shelf") {
   const staff = GameState.staff?.hired;
+  const unpaidWage = Math.max(0, Math.floor(Number(GameState.staff?.unpaidWage) || 0));
+  const isWageSuspended = unpaidWage > 0 || GameState.staff?.wageSuspended === true;
 
-  if (!staff) {
+  if (!staff || isWageSuspended) {
     return 0;
   }
 
@@ -1516,17 +1805,28 @@ getAssistedActionDurationMs(phase = "shelf", baseDurationMs = this.restockDurati
   return Math.max(1800, reducedDuration);
 },
 
-completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
+completeShelfRestock(restockTarget = this.activeRestockTarget) {
   const targetShelf = this.getShelfSlot(
-    shelf.instanceId ?? shelf.shelfInstanceId ?? shelf.shelfId
+    restockTarget?.shelfInstanceId ??
+    restockTarget?.instanceId ??
+    restockTarget?.shelfId ??
+    this.activeShelfId
+  );
+  const productId = this.getResolvedProductId(
+    restockTarget?.productId ?? targetShelf.productId
   );
 
-  const productId = this.getResolvedProductId(targetShelf.productId);
-  const productStock = targetShelf.products?.[productId] ?? {
-    currentStock: 0,
-    maxStock: 8
-  };
+  if (!targetShelf || !productId) {
+    this.isPlayerBusy = false;
+    this.restockPhase = null;
+    this.activeRestockTarget = null;
+    this.setCarryingBoxType(null);
+    this.setWarehouseBoxState("closed");
+    this.showActionMessage("보충할 상품 정보를 찾지 못했습니다.");
+    return;
+  }
 
+  const productStock = this.getProductStockForShelf(targetShelf, productId);
   const capacity = Math.max(1, Math.floor(Number(productStock.maxStock) || 8));
   const currentStock = Math.max(0, Math.floor(Number(productStock.currentStock) || 0));
   const needStock = capacity - currentStock;
@@ -1536,6 +1836,7 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
   if (restockAmount <= 0) {
     this.isPlayerBusy = false;
     this.restockPhase = null;
+    this.activeRestockTarget = null;
     this.setCarryingBoxType(null);
     this.setWarehouseBoxState("closed");
     this.showActionMessage("창고에 입고된 재고가 없어 보충할 수 없습니다.");
@@ -1566,17 +1867,19 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     day: GameState.day,
     productId,
     shelfId: targetShelf.shelfId,
+    shelfInstanceId: targetShelf.instanceId,
     quantity: restockAmount,
     source: "player_shelf_restock"
   });
 
   this.isPlayerBusy = false;
   this.restockPhase = null;
+  this.activeRestockTarget = null;
   this.setCarryingBoxType(null);
   this.setWarehouseBoxState("closed");
 
   this.showActionMessage(
-    `진열대 보충 완료! ${restockAmount}개를 채웠습니다. 진열대: ${nextStock}/${capacity}, 창고 재고: ${availableWarehouseStock}개`
+    `진열대 보충 완료! ${restockAmount}개를 채웠습니다. ${productId}: ${nextStock}/${capacity}, 창고 재고: ${availableWarehouseStock}개`
   );
 },
 
@@ -1637,6 +1940,10 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     this.showActionMessage(`청소 중입니다... ${this.restockRemainingSeconds}초`);
 
     this.cleaningCountdownTimerId = setInterval(() => {
+      if (this.isGamePausedInteractionLocked()) {
+        return;
+      }
+
       this.restockRemainingSeconds -= 1;
 
       if (this.restockRemainingSeconds > 0) {
@@ -1690,7 +1997,7 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       return;
     }
 
-    if (this.isCustomerEventModalInteractionLocked()) {
+    if (this.isInteractionLocked()) {
       event.preventDefault?.();
       event.stopPropagation?.();
       return;
@@ -1712,7 +2019,8 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     if (actionType === "shelf_restock" || actionType === "shelf") {
       this.handleShelfRestockAction({
         shelfId: actionNode.dataset.shelfId,
-        shelfInstanceId: actionNode.dataset.shelfInstanceId
+        shelfInstanceId: actionNode.dataset.shelfInstanceId,
+        productId: actionNode.dataset.productId
       });
       return;
     }
@@ -1816,11 +2124,12 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       return false;
     }
 
+    const delayMs = Math.max(0, Number(checkoutPayload.nuisanceCheckoutDelayMs) || 0);
+
     return (
-      checkoutPayload.customerTypeId === "difficult" ||
-      checkoutPayload.isNuisance === true ||
-      Boolean(checkoutPayload.nuisanceProfileId) ||
-      Number(checkoutPayload.nuisanceCheckoutDelayMs) > 0
+      checkoutPayload.isNuisance === true &&
+      checkoutPayload.nuisanceEventResolved === true &&
+      delayMs > 0
     );
   },
 
@@ -1832,23 +2141,74 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
     return (options.actorType ?? checkoutPayload.actorType ?? "player") === "player";
   },
 
+  runPauseAwareActionDelay({ durationMs = 1000, tickMs = 250, onTick = null, onComplete = null } = {}) {
+    const safeDurationMs = Math.max(0, Math.floor(Number(durationMs) || 0));
+    const safeTickMs = Math.max(50, Math.floor(Number(tickMs) || 250));
+    let remainingMs = safeDurationMs;
+
+    if (remainingMs <= 0) {
+      onTick?.(0);
+      onComplete?.();
+      return null;
+    }
+
+    const timerId = setInterval(() => {
+      if (this.isGamePausedInteractionLocked()) {
+        return;
+      }
+
+      remainingMs = Math.max(0, remainingMs - safeTickMs);
+      onTick?.(remainingMs);
+
+      if (remainingMs > 0) {
+        return;
+      }
+
+      clearInterval(timerId);
+      this.pauseAwareActionTimerIds.delete(timerId);
+      onComplete?.();
+    }, safeTickMs);
+
+    this.pauseAwareActionTimerIds.add(timerId);
+    return timerId;
+  },
+
+  clearPauseAwareActionTimers() {
+    this.pauseAwareActionTimerIds.forEach((timerId) => {
+      clearInterval(timerId);
+    });
+    this.pauseAwareActionTimerIds.clear();
+  },
+
   schedulePlayerCheckout(checkoutPayload = {}, options = {}) {
     if (options.actorType !== "staff") {
       this.isPlayerBusy = true;
     }
 
     const delayMs = PLAYER_CHECKOUT_DELAY_MS;
-    const delaySeconds = Math.max(1, Math.ceil(delayMs / 1000));
+    let lastDisplayedSeconds = Math.max(1, Math.ceil(delayMs / 1000));
 
-    this.showActionMessage(`계산 중입니다... ${delaySeconds}초`);
+    this.showActionMessage(`계산 중입니다... ${lastDisplayedSeconds}초`);
 
-    setTimeout(() => {
-      if (options.actorType !== "staff") {
-        this.isPlayerBusy = false;
+    this.runPauseAwareActionDelay({
+      durationMs: delayMs,
+      tickMs: 250,
+      onTick: (remainingMs) => {
+        const nextDisplayedSeconds = Math.ceil(remainingMs / 1000);
+
+        if (nextDisplayedSeconds > 0 && nextDisplayedSeconds !== lastDisplayedSeconds) {
+          lastDisplayedSeconds = nextDisplayedSeconds;
+          this.showActionMessage(`계산 중입니다... ${lastDisplayedSeconds}초`);
+        }
+      },
+      onComplete: () => {
+        if (options.actorType !== "staff") {
+          this.isPlayerBusy = false;
+        }
+
+        this.completeCheckout(checkoutPayload, options);
       }
-
-      this.completeCheckout(checkoutPayload, options);
-    }, delayMs);
+    });
   },
 
   scheduleDelayedCheckout(checkoutPayload = {}, options = {}) {
@@ -1868,19 +2228,31 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       0,
       Number(checkoutPayload.nuisanceCheckoutDelayMs) || NUISANCE_CHECKOUT_DELAY_MS
     );
-    const delaySeconds = Math.max(1, Math.ceil(delayMs / 1000));
+    let lastDisplayedSeconds = Math.max(1, Math.ceil(delayMs / 1000));
 
-    this.showActionMessage(`진상 손님 응대 중입니다... ${delaySeconds}초`);
+    this.showActionMessage(`진상 손님 응대 중입니다... ${lastDisplayedSeconds}초`);
 
-    setTimeout(() => {
-      this.pendingNuisanceCheckoutCustomerIds.delete(customerId);
+    this.runPauseAwareActionDelay({
+      durationMs: delayMs,
+      tickMs: 250,
+      onTick: (remainingMs) => {
+        const nextDisplayedSeconds = Math.ceil(remainingMs / 1000);
 
-      if (options.actorType !== "staff") {
-        this.isPlayerBusy = false;
+        if (nextDisplayedSeconds > 0 && nextDisplayedSeconds !== lastDisplayedSeconds) {
+          lastDisplayedSeconds = nextDisplayedSeconds;
+          this.showActionMessage(`진상 손님 응대 중입니다... ${lastDisplayedSeconds}초`);
+        }
+      },
+      onComplete: () => {
+        this.pendingNuisanceCheckoutCustomerIds.delete(customerId);
+
+        if (options.actorType !== "staff") {
+          this.isPlayerBusy = false;
+        }
+
+        this.completeCheckout(checkoutPayload, options);
       }
-
-      this.completeCheckout(checkoutPayload, options);
-    }, delayMs);
+    });
   },
 
   completeCheckout(checkoutPayload = {}, options = {}) {
@@ -1985,6 +2357,12 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       return null;
     }
 
+    if (CustomerSystem.isNuisanceEventPendingForCustomer?.(customer.customerId)) {
+      this.showActionMessage("진상 손님 응대 선택지를 먼저 처리해야 합니다.");
+      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+      return null;
+    }
+
     if (!carriedProductId) {
       this.showActionMessage("손님이 아직 상품을 고르지 않았습니다.");
       console.warn("[PlayerActionSystem] 상품을 들지 않은 손님은 계산할 수 없습니다.", customer);
@@ -2062,6 +2440,7 @@ completeShelfRestock(shelf = this.getShelfSlot(this.activeShelfId)) {
       customerTypeName: customer.customerTypeName ?? "",
       isNuisance: customer.isNuisance === true,
       nuisanceProfileId: customer.nuisanceProfileId ?? null,
+      nuisanceEventResolved: customer.nuisanceEventResolved === true,
       nuisanceCheckoutDelayMs: Number(customer.nuisanceCheckoutDelayMs) || 0,
       wantedProductId,
       productId: product.id,

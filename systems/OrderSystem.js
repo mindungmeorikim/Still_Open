@@ -20,6 +20,7 @@ import { BMSystem } from "./BMSystem.js";
 import { InventorySystem } from "./InventorySystem.js";
 
 const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
+const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
 const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const ORDER_VALIDATION_MESSAGES = Object.freeze({
@@ -54,6 +55,10 @@ export const OrderSystem = {
       this.handleStockOrganized(data);
     });
 
+    EventBus.on(SAVE_GAME_LOADED, (data = {}) => {
+      this.hydrateSaveSnapshot(data.order ?? data.saveData?.order ?? {});
+    });
+
     EventBus.on(EVENTS.PLAYER_ACTION_RECORDED, (data) => {
       this.handlePlayerActionRecorded(data);
     });
@@ -67,6 +72,7 @@ export const OrderSystem = {
     this.clearDeliveryTimer();
     this.pendingDelivery = null;
     this.orderSequence = 0;
+    this.syncOrderSnapshotToGameState("tutorial_practice_reset");
 
     EventBus.emit(EVENTS.ORDER_DELIVERED, {
       day: GameState.day,
@@ -218,6 +224,8 @@ export const OrderSystem = {
       isArrived: false
     };
 
+    this.syncOrderSnapshotToGameState("order_confirmed");
+
     this.deliveryTimerId = setTimeout(() => {
       this.deliverPendingOrder(orderId, availableMoney);
     }, this.DELIVERY_WAIT_MS);
@@ -232,6 +240,7 @@ export const OrderSystem = {
 
     this.pendingDelivery.isArrived = true;
     this.deliveryTimerId = null;
+    this.syncOrderSnapshotToGameState("order_arrived");
 
     EventBus.emit(EVENTS.ORDER_DELIVERED, {
       ...this.createDeliveryPayload("arrived"),
@@ -296,6 +305,7 @@ export const OrderSystem = {
     }
 
     item.isSorted = true;
+    this.syncOrderSnapshotToGameState("delivery_item_sorted");
 
     EventBus.emit(EVENTS.RESTOCK_COMPLETED, {
       day: GameState.day,
@@ -316,6 +326,7 @@ export const OrderSystem = {
 
       this.pendingDelivery = null;
       this.clearDeliveryTimer();
+      this.syncOrderSnapshotToGameState("delivery_completed");
 
       EventBus.emit(EVENTS.ORDER_DELIVERED, completedPayload);
 
@@ -364,9 +375,92 @@ export const OrderSystem = {
 
     this.pendingDelivery = null;
     this.clearDeliveryTimer();
+    this.syncOrderSnapshotToGameState("stock_organized_compat");
 
     EventBus.emit(EVENTS.ORDER_DELIVERED, completedPayload);
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  hydrateSaveSnapshot(snapshot = {}) {
+    this.clearDeliveryTimer();
+
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    this.orderSequence = this.toNonNegativeInteger(source.orderSequence);
+    this.pendingDelivery = this.normalizePendingDeliveryForRuntime(source.pendingDelivery);
+
+    if (this.pendingDelivery && !this.pendingDelivery.isArrived) {
+      const orderId = this.pendingDelivery.orderId;
+      this.deliveryTimerId = setTimeout(() => {
+        this.deliverPendingOrder(orderId);
+      }, Math.min(this.DELIVERY_WAIT_MS, 500));
+    }
+
+    if (this.pendingDelivery?.isArrived === true && !this.isDeliveryFullySorted()) {
+      EventBus.emit(EVENTS.ORDER_DELIVERED, this.createDeliveryPayload("save_loaded"));
+    }
+
+    this.syncOrderSnapshotToGameState("save_loaded");
+  },
+
+  syncOrderSnapshotToGameState(reason = "order_sync") {
+    GameState.orderSnapshot = {
+      orderSequence: this.toNonNegativeInteger(this.orderSequence),
+      pendingDelivery: this.clonePendingDelivery(this.pendingDelivery),
+      reason
+    };
+  },
+
+  clonePendingDelivery(delivery = null) {
+    if (!delivery || typeof delivery !== "object") {
+      return null;
+    }
+
+    const normalized = this.normalizePendingDeliveryForRuntime(delivery);
+
+    if (!normalized) {
+      return null;
+    }
+
+    return JSON.parse(JSON.stringify(normalized));
+  },
+
+  normalizePendingDeliveryForRuntime(delivery = null) {
+    if (!delivery || typeof delivery !== "object") {
+      return null;
+    }
+
+    const orderId = String(delivery.orderId ?? "").trim();
+    const items = Array.isArray(delivery.items)
+      ? delivery.items
+          .map((item) => {
+            const productId = String(item?.productId ?? "").trim().replace(/-/g, "_");
+            const quantity = this.toPositiveInteger(item?.quantity);
+
+            if (!productId || quantity <= 0) {
+              return null;
+            }
+
+            return {
+              ...item,
+              productId,
+              quantity,
+              isSorted: item?.isSorted === true
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    if (!orderId || items.length === 0 || items.every((item) => item.isSorted === true)) {
+      return null;
+    }
+
+    return {
+      orderId,
+      day: this.toDayNumber(delivery.day, GameState.day),
+      items,
+      totalCost: this.toNonNegativeNumber(delivery.totalCost),
+      isArrived: delivery.isArrived === true
+    };
   },
 
   isZeroQuantityOrderAllowed(day = GameState.day) {
@@ -378,6 +472,7 @@ export const OrderSystem = {
   completeEmptyOrder(data = {}, orderId = null, availableMoney = this.getAvailableMoney()) {
     this.pendingDelivery = null;
     this.clearDeliveryTimer();
+    this.syncOrderSnapshotToGameState("empty_order");
 
     EventBus.emit(EVENTS.ORDER_DELIVERED, {
       day: GameState.day,
@@ -711,6 +806,16 @@ export const OrderSystem = {
     const numberValue = Number(value);
 
     if (!Number.isFinite(numberValue) || numberValue <= 0) {
+      return 0;
+    }
+
+    return numberValue;
+  },
+
+  toNonNegativeInteger(value) {
+    const numberValue = Math.floor(Number(value) || 0);
+
+    if (!Number.isFinite(numberValue) || numberValue < 0) {
       return 0;
     }
 

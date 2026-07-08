@@ -146,10 +146,17 @@ export const PlayerMovementSystem = {
     );
   },
 
+  isGamePausedMovementLocked() {
+    return Boolean(
+      document.body?.classList?.contains("is-game-paused")
+    );
+  },
+
   isMovementLocked() {
     return (
       this.isTutorialMovementLocked() ||
-      this.isCustomerEventModalMovementLocked()
+      this.isCustomerEventModalMovementLocked() ||
+      this.isGamePausedMovementLocked()
     );
   },
 

@@ -28107,3 +28107,581 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) #result-confirm-b
 #cleaning-zone.cleaning-zone:disabled {
   pointer-events: none !important;
 }
+
+/* ========================================================================== */
+/* [v8.10.0] Pause System Final Override                                      */
+/* - P 키/상단 버튼 일시정지 UI를 16:9 게임 프레임 안에서 표시한다.           */
+/* - 진상 이벤트 모달과 겹치지 않도록 모달 활성 중 버튼을 숨긴다.             */
+/* ========================================================================== */
+#game-root > .game-pause-button,
+.game-pause-button {
+  position: absolute !important;
+  top: clamp(8px, 1vw, 12px) !important;
+  right: clamp(8px, 1vw, 12px) !important;
+  z-index: 591 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 96px !important;
+  min-height: 36px !important;
+  padding: 7px 12px !important;
+  border: 2px solid rgba(255, 255, 255, 0.72) !important;
+  border-radius: 999px !important;
+  background: rgba(30, 24, 18, 0.88) !important;
+  color: #fff8dc !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28) !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+#top-icon-menu .game-pause-button {
+  position: static !important;
+  flex: 0 0 auto !important;
+  top: auto !important;
+  right: auto !important;
+}
+
+.game-pause-button:hover,
+.game-pause-button:focus-visible {
+  transform: translateY(-1px) !important;
+  outline: 3px solid rgba(255, 222, 120, 0.65) !important;
+}
+
+.game-pause-button.is-active {
+  background: rgba(62, 92, 42, 0.92) !important;
+}
+
+.game-pause-button:disabled,
+.game-pause-button[hidden],
+body.is-customer-event-modal-active .game-pause-button {
+  display: none !important;
+}
+
+#game-root > .game-pause-overlay,
+.game-pause-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 11990 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: clamp(16px, 3vmin, 28px) !important;
+  background: rgba(0, 0, 0, 0.52) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+  pointer-events: auto !important;
+}
+
+.game-pause-overlay.hidden {
+  display: none !important;
+}
+
+.game-pause-panel {
+  width: min(360px, 92%) !important;
+  padding: 28px 24px 24px !important;
+  border: 3px solid rgba(255, 232, 154, 0.9) !important;
+  border-radius: 22px !important;
+  background: linear-gradient(180deg, #fff8df 0%, #f2d797 100%) !important;
+  color: #33210f !important;
+  text-align: center !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35) !important;
+}
+
+.game-pause-panel h2 {
+  margin: 0 0 10px !important;
+  font-size: clamp(22px, 4vmin, 28px) !important;
+  font-weight: 950 !important;
+}
+
+.game-pause-panel p {
+  margin: 8px 0 !important;
+  line-height: 1.45 !important;
+}
+
+.game-pause-hint {
+  color: #6b4c20 !important;
+  font-size: 13px !important;
+}
+
+.game-pause-resume-button {
+  min-width: 148px !important;
+  min-height: 44px !important;
+  margin-top: 16px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: #3f6f2a !important;
+  color: #fff8dc !important;
+  font-size: 16px !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+  box-shadow: 0 6px 0 rgba(38, 63, 25, 0.8) !important;
+}
+
+.game-pause-resume-button:hover,
+.game-pause-resume-button:focus-visible {
+  transform: translateY(-1px) !important;
+  outline: 3px solid rgba(95, 130, 40, 0.35) !important;
+}
+
+body.is-game-paused #store-area,
+body.is-game-paused #store-world-map {
+  cursor: default !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #top-icon-menu .game-pause-button,
+  .game-pause-button {
+    min-width: 82px !important;
+    min-height: 30px !important;
+    padding: 5px 9px !important;
+    font-size: 11px !important;
+  }
+
+  .game-pause-panel {
+    width: min(320px, 90%) !important;
+    padding: 20px 18px 18px !important;
+  }
+
+  .game-pause-hint {
+    font-size: 11px !important;
+  }
+
+  .game-pause-resume-button {
+    min-height: 38px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* ========================================================================== */
+/* [v8.10.1] BM Shop Result Popup Final Override                              */
+/* - 구매/업그레이드 성공 팝업은 상점 팝업 내부에서만 표시한다.                */
+/* - 16:9 게임 프레임과 상점창 영역 밖으로 튀어나가지 않도록 크기를 제한한다. */
+/* ========================================================================== */
+#bm-contract-shop-modal .bm-shop-modern-content,
+#bm-contract-shop-modal .bm-contract-shop-content {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#bm-contract-shop-modal #bm-shop-result-modal.bm-shop-result-modal,
+#bm-shop-result-modal.bm-shop-result-modal {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 9850 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  padding: clamp(10px, 2vmin, 18px) !important;
+  background: rgba(31, 22, 12, 0.46) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}
+
+body > #bm-shop-result-modal.bm-shop-result-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 9850 !important;
+}
+
+#bm-shop-result-modal.bm-shop-result-modal.hidden {
+  display: none !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-content {
+  position: relative !important;
+  display: grid !important;
+  justify-items: center !important;
+  width: min(520px, calc(100% - 20px)) !important;
+  max-width: calc(100% - 20px) !important;
+  max-height: calc(100% - 20px) !important;
+  padding: clamp(18px, 3vmin, 28px) !important;
+  border: clamp(2px, 0.45vmin, 4px) solid rgba(255, 205, 92, 0.92) !important;
+  border-radius: clamp(20px, 3.2vmin, 30px) !important;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 233, 148, 0.35) 0 18%, transparent 42%),
+    linear-gradient(180deg, #fffdf7 0%, #fff3d8 100%) !important;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.38), inset 0 2px 0 rgba(255, 255, 255, 0.75) !important;
+  color: #3a2a1c !important;
+  text-align: center !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1) !important;
+  animation: bmShopResultPop 180ms ease-out both;
+}
+
+#bm-shop-result-modal .bm-shop-result-badge {
+  display: inline-grid !important;
+  place-items: center !important;
+  min-width: clamp(48px, 7vmin, 58px) !important;
+  height: clamp(48px, 7vmin, 58px) !important;
+  margin: 0 auto clamp(6px, 1.2vmin, 10px) !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #ffe78b 0%, #f7a832 100%) !important;
+  color: #4c2a0b !important;
+  font-size: clamp(18px, 3.2vmin, 24px) !important;
+  font-weight: 1000 !important;
+  box-shadow: 0 8px 0 rgba(141, 81, 20, 0.18), 0 14px 28px rgba(189, 117, 34, 0.24) !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-content h2 {
+  margin: 0 0 clamp(10px, 2vmin, 16px) !important;
+  color: #3a2a1c !important;
+  font-size: clamp(24px, 4.2vmin, 34px) !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.08 !important;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.7) !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-body {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-card {
+  display: grid !important;
+  grid-template-columns: clamp(78px, 15vmin, 108px) minmax(0, 1fr) !important;
+  gap: clamp(12px, 2.4vmin, 18px) !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-height: clamp(94px, 18vmin, 124px) !important;
+  padding: clamp(12px, 2.4vmin, 18px) !important;
+  border: 2px solid rgba(255, 198, 91, 0.62) !important;
+  border-radius: clamp(18px, 3vmin, 24px) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  box-shadow: inset 0 -5px 0 rgba(255, 203, 103, 0.18) !important;
+  text-align: left !important;
+  box-sizing: border-box !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-image-box {
+  display: grid !important;
+  place-items: center !important;
+  width: clamp(78px, 15vmin, 108px) !important;
+  height: clamp(78px, 15vmin, 108px) !important;
+  border-radius: clamp(18px, 3vmin, 26px) !important;
+  background: #fffaf0 !important;
+  box-shadow: inset 0 -6px 0 rgba(255, 205, 103, 0.24), 0 8px 20px rgba(83, 53, 24, 0.12) !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-image-box img {
+  max-width: 78% !important;
+  max-height: 78% !important;
+  object-fit: contain !important;
+  filter: drop-shadow(0 5px 0 rgba(0, 0, 0, 0.12)) !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-copy {
+  display: grid !important;
+  gap: clamp(5px, 1vmin, 8px) !important;
+  min-width: 0 !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-copy strong {
+  color: #3a2a1c !important;
+  font-size: clamp(15px, 2.7vmin, 20px) !important;
+  font-weight: 1000 !important;
+  line-height: 1.2 !important;
+  word-break: keep-all !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-copy p {
+  margin: 0 !important;
+  color: #6d5942 !important;
+  font-size: clamp(12px, 2.2vmin, 16px) !important;
+  font-weight: 850 !important;
+  line-height: 1.42 !important;
+  word-break: keep-all !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-ok {
+  min-width: clamp(132px, 24vmin, 160px) !important;
+  min-height: clamp(40px, 7vmin, 48px) !important;
+  margin-top: clamp(12px, 2.6vmin, 18px) !important;
+  padding: 0 clamp(20px, 4vmin, 26px) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: linear-gradient(180deg, #ffce6a 0%, #f79f35 100%) !important;
+  color: #4c2a0b !important;
+  font-size: clamp(14px, 2.4vmin, 17px) !important;
+  font-weight: 1000 !important;
+  box-shadow: 0 7px 0 rgba(144, 82, 22, 0.22), 0 12px 24px rgba(189, 117, 34, 0.22) !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-ok:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.04) !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-ok:active {
+  transform: translateY(2px) !important;
+  box-shadow: 0 4px 0 rgba(144, 82, 22, 0.22) !important;
+}
+
+@keyframes bmShopResultPop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 720px), (max-height: 560px) {
+  #bm-contract-shop-modal #bm-shop-result-modal.bm-shop-result-modal,
+  #bm-shop-result-modal.bm-shop-result-modal {
+    padding: 8px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-content {
+    width: min(440px, calc(100% - 12px)) !important;
+    max-width: calc(100% - 12px) !important;
+    max-height: calc(100% - 12px) !important;
+    padding: 16px !important;
+    border-radius: 22px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-card {
+    grid-template-columns: 72px minmax(0, 1fr) !important;
+    min-height: 88px !important;
+    padding: 12px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-image-box {
+    width: 72px !important;
+    height: 72px !important;
+    border-radius: 18px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-badge {
+    min-width: 44px !important;
+    height: 44px !important;
+    font-size: 18px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-content h2 {
+    font-size: 24px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-copy strong {
+    font-size: 15px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-copy p {
+    font-size: 12px !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-ok {
+    min-height: 40px !important;
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  #bm-shop-result-modal .bm-shop-result-card {
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
+    text-align: center !important;
+  }
+
+  #bm-shop-result-modal .bm-shop-result-copy {
+    justify-items: center !important;
+  }
+}
+
+
+/* [v8.10.4] Staff unpaid wage UI final override */
+#bm-contract-shop-modal .bm-staff-upgrade-card.is-wage-suspended {
+  border-color: rgba(214, 94, 53, 0.55);
+  background: rgba(255, 247, 241, 0.96);
+}
+
+#bm-contract-shop-modal .bm-staff-unpaid-wage-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+  align-items: stretch;
+  justify-content: center;
+  min-width: min(100%, 9.5rem);
+  max-width: 100%;
+  padding: 0.48rem 0.56rem;
+  border: 1px solid rgba(214, 94, 53, 0.35);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.78);
+  box-sizing: border-box;
+}
+
+#bm-contract-shop-modal .bm-staff-unpaid-wage-panel strong {
+  font-size: clamp(0.72rem, 1.4vw, 0.86rem);
+  color: #9b3d25;
+}
+
+#bm-contract-shop-modal .bm-staff-unpaid-wage-panel span {
+  font-size: clamp(0.68rem, 1.25vw, 0.8rem);
+  color: #5d3a2d;
+}
+
+#bm-contract-shop-modal .bm-staff-unpaid-wage-pay-button {
+  min-height: 2rem;
+  padding: 0.32rem 0.56rem;
+  border: 0;
+  border-radius: 999px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#bm-contract-shop-modal .bm-staff-unpaid-wage-pay-button:disabled,
+#bm-contract-shop-modal .bm-staff-upgrade-card.is-wage-suspended .bm-staff-upgrade-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.result-row-staff.is-warning strong {
+  color: #b64a2f;
+}
+
+/* ========================================================================== */
+/* [v8.10.5] Pause Button Autostart/Stuck Fix Final Override                  */
+/* - 일시정지는 영업 중 사용자가 P키/버튼을 눌렀을 때만 열린다.                */
+/* - 일시정지 버튼은 설정 아이콘 바로 왼쪽의 상단 아이콘 메뉴 안에 둔다.       */
+/* - 오버레이 hidden 상태를 hidden 속성 + class 양쪽으로 강제 보장한다.        */
+/* ========================================================================== */
+#game-root > #top-icon-menu .game-pause-button,
+#top-icon-menu .game-pause-button,
+.game-pause-button.hud-icon-button {
+  position: relative !important;
+  top: auto !important;
+  right: auto !important;
+  z-index: auto !important;
+  display: inline-grid !important;
+  grid-template-rows: 1fr auto !important;
+  place-items: center !important;
+  flex: 0 0 auto !important;
+  width: 58px !important;
+  min-width: 58px !important;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 5px 6px 4px !important;
+  border: 2px solid rgba(255, 232, 156, 0.78) !important;
+  border-radius: 14px !important;
+  background: linear-gradient(180deg, rgba(255, 244, 190, 0.96), rgba(226, 171, 73, 0.96)) !important;
+  color: #3b2b12 !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  box-shadow: 0 5px 12px rgba(46, 31, 14, 0.24) !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
+
+#top-icon-menu .game-pause-button[hidden],
+.game-pause-button[hidden],
+body.is-title-screen-active .game-pause-button,
+body.is-customer-event-modal-active .game-pause-button {
+  display: none !important;
+}
+
+#top-icon-menu .game-pause-button.is-active,
+.game-pause-button.hud-icon-button.is-active {
+  background: linear-gradient(180deg, rgba(221, 247, 200, 0.98), rgba(85, 146, 55, 0.98)) !important;
+  color: #17350f !important;
+}
+
+.game-pause-button-icon {
+  display: grid !important;
+  place-items: center !important;
+  width: 28px !important;
+  height: 24px !important;
+  margin: 0 auto 1px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+.game-pause-button-label {
+  display: block !important;
+  max-width: 100% !important;
+  color: inherit !important;
+  font-size: 9px !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#game-root > .game-pause-overlay[hidden],
+.game-pause-overlay[hidden],
+#game-root > .game-pause-overlay.hidden,
+.game-pause-overlay.hidden {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+#game-root > .game-pause-overlay:not(.hidden):not([hidden]),
+.game-pause-overlay:not(.hidden):not([hidden]) {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 11990 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: clamp(16px, 3vmin, 28px) !important;
+  background: rgba(0, 0, 0, 0.52) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #game-root > #top-icon-menu .game-pause-button,
+  #top-icon-menu .game-pause-button,
+  .game-pause-button.hud-icon-button {
+    width: 50px !important;
+    min-width: 50px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 4px 5px 3px !important;
+  }
+
+  .game-pause-button-icon {
+    height: 20px !important;
+    font-size: 15px !important;
+  }
+
+  .game-pause-button-label {
+    font-size: 8px !important;
+  }
+}
+
+/* ========================================================================== */
+/* [v8.10.8] Staff Pause Safety Final Override                                */
+/* - 수동 일시정지 중 알바 이동/작업 시각 애니메이션도 멈춘 것처럼 보이게 한다. */
+/* ========================================================================== */
+body.is-game-paused #staff-character,
+body.is-game-paused #staff-character *,
+body.is-game-paused .staff-character,
+body.is-game-paused .staff-character * {
+  animation-play-state: paused !important;
+  transition-duration: 0s !important;
+}

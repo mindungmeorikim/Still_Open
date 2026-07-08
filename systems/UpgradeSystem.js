@@ -23,6 +23,8 @@ import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
 
+const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
+
 export const UpgradeSystem = {
   availableUpgrades: [
     {
@@ -64,6 +66,8 @@ export const UpgradeSystem = {
   init() {
     EventBus.on(EVENTS.RESULT_CALCULATED, (resultData) => {
       this.lastResultData = resultData;
+      this.isUpgradeSelected = false;
+      this.syncUpgradeFlowToGameState("result_calculated");
 
       /*
         정산 결과 확인 버튼을 누른 뒤
@@ -86,6 +90,66 @@ export const UpgradeSystem = {
     EventBus.on(EVENTS.UPGRADE_PHASE_STARTED, (resultData) => {
       this.startUpgradePhase(resultData);
     });
+
+    EventBus.on(SAVE_GAME_LOADED, (data = {}) => {
+      this.hydrateSaveSnapshot(data.upgradeFlow ?? data.saveData?.upgradeFlow ?? {});
+    });
+  },
+
+  hydrateSaveSnapshot(snapshot = {}) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+
+    this.clearNextDayTimer();
+    this.lastResultData = source.lastResultData ?? GameState.upgradeFlow?.lastResultData ?? null;
+    this.isUpgradeSelected = source.isUpgradeSelected === true;
+
+    const selectedUpgrade = source.selectedUpgrade ?? GameState.upgradeFlow?.selectedUpgrade ?? null;
+    this.syncUpgradeFlowToGameState("save_loaded", selectedUpgrade);
+
+    if (GameState.phase === GAME_PHASE.RESULT && this.lastResultData) {
+      UIManager.showResultModal(
+        this.lastResultData,
+        () => {
+          if (this.lastResultData?.infiniteGameOver?.isGameOver) {
+            UIManager.showInfiniteGameOverModal(this.lastResultData.infiniteGameOver);
+            return;
+          }
+
+          EventBus.emit(EVENTS.UPGRADE_PHASE_STARTED, this.lastResultData);
+        },
+        {}
+      );
+      return;
+    }
+
+    if (GameState.phase !== GAME_PHASE.UPGRADE) {
+      return;
+    }
+
+    if (this.isUpgradeSelected) {
+      UIManager.showMessage("멘탈 회복 선택이 저장되어 다음 Day로 이동합니다.");
+      this.nextDayTimerId = setTimeout(() => {
+        this.nextDayTimerId = null;
+        EventBus.emit(EVENTS.NEXT_DAY_READY, {
+          currentDay: GameState.day,
+          selectedUpgrade,
+          upgradeEffects: GameState.upgradeEffects,
+          resultData: this.lastResultData
+        });
+      }, 300);
+      return;
+    }
+
+    this.startUpgradePhase(this.lastResultData);
+  },
+
+  syncUpgradeFlowToGameState(reason = "upgrade_flow_sync", selectedUpgrade = GameState.upgradeFlow?.selectedUpgrade ?? null) {
+    GameState.upgradeFlow = {
+      lastResultData: this.lastResultData,
+      isUpgradeSelected: this.isUpgradeSelected === true,
+      selectedUpgrade: selectedUpgrade ?? null,
+      reason
+    };
   },
 
   startUpgradePhase(resultData = this.lastResultData) {
@@ -97,6 +161,7 @@ export const UpgradeSystem = {
     this.isUpgradeSelected = false;
 
     GameState.phase = GAME_PHASE.UPGRADE;
+    this.syncUpgradeFlowToGameState("upgrade_phase_started");
 
     const recoveryOptions = this.getRecoveryOptionsForRender();
 
@@ -152,6 +217,7 @@ export const UpgradeSystem = {
     GameState.upgrades.push(appliedUpgrade);
 
     this.applyUpgrade(appliedUpgrade);
+    this.syncUpgradeFlowToGameState("upgrade_selected", appliedUpgrade);
 
     EventBus.emit(EVENTS.UPGRADE_SELECTED, {
       day: GameState.day,

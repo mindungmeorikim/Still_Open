@@ -182,8 +182,12 @@ const STAFF_LATE_ARRIVAL_MESSAGE = "알바생이 뒤늦게 출근했습니다!";
 export const StaffAssistSystem = {
   isInitialized: false,
   checkTimerId: null,
+  checkTimerRecord: null,
   lateEntryTimerId: null,
+  lateEntryTimerRecord: null,
   taskTimerIds: [],
+  taskTimerRecords: [],
+  managedTimerRecords: [],
   moveRafId: null,
   moveSequence: 0,
   isWorking: false,
@@ -291,10 +295,24 @@ export const StaffAssistSystem = {
 
       this.scheduleNextCheck(this.isWorking ? this.getCheckIntervalMs() : 900);
     });
+
+    EventBus.on("GAME_PAUSED", () => {
+      this.handleGamePaused();
+    });
+
+    EventBus.on("GAME_RESUMED", () => {
+      this.handleGameResumed();
+    });
   },
 
   runCheckCycle() {
     this.checkTimerId = null;
+    this.checkTimerRecord = null;
+
+    if (this.isGamePaused()) {
+      this.scheduleNextCheck(500);
+      return;
+    }
 
     if (!this.hasHiredStaff()) {
       this.updateState("idle", { reason: "no_staff" });
@@ -854,8 +872,9 @@ export const StaffAssistSystem = {
       this.emitLateCommuteMessageOnce();
     }
 
-    this.lateEntryTimerId = window.setTimeout(() => {
+    this.lateEntryTimerRecord = this.createManagedTimer(() => {
       this.lateEntryTimerId = null;
+      this.lateEntryTimerRecord = null;
 
       if (
         this.attendanceDecision?.day !== GameState.day ||
@@ -877,7 +896,8 @@ export const StaffAssistSystem = {
       };
       this.emitMessage(STAFF_LATE_ARRIVAL_MESSAGE, 2600);
       this.enterStoreFromEntrance("late_arrival");
-    }, delayMs);
+    }, delayMs, "lateEntry");
+    this.lateEntryTimerId = this.lateEntryTimerRecord.id;
   },
 
   isLateAttendancePending() {
@@ -1116,6 +1136,12 @@ export const StaffAssistSystem = {
 
     const step = () => {
       if (sequence !== this.moveSequence) {
+        return;
+      }
+
+      if (this.isGamePaused()) {
+        lastFrameAtMs = this.getNowMs();
+        this.moveRafId = window.requestAnimationFrame(step);
         return;
       }
 
@@ -2028,60 +2054,192 @@ export const StaffAssistSystem = {
 
     const safeDelayMs = Math.max(500, Math.floor(Number(delayMs) || 0));
 
-    this.checkTimerId = window.setTimeout(() => {
+    this.checkTimerRecord = this.createManagedTimer(() => {
+      this.checkTimerId = null;
+      this.checkTimerRecord = null;
       this.runCheckCycle();
-    }, safeDelayMs);
+    }, safeDelayMs, "check");
+    this.checkTimerId = this.checkTimerRecord.id;
   },
 
   clearCheckTimer() {
-    if (!this.checkTimerId) {
+    if (!this.checkTimerRecord && !this.checkTimerId) {
       return;
     }
 
-    window.clearTimeout(this.checkTimerId);
+    this.clearManagedTimerRecord(this.checkTimerRecord);
+    this.checkTimerRecord = null;
     this.checkTimerId = null;
   },
 
   clearLateEntryTimer() {
-    if (!this.lateEntryTimerId) {
+    if (!this.lateEntryTimerRecord && !this.lateEntryTimerId) {
       return;
     }
 
-    window.clearTimeout(this.lateEntryTimerId);
+    this.clearManagedTimerRecord(this.lateEntryTimerRecord);
+    this.lateEntryTimerRecord = null;
     this.lateEntryTimerId = null;
   },
 
   setTaskTimer(callback, delayMs) {
-    const timerId = window.setTimeout(() => {
-      this.taskTimerIds = this.taskTimerIds.filter((id) => id !== timerId);
+    let timerRecord = null;
+
+    timerRecord = this.createManagedTimer(() => {
+      this.taskTimerRecords = this.taskTimerRecords.filter((record) => record !== timerRecord);
+      this.refreshTaskTimerIds();
       callback();
-    }, Math.max(0, Math.floor(Number(delayMs) || 0)));
+    }, Math.max(0, Math.floor(Number(delayMs) || 0)), "task");
 
-    this.taskTimerIds.push(timerId);
+    this.taskTimerRecords.push(timerRecord);
+    this.refreshTaskTimerIds();
 
-    return timerId;
+    return timerRecord.id;
   },
 
   clearTaskTimers() {
-    this.taskTimerIds.forEach((timerId) => {
-      window.clearTimeout(timerId);
+    this.taskTimerRecords.forEach((timerRecord) => {
+      this.clearManagedTimerRecord(timerRecord);
     });
+    this.taskTimerRecords = [];
     this.taskTimerIds = [];
     this.cancelStaffMovement();
   },
 
+  createManagedTimer(callback, delayMs = 0, kind = "task") {
+    const timerRecord = {
+      id: null,
+      kind,
+      callback,
+      dueAtMs: null,
+      remainingMs: Math.max(0, Math.floor(Number(delayMs) || 0)),
+      cleared: false
+    };
+
+    this.managedTimerRecords.push(timerRecord);
+    this.scheduleManagedTimerRecord(timerRecord);
+
+    return timerRecord;
+  },
+
+  scheduleManagedTimerRecord(timerRecord) {
+    if (!timerRecord || timerRecord.cleared) {
+      return;
+    }
+
+    if (timerRecord.id) {
+      window.clearTimeout(timerRecord.id);
+      timerRecord.id = null;
+    }
+
+    if (this.isGamePaused()) {
+      this.refreshTimerAliases();
+      return;
+    }
+
+    const delayMs = Math.max(0, Math.floor(Number(timerRecord.remainingMs) || 0));
+    timerRecord.dueAtMs = this.getNowMs() + delayMs;
+    timerRecord.id = window.setTimeout(() => {
+      timerRecord.id = null;
+
+      if (timerRecord.cleared) {
+        return;
+      }
+
+      if (this.isGamePaused()) {
+        timerRecord.remainingMs = Math.max(0, Math.ceil(timerRecord.dueAtMs - this.getNowMs()));
+        this.refreshTimerAliases();
+        return;
+      }
+
+      this.removeManagedTimerRecord(timerRecord);
+      timerRecord.callback?.();
+      this.refreshTimerAliases();
+    }, delayMs);
+
+    this.refreshTimerAliases();
+  },
+
+  clearManagedTimerRecord(timerRecord) {
+    if (!timerRecord) {
+      return;
+    }
+
+    timerRecord.cleared = true;
+
+    if (timerRecord.id) {
+      window.clearTimeout(timerRecord.id);
+      timerRecord.id = null;
+    }
+
+    this.removeManagedTimerRecord(timerRecord);
+    this.refreshTimerAliases();
+  },
+
+  removeManagedTimerRecord(timerRecord) {
+    this.managedTimerRecords = this.managedTimerRecords.filter((record) => record !== timerRecord);
+  },
+
+  handleGamePaused() {
+    const nowMs = this.getNowMs();
+
+    this.managedTimerRecords.forEach((timerRecord) => {
+      if (!timerRecord || timerRecord.cleared || !timerRecord.id) {
+        return;
+      }
+
+      timerRecord.remainingMs = Math.max(0, Math.ceil(timerRecord.dueAtMs - nowMs));
+      window.clearTimeout(timerRecord.id);
+      timerRecord.id = null;
+    });
+
+    this.refreshTimerAliases();
+  },
+
+  handleGameResumed() {
+    this.managedTimerRecords.forEach((timerRecord) => {
+      if (!timerRecord || timerRecord.cleared || timerRecord.id) {
+        return;
+      }
+
+      this.scheduleManagedTimerRecord(timerRecord);
+    });
+
+    this.refreshTimerAliases();
+  },
+
+  refreshTimerAliases() {
+    this.checkTimerId = this.checkTimerRecord?.id ?? null;
+    this.lateEntryTimerId = this.lateEntryTimerRecord?.id ?? null;
+    this.refreshTaskTimerIds();
+  },
+
+  refreshTaskTimerIds() {
+    this.taskTimerIds = this.taskTimerRecords
+      .map((record) => record?.id)
+      .filter(Boolean);
+  },
+
+  getStaffUnpaidWage() {
+    return Math.max(0, Math.floor(Number(GameState.staff?.unpaidWage) || 0));
+  },
+
+  isStaffWageSuspended() {
+    return this.getStaffUnpaidWage() > 0 || GameState.staff?.wageSuspended === true;
+  },
+
   hasHiredStaff() {
-    return Boolean(GameState.staff?.hired);
+    return Boolean(GameState.staff?.hired) && !this.isStaffWageSuspended();
   },
 
   canAssistInCurrentPhase() {
-    return ACTIVE_PHASES.has(GameState.phase);
+    return ACTIVE_PHASES.has(GameState.phase) && !this.isStaffWageSuspended();
   },
 
   getAssistPower(type) {
     const staff = GameState.staff?.hired;
 
-    if (!staff) {
+    if (!staff || this.isStaffWageSuspended()) {
       return 0;
     }
 
@@ -2119,5 +2277,9 @@ export const StaffAssistSystem = {
 
   getNowMs() {
     return Math.floor(window.performance?.now?.() ?? Date.now());
+  },
+
+  isGamePaused() {
+    return Boolean(document.body?.classList?.contains("is-game-paused"));
   }
 };

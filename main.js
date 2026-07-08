@@ -27,6 +27,7 @@ import { DailyMissionSystem } from "./systems/DailyMissionSystem.js";
 import { StaffAssistSystem } from "./systems/StaffAssistSystem.js";
 import { DebugSystem } from "./systems/DebugSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
+import { PauseSystem } from "./systems/PauseSystem.js";
 
 import { MobileUI } from "./ui/MobileUI.js";
 import { MobileInputSystem } from "./systems/MobileInputSystem.js";
@@ -75,6 +76,7 @@ function setCustomerEventModalActive(isActive) {
     "is-customer-event-modal-active",
     isActive === true
   );
+  PauseSystem.updatePauseUi?.();
 }
 
 function createCustomerEventEffectKey(payload = {}, suffix = "effect") {
@@ -86,12 +88,12 @@ function createCustomerEventEffectKey(payload = {}, suffix = "effect") {
   ].join(":");
 }
 
-function applyNuisanceEventEntranceEffects(payload = {}) {
+function applyNuisanceEventModalOpenPenalty(payload = {}) {
   if (payload.isNuisance !== true) {
     return;
   }
 
-  const effectKey = createCustomerEventEffectKey(payload, "entrance");
+  const effectKey = createCustomerEventEffectKey(payload, "modal-open");
 
   if (nuisanceEventEffectKeys.has(effectKey)) {
     return;
@@ -138,10 +140,8 @@ function showCustomerEventCandidate() {
 
   try {
     EventBus.emit(SANITATION_CUSTOMER_EVENT_TRIGGERED, payload);
-    applyNuisanceEventEntranceEffects(payload);
     CustomerSystem.pauseCustomerWaitTime();
     GameFlowSystem.pauseDayTimer();
-    setCustomerEventModalActive(true);
 
     UIManager.showCustomerEventModal(
       payload,
@@ -156,6 +156,11 @@ function showCustomerEventCandidate() {
           choice
         );
 
+        CustomerSystem.resolveNuisanceEventForCustomer?.(
+          eventPayload.customerId,
+          eventPayload
+        );
+
         if (effectResult.success) {
           applyCustomerEventChoiceStatEffects(choice);
         }
@@ -164,6 +169,16 @@ function showCustomerEventCandidate() {
       },
       applyNuisanceResponseTimeout
     );
+
+    if (isCustomerEventModalOpen()) {
+      setCustomerEventModalActive(true);
+      applyNuisanceEventModalOpenPenalty(payload);
+    } else {
+      setCustomerEventModalActive(false);
+      CustomerSystem.resumeCustomerWaitTime();
+      GameFlowSystem.resumeDayTimer();
+    }
+
     isCustomerEventFlowStarting = false;
   } catch (error) {
     isCustomerEventFlowStarting = false;
@@ -210,6 +225,7 @@ function initGame() {
   StaffAssistSystem.init();
   DebugSystem.init();
   AudioSystem.init();
+  PauseSystem.init();
   MobileUI.init();
   MobileInputSystem.init();
   bindCustomerEventModalFlow();

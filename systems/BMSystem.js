@@ -136,6 +136,7 @@ const unique = (values = []) => [...new Set(values.map((value) => String(value ?
 export const BMSystem = {
   isInitialized: false,
   peakCouponTimerId: null,
+  peakCouponRemainingMs: 0,
 
   init() {
     if (this.isInitialized) return;
@@ -359,9 +360,7 @@ export const BMSystem = {
     bm.peakCouponUsedDay = GameState.day;
     bm.peakCouponActive = true;
     bm.peakCouponMultiplier = PEAK_COUPON_REVENUE_MULTIPLIER;
-    this.clearPeakCouponTimer();
-    this.peakCouponTimerId = setTimeout(() => this.deactivatePeakCoupon("duration_finished"), PEAK_COUPON_DURATION_SECONDS * 1000);
-    this.peakCouponTimerId?.unref?.();
+    this.startPeakCouponTimer(PEAK_COUPON_DURATION_SECONDS * 1000);
     return this.ok("peak_coupon_activated", `피크타임 쿠폰 사용! ${PEAK_COUPON_DURATION_SECONDS}초 동안 매출이 1.5배 적용됩니다.`, { durationSeconds: PEAK_COUPON_DURATION_SECONDS });
   },
 
@@ -393,7 +392,31 @@ export const BMSystem = {
     return true;
   },
 
-  clearPeakCouponTimer() { if (this.peakCouponTimerId) clearTimeout(this.peakCouponTimerId); this.peakCouponTimerId = null; },
+  startPeakCouponTimer(durationMs = PEAK_COUPON_DURATION_SECONDS * 1000) {
+    const tickMs = 250;
+    this.clearPeakCouponTimer();
+    this.peakCouponRemainingMs = Math.max(0, Math.floor(Number(durationMs) || 0));
+    this.peakCouponTimerId = setInterval(() => {
+      if (this.isGamePaused()) {
+        return;
+      }
+
+      this.peakCouponRemainingMs = Math.max(0, this.peakCouponRemainingMs - tickMs);
+
+      if (this.peakCouponRemainingMs > 0) {
+        return;
+      }
+
+      this.deactivatePeakCoupon("duration_finished");
+    }, tickMs);
+    this.peakCouponTimerId?.unref?.();
+  },
+
+  isGamePaused() {
+    return Boolean(document.body?.classList?.contains("is-game-paused"));
+  },
+
+  clearPeakCouponTimer() { if (this.peakCouponTimerId) clearInterval(this.peakCouponTimerId); this.peakCouponTimerId = null; this.peakCouponRemainingMs = 0; },
   getRevenueMultiplier() { return this.ensureBMState().peakCouponActive ? PEAK_COUPON_REVENUE_MULTIPLIER : 1; },
 
   purchaseWarehouseUpgrade() {
@@ -561,15 +584,92 @@ export const BMSystem = {
     return { product, level, nextLevel, displayName: this.getProductDisplayName(product), baseDisplayName: this.getProductBaseDisplayName(product), currentPrice, nextPrice, nextCost: nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0, typeLabel: config.name, canUpgrade: !!nextLevel && this.canSellProduct(product.id) && GameState.money >= (nextLevel ? this.getProductUpgradeCost(product, nextLevel) : 0) };
   },
 
+  getHiredStaffState() {
+    const staffState = GameState.staff && typeof GameState.staff === "object" ? GameState.staff : null;
+
+    if (staffState?.hired && typeof staffState.hired === "object") {
+      return staffState.hired;
+    }
+
+    // 이전/병합 중간 버전에서 다른 키에 고용 알바가 남아 있는 경우를 현재 표준 키로 보정한다.
+    const legacyHired = [
+      staffState?.hiredStaff,
+      staffState?.currentStaff,
+      staffState?.activeStaff,
+      staffState?.selectedStaff
+    ].find((candidate) => candidate && typeof candidate === "object" && (candidate.id || candidate.name));
+
+    if (staffState && legacyHired) {
+      staffState.hired = { ...legacyHired };
+      return staffState.hired;
+    }
+
+    // 알바 보조 시스템에는 출근/대기 중인 알바 정보가 남아 있는데 staff.hired만 비어 있는 세이브를 복구한다.
+    const assistState = GameState.staffAssist && typeof GameState.staffAssist === "object" ? GameState.staffAssist : null;
+    if (staffState && assistState && (assistState.staffId || assistState.staffName)) {
+      staffState.hired = {
+        id: assistState.staffId ?? "staff_recovered",
+        name: assistState.staffName ?? "고용 알바",
+        type: assistState.staffType ?? "알바",
+        recoveredFromAssistState: true
+      };
+      return staffState.hired;
+    }
+
+    return null;
+  },
+
+  hasHiredStaff() {
+    return Boolean(this.getHiredStaffState());
+  },
+
+  getStaffAbilityUpgradeBlockReason() {
+    const bm = this.ensureBMState();
+    const state = bm.staffAbilityUpgrade;
+    const hiredStaff = this.getHiredStaffState();
+    const hasUnpaidWage = this.hasStaffUnpaidWage();
+    const nextAvailableDay = state.lastUpgradeDay
+      ? state.lastUpgradeDay + STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS
+      : GameState.day;
+
+    if (!hiredStaff) {
+      return { code: "no_staff", message: "고용된 알바 필요" };
+    }
+
+    if (hasUnpaidWage) {
+      return { code: "staff_wage_unpaid", message: "미지급 임금 납부 필요" };
+    }
+
+    if (state.totalCount >= STAFF_ABILITY_MAX_TOTAL_UPGRADES) {
+      return { code: "max_level", message: "최대 강화" };
+    }
+
+    if (GameState.day < nextAvailableDay) {
+      return { code: "cooldown", message: `다음 가능 Day ${nextAvailableDay}` };
+    }
+
+    if (bm.diamond < STAFF_ABILITY_UPGRADE_DIAMOND_PRICE) {
+      return {
+        code: "not_enough_diamond",
+        message: `다이아 부족 ${Number(bm.diamond || 0).toLocaleString("ko-KR")} / ${STAFF_ABILITY_UPGRADE_DIAMOND_PRICE}`
+      };
+    }
+
+    return null;
+  },
+
   purchaseStaffAbilityUpgrade(abilityKey) {
     const key = ["warehouse", "shelf", "cleaning"].includes(abilityKey) ? abilityKey : null;
     if (!key) return this.fail("invalid_ability", "강화할 알바 능력치를 선택해주세요.");
     const bm = this.ensureBMState();
     const state = bm.staffAbilityUpgrade;
-    if (!GameState.staff?.hired) return this.fail("no_staff", "고용된 알바가 필요합니다.");
-    if (state.totalCount >= STAFF_ABILITY_MAX_TOTAL_UPGRADES) return this.fail("max_level", "알바 강화 가능 횟수를 모두 사용했습니다.");
-    if (state.lastUpgradeDay && GameState.day - state.lastUpgradeDay < STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS) return this.fail("cooldown", `알바 강화권은 Day ${state.lastUpgradeDay + STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS}부터 다시 구매할 수 있습니다.`);
-    if (bm.diamond < STAFF_ABILITY_UPGRADE_DIAMOND_PRICE) return this.fail("not_enough_diamond", `다이아가 부족합니다. 필요 다이아: ${STAFF_ABILITY_UPGRADE_DIAMOND_PRICE}`);
+    const blockReason = this.getStaffAbilityUpgradeBlockReason();
+
+    if (blockReason?.code === "no_staff") return this.fail("no_staff", "고용된 알바가 필요합니다.");
+    if (blockReason?.code === "staff_wage_unpaid") return this.fail("staff_wage_unpaid", "미지급 임금을 납부해야 알바를 강화할 수 있습니다.");
+    if (blockReason?.code === "max_level") return this.fail("max_level", "알바 강화 가능 횟수를 모두 사용했습니다.");
+    if (blockReason?.code === "cooldown") return this.fail("cooldown", `알바 강화권은 Day ${state.lastUpgradeDay + STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS}부터 다시 구매할 수 있습니다.`);
+    if (blockReason?.code === "not_enough_diamond") return this.fail("not_enough_diamond", `다이아가 부족합니다. 필요 다이아: ${STAFF_ABILITY_UPGRADE_DIAMOND_PRICE}`);
     const spendResult = EconomySystem.spendDiamond(STAFF_ABILITY_UPGRADE_DIAMOND_PRICE, "staff_ability_upgrade", {
       source: "bm_shop",
       abilityKey: key
@@ -581,11 +681,33 @@ export const BMSystem = {
     return this.ok("staff_ability_upgraded", `알바 ${this.getStaffAbilityLabel(key)} 능력이 1칸 강화되었습니다.`, { abilityKey: key, currencyResult: spendResult });
   },
 
+  hasStaffUnpaidWage() {
+    const unpaidWage = Math.max(0, Math.floor(Number(GameState.staff?.unpaidWage) || 0));
+    return unpaidWage > 0 || GameState.staff?.wageSuspended === true;
+  },
+
   getStaffAbilityUpgradeState() {
     const bm = this.ensureBMState();
     const state = bm.staffAbilityUpgrade;
     const nextAvailableDay = state.lastUpgradeDay ? state.lastUpgradeDay + STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS : GameState.day;
-    return { priceDiamond: STAFF_ABILITY_UPGRADE_DIAMOND_PRICE, maxTotal: STAFF_ABILITY_MAX_TOTAL_UPGRADES, cooldownDays: STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS, totalCount: state.totalCount, lastUpgradeDay: state.lastUpgradeDay, nextAvailableDay, abilities: { ...state.abilities }, canUpgrade: !!GameState.staff?.hired && state.totalCount < STAFF_ABILITY_MAX_TOTAL_UPGRADES && GameState.day >= nextAvailableDay && bm.diamond >= STAFF_ABILITY_UPGRADE_DIAMOND_PRICE };
+    const hiredStaff = this.getHiredStaffState();
+    const hasStaff = Boolean(hiredStaff);
+    const hasUnpaidWage = this.hasStaffUnpaidWage();
+    const blockReason = this.getStaffAbilityUpgradeBlockReason();
+    return {
+      priceDiamond: STAFF_ABILITY_UPGRADE_DIAMOND_PRICE,
+      maxTotal: STAFF_ABILITY_MAX_TOTAL_UPGRADES,
+      cooldownDays: STAFF_ABILITY_UPGRADE_COOLDOWN_DAYS,
+      totalCount: state.totalCount,
+      lastUpgradeDay: state.lastUpgradeDay,
+      nextAvailableDay,
+      abilities: { ...state.abilities },
+      hasStaff,
+      hiredStaff,
+      hasUnpaidWage,
+      blockReason,
+      canUpgrade: hasStaff && !hasUnpaidWage && !blockReason
+    };
   },
 
   getStaffAbilityLabel(key) { return { warehouse: "창고", shelf: "진열대", cleaning: "청소" }[key] ?? key; },

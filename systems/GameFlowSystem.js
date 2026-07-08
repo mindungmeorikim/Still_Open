@@ -34,10 +34,13 @@ const STAFF_EVENTS = {
   HIRE_SKIPPED: "STAFF_HIRE_SKIPPED",
   STATE_CHANGED: "STAFF_STATE_CHANGED",
   AUTO_CHECKOUT_REQUESTED: "STAFF_AUTO_CHECKOUT_REQUESTED",
-  AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED"
+  AUTO_CHECKOUT_COMPLETED: "STAFF_AUTO_CHECKOUT_COMPLETED",
+  UNPAID_WAGE_PAYMENT_REQUESTED: "STAFF_UNPAID_WAGE_PAYMENT_REQUESTED",
+  UNPAID_WAGE_PAID: "STAFF_UNPAID_WAGE_PAID"
 };
 
 const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
+const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
 const STAFF_UNLOCK_DAY = 3;
 const STAFF_SHIFT_HOURS = 3;
 const STAFF_SHIFT_ENTRY_REQUESTED = "STAFF_SHIFT_ENTRY_REQUESTED";
@@ -163,6 +166,9 @@ export const GameFlowSystem = {
     EventBus.on(EVENTS.STOCK_ORGANIZED, (data) => {
       this.handleStockOrganized(data);
     });
+    EventBus.on(SAVE_GAME_LOADED, (data = {}) => {
+      this.hydrateSaveSnapshot(data.flow ?? data.saveData?.flow ?? {});
+    });
     EventBus.on(EVENTS.INVENTORY_CHANGED, (data) => {
       this.handleInventoryChanged(data);
     });
@@ -178,6 +184,9 @@ export const GameFlowSystem = {
     EventBus.on(STAFF_EVENTS.AUTO_CHECKOUT_COMPLETED, (data) => {
       this.handleStaffAutoCheckoutCompleted(data);
     });
+    EventBus.on(STAFF_EVENTS.UNPAID_WAGE_PAYMENT_REQUESTED, (data) => {
+      this.handleStaffUnpaidWagePaymentRequested(data);
+    });
   },
 
   ensureStaffState() {
@@ -185,7 +194,12 @@ export const GameFlowSystem = {
       GameState.staff = {
         unlocked: false,
         hired: null,
-        hirePopupShownDay: null
+        hirePopupShownDay: null,
+        unpaidWage: 0,
+        wageSuspended: false,
+        unpaidSinceDay: null,
+        lastWageSettlementDay: null,
+        lastWagePaymentDay: null
       };
     }
 
@@ -201,6 +215,7 @@ export const GameFlowSystem = {
     }
 
     this.normalizeHiredStaffBaseStats(GameState.staff.hired);
+    this.normalizeStaffWageState(GameState.staff);
 
     if (GameState.staff.workCountDay !== GameState.day) {
       GameState.staff.todayWarehouseHelpCount = 0;
@@ -232,6 +247,59 @@ export const GameFlowSystem = {
 
   toStaffStat(value) {
     return Math.min(5, Math.max(0, Math.floor(Number(value) || 0)));
+  },
+
+  toNonNegativeMoney(value) {
+    return Math.max(0, Math.floor(Number(value) || 0));
+  },
+
+  toNullableDay(value) {
+    const day = Math.floor(Number(value) || 0);
+    return day > 0 ? day : null;
+  },
+
+  normalizeStaffWageState(staffState = GameState.staff) {
+    if (!staffState || typeof staffState !== "object") {
+      return null;
+    }
+
+    staffState.unpaidWage = this.toNonNegativeMoney(staffState.unpaidWage);
+    staffState.wageSuspended = staffState.unpaidWage > 0 || staffState.wageSuspended === true;
+    staffState.unpaidSinceDay = staffState.unpaidWage > 0
+      ? this.toNullableDay(staffState.unpaidSinceDay) ?? GameState.day
+      : null;
+    staffState.lastWageSettlementDay = this.toNullableDay(staffState.lastWageSettlementDay);
+    staffState.lastWagePaymentDay = this.toNullableDay(staffState.lastWagePaymentDay);
+
+    if (staffState.unpaidWage <= 0) {
+      staffState.unpaidWage = 0;
+      staffState.wageSuspended = false;
+      staffState.unpaidSinceDay = null;
+    }
+
+    return staffState;
+  },
+
+  getStaffUnpaidWage(staffState = GameState.staff) {
+    return this.toNonNegativeMoney(staffState?.unpaidWage);
+  },
+
+  hasStaffUnpaidWage(staffState = GameState.staff) {
+    return this.getStaffUnpaidWage(staffState) > 0 || staffState?.wageSuspended === true;
+  },
+
+  canStaffWork(staffState = GameState.staff) {
+    return Boolean(staffState?.hired) && !this.hasStaffUnpaidWage(staffState);
+  },
+
+  getStaffWageBlockedMessage(staffState = GameState.staff) {
+    const unpaidWage = this.getStaffUnpaidWage(staffState);
+
+    if (unpaidWage <= 0) {
+      return "알바 임금 미지급 상태가 아닙니다.";
+    }
+
+    return `미지급 임금 ₩${unpaidWage.toLocaleString("ko-KR")}을 납부해야 알바가 다시 출근합니다.`;
   },
 
   getStaffCandidates() {
@@ -294,11 +362,67 @@ export const GameFlowSystem = {
       expectedDailyWage: candidate.hourlyWage * STAFF_SHIFT_HOURS,
       hiredDay: GameState.day
     };
+    staffState.unpaidWage = 0;
+    staffState.wageSuspended = false;
+    staffState.unpaidSinceDay = null;
+    staffState.lastWageSettlementDay = null;
+    staffState.lastWagePaymentDay = null;
 
     UIManager.showMessage(
       `${candidate.name} 알바를 고용했습니다. 창고/진열대/청소 보조가 활성화됩니다.`
     );
 
+    EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
+      day: GameState.day,
+      staff: staffState
+    });
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  handleStaffUnpaidWagePaymentRequested(data = {}) {
+    const staffState = this.ensureStaffState();
+
+    if (data.day && data.day !== GameState.day) {
+      return;
+    }
+
+    if (!staffState.hired) {
+      UIManager.showMessage("고용된 알바가 없습니다.");
+      return;
+    }
+
+    const unpaidWage = this.getStaffUnpaidWage(staffState);
+
+    if (unpaidWage <= 0) {
+      staffState.unpaidWage = 0;
+      staffState.wageSuspended = false;
+      staffState.unpaidSinceDay = null;
+      UIManager.showMessage("미지급 임금이 없습니다.");
+      EventBus.emit(STAFF_EVENTS.STATE_CHANGED, { day: GameState.day, staff: staffState });
+      EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+      return;
+    }
+
+    if (GameState.money < unpaidWage) {
+      UIManager.showMessage(
+        `골드가 부족합니다. 미지급 임금 ₩${unpaidWage.toLocaleString("ko-KR")}을 납부해야 합니다.`
+      );
+      return;
+    }
+
+    GameState.money = Math.max(0, Math.floor(Number(GameState.money) || 0) - unpaidWage);
+    staffState.unpaidWage = 0;
+    staffState.wageSuspended = false;
+    staffState.unpaidSinceDay = null;
+    staffState.lastWagePaymentDay = GameState.day;
+
+    UIManager.showMessage("미지급 임금을 모두 납부했습니다. 알바가 다시 출근할 수 있습니다.");
+
+    EventBus.emit(STAFF_EVENTS.UNPAID_WAGE_PAID, {
+      day: GameState.day,
+      amount: unpaidWage,
+      staff: staffState
+    });
     EventBus.emit(STAFF_EVENTS.STATE_CHANGED, {
       day: GameState.day,
       staff: staffState
@@ -340,8 +464,9 @@ export const GameFlowSystem = {
   },
 
   getStaffAssistPower(type = "shelf") {
-    const staff = this.ensureStaffState().hired;
-    if (!staff) return 0;
+    const staffState = this.ensureStaffState();
+    const staff = staffState.hired;
+    if (!staff || this.hasStaffUnpaidWage(staffState)) return 0;
     const base = Math.max(0, Math.floor(Number(staff.stats?.[type]) || 0));
     const bonus = Math.max(0, Math.floor(Number(GameState.bm?.staffAbilityUpgrade?.abilities?.[type]) || 0));
     return Math.min(5, base + bonus);
@@ -368,6 +493,48 @@ export const GameFlowSystem = {
     };
   },
 
+  hydrateSaveSnapshot(flowSnapshot = {}) {
+    this.ensureStaffState();
+    this.clearDayTimer();
+
+    const source = flowSnapshot && typeof flowSnapshot === "object" ? flowSnapshot : {};
+    const savedOrderReadyDay = Math.floor(Number(source.orderReadyDay));
+    const hasCurrentDayReady = Number.isFinite(savedOrderReadyDay) && savedOrderReadyDay === GameState.day;
+
+    this.orderReadyDay = hasCurrentDayReady ? savedOrderReadyDay : null;
+
+    if (GameState.phase === GAME_PHASE.DAY_START) {
+      this.orderReadyDay = GameState.day;
+    }
+
+    this.isStoreOpen = false;
+    this.isClosing = false;
+    this.isDayTimerPaused = false;
+    this.staffAutoCheckoutElapsedSeconds = Math.max(
+      0,
+      Math.floor(Number(source.staffAutoCheckoutElapsedSeconds) || 0)
+    );
+    this.remainingDaySeconds = Math.max(
+      0,
+      Math.floor(Number(source.remainingDaySeconds) || GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS)
+    );
+
+    this.syncFlowSnapshotToGameState("save_loaded");
+  },
+
+  syncFlowSnapshotToGameState(reason = "flow_sync") {
+    GameState.flowSnapshot = {
+      orderReadyDay: this.orderReadyDay,
+      remainingDaySeconds: this.remainingDaySeconds,
+      isStoreOpen: this.isStoreOpen,
+      isClosing: this.isClosing,
+      isDayTimerPaused: this.isDayTimerPaused,
+      staffAutoCheckoutElapsedSeconds: this.staffAutoCheckoutElapsedSeconds,
+      savedPhase: GameState.phase,
+      reason
+    };
+  },
+
   resetTutorialPracticeRun(data = {}) {
     this.clearDayTimer();
     this.orderReadyDay = null;
@@ -376,6 +543,7 @@ export const GameFlowSystem = {
     this.isDayTimerPaused = false;
     this.staffAutoCheckoutElapsedSeconds = 0;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
+    this.syncFlowSnapshotToGameState("tutorial_practice_reset");
 
     if (GameState.day <= 1 && GameState.isEndlessMode !== true) {
       GameState.day = 1;
@@ -416,6 +584,7 @@ export const GameFlowSystem = {
     this.staffAutoCheckoutElapsedSeconds = 0;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
     this.clearDayTimer();
+    this.syncFlowSnapshotToGameState("day_started_reset");
 
     GameState.phase = GAME_PHASE.ORDER;
 
@@ -481,6 +650,7 @@ export const GameFlowSystem = {
     this.isDayTimerPaused = false;
     this.staffAutoCheckoutElapsedSeconds = 0;
     this.startDayTimer();
+    this.syncFlowSnapshotToGameState("store_opened");
 
     EventBus.emit(STAFF_SHIFT_ENTRY_REQUESTED, {
       day: GameState.day,
@@ -521,6 +691,7 @@ export const GameFlowSystem = {
     this.isStoreOpen = false;
     this.isDayTimerPaused = false;
     this.clearDayTimer();
+    this.syncFlowSnapshotToGameState("store_closed");
 
     GameState.phase = GAME_PHASE.DAY_END;
 
@@ -572,6 +743,7 @@ export const GameFlowSystem = {
     this.isDayTimerPaused = false;
     this.staffAutoCheckoutElapsedSeconds = 0;
     this.remainingDaySeconds = GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS;
+    this.syncFlowSnapshotToGameState("next_day_ready");
 
     if (GameState.day > GAME_CONFIG.MAX_STORY_DAY) {
       GameState.isEndlessMode = true;
@@ -611,6 +783,8 @@ export const GameFlowSystem = {
     if (GameState.phase === GAME_PHASE.ORDER) {
       GameState.phase = GAME_PHASE.DAY_START;
     }
+
+    this.syncFlowSnapshotToGameState("stock_organized");
 
     const readyMessage = data.source === "empty_order"
       ? data.message ?? "발주 없이 준비를 완료했습니다. 영업 시작 버튼을 눌러 180초 영업을 시작하세요."

@@ -194,13 +194,19 @@ export const ResultSystem = {
 
     const stats = GameState.todayStats;
     const staffResult = this.createStaffResultSummary();
+    this.removePreviouslyAppliedStaffWageCost(stats);
+    const staffWageSettlement = this.applyStaffWageSettlement(staffResult, stats);
 
-    stats.staffWageCost = staffResult.wageCost;
+    stats.staffWageCost = staffWageSettlement.wageCost;
+    stats.staffWagePaid = staffWageSettlement.paidAmount;
+    stats.staffUnpaidWage = staffWageSettlement.unpaidAmount;
+    stats.staffTotalUnpaidWage = staffWageSettlement.totalUnpaidWage;
+    stats.staffWageStatus = staffWageSettlement.status;
     stats.staffCheckoutCount = staffResult.checkoutCount;
     stats.staffName = staffResult.name;
     stats.staffType = staffResult.type;
-    stats.staffExpectedDailyWage = staffResult.wageCost;
-    stats.cost += staffResult.wageCost;
+    stats.staffExpectedDailyWage = staffWageSettlement.wageCost;
+    stats.cost += staffWageSettlement.wageCost;
 
     stats.profit =
       stats.revenue -
@@ -212,7 +218,7 @@ export const ResultSystem = {
     const bmScore = stats.bmBonus;
     const sanitationPenalty = this.getSanitationSettlementPenalty();
 
-    GameState.money += stats.profit;
+    GameState.money = staffWageSettlement.finalMoney;
 
     const satisfactionChange =
       stats.satisfiedCustomers * 2 -
@@ -322,7 +328,14 @@ export const ResultSystem = {
       checkoutSuccessCount: stats.checkoutSuccessCount,
       restockCount: stats.restockCount,
       cleaningCount: stats.cleaningCount,
-      staff: staffResult,
+      staff: {
+        ...staffResult,
+        wageSettlement: staffWageSettlement,
+        wagePaid: staffWageSettlement.paidAmount,
+        unpaidWage: staffWageSettlement.unpaidAmount,
+        totalUnpaidWage: staffWageSettlement.totalUnpaidWage,
+        wagePaymentStatus: staffWageSettlement.status
+      },
       sanitation: sanitationPenalty.sanitation,
       sanitationPenalty,
 
@@ -549,9 +562,105 @@ export const ResultSystem = {
     GameState.todayStats.mvpTestDataApplied = true;
   },
 
+  removePreviouslyAppliedStaffWageCost(stats = GameState.todayStats) {
+    const previousWageCost = Math.max(
+      0,
+      Math.floor(Number(stats.staffWageCost) || 0)
+    );
+
+    if (previousWageCost <= 0) {
+      return 0;
+    }
+
+    stats.cost = Math.max(0, this.toNumber(stats.cost) - previousWageCost);
+    stats.staffWageCost = 0;
+
+    return previousWageCost;
+  },
+
+  getStaffUnpaidWage(staffState = GameState.staff) {
+    return Math.max(0, Math.floor(Number(staffState?.unpaidWage) || 0));
+  },
+
+  normalizeStaffWageFields(staffState = GameState.staff) {
+    if (!staffState || typeof staffState !== "object") {
+      return null;
+    }
+
+    staffState.unpaidWage = this.getStaffUnpaidWage(staffState);
+    staffState.wageSuspended = staffState.unpaidWage > 0 || staffState.wageSuspended === true;
+
+    if (staffState.unpaidWage <= 0) {
+      staffState.unpaidWage = 0;
+      staffState.wageSuspended = false;
+      staffState.unpaidSinceDay = null;
+    } else if (!staffState.unpaidSinceDay) {
+      staffState.unpaidSinceDay = GameState.day;
+    }
+
+    return staffState;
+  },
+
+  applyStaffWageSettlement(staffResult = {}, stats = GameState.todayStats) {
+    const staffState = this.normalizeStaffWageFields(GameState.staff) ?? {};
+    const wageCost = Math.max(0, Math.floor(Number(staffResult.wageCost) || 0));
+    const startingMoney = Math.max(0, Math.floor(Number(GameState.money) || 0));
+    const baseCost = Math.max(0, this.toNumber(stats.cost));
+    const availableBeforeWage = Math.floor(
+      startingMoney +
+      this.toNumber(stats.revenue) -
+      baseCost -
+      this.toNumber(stats.expiredLoss) -
+      this.toNumber(stats.eventPenalty) +
+      this.toNumber(stats.bmBonus)
+    );
+    const payableAmount = Math.max(0, availableBeforeWage);
+    const paidAmount = staffResult.hired ? Math.min(wageCost, payableAmount) : 0;
+    const unpaidAmount = staffResult.hired ? Math.max(0, wageCost - paidAmount) : 0;
+    const finalMoney = Math.max(0, availableBeforeWage - paidAmount);
+    const previousUnpaidWage = this.getStaffUnpaidWage(staffState);
+    const totalUnpaidWage = staffResult.hired
+      ? previousUnpaidWage + unpaidAmount
+      : previousUnpaidWage;
+
+    if (staffResult.hired) {
+      staffState.lastWageSettlementDay = GameState.day;
+
+      if (unpaidAmount > 0) {
+        staffState.unpaidWage = totalUnpaidWage;
+        staffState.wageSuspended = true;
+        staffState.unpaidSinceDay = staffState.unpaidSinceDay ?? GameState.day;
+      } else if (previousUnpaidWage <= 0) {
+        staffState.unpaidWage = 0;
+        staffState.wageSuspended = false;
+        staffState.unpaidSinceDay = null;
+      }
+    }
+
+    return {
+      wageCost,
+      paidAmount,
+      unpaidAmount,
+      previousUnpaidWage,
+      totalUnpaidWage,
+      startingMoney,
+      availableBeforeWage,
+      finalMoney,
+      status: !staffResult.hired
+        ? "none"
+        : staffResult.suspended
+          ? "suspended"
+          : unpaidAmount > 0
+            ? "unpaid"
+            : "paid"
+    };
+  },
+
   createStaffResultSummary() {
-    const staffState = GameState.staff ?? {};
+    const staffState = this.normalizeStaffWageFields(GameState.staff) ?? {};
     const hired = staffState.hired ?? null;
+    const unpaidWage = this.getStaffUnpaidWage(staffState);
+    const isSuspended = unpaidWage > 0 || staffState.wageSuspended === true;
 
     if (!hired) {
       return {
@@ -561,16 +670,19 @@ export const ResultSystem = {
         checkoutCount: 0,
         hourlyWage: 0,
         shiftHours: 0,
-        wageCost: 0
+        wageCost: 0,
+        suspended: false,
+        previousUnpaidWage: unpaidWage
       };
     }
 
     const hourlyWage = Math.max(0, Number(hired.hourlyWage) || 0);
     const shiftHours = Math.max(0, Number(hired.shiftHours) || 3);
-    const wageCost = Math.max(
+    const expectedDailyWage = Math.max(
       0,
       Number(hired.expectedDailyWage) || hourlyWage * shiftHours
     );
+    const wageCost = isSuspended ? 0 : expectedDailyWage;
 
     return {
       hired: true,
@@ -580,7 +692,11 @@ export const ResultSystem = {
       checkoutCount: Math.max(0, Number(staffState.todayCheckoutCount) || 0),
       hourlyWage,
       shiftHours,
-      wageCost
+      expectedDailyWage,
+      wageCost,
+      suspended: isSuspended,
+      previousUnpaidWage: unpaidWage,
+      unpaidSinceDay: staffState.unpaidSinceDay ?? null
     };
   },
 

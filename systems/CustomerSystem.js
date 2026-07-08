@@ -24,7 +24,7 @@
 
 import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
-import { EVENTS, GAME_PHASE } from "../core/Constants.js";
+import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 
 import {
   CUSTOMER_STATUS,
@@ -41,6 +41,12 @@ import {
 } from "../data/ProductData.js";
 import { getShelfInstanceIdByProductId } from "../data/ProductShelfMapData.js";
 import { getShelfInstanceById } from "../data/ShelfPlacementData.js";
+import {
+  getNuisanceAssetVariantIdForProfile,
+  getNuisanceProfileIdForAssetVariantId,
+  getNuisanceProfileIds,
+  isNuisanceCustomerAssetVariantId
+} from "../data/AssetData.js";
 import { RandomEventSystem } from "./RandomEventSystem.js";
 import { BMSystem } from "./BMSystem.js";
 
@@ -58,6 +64,8 @@ export const CustomerSystem = {
   routeTimerId: null,
   spawnTimerId: null,
   initialSpawnTimerId: null,
+  initialSpawnDueAtMs: null,
+  initialSpawnRemainingMs: 0,
   isWaitTimePaused: false,
   isCustomerFlowPaused: false,
   targetSpawnCount: 0,
@@ -97,11 +105,7 @@ export const CustomerSystem = {
     const initialCustomerDelayMs = this.getInitialCustomerDelayMs();
 
     if (initialCustomerDelayMs > 0) {
-      this.initialSpawnTimerId = setTimeout(() => {
-        this.initialSpawnTimerId = null;
-        this.spawnNextCustomer();
-        this.startSpawnTimer();
-      }, initialCustomerDelayMs);
+      this.scheduleInitialSpawnTimer(initialCustomerDelayMs);
     } else {
       this.spawnNextCustomer();
       this.startSpawnTimer();
@@ -235,11 +239,60 @@ export const CustomerSystem = {
     }, this.getSpawnIntervalMsByDay());
   },
 
-  stopInitialSpawnTimer() {
-    if (!this.initialSpawnTimerId) return;
+  scheduleInitialSpawnTimer(delayMs = 0) {
+    this.stopInitialSpawnTimer();
+    this.initialSpawnRemainingMs = Math.max(0, Math.floor(Number(delayMs) || 0));
+    this.resumeInitialSpawnTimer();
+  },
 
+  pauseInitialSpawnTimer() {
+    if (!this.initialSpawnTimerId) {
+      return;
+    }
+
+    this.initialSpawnRemainingMs = Math.max(
+      0,
+      Math.ceil((Number(this.initialSpawnDueAtMs) || this.getNowMs()) - this.getNowMs())
+    );
     clearTimeout(this.initialSpawnTimerId);
     this.initialSpawnTimerId = null;
+    this.initialSpawnDueAtMs = null;
+  },
+
+  resumeInitialSpawnTimer() {
+    if (this.initialSpawnTimerId || this.initialSpawnRemainingMs <= 0) {
+      return;
+    }
+
+    if (this.isGamePaused() || this.isCustomerFlowPaused) {
+      return;
+    }
+
+    const delayMs = Math.max(0, Math.floor(Number(this.initialSpawnRemainingMs) || 0));
+    this.initialSpawnDueAtMs = this.getNowMs() + delayMs;
+    this.initialSpawnTimerId = setTimeout(() => {
+      this.initialSpawnTimerId = null;
+      this.initialSpawnDueAtMs = null;
+
+      if (this.isGamePaused() || this.isCustomerFlowPaused) {
+        this.initialSpawnRemainingMs = Math.max(0, delayMs);
+        return;
+      }
+
+      this.initialSpawnRemainingMs = 0;
+      this.spawnNextCustomer();
+      this.startSpawnTimer();
+    }, delayMs);
+  },
+
+  stopInitialSpawnTimer() {
+    if (this.initialSpawnTimerId) {
+      clearTimeout(this.initialSpawnTimerId);
+    }
+
+    this.initialSpawnTimerId = null;
+    this.initialSpawnDueAtMs = null;
+    this.initialSpawnRemainingMs = 0;
   },
 
   stopSpawnTimer() {
@@ -267,10 +320,24 @@ export const CustomerSystem = {
   },
 
   getSpawnIntervalMsByDay() {
-    const day = Math.max(1, Math.floor(Number(GameState.day) || 1));
-    const intervalSeconds = Math.max(2, 4.5 - day * 0.5);
+    const targetCount = Math.max(
+      1,
+      Math.floor(Number(this.targetSpawnCount) || 1)
+    );
+    const daySeconds = Math.max(
+      30,
+      Number(GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS) || 180
+    );
 
-    return Math.floor(intervalSeconds * 1000);
+    if (targetCount <= 1) {
+      return 12000;
+    }
+
+    const intervalSeconds = daySeconds / Math.max(1, targetCount - 1);
+
+    return Math.floor(
+      Math.max(2000, Math.min(12000, intervalSeconds * 1000))
+    );
   },
 
   createCustomer() {
@@ -284,17 +351,38 @@ export const CustomerSystem = {
 
     this.customerIdCounter += 1;
 
+    const customerId = `customer-${GameState.day}-${this.customerIdCounter}`;
+    const nuisanceProfileId = this.pickNuisanceProfileIdForCustomer(
+      customerType,
+      customerId
+    );
+    const nuisanceAssetVariantId = nuisanceProfileId
+      ? getNuisanceAssetVariantIdForProfile(nuisanceProfileId, customerId)
+      : null;
+    const isNuisance = this.isNuisanceCustomerTypeOrAsset({
+      typeId: customerType.id,
+      nuisanceProfileId,
+      nuisanceAssetVariantId
+    });
     const entryDialogueText = this.pickCustomerEntryDialogue(
       customerType,
       this.customerIdCounter
     );
 
     return {
-      id: `customer-${GameState.day}-${this.customerIdCounter}`,
+      id: customerId,
 
       typeId: customerType.id,
       typeName: customerType.name,
       entryDialogueText,
+      isNuisance,
+      nuisanceProfileId,
+      nuisanceAssetVariantId,
+      assetVariantId: nuisanceAssetVariantId,
+      nuisanceEventRequired: isNuisance,
+      nuisanceEventOpened: false,
+      nuisanceEventResolved: false,
+      nuisanceCheckoutDelayMs: 0,
 
       patience: customerType.patience,
       spendBias: customerType.spendBias,
@@ -333,6 +421,41 @@ export const CustomerSystem = {
     // 진상 손님의 멘탈 페널티는 입장 시점이 아니라
     // 계산대 이벤트 모달이 실제로 열릴 때 main.js에서 1회만 적용한다.
     return customer;
+  },
+
+  pickNuisanceProfileIdForCustomer(customerType = {}, seedSource = "") {
+    if (customerType.id !== "difficult") {
+      return null;
+    }
+
+    const profileIds = getNuisanceProfileIds();
+
+    if (profileIds.length === 0) {
+      return null;
+    }
+
+    const seed = String(seedSource || `${GameState.day}-${this.customerIdCounter}`);
+    let hash = 0;
+
+    for (let index = 0; index < seed.length; index += 1) {
+      hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+    }
+
+    return profileIds[hash % profileIds.length] ?? null;
+  },
+
+  isNuisanceCustomerTypeOrAsset(customer = {}) {
+    const nuisanceAssetVariantId = customer.nuisanceAssetVariantId ?? customer.assetVariantId ?? null;
+    const assetProfileId = getNuisanceProfileIdForAssetVariantId(nuisanceAssetVariantId);
+
+    return (
+      customer.typeId === "difficult" ||
+      customer.customerTypeId === "difficult" ||
+      customer.isNuisance === true ||
+      Boolean(customer.nuisanceProfileId) ||
+      Boolean(assetProfileId) ||
+      isNuisanceCustomerAssetVariantId(nuisanceAssetVariantId)
+    );
   },
 
   pickCustomerEntryDialogue(customerType = {}, seedValue = 0) {
@@ -494,11 +617,16 @@ export const CustomerSystem = {
   pauseCustomerWaitTime() {
     this.isWaitTimePaused = true;
     this.isCustomerFlowPaused = true;
+    this.pauseInitialSpawnTimer();
   },
 
   resumeCustomerWaitTime() {
     this.isWaitTimePaused = false;
     this.isCustomerFlowPaused = GameState.phase !== GAME_PHASE.STORE_RUNNING;
+
+    if (!this.isCustomerFlowPaused) {
+      this.resumeInitialSpawnTimer();
+    }
   },
 
   updateCustomersByTick(amount) {
@@ -1153,21 +1281,22 @@ export const CustomerSystem = {
     this.stopInitialSpawnTimer();
     this.stopRouteTimer();
     this.stopSpawnTimer();
-    this.isCustomerFlowPaused = false;
+    this.isCustomerFlowPaused = true;
     this.isWaitTimePaused = false;
 
-    this.customers = this.customers.map((customer) => {
-      const shouldLeave =
+    this.customers.forEach((customer) => {
+      const shouldReportLeave =
         customer.status !== CUSTOMER_STATUS.LEAVING &&
         !customer.isSatisfied &&
         !customer.hasReportedLeft;
 
-      if (!shouldLeave) {
-        return customer;
+      if (shouldReportLeave) {
+        this.markCustomerAsLeaving(customer, "store_closed");
       }
-
-      return this.markCustomerAsLeaving(customer, "store_closed");
     });
+
+    this.customers = [];
+    this.pendingPickupQuantitiesByProductId = {};
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
@@ -1219,8 +1348,13 @@ export const CustomerSystem = {
       mood: customer.mood,
       nuisanceEffectApplied: customer.nuisanceEffectApplied === true,
       nuisanceTimeoutApplied: customer.nuisanceTimeoutApplied === true,
-      isNuisance: customer.isNuisance === true,
+      isNuisance: this.isNuisanceCustomerTypeOrAsset(customer),
       nuisanceProfileId: customer.nuisanceProfileId ?? null,
+      nuisanceAssetVariantId: customer.nuisanceAssetVariantId ?? customer.assetVariantId ?? null,
+      assetVariantId: customer.assetVariantId ?? customer.nuisanceAssetVariantId ?? null,
+      nuisanceEventRequired: customer.nuisanceEventRequired === true,
+      nuisanceEventOpened: customer.nuisanceEventOpened === true,
+      nuisanceEventResolved: customer.nuisanceEventResolved === true,
       nuisanceCheckoutDelayMs: Number(customer.nuisanceCheckoutDelayMs) || 0
     };
   },
@@ -1254,12 +1388,21 @@ export const CustomerSystem = {
       leaveReason: customer.leaveReason ?? null,
       leavingRenderTime: customer.leavingRenderTime ?? 0,
       bubbleText: customer.bubbleText ?? null,
-      isNuisance: customer.isNuisance === true,
-      nuisanceProfileId: customer.nuisanceProfileId ?? null
+      isNuisance: this.isNuisanceCustomerTypeOrAsset(customer),
+      nuisanceProfileId: customer.nuisanceProfileId ?? null,
+      nuisanceAssetVariantId: customer.nuisanceAssetVariantId ?? customer.assetVariantId ?? null,
+      assetVariantId: customer.assetVariantId ?? customer.nuisanceAssetVariantId ?? null,
+      nuisanceEventRequired: customer.nuisanceEventRequired === true,
+      nuisanceEventOpened: customer.nuisanceEventOpened === true,
+      nuisanceEventResolved: customer.nuisanceEventResolved === true
     };
   },
 
   getRenderableCustomers() {
+    if (GameState.phase !== GAME_PHASE.STORE_RUNNING) {
+      return [];
+    }
+
     return this.customers
       .filter((customer) => {
         const shouldRenderLeavingCustomer =
@@ -1465,12 +1608,27 @@ export const CustomerSystem = {
       return null;
     }
 
+    const nuisanceProfileId =
+      eventDetail.nuisanceProfileId ??
+      customer.nuisanceProfileId ??
+      getNuisanceProfileIdForAssetVariantId(
+        customer.nuisanceAssetVariantId ?? customer.assetVariantId
+      ) ??
+      null;
+    const nuisanceAssetVariantId =
+      customer.nuisanceAssetVariantId ??
+      customer.assetVariantId ??
+      getNuisanceAssetVariantIdForProfile(nuisanceProfileId, customer.id);
     const updatedCustomer = {
       ...customer,
       isNuisance: true,
-      nuisanceProfileId: eventDetail.nuisanceProfileId ?? customer.nuisanceProfileId ?? null,
-      nuisanceCheckoutDelayMs:
-        Number(eventDetail.nuisanceCheckoutDelayMs) || customer.nuisanceCheckoutDelayMs || NUISANCE_CHECKOUT_DELAY_MS
+      nuisanceProfileId,
+      nuisanceAssetVariantId,
+      assetVariantId: nuisanceAssetVariantId ?? customer.assetVariantId ?? null,
+      nuisanceEventRequired: true,
+      nuisanceEventOpened: true,
+      nuisanceEventResolved: customer.nuisanceEventResolved === true,
+      nuisanceCheckoutDelayMs: 0
     };
 
     this.replaceCustomer(updatedCustomer);
@@ -1478,11 +1636,54 @@ export const CustomerSystem = {
     return updatedCustomer;
   },
 
+  resolveNuisanceEventForCustomer(customerId, eventPayload = {}) {
+    if (!customerId) {
+      return null;
+    }
+
+    const customer = this.getCustomerById(customerId);
+
+    if (!customer || !this.isNuisanceCustomerTypeOrAsset(customer)) {
+      return null;
+    }
+
+    const updatedCustomer = {
+      ...customer,
+      isNuisance: true,
+      nuisanceProfileId:
+        eventPayload.nuisanceProfileId ?? customer.nuisanceProfileId ?? null,
+      nuisanceEventRequired: true,
+      nuisanceEventOpened: true,
+      nuisanceEventResolved: true,
+      // 선택지 처리 후 진상 손님은 공통적으로 5초 응대 후딜을 가진다.
+      nuisanceCheckoutDelayMs: NUISANCE_CHECKOUT_DELAY_MS
+    };
+
+    this.replaceCustomer(updatedCustomer);
+    EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+
+    return this.createCustomerPayload(updatedCustomer);
+  },
+
+  isNuisanceEventPendingForCustomer(customerId) {
+    const customer = this.getCustomerById(customerId);
+
+    return this.needsNuisanceEventBeforeCheckout(customer);
+  },
+
+  needsNuisanceEventBeforeCheckout(customer) {
+    return (
+      this.isCheckoutReadyCustomer(customer) &&
+      this.isNuisanceCustomerTypeOrAsset(customer) &&
+      customer.nuisanceEventResolved !== true
+    );
+  },
+
   getGuaranteedNuisanceEventTargetCustomer() {
     const candidates = this.getWaitingCustomers()
       .filter((customer) => {
         return (
-          customer.typeId === "difficult" &&
+          this.needsNuisanceEventBeforeCheckout(customer) &&
           RandomEventSystem.getGuaranteedNuisanceEventsForCustomer(
             customer,
             GameState.day
@@ -1520,7 +1721,9 @@ export const CustomerSystem = {
     for (const eventDetail of eventCandidates) {
       const eventCustomer =
         this.markCustomerNuisanceEvent(customer.id, eventDetail) ?? customer;
-      const payload = RandomEventSystem.createEventPayload(eventCustomer, eventDetail);
+      const payload = RandomEventSystem.createEventPayload(eventCustomer, eventDetail, {
+        forceEnableChoices: true
+      });
 
       if (payload) {
         return payload;
@@ -1561,5 +1764,13 @@ export const CustomerSystem = {
       this.markCustomerNuisanceEvent(customer.id, eventDetail) ?? customer;
 
     return RandomEventSystem.createEventPayload(eventCustomer, eventDetail);
+  },
+
+  getNowMs() {
+    return Math.floor(window.performance?.now?.() ?? 0);
+  },
+
+  isGamePaused() {
+    return Boolean(document.body?.classList?.contains("is-game-paused"));
   }
 };
