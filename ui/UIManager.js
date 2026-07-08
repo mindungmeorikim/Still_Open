@@ -45,6 +45,16 @@ const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const DEFAULT_CLEANING_POINT = Object.freeze(getCleaningPointByZoneId());
+const CUSTOMER_ENTRY_ROUTE_STEP_MS = 640;
+const CUSTOMER_ENTRY_ROUTE_SPLIT_X = 700;
+const CUSTOMER_ENTRY_LEFT_WAYPOINTS = Object.freeze([
+  Object.freeze({ x: 540, y: 635 })
+]);
+const CUSTOMER_ENTRY_RIGHT_WAYPOINTS = Object.freeze([
+  Object.freeze({ x: 560, y: 642 }),
+  Object.freeze({ x: 735, y: 625 })
+]);
+const CUSTOMER_ENTRY_ROUTE_TRANSITION = `left ${CUSTOMER_ENTRY_ROUTE_STEP_MS}ms ease-in-out, top ${CUSTOMER_ENTRY_ROUTE_STEP_MS}ms ease-in-out, transform 200ms ease, background 200ms ease, border-color 200ms ease`;
 const TUTORIAL_ORDER_TARGET_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const TUTORIAL_PRACTICE_RESET_REQUESTED = "TUTORIAL_PRACTICE_RESET_REQUESTED";
 const ORDER_VALIDATION_MESSAGES = Object.freeze({
@@ -4199,6 +4209,7 @@ renderDebugCollisionBoxes() {
       this.applyCustomerQueueOffset(customerNode, customer, counterQueueIndexes);
       this.renderCustomerNodeContent(customerNode, customer);
       customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
+      customerNode.dataset.lastCustomerZone = customer.currentZone ?? "";
     });
   },
 
@@ -4206,13 +4217,113 @@ renderDebugCollisionBoxes() {
     const position = this.getCustomerTargetPosition(customer);
 
     if (!position) {
+      this.clearCustomerEntryRoute(customerNode);
       customerNode.style.removeProperty("left");
       customerNode.style.removeProperty("top");
       return;
     }
 
     const offsetX = (index % 3) * 12;
-    customerNode.style.setProperty("left", `${position.x + offsetX}px`, "important");
+    const finalPosition = {
+      x: position.x + offsetX,
+      y: position.y
+    };
+    const routeKey = this.getCustomerEntryRouteKey(customer, finalPosition);
+
+    if (
+      customerNode.dataset.customerEntryRouteActive === "true" &&
+      customerNode.dataset.customerEntryRouteKey === routeKey
+    ) {
+      return;
+    }
+
+    if (this.shouldRunCustomerEntryRoute(customerNode, customer, routeKey)) {
+      this.runCustomerEntryRoute(customerNode, customer, finalPosition, index, routeKey);
+      return;
+    }
+
+    this.clearCustomerEntryRoute(customerNode);
+    this.setCustomerNodePosition(customerNode, finalPosition);
+  },
+
+  getCustomerEntryRouteKey(customer, finalPosition) {
+    return [
+      customer.customerId ?? "customer",
+      Math.round(finalPosition.x),
+      Math.round(finalPosition.y)
+    ].join(":");
+  },
+
+  shouldRunCustomerEntryRoute(customerNode, customer, routeKey) {
+    return (
+      customerNode.dataset.lastCustomerZone === "door" &&
+      this.isCustomerShelfZone(customer.currentZone) &&
+      customer.status === "shopping" &&
+      customerNode.dataset.customerEntryRouteCompleted !== routeKey
+    );
+  },
+
+  runCustomerEntryRoute(customerNode, customer, finalPosition, index = 0, routeKey = "") {
+    const routePoints = this.getCustomerEntryRoutePoints(finalPosition, index);
+
+    this.clearCustomerEntryRoute(customerNode);
+    customerNode.dataset.customerEntryRouteKey = routeKey;
+    customerNode.dataset.customerEntryRouteActive = "true";
+    customerNode.dataset.customerEntryRouteCompleted = "";
+    customerNode.classList.add("customer-entry-routing");
+    customerNode.style.setProperty("transition", CUSTOMER_ENTRY_ROUTE_TRANSITION, "important");
+
+    this.setCustomerNodePosition(customerNode, routePoints[0]);
+
+    customerNode._customerEntryRouteTimers = routePoints.slice(1).map((routePoint, routeIndex) => {
+      return window.setTimeout(() => {
+        this.setCustomerNodePosition(customerNode, routePoint);
+
+        if (routeIndex === routePoints.length - 2) {
+          customerNode.dataset.customerEntryRouteActive = "false";
+          customerNode.dataset.customerEntryRouteCompleted = routeKey;
+          customerNode.classList.remove("customer-entry-routing");
+          customerNode.style.removeProperty("transition");
+          customerNode._customerEntryRouteTimers = [];
+        }
+      }, CUSTOMER_ENTRY_ROUTE_STEP_MS * (routeIndex + 1));
+    });
+  },
+
+  getCustomerEntryRoutePoints(finalPosition, index = 0) {
+    const laneOffsetX = (index % 3) * 10;
+    const laneOffsetY = (index % 2) * 6;
+    const baseWaypoints = finalPosition.x >= CUSTOMER_ENTRY_ROUTE_SPLIT_X
+      ? CUSTOMER_ENTRY_RIGHT_WAYPOINTS
+      : CUSTOMER_ENTRY_LEFT_WAYPOINTS;
+    const waypoints = baseWaypoints.map((waypoint) => {
+      return {
+        x: waypoint.x + laneOffsetX,
+        y: waypoint.y + laneOffsetY
+      };
+    });
+
+    return [
+      ...waypoints,
+      finalPosition
+    ];
+  },
+
+  clearCustomerEntryRoute(customerNode) {
+    if (Array.isArray(customerNode._customerEntryRouteTimers)) {
+      customerNode._customerEntryRouteTimers.forEach((timerId) => {
+        window.clearTimeout(timerId);
+      });
+    }
+
+    customerNode._customerEntryRouteTimers = [];
+    customerNode.dataset.customerEntryRouteActive = "false";
+    customerNode.classList.remove("customer-entry-routing");
+    customerNode.style.removeProperty("transition");
+  },
+
+  setCustomerNodePosition(customerNode, position) {
+    customerNode.style.setProperty("left", `${position.x}px`, "important");
     customerNode.style.setProperty("top", `${position.y}px`, "important");
   },
 
