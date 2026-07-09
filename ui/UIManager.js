@@ -30,7 +30,6 @@ import {
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
 import { AudioSystem } from "../systems/AudioSystem.js";
-import { ResponsiveLayoutSystem } from "../systems/ResponsiveLayoutSystem.js";
 import { CURRENCY_EVENTS } from "../systems/EconomySystem.js";
 import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
 import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
@@ -7406,16 +7405,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
             safeArea.top + safeArea.height * 0.62
           );
 
-    const responsiveZoomBias = ResponsiveLayoutSystem.getCameraZoomBias?.() ?? 1;
-    const responsiveFollowZoom = (Number(this.worldCamera.followZoom) || 1.08) * responsiveZoomBias;
     const minimumFollowZoom = Math.max(
       this.getWorldCoverZoom(),
-      responsiveFollowZoom
+      Number(this.worldCamera.followZoom) || 1.08
     );
-    const currentZoom = Number(this.worldCamera.zoom) || 0;
-    const requestedZoom = ResponsiveLayoutSystem.isCompactMode?.()
-      ? Math.max(this.getWorldCoverZoom(), Math.min(currentZoom || minimumFollowZoom, minimumFollowZoom + 0.12))
-      : Math.max(currentZoom, minimumFollowZoom);
+    const requestedZoom = Math.max(Number(this.worldCamera.zoom) || 0, minimumFollowZoom);
     const zoom = options.applyZoom === true
       ? this.setStoreCameraZoom(requestedZoom, false)
       : Math.min(this.worldCamera.maxZoom, Math.max(this.getStoreCameraMinZoom(), requestedZoom));
@@ -7738,21 +7732,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   getStoreCameraSafeArea(viewportWidth = 960, viewportHeight = 540) {
-    const bias = ResponsiveLayoutSystem.getCameraSafeAreaBias?.() ?? {
-      top: 1,
-      bottom: 1,
-      left: 1,
-      right: 1
-    };
-    const isCompact = ResponsiveLayoutSystem.isCompactMode?.() === true;
-    const leftBase = Math.max(72, Math.min(170, viewportWidth * 0.16));
-    const rightBase = Math.max(56, Math.min(96, viewportWidth * 0.09));
-    const topBase = Math.max(58, Math.min(96, viewportHeight * 0.12));
-    const bottomBase = Math.max(84, Math.min(116, viewportHeight * 0.15));
-    const left = Math.max(isCompact ? 46 : 72, Math.round(leftBase * bias.left));
-    const right = Math.max(isCompact ? 34 : 56, Math.round(rightBase * bias.right));
-    const top = Math.max(isCompact ? 36 : 58, Math.round(topBase * bias.top));
-    const bottom = Math.max(isCompact ? 54 : 84, Math.round(bottomBase * bias.bottom));
+    const left = Math.max(72, Math.min(170, viewportWidth * 0.16));
+    const right = Math.max(56, Math.min(96, viewportWidth * 0.09));
+    const top = Math.max(58, Math.min(96, viewportHeight * 0.12));
+    const bottom = Math.max(84, Math.min(116, viewportHeight * 0.15));
 
     return {
       left,
@@ -7816,15 +7799,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const safeArea = this.getStoreCameraSafeArea(viewportWidth, viewportHeight);
     const sceneWidth = Math.max(1, Number(scene.focusWidth) || Number(scene.width) || 560);
     const sceneHeight = Math.max(1, Number(scene.focusHeight) || Number(scene.height) || 360);
-    const zoomBias = ResponsiveLayoutSystem.getCameraZoomBias?.() ?? 1;
-    const paddingBias = ResponsiveLayoutSystem.getCameraFocusPaddingBias?.() ?? 1;
-    const widthZoom = safeArea.width / (sceneWidth * (1.08 + (1 - paddingBias) * 0.14));
-    const heightZoom = safeArea.height / (sceneHeight * (1.18 + (1 - paddingBias) * 0.18));
+    const widthZoom = safeArea.width / (sceneWidth * 1.08);
+    const heightZoom = safeArea.height / (sceneHeight * 1.18);
     const coverZoom = this.getWorldCoverZoom();
-    const targetZoom = Math.min(widthZoom, heightZoom, this.worldCamera.maxZoom) * zoomBias;
+    const targetZoom = Math.min(widthZoom, heightZoom, this.worldCamera.maxZoom);
 
     return Math.max(
-      coverZoom + 0.16 * zoomBias,
+      coverZoom + 0.16,
       Math.min(this.worldCamera.maxZoom, targetZoom)
     );
   },
@@ -7850,10 +7831,9 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const viewportWidth = viewport.clientWidth || 960;
     const viewportHeight = viewport.clientHeight || 560;
     const coverZoom = this.getWorldCoverZoom();
-    const zoomBias = ResponsiveLayoutSystem.getCameraZoomBias?.() ?? 1;
     const unifiedStoreZoom = Math.max(
       coverZoom,
-      Math.min(this.worldCamera.maxZoom, viewportWidth / 1260, viewportHeight / 760) * zoomBias
+      Math.min(this.worldCamera.maxZoom, viewportWidth / 1260, viewportHeight / 760)
     );
     const zoom = this.setStoreCameraZoom(unifiedStoreZoom, false);
     const storeCenterX = 839;
