@@ -29079,3 +29079,275 @@ body:not(.is-tutorial-active) #daily-reward-modal.modal:not(.hidden) .daily-rewa
   border-radius: 9999px !important;
   box-sizing: border-box !important;
 }
+
+
+/* ===========================================================================
+   [v8.10.10] 16:9 popup coverage expansion, order/shop untouched
+   - 발주창(#order-modal)과 상점창(#bm-contract-shop-modal)은 기존 상태를 유지하고 신규 보정 대상에서 제외한다.
+   - 브리핑/정산/알바/업그레이드/보상함/도움말/설정/구매확인/엔딩/무한모드/손님이벤트만 16:9 게임 프레임 안으로 추가 고정한다.
+   - 월드, 카메라, game-world transform, 오브젝트/충돌/상호작용 좌표는 수정하지 않는다.
+   =========================================================================== */
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #upgrade-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #daily-reward-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #daily-mission-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #reward-inbox-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #settings-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]),
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) {
+  position: fixed !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: var(--so-ui-frame-left) !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: var(--so-ui-frame-width) !important;
+  height: var(--so-ui-frame-height) !important;
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: var(--so-ui-frame-pad) !important;
+  overflow: hidden !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #upgrade-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #settings-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) > .modal-content,
+body:not(.is-tutorial-active) #daily-mission-modal.modal:not(.hidden):not([hidden]) > .daily-mission-modal-content,
+body:not(.is-tutorial-active) #reward-inbox-modal.modal:not(.hidden):not([hidden]) > .reward-inbox-modal-content,
+body:not(.is-tutorial-active) #daily-reward-modal.modal:not(.hidden):not([hidden]) > .daily-reward-frame {
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: auto !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+
+/* 브리핑: 발주하러 가기 버튼이 16:9 하단에서 잘리지 않도록 최종 고정 */
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-modal-content {
+  width: min(100%, 1040px) !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  padding: clamp(8px, 1.6vmin, 14px) clamp(10px, 2vmin, 18px) !important;
+  gap: clamp(6px, 1.2vmin, 10px) clamp(10px, 2vmin, 16px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-title {
+  font-size: clamp(18px, 3.3vmin, 22px) !important;
+  line-height: 1.18 !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-subtitle,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-story,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) #day-scenario-market-message {
+  font-size: clamp(11px, 2.05vmin, 13px) !important;
+  line-height: 1.34 !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-goal-box,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-market-box,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-features,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-tip {
+  min-height: 0 !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-goal-box > div,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-market-box,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-tip {
+  padding: clamp(7px, 1.4vmin, 10px) !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-market-box,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-features {
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-features li,
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) #day-scenario-recommend-list li {
+  padding: clamp(6px, 1.2vmin, 8px) clamp(8px, 1.4vmin, 10px) !important;
+  font-size: clamp(10.5px, 1.85vmin, 12px) !important;
+  line-height: 1.28 !important;
+}
+
+body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) #day-scenario-confirm-button.day-scenario-confirm-button {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 5 !important;
+  align-self: stretch !important;
+  min-height: clamp(34px, 6vmin, 40px) !important;
+  max-height: 42px !important;
+  margin: 0 !important;
+  padding: 0 clamp(16px, 3vmin, 24px) !important;
+  font-size: clamp(12px, 2.1vmin, 14px) !important;
+  box-shadow: 0 -4px 0 rgba(255, 255, 255, 0.36), 0 8px 0 rgba(122, 73, 12, 0.22) !important;
+}
+
+/* 추가 팝업: 주요 모달들을 프레임 안에서 내부 스크롤 처리 */
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-content,
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) .ending-modal-content,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-modal-content,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-modal-content {
+  display: flex !important;
+  flex-direction: column !important;
+  width: min(100%, 520px) !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  padding: clamp(14px, 2.6vmin, 24px) !important;
+}
+
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-body,
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) .ending-reward-box,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-reasons,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-choice-list,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) #customer-event-result-text {
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-actions,
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) .ending-continue-button,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-reset-button,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-close-button {
+  flex: 0 0 auto !important;
+}
+
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) .ending-continue-button,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-reset-button,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-close-button {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 3 !important;
+  min-height: clamp(36px, 6.5vmin, 44px) !important;
+  margin-top: clamp(8px, 1.6vmin, 14px) !important;
+}
+
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-choice-list {
+  flex: 1 1 auto !important;
+  padding-right: 4px !important;
+}
+
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-modal-dialogue,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-modal-summary,
+body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-modal-meta,
+body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) .ending-description,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-description,
+body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-reset-box p {
+  font-size: clamp(11.5px, 2.05vmin, 14px) !important;
+  line-height: 1.36 !important;
+}
+
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-card {
+  min-height: 0 !important;
+}
+
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-image-box {
+  flex-basis: clamp(56px, 10vmin, 76px) !important;
+  width: clamp(56px, 10vmin, 76px) !important;
+  height: clamp(56px, 10vmin, 76px) !important;
+}
+
+body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-image-box img {
+  max-width: clamp(46px, 8.4vmin, 64px) !important;
+  max-height: clamp(46px, 8.4vmin, 64px) !important;
+}
+
+/* 도움말: 튜토리얼 도움말 카드가 16:9 프레임 밖으로 커지지 않게 카드만 제한 */
+#tutorial-overlay:not(.hidden) .tutorial-card {
+  max-width: min(360px, calc(var(--so-ui-frame-width) - 24px)) !important;
+  max-height: calc(var(--so-ui-frame-height) - 24px) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+#tutorial-overlay:not(.hidden) .tutorial-actions {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 4 !important;
+  padding-top: 6px !important;
+  background: inherit !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #result-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #upgrade-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #daily-reward-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #daily-mission-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #reward-inbox-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #settings-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]),
+  body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) {
+    padding: clamp(6px, 1.2vmin, 10px) !important;
+  }
+
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-modal-content {
+    grid-template-columns: minmax(260px, 0.9fr) minmax(300px, 1.1fr) !important;
+    gap: 5px 10px !important;
+    padding: 7px 9px !important;
+  }
+
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-kicker,
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-subtitle,
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-story,
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) #day-scenario-market-message,
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-tip {
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+  }
+
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-title {
+    font-size: 18px !important;
+  }
+
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-goal-box > div,
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-market-box,
+  body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden):not([hidden]) .day-scenario-tip {
+    padding: 6px 8px !important;
+  }
+
+  body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-content,
+  body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden):not([hidden]) .ending-modal-content,
+  body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden):not([hidden]) .infinite-game-over-modal-content,
+  body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-modal-content {
+    width: min(100%, 500px) !important;
+    padding: 12px !important;
+  }
+
+  body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not([hidden]) .bm-purchase-confirm-card {
+    gap: 10px !important;
+    padding: 10px !important;
+  }
+
+  body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden):not([hidden]) .customer-event-choice-button {
+    min-height: 44px !important;
+    padding: 8px 10px !important;
+  }
+}
