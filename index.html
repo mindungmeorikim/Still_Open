@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2f6f4e" />
   <title>오늘도 정상영업</title>
+  <link rel="manifest" href="./manifest.json" />
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="./mobile_ui.css" />
 </head>
@@ -59,5 +61,14 @@
   </div>
 
   <script type="module" src="./main.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch((error) => {
+          console.warn("Service worker registration failed:", error);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

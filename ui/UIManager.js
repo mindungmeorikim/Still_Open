@@ -2672,7 +2672,7 @@ export const UIManager = {
           <img
             id="title-screen-logo"
             class="title-logo"
-            src="./assets/title/logo/game_logo_hq_safe.png"
+            src="./assets/title/logo/game_logo_title.png"
             alt="오늘도 정상영업"
             draggable="false"
           />
