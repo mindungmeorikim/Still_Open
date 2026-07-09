@@ -2,6 +2,8 @@ const DESKTOP_MODE = "desktop";
 const TABLET_MODE = "tablet";
 const MOBILE_LANDSCAPE_MODE = "mobile-landscape";
 const MOBILE_SMALL_MODE = "mobile-small";
+const MOBILE_LANDSCAPE_CLASS = "is-mobile-landscape";
+const COMPACT_LANDSCAPE_CLASS = "is-compact-landscape";
 
 const RESPONSIVE_CHANGE_EVENT = "stillopen:responsive-layout-changed";
 
@@ -22,6 +24,23 @@ function getVisualViewportSize() {
   };
 }
 
+function getPointerContext() {
+  const isCoarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
+  const maxTouchPoints = typeof navigator !== "undefined"
+    ? Number(navigator.maxTouchPoints || 0)
+    : 0;
+  const hasTouch = maxTouchPoints > 0 || "ontouchstart" in window;
+
+  return {
+    isCoarsePointer,
+    hasTouch
+  };
+}
+
+function getAspectRatio(width, height) {
+  return height > 0 ? width / height : 0;
+}
+
 function getGameFrameRect(viewport) {
   const gameRoot = document.getElementById("game-root");
   const rect = gameRoot?.getBoundingClientRect?.();
@@ -39,8 +58,8 @@ function getGameFrameRect(viewport) {
   const frameHeight = Math.min(viewport.height, viewport.width * 9 / 16);
 
   return {
-    left: Math.round((viewport.width - frameWidth) / 2),
-    top: Math.round((viewport.height - frameHeight) / 2),
+    left: Math.round(viewport.offsetLeft + (viewport.width - frameWidth) / 2),
+    top: Math.round(viewport.offsetTop + (viewport.height - frameHeight) / 2),
     width: Math.round(frameWidth),
     height: Math.round(frameHeight)
   };
@@ -50,17 +69,29 @@ function detectMode(width, height) {
   const isLandscape = width >= height;
   const shortSide = Math.min(width, height);
   const longSide = Math.max(width, height);
-  const isCoarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches === true;
+  const aspectRatio = getAspectRatio(width, height);
+  const { isCoarsePointer, hasTouch } = getPointerContext();
+  const isTouchLike = isCoarsePointer || hasTouch;
+  const isCompactLandscape =
+    isLandscape &&
+    (
+      (height <= 820 && aspectRatio >= 1.45) ||
+      (isTouchLike && aspectRatio >= 1.25)
+    );
 
-  if (isLandscape && (height <= 430 || width <= 760)) {
+  if (isLandscape && ((height <= 560 && aspectRatio >= 1.45) || width <= 760)) {
     return MOBILE_SMALL_MODE;
+  }
+
+  if (isCompactLandscape) {
+    return MOBILE_LANDSCAPE_MODE;
   }
 
   if (isLandscape && (height <= 640 || width <= 1180 || isCoarsePointer)) {
     return MOBILE_LANDSCAPE_MODE;
   }
 
-  if (shortSide <= 720 || longSide <= 1280 || isCoarsePointer) {
+  if (shortSide <= 720 || longSide <= 1280 || isTouchLike) {
     return TABLET_MODE;
   }
 
@@ -70,21 +101,21 @@ function detectMode(width, height) {
 function getScales(mode, width, height) {
   if (mode === MOBILE_SMALL_MODE) {
     return {
-      uiScale: clamp(height / 430, 0.68, 0.78),
-      hudScale: clamp(height / 460, 0.58, 0.68),
-      bottomScale: clamp(height / 460, 0.62, 0.72),
-      joystickScale: clamp(height / 520, 0.60, 0.70),
-      popupScale: clamp(height / 500, 0.72, 0.82)
+      uiScale: clamp(height / 560, 0.62, 0.76),
+      hudScale: clamp(height / 620, 0.52, 0.64),
+      bottomScale: clamp(height / 620, 0.56, 0.68),
+      joystickScale: clamp(height / 680, 0.50, 0.64),
+      popupScale: clamp(height / 620, 0.68, 0.80)
     };
   }
 
   if (mode === MOBILE_LANDSCAPE_MODE) {
     return {
-      uiScale: clamp(height / 620, 0.78, 0.9),
-      hudScale: clamp(height / 680, 0.66, 0.82),
-      bottomScale: clamp(height / 680, 0.70, 0.84),
-      joystickScale: clamp(height / 760, 0.66, 0.78),
-      popupScale: clamp(height / 680, 0.80, 0.9)
+      uiScale: clamp(height / 760, 0.72, 0.86),
+      hudScale: clamp(height / 820, 0.56, 0.74),
+      bottomScale: clamp(height / 840, 0.60, 0.76),
+      joystickScale: clamp(height / 920, 0.56, 0.70),
+      popupScale: clamp(height / 780, 0.76, 0.88)
     };
   }
 
@@ -110,23 +141,23 @@ function getScales(mode, width, height) {
 function getCameraProfile(mode) {
   if (mode === MOBILE_SMALL_MODE) {
     return {
-      zoomBias: 0.84,
-      focusPaddingBias: 0.62,
-      topBias: 0.66,
-      bottomBias: 0.78,
-      leftBias: 0.68,
-      rightBias: 0.72
+      zoomBias: 0.78,
+      focusPaddingBias: 0.56,
+      topBias: 0.58,
+      bottomBias: 0.68,
+      leftBias: 0.62,
+      rightBias: 0.66
     };
   }
 
   if (mode === MOBILE_LANDSCAPE_MODE) {
     return {
-      zoomBias: 0.9,
-      focusPaddingBias: 0.72,
-      topBias: 0.72,
-      bottomBias: 0.84,
-      leftBias: 0.74,
-      rightBias: 0.8
+      zoomBias: 0.84,
+      focusPaddingBias: 0.66,
+      topBias: 0.64,
+      bottomBias: 0.76,
+      leftBias: 0.68,
+      rightBias: 0.72
     };
   }
 
@@ -214,23 +245,44 @@ export const ResponsiveLayoutSystem = {
     const scales = getScales(mode, viewport.width, viewport.height);
     const frame = getGameFrameRect(viewport);
     const isCompact = mode !== DESKTOP_MODE;
+    const isCompactLandscape = mode === MOBILE_LANDSCAPE_MODE || mode === MOBILE_SMALL_MODE;
     const safeTopPx = isCompact ? Math.round(clamp(viewport.height * 0.012, 4, 10)) : 0;
     const safeBottomPx = isCompact ? Math.round(clamp(viewport.height * 0.014, 5, 12)) : 0;
     const popupPadding = Math.round(clamp(18 * scales.popupScale, 8, 18));
     const modalMaxWidth = Math.max(280, frame.width - popupPadding * 2);
     const modalMaxHeight = Math.max(180, frame.height - popupPadding * 2);
     const cameraProfile = getCameraProfile(mode);
-    const hudButtonSize = Math.round(clamp(viewport.height * 0.078 * scales.hudScale, 28, 48));
-    const dayCardWidth = Math.round(clamp(viewport.width * 0.14, 88, 128));
-    const dayCardHeight = Math.round(clamp(viewport.height * 0.11, 40, 56));
-    const statusWidth = Math.round(clamp(viewport.width * 0.44, 230, 470));
-    const topUiRight = Math.round(clamp(viewport.width * 0.2, 128, 168));
-    const bottomActionWidth = Math.round(clamp(viewport.width * 0.38, 218, 360));
-    const bottomStartWidth = Math.round(clamp(viewport.width * 0.18, 126, 210));
-    const dockButtonHeight = Math.round(clamp(viewport.height * 0.112, 42, 58));
-    const openButtonHeight = Math.round(clamp(viewport.height * 0.124, 48, 66));
-    const joystickSize = Math.round(clamp(viewport.height * 0.16 * scales.joystickScale, 56, 84));
-    const joystickBottom = Math.round(safeBottomPx + dockButtonHeight + 12);
+    const hudButtonSize = Math.round(isCompactLandscape
+      ? clamp(viewport.height * 0.072 * scales.hudScale, 28, 42)
+      : clamp(viewport.height * 0.078 * scales.hudScale, 28, 48));
+    const dayCardWidth = Math.round(isCompactLandscape
+      ? clamp(frame.width * 0.095, 78, 108)
+      : clamp(viewport.width * 0.14, 88, 128));
+    const dayCardHeight = Math.round(isCompactLandscape
+      ? clamp(viewport.height * 0.076, 34, 46)
+      : clamp(viewport.height * 0.11, 40, 56));
+    const statusWidth = Math.round(isCompactLandscape
+      ? clamp(frame.width * 0.33, 220, 360)
+      : clamp(viewport.width * 0.44, 230, 470));
+    const topUiRight = Math.round(isCompactLandscape
+      ? clamp(frame.width * 0.18, 188, 224)
+      : clamp(viewport.width * 0.2, 128, 168));
+    const bottomActionWidth = Math.round(isCompactLandscape
+      ? clamp(frame.width * 0.27, 176, 300)
+      : clamp(viewport.width * 0.38, 218, 360));
+    const bottomStartWidth = Math.round(isCompactLandscape
+      ? clamp(frame.width * 0.145, 104, 170)
+      : clamp(viewport.width * 0.18, 126, 210));
+    const dockButtonHeight = Math.round(isCompactLandscape
+      ? clamp(viewport.height * 0.082 * scales.bottomScale, 34, 46)
+      : clamp(viewport.height * 0.112, 42, 58));
+    const openButtonHeight = Math.round(isCompactLandscape
+      ? clamp(viewport.height * 0.092 * scales.bottomScale, 40, 54)
+      : clamp(viewport.height * 0.124, 48, 66));
+    const joystickSize = Math.round(isCompactLandscape
+      ? clamp(viewport.height * 0.13 * scales.joystickScale, 46, 68)
+      : clamp(viewport.height * 0.16 * scales.joystickScale, 56, 84));
+    const joystickBottom = Math.round(safeBottomPx + dockButtonHeight + (isCompactLandscape ? 8 : 12));
     const cameraControlsTop = Math.round(safeTopPx + dayCardHeight + 8);
     const nextState = {
       mode,
@@ -238,6 +290,8 @@ export const ResponsiveLayoutSystem = {
       height: viewport.height,
       isLandscape: viewport.width >= viewport.height,
       isCompact,
+      isMobileLandscape: isCompactLandscape,
+      isCompactLandscape,
       frame,
       safeTopPx,
       safeBottomPx,
@@ -291,6 +345,8 @@ export const ResponsiveLayoutSystem = {
     const root = document.documentElement;
     const gameRoot = document.getElementById("game-root");
     const targets = [root, gameRoot].filter(Boolean);
+    const isMobileLandscape = state.isMobileLandscape === true;
+    const isCompactLandscape = state.isCompactLandscape === true;
     const variables = {
       "--ui-scale": state.uiScale.toFixed(3),
       "--hud-scale": state.hudScale.toFixed(3),
@@ -324,10 +380,14 @@ export const ResponsiveLayoutSystem = {
 
     root.dataset.responsiveMode = state.mode;
     root.dataset.responsiveCompact = state.isCompact ? "true" : "false";
+    root.classList.toggle(MOBILE_LANDSCAPE_CLASS, isMobileLandscape);
+    root.classList.toggle(COMPACT_LANDSCAPE_CLASS, isCompactLandscape);
 
     if (gameRoot) {
       gameRoot.dataset.responsiveMode = state.mode;
       gameRoot.dataset.responsiveCompact = state.isCompact ? "true" : "false";
+      gameRoot.classList.toggle(MOBILE_LANDSCAPE_CLASS, isMobileLandscape);
+      gameRoot.classList.toggle(COMPACT_LANDSCAPE_CLASS, isCompactLandscape);
     }
 
     targets.forEach((target) => setVariables(target, variables));
