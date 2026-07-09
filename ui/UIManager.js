@@ -9787,6 +9787,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     `;
 
     yesButton.onclick = () => {
+      if (this.shouldBlockBMDiamondPurchase(options.requiredDiamond)) {
+        this.hideBMShopPurchaseConfirm();
+        return;
+      }
       this.hideBMShopPurchaseConfirm();
       if (typeof onConfirm === "function") {
         onConfirm();
@@ -9805,6 +9809,26 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (!this.bmPurchaseConfirmModal) return;
 
     this.bmPurchaseConfirmModal.classList.add("hidden");
+  },
+
+  normalizeBMDiamondPrice(price) {
+    return Math.max(0, Math.floor(Number(price) || 0));
+  },
+
+  getBMDiamondBalance() {
+    return Math.max(0, Math.floor(Number(BMSystem.getBMState()?.diamond) || 0));
+  },
+
+  canAffordBMDiamondPrice(price) {
+    return this.getBMDiamondBalance() >= this.normalizeBMDiamondPrice(price);
+  },
+
+  shouldBlockBMDiamondPurchase(price) {
+    if (price === undefined || price === null) return false;
+    const requiredDiamond = this.normalizeBMDiamondPrice(price);
+    if (this.canAffordBMDiamondPrice(requiredDiamond)) return false;
+    this.showMessage(`다이아가 부족합니다. 필요 다이아: ${requiredDiamond.toLocaleString("ko-KR")}`);
+    return true;
   },
 
   createBMShopResultModal() {
@@ -10462,7 +10486,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       ${this.createBMShopSubTabIntroMarkup("골드 충전", "발주, 계약, 강화에 쓰는 기본 재화입니다.")}
       <div class="bm-shop-card-grid bm-currency-product-grid">
         ${goldProducts.map((product) => {
-          const canBuy = BMSystem.getBMState().diamond >= product.diamondPrice;
+          const canBuy = this.canAffordBMDiamondPrice(product.diamondPrice);
           return `
             <article class="bm-contract-shop-card bm-shop-action-card bm-currency-card ${canBuy ? "is-purchasable" : "is-not-enough-diamond"}">
               ${this.createBMAssetImageMarkup(this.getBMGoldProductImagePath(product), product.name)}
@@ -10704,6 +10728,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const price = Number(peakState.purchasePriceDiamond ?? 20);
     const owned = Number(peakState.ownedCount ?? 0);
     const discountText = peakState.discountActive ? "광고 할인 적용 중: 10다이아" : "기본 가격 20다이아";
+    const canPurchase = this.canAffordBMDiamondPrice(price);
 
     return `
       <article class="bm-contract-shop-card bm-tool-card bm-peak-coupon-card">
@@ -10715,7 +10740,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
           <small>${peakState.message ?? ""}</small>
         </div>
         <div class="bm-tool-actions">
-          <button id="bm-peak-coupon-purchase-button" class="bm-peak-coupon-button" type="button">${price}다이아 구매</button>
+          <button id="bm-peak-coupon-purchase-button" class="bm-peak-coupon-button" type="button" ${canPurchase ? "" : "disabled"}>${price}다이아 구매</button>
           <button id="bm-peak-coupon-use-button" class="bm-peak-coupon-button" type="button" ${peakState.canUse ? "" : "disabled"}>사용</button>
         </div>
       </article>
@@ -10984,11 +11009,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
           return;
         }
 
+        if (this.shouldBlockBMDiamondPurchase(product.diamondPrice)) return;
         this.showBMShopPurchaseConfirm({
           product: { ...product, imagePath: this.getBMGoldProductImagePath(product) },
           priceText: `${product.diamondPrice.toLocaleString("ko-KR")}다이아`,
           description: `${product.goldAmount.toLocaleString("ko-KR")}골드를 충전합니다.`,
-          confirmMessage: "해당 골드 상품을 구매하시겠습니까?"
+          confirmMessage: "해당 골드 상품을 구매하시겠습니까?",
+          requiredDiamond: product.diamondPrice
         }, () => {
           EventBus.emit(BM_EVENTS.GOLD_PRODUCT_PURCHASE_REQUESTED, { productId: button.dataset.productId });
         });
@@ -11035,8 +11062,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const isPurchased = BMSystem.isPremiumProductPurchased(product.id);
     const isZoneUnlocked = BMSystem.isZoneUnlocked(product.requiredZoneId);
     const diamondPrice = Number(product.diamondPrice) || 0;
-    const bmState = BMSystem.getBMState();
-    const hasEnoughDiamond = bmState.diamond >= diamondPrice;
+    const hasEnoughDiamond = this.canAffordBMDiamondPrice(diamondPrice);
 
     if (isPurchased) return { className: "is-owned", canPurchase: false, buttonText: "보유 중", message: "프리미엄 상품 구매 완료" };
     if (!isZoneUnlocked) return { className: "is-locked", canPurchase: false, buttonText: "구역 필요", message: "상품이 배치된 구역 해금 필요" };
@@ -11055,11 +11081,14 @@ renderShelfWarningIcons(node, shelfInstanceId) {
           return;
         }
 
+        const diamondPrice = Number(product.diamondPrice) || 0;
+        if (this.shouldBlockBMDiamondPurchase(diamondPrice)) return;
         this.showBMShopPurchaseConfirm({
           product,
           priceText: `${(Number(product.diamondPrice) || 0).toLocaleString("ko-KR")}다이아`,
           description: "프리미엄 상품을 구매하면 해당 상품의 판매 조건을 보유합니다.",
-          confirmMessage: "해당 프리미엄 상품을 구매하시겠습니까?"
+          confirmMessage: "해당 프리미엄 상품을 구매하시겠습니까?",
+          requiredDiamond: diamondPrice
         }, () => {
           EventBus.emit(BM_EVENTS.PREMIUM_PRODUCT_PURCHASE_REQUESTED, { day: GameState.day, productId });
         });
@@ -11074,12 +11103,14 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       if (button.disabled) return;
       const skipState = BMSystem.getBMState().contractUnlockSkip ?? {};
       const price = Number(skipState.priceDiamond ?? 50);
+      if (this.shouldBlockBMDiamondPurchase(price)) return;
       this.showBMShopPurchaseConfirm({
         title: "스킵권 사용 확인",
         product: { id: "contract_unlock_skip", name: "판매권 해금 대기일 스킵권", imagePath: BM_ASSETS.items.skip3Day },
         priceText: `${price.toLocaleString("ko-KR")}다이아`,
         description: "다음 판매권 2종을 상점에 즉시 해금합니다.",
-        confirmMessage: "판매권 해금 대기일 스킵권을 사용하시겠습니까?"
+        confirmMessage: "판매권 해금 대기일 스킵권을 사용하시겠습니까?",
+        requiredDiamond: price
       }, () => {
         EventBus.emit(BM_EVENTS.CONTRACT_UNLOCK_SKIP_REQUESTED, { day: GameState.day });
       });
@@ -11094,12 +11125,14 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         if (purchaseButton.disabled) return;
         const peakState = BMSystem.getBMState().peakCoupon ?? {};
         const price = Number(peakState.purchasePriceDiamond ?? 20);
+        if (this.shouldBlockBMDiamondPurchase(price)) return;
         this.showBMShopPurchaseConfirm({
           title: "쿠폰 구매 확인",
           product: { id: "peak_time_coupon", name: "피크타임 쿠폰", imagePath: BM_ASSETS.coupons.peakTime },
           priceText: `${price.toLocaleString("ko-KR")}다이아`,
           description: "구매하면 피크타임 쿠폰 1장을 보유합니다.",
-          confirmMessage: "피크타임 쿠폰을 구매하시겠습니까?"
+          confirmMessage: "피크타임 쿠폰을 구매하시겠습니까?",
+          requiredDiamond: price
         }, () => {
           EventBus.emit(BM_EVENTS.PEAK_COUPON_PURCHASE_REQUESTED, { day: GameState.day });
         });
@@ -11203,12 +11236,15 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         const abilityKey = button.dataset.abilityKey;
         const state = BMSystem.getStaffAbilityUpgradeState();
         const label = BMSystem.getStaffAbilityLabel(abilityKey);
+        const price = Number(state.priceDiamond ?? 80);
+        if (this.shouldBlockBMDiamondPurchase(price)) return;
         this.showBMShopPurchaseConfirm({
           title: "알바 강화 확인",
           product: { id: `staff_upgrade_${abilityKey}`, name: `알바 ${label} 강화`, imagePath: BM_ASSETS.staff.upgrade },
-          priceText: `${Number(state.priceDiamond ?? 80).toLocaleString("ko-KR")}다이아`,
+          priceText: `${price.toLocaleString("ko-KR")}다이아`,
           description: `알바 ${label} 능력을 1칸 강화합니다.`,
-          confirmMessage: "알바 능력을 강화하시겠습니까?"
+          confirmMessage: "알바 능력을 강화하시겠습니까?",
+          requiredDiamond: price
         }, () => {
           EventBus.emit(BM_EVENTS.STAFF_ABILITY_UPGRADE_REQUESTED, { day: GameState.day, abilityKey });
         });
