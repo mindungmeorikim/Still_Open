@@ -101,7 +101,7 @@ export const GameFlowSystem = {
   */
   dayBalanceTable: {
     1: {
-      targetRevenue: 30000,
+      targetRevenue: 25000,
       targetSatisfaction: 70,
       difficulty: {
         customerSpawnRate: 1.0,
@@ -111,7 +111,7 @@ export const GameFlowSystem = {
       }
     },
     2: {
-      targetRevenue: 45000,
+      targetRevenue: 40000,
       targetSatisfaction: 70,
       difficulty: {
         customerSpawnRate: 1.15,
@@ -121,7 +121,7 @@ export const GameFlowSystem = {
       }
     },
     3: {
-      targetRevenue: 60000,
+      targetRevenue: 55000,
       targetSatisfaction: 72,
       difficulty: {
         customerSpawnRate: 1.3,
@@ -131,7 +131,7 @@ export const GameFlowSystem = {
       }
     },
     4: {
-      targetRevenue: 80000,
+      targetRevenue: 72000,
       targetSatisfaction: 75,
       difficulty: {
         customerSpawnRate: 1.5,
@@ -141,7 +141,7 @@ export const GameFlowSystem = {
       }
     },
     5: {
-      targetRevenue: 100000,
+      targetRevenue: 90000,
       targetSatisfaction: 78,
       difficulty: {
         customerSpawnRate: 1.75,
@@ -947,7 +947,7 @@ export const GameFlowSystem = {
     const extraDay = day - GAME_CONFIG.MAX_STORY_DAY;
 
     return {
-      targetRevenue: 100000 + extraDay * 25000,
+      targetRevenue: 90000 + extraDay * 20000,
       targetSatisfaction: Math.min(90, 78 + extraDay),
       difficulty: {
         customerSpawnRate: Number((1.75 + extraDay * 0.12).toFixed(2)),

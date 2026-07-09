@@ -420,7 +420,7 @@ export const SaveSystem = {
       mental: GAME_CONFIG.START_MENTAL,
       satisfaction: GAME_CONFIG.START_SATISFACTION,
       dailyGoal: {
-        targetRevenue: 30000,
+        targetRevenue: 25000,
         targetSatisfaction: 70
       },
       todayStats: this.createEmptyTodayStats(),
@@ -495,9 +495,81 @@ export const SaveSystem = {
     const extraDay = INFINITE_MODE_START_DAY - GAME_CONFIG.MAX_STORY_DAY;
 
     return {
-      targetRevenue: 100000 + extraDay * 25000,
+      targetRevenue: 90000 + extraDay * 20000,
       targetSatisfaction: Math.min(90, 78 + extraDay)
     };
+  },
+
+  normalizeLoadedDailyGoal(snapshot = {}, day = 1) {
+    const source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const targetRevenue = Math.max(
+      0,
+      Math.floor(Number(source.targetRevenue) || 0)
+    );
+
+    return {
+      targetRevenue: this.migrateLegacyTargetRevenue(targetRevenue, safeDay),
+      targetSatisfaction: this.clampStat(source.targetSatisfaction, 70)
+    };
+  },
+
+  migrateLegacyTargetRevenue(targetRevenue, day = 1) {
+    const safeTargetRevenue = Math.max(0, Math.floor(Number(targetRevenue) || 0));
+    const currentBase = this.getCurrentBaseTargetRevenue(day);
+    const legacyBase = this.getLegacyBaseTargetRevenue(day);
+
+    if (safeTargetRevenue <= 0) {
+      return currentBase;
+    }
+
+    if (safeTargetRevenue === legacyBase) {
+      return currentBase;
+    }
+
+    const legacyBonus = safeTargetRevenue - legacyBase;
+
+    if (legacyBonus > 0 && legacyBonus <= 50000) {
+      return currentBase + legacyBonus;
+    }
+
+    return safeTargetRevenue;
+  },
+
+  getCurrentBaseTargetRevenue(day = 1) {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const storyTargets = {
+      1: 25000,
+      2: 40000,
+      3: 55000,
+      4: 72000,
+      5: 90000
+    };
+
+    if (storyTargets[safeDay]) {
+      return storyTargets[safeDay];
+    }
+
+    const extraDay = safeDay - GAME_CONFIG.MAX_STORY_DAY;
+    return 90000 + extraDay * 20000;
+  },
+
+  getLegacyBaseTargetRevenue(day = 1) {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const legacyStoryTargets = {
+      1: 30000,
+      2: 45000,
+      3: 60000,
+      4: 80000,
+      5: 100000
+    };
+
+    if (legacyStoryTargets[safeDay]) {
+      return legacyStoryTargets[safeDay];
+    }
+
+    const extraDay = safeDay - GAME_CONFIG.MAX_STORY_DAY;
+    return 100000 + extraDay * 25000;
   },
 
   createInfiniteModeStartDifficulty() {
@@ -905,7 +977,10 @@ export const SaveSystem = {
       nextState.satisfaction,
       GAME_CONFIG.START_SATISFACTION
     );
-    GameState.dailyGoal = this.deepClone(nextState.dailyGoal ?? defaultSnapshot.dailyGoal);
+    GameState.dailyGoal = this.normalizeLoadedDailyGoal(
+      nextState.dailyGoal ?? defaultSnapshot.dailyGoal,
+      GameState.day
+    );
     GameState.todayStats = {
       ...this.createEmptyTodayStats(),
       ...this.deepClone(nextState.todayStats ?? {})

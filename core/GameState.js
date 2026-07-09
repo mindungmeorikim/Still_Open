@@ -17,7 +17,7 @@ export const GameState = {
   satisfaction: GAME_CONFIG.START_SATISFACTION,
 
   dailyGoal: {
-    targetRevenue: 30000,
+    targetRevenue: 25000,
     targetSatisfaction: 70
   },
 
