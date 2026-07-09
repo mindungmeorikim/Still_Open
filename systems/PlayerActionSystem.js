@@ -644,7 +644,8 @@ export const PlayerActionSystem = {
     const capacity = Math.max(1, Math.floor(Number(productStock.maxStock) || 8));
     const currentStock = Math.max(0, Math.floor(Number(productStock.currentStock) || 0));
     const availableWarehouseStock = this.getAvailableWarehouseStock(resolvedProductId);
-    const distance = this.getDistanceToZone(targetShelf.nodeId, targetShelf);
+    const interactionInfo = this.getShelfInteractionInfo(targetShelf);
+    const distance = interactionInfo.distance;
     const interactionDistance =
       Number(targetShelf.interactionDistance) || this.interactionDistance;
 
@@ -660,6 +661,10 @@ export const PlayerActionSystem = {
       availableWarehouseStock,
       interactionDistance,
       distance,
+      pointDistance: interactionInfo.pointDistance,
+      rectDistance: interactionInfo.rectDistance,
+      interactionRect: interactionInfo.rect,
+      isInsideInteractionRect: interactionInfo.isInsideRect,
       isEmpty: currentStock <= 0,
       isFull: currentStock >= capacity,
       isRestockable: currentStock <= 0 && availableWarehouseStock > 0
@@ -679,10 +684,7 @@ export const PlayerActionSystem = {
   getNearbyShelfTargets() {
     return this.getShelfSlots()
       .flatMap((shelf) => this.getRestockCandidatesForShelf(shelf))
-      .filter((target) => (
-        target.distance !== null &&
-        target.distance <= target.interactionDistance
-      ));
+      .filter((target) => this.isShelfTargetInInteractionRange(target));
   },
 
   getShelfInteractionPriority(target = {}) {
@@ -710,8 +712,16 @@ export const PlayerActionSystem = {
       return priorityGap;
     }
 
-    const firstDistance = Number(first.distance);
-    const secondDistance = Number(second.distance);
+    const firstRectRank = first.isInsideInteractionRect ? 0 : 1;
+    const secondRectRank = second.isInsideInteractionRect ? 0 : 1;
+    const rectRankGap = firstRectRank - secondRectRank;
+
+    if (rectRankGap !== 0) {
+      return rectRankGap;
+    }
+
+    const firstDistance = Number(first.pointDistance ?? first.distance);
+    const secondDistance = Number(second.pointDistance ?? second.distance);
 
     if (Number.isFinite(firstDistance) && Number.isFinite(secondDistance)) {
       const distanceGap = firstDistance - secondDistance;
@@ -771,12 +781,113 @@ export const PlayerActionSystem = {
     const targetShelf = this.getShelfSlot(
       shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
     );
-
-    const distance = this.getDistanceToZone(targetShelf.nodeId, targetShelf);
+    const interactionInfo = this.getShelfInteractionInfo(targetShelf);
     const interactionDistance =
       Number(targetShelf.interactionDistance) || this.interactionDistance;
 
-    return distance !== null && distance <= interactionDistance;
+    return (
+      interactionInfo.isInsideRect === true ||
+      (
+        interactionInfo.distance !== null &&
+        interactionInfo.distance <= interactionDistance
+      )
+    );
+  },
+
+  isShelfTargetInInteractionRange(target = {}) {
+    if (!target) {
+      return false;
+    }
+
+    if (target.isInsideInteractionRect === true) {
+      return true;
+    }
+
+    return (
+      target.distance !== null &&
+      target.distance <= target.interactionDistance
+    );
+  },
+
+  getShelfInteractionInfo(shelf = this.shelf) {
+    const targetShelf = this.getShelfSlot(
+      shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
+    );
+    const playerPoint = this.getPlayerInteractionPoint();
+    const zoneCenter = this.getZoneCenter(targetShelf.nodeId, targetShelf);
+    const rect = this.getShelfInteractionRect(targetShelf, zoneCenter);
+    const pointDistance = playerPoint && zoneCenter
+      ? this.getDistanceBetweenPoints(playerPoint, zoneCenter)
+      : null;
+    const rectDistance = playerPoint && rect
+      ? this.getDistanceToRect(playerPoint, rect)
+      : null;
+    const isInsideRect = playerPoint && rect
+      ? this.isPointInsideRect(playerPoint, rect)
+      : false;
+
+    return {
+      distance: pointDistance,
+      pointDistance,
+      rectDistance,
+      rect,
+      isInsideRect
+    };
+  },
+
+  getShelfInteractionRect(shelf = this.shelf, zoneCenter = null) {
+    if (!shelf) {
+      return null;
+    }
+
+    const width = Math.max(80, Number(shelf.width) || 100);
+    const height = Math.max(80, Number(shelf.height) || 100);
+    const center = zoneCenter ?? this.getZoneCenter(shelf.nodeId, shelf);
+
+    if (!center) {
+      return null;
+    }
+
+    // 진열대는 길쭉한 오브젝트라 한 점 원형 판정보다 앞면 사각형 판정이 안정적이다.
+    // 기존 interactionX/Y를 중심으로 쓰되, 플레이어 발 위치가 닿는 앞쪽/아래쪽으로 범위를 넓힌다.
+    const rectWidth = Math.max(150, Math.round(width * 1.35));
+    const rectHeight = Math.max(132, Math.round(height * 1.2));
+    const centerX = Number(center.x) || 0;
+    const centerY = (Number(center.y) || 0) + Math.max(24, height * 0.22);
+
+    return {
+      x: centerX - rectWidth / 2,
+      y: centerY - rectHeight / 2,
+      width: rectWidth,
+      height: rectHeight
+    };
+  },
+
+  isPointInsideRect(point = null, rect = null) {
+    if (!point || !rect) {
+      return false;
+    }
+
+    return (
+      point.x >= rect.x &&
+      point.x <= rect.x + rect.width &&
+      point.y >= rect.y &&
+      point.y <= rect.y + rect.height
+    );
+  },
+
+  getDistanceToRect(point = null, rect = null) {
+    if (!point || !rect) {
+      return null;
+    }
+
+    const nearestX = Math.max(rect.x, Math.min(point.x, rect.x + rect.width));
+    const nearestY = Math.max(rect.y, Math.min(point.y, rect.y + rect.height));
+
+    return this.getDistanceBetweenPoints(point, {
+      x: nearestX,
+      y: nearestY
+    });
   },
 
   getCounterInteractionDistance() {
@@ -799,6 +910,14 @@ export const PlayerActionSystem = {
   },
 
   getPrimaryInteractionTarget() {
+    const counterTarget = this.getCounterInteractionTarget();
+
+    // 계산 손님이 대기 중이면 계산대를 최우선으로 처리한다.
+    // 진열대/청소 범위가 겹쳐도 스페이스바 입력이 엉뚱한 행동으로 빠지지 않게 한다.
+    if (counterTarget && this.hasCheckoutReadyCustomer()) {
+      return counterTarget;
+    }
+
     const shelfTargets = this.getNearbyShelfTargets()
       .sort((first, second) => this.sortRestockTargets(first, second));
 
@@ -810,22 +929,15 @@ export const PlayerActionSystem = {
       return emptyShelfTarget;
     }
 
-    const counterTarget = this.getCounterInteractionTarget();
-
-    // 계산대와 청소 구역이 가까운 1구역에서는 계산 손님이 대기 중일 때
-    // 청소보다 계산을 우선한다.
-    if (counterTarget && this.hasCheckoutReadyCustomer()) {
-      return counterTarget;
-    }
-
     const cleaningTarget = this.getCleaningInteractionTarget();
+
+    // 청소가 필요한 상태에서는 비어 있지 않은 진열대보다 청소를 우선한다.
+    if (cleaningTarget) {
+      return cleaningTarget;
+    }
 
     if (counterTarget) {
       return counterTarget;
-    }
-
-    if (cleaningTarget) {
-      return cleaningTarget;
     }
 
     return shelfTargets[0] ?? null;
@@ -1291,17 +1403,14 @@ export const PlayerActionSystem = {
       return null;
     }
 
-    const playerCenter = this.getPlayerCenter();
+    const playerPoint = this.getPlayerInteractionPoint();
     const zoneCenter = this.getZoneCenter(zoneId, fallback);
 
-    if (!zoneCenter) {
+    if (!playerPoint || !zoneCenter) {
       return null;
     }
 
-    const dx = playerCenter.x - zoneCenter.x;
-    const dy = playerCenter.y - zoneCenter.y;
-
-    return Math.sqrt(dx * dx + dy * dy);
+    return this.getDistanceBetweenPoints(playerPoint, zoneCenter);
   },
 
   getPlayerCenter() {
@@ -1314,6 +1423,29 @@ export const PlayerActionSystem = {
       x: (Number(player.x) || 0) + playerWidth / 2,
       y: (Number(player.y) || 0) + playerHeight / 2
     };
+  },
+
+  getPlayerInteractionPoint() {
+    const player = GameState.player ?? { x: 0, y: 0 };
+    const playerNode = document.getElementById("player-zone");
+    const playerWidth = Number(playerNode?.offsetWidth) || 58;
+    const playerHeight = Number(playerNode?.offsetHeight) || 102;
+
+    return {
+      x: (Number(player.x) || 0) + playerWidth / 2,
+      y: (Number(player.y) || 0) + playerHeight * 0.86
+    };
+  },
+
+  getDistanceBetweenPoints(first = null, second = null) {
+    if (!first || !second) {
+      return null;
+    }
+
+    const dx = (Number(first.x) || 0) - (Number(second.x) || 0);
+    const dy = (Number(first.y) || 0) - (Number(second.y) || 0);
+
+    return Math.sqrt(dx * dx + dy * dy);
   },
 
   getZoneCenter(zoneId, fallback = null) {
@@ -1984,6 +2116,14 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
     });
   },
 
+  shouldPrioritizeCheckoutOverPointerAction(actionType = "") {
+    return (
+      !this.isCheckoutAction(actionType) &&
+      this.hasCheckoutReadyCustomer() &&
+      Boolean(this.getCounterInteractionTarget())
+    );
+  },
+
   handlePointerAction(event) {
     const actionNode = event.target.closest?.("[data-player-action]");
 
@@ -2006,7 +2146,25 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
     if (this.isPlayerBusy) {
       this.showActionMessage("지금은 다른 행동을 할 수 없습니다.");
       return;
-    } 
+    }
+
+    // 터치/클릭 대상의 투명 영역이 겹쳐도 계산 손님 대기 중에는 계산대를 우선한다.
+    if (this.shouldPrioritizeCheckoutOverPointerAction(actionType)) {
+      if (!this.tryLockCheckoutInput()) {
+        return;
+      }
+
+      EventBus.emit(EVENTS.PLAYER_ACTION_RECORDED, {
+        day: GameState.day,
+        actionType: "checkout",
+        orderId: null,
+        productId: null,
+        source: "player_action_system_pointer_priority"
+      });
+
+      this.handleCheckoutAction();
+      return;
+    }
 
     if (actionType === "cleaning") {
       this.handleCleaningAction({
