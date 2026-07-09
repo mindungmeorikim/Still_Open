@@ -28704,3 +28704,370 @@ body.is-game-paused .staff-character * {
   pointer-events: auto !important;
   touch-action: manipulation !important;
 }
+
+/* ========================================================================== */
+/* FINAL RESPONSIVE OVERRIDE                                                  */
+/* ========================================================================== */
+:root {
+  --ui-scale: 1;
+  --hud-scale: 1;
+  --bottom-scale: 1;
+  --joystick-scale: 1;
+  --popup-scale: 1;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --game-frame-left: 0px;
+  --game-frame-top: 0px;
+  --game-frame-width: min(100vw, calc(100dvh * 16 / 9));
+  --game-frame-height: min(100dvh, calc(100vw * 9 / 16));
+  --responsive-modal-padding: 18px;
+  --responsive-modal-max-width: 100%;
+  --responsive-modal-max-height: 100%;
+  --responsive-hud-button-size: 48px;
+  --responsive-day-card-width: 128px;
+  --responsive-day-card-height: 56px;
+  --responsive-status-width: 470px;
+  --responsive-top-ui-right: 156px;
+  --responsive-bottom-action-width: 360px;
+  --responsive-bottom-start-width: 210px;
+  --responsive-dock-button-height: 58px;
+  --responsive-open-button-height: 66px;
+  --responsive-joystick-size: 84px;
+  --responsive-joystick-bottom: 72px;
+  --responsive-camera-controls-top: 64px;
+}
+
+html[data-responsive-compact="true"] body {
+  overflow: hidden !important;
+}
+
+html[data-responsive-compact="true"] #top-ui {
+  top: var(--safe-top) !important;
+  left: 6px !important;
+  right: var(--responsive-top-ui-right) !important;
+  width: auto !important;
+  grid-template-columns: var(--responsive-day-card-width) minmax(0, var(--responsive-status-width)) !important;
+  gap: 4px 6px !important;
+  transform: none !important;
+}
+
+html[data-responsive-compact="true"] #day-card {
+  min-height: var(--responsive-day-card-height) !important;
+  grid-template-columns: 28px minmax(0, 1fr) !important;
+  gap: 5px !important;
+  padding: 6px 7px !important;
+  border-radius: 13px !important;
+}
+
+html[data-responsive-compact="true"] .day-card-icon {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 9px !important;
+  font-size: 17px !important;
+}
+
+html[data-responsive-compact="true"] #day-info {
+  font-size: 14px !important;
+  line-height: 1 !important;
+}
+
+html[data-responsive-compact="true"] #time-info {
+  font-size: 10px !important;
+  line-height: 1.05 !important;
+}
+
+html[data-responsive-compact="true"] #phase-chip {
+  grid-column: 1 / -1 !important;
+  min-height: 18px !important;
+  padding: 3px 5px !important;
+  border-radius: 10px !important;
+  font-size: 9px !important;
+}
+
+html[data-responsive-compact="true"] #status-panel {
+  width: var(--responsive-status-width) !important;
+  max-width: var(--responsive-status-width) !important;
+  min-height: 34px !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 3px !important;
+  border-radius: 15px !important;
+}
+
+html[data-responsive-compact="true"] #status-panel p {
+  min-height: 34px !important;
+  gap: 3px !important;
+  padding: 4px 5px !important;
+  overflow: hidden !important;
+  font-size: 10px !important;
+  line-height: 1.05 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html[data-responsive-compact="true"] #money-info::before,
+html[data-responsive-compact="true"] #satisfaction-info::before,
+html[data-responsive-compact="true"] #mental-info::before,
+html[data-responsive-compact="true"] #stock-info::after {
+  width: 19px !important;
+  height: 19px !important;
+  min-width: 19px !important;
+  font-size: 12px !important;
+}
+
+html[data-responsive-compact="true"] #game-root > #top-icon-menu,
+html[data-responsive-compact="true"] #top-icon-menu {
+  top: var(--safe-top) !important;
+  right: 5px !important;
+  gap: 4px !important;
+  max-width: calc(var(--responsive-top-ui-right) - 10px) !important;
+  overflow: visible !important;
+}
+
+html[data-responsive-compact="true"] #top-icon-menu .hud-icon-button,
+html[data-responsive-compact="true"] #top-icon-menu .game-pause-button,
+html[data-responsive-compact="true"] .game-pause-button.hud-icon-button,
+html[data-responsive-compact="true"] #reward-inbox-button.reward-inbox-button,
+html[data-responsive-compact="true"] #tutorial-help-button.tutorial-help-button,
+html[data-responsive-compact="true"] #ingame-settings-button.ui-special-settings-button {
+  width: var(--responsive-hud-button-size) !important;
+  min-width: var(--responsive-hud-button-size) !important;
+  height: var(--responsive-hud-button-size) !important;
+  min-height: var(--responsive-hud-button-size) !important;
+  padding: 3px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+}
+
+html[data-responsive-compact="true"] .game-pause-button-icon,
+html[data-responsive-compact="true"] .reward-inbox-button-icon,
+html[data-responsive-compact="true"] .tutorial-help-button-icon {
+  width: 18px !important;
+  height: 18px !important;
+  font-size: 14px !important;
+}
+
+html[data-responsive-compact="true"] .game-pause-button-label,
+html[data-responsive-compact="true"] .top-icon-button-label,
+html[data-responsive-compact="true"] .tutorial-help-button-label {
+  font-size: 7px !important;
+  line-height: 1 !important;
+}
+
+html[data-responsive-compact="true"] #store-composition.world-store-composition .store-composition-header {
+  top: var(--responsive-camera-controls-top) !important;
+  right: 5px !important;
+  max-width: min(230px, calc(100% - 12px)) !important;
+  transform: scale(0.7) !important;
+  transform-origin: top right !important;
+}
+
+html[data-responsive-compact="true"] #store-camera-controls {
+  gap: 4px !important;
+}
+
+html[data-responsive-compact="true"] .store-camera-button,
+html[data-responsive-compact="true"] #store-camera-fit-button {
+  min-width: 36px !important;
+  min-height: 20px !important;
+  padding: 3px 5px !important;
+  border-radius: 8px !important;
+  font-size: 8px !important;
+}
+
+html[data-responsive-compact="true"] #bottom-ui {
+  left: 6px !important;
+  right: 6px !important;
+  bottom: var(--safe-bottom) !important;
+  width: auto !important;
+  grid-template-columns: minmax(0, var(--responsive-bottom-action-width)) minmax(0, var(--responsive-bottom-start-width)) !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  transform: none !important;
+}
+
+html[data-responsive-compact="true"] #action-dock {
+  grid-template-columns: repeat(4, minmax(42px, 1fr)) !important;
+  gap: 4px !important;
+}
+
+html[data-responsive-compact="true"] .dock-button,
+html[data-responsive-compact="true"] #start-day-button,
+html[data-responsive-compact="true"] #end-day-button,
+html[data-responsive-compact="true"] #upgrade-shortcut-button,
+html[data-responsive-compact="true"] #shop-shortcut-button {
+  min-height: var(--responsive-dock-button-height) !important;
+  height: var(--responsive-dock-button-height) !important;
+  padding: 5px 4px !important;
+  border-radius: 11px !important;
+  font-size: 10px !important;
+  line-height: 1.05 !important;
+}
+
+html[data-responsive-compact="true"] .dock-button::before,
+html[data-responsive-compact="true"] #start-day-button::before,
+html[data-responsive-compact="true"] #end-day-button::before,
+html[data-responsive-compact="true"] #upgrade-shortcut-button::before,
+html[data-responsive-compact="true"] #shop-shortcut-button::before {
+  margin-bottom: 2px !important;
+  font-size: 15px !important;
+}
+
+html[data-responsive-compact="true"] .primary-start-button,
+html[data-responsive-compact="true"] #open-store-button.primary-start-button {
+  min-height: var(--responsive-open-button-height) !important;
+  height: var(--responsive-open-button-height) !important;
+  padding: 6px 8px !important;
+  border-radius: 16px !important;
+  font-size: 15px !important;
+  line-height: 1.05 !important;
+}
+
+html[data-responsive-compact="true"] #message-panel {
+  top: calc(var(--safe-top) + var(--responsive-day-card-height) + 6px) !important;
+  bottom: auto !important;
+  max-width: min(360px, 36vw) !important;
+  max-height: 30px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+}
+
+html[data-responsive-compact="true"] #system-message,
+html[data-responsive-compact="true"] #message-panel p {
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+}
+
+html[data-responsive-compact="true"] #game-root > .mobile-controls .mobile-joystick,
+html[data-responsive-compact="true"] body > .mobile-controls .mobile-joystick {
+  left: calc(env(safe-area-inset-left, 0px) + 8px) !important;
+  bottom: var(--responsive-joystick-bottom) !important;
+  width: var(--responsive-joystick-size) !important;
+}
+
+html[data-responsive-compact="true"] .mobile-joystick-base {
+  border-width: 2px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.22) !important;
+}
+
+html[data-responsive-mode="mobile-small"] #top-ui {
+  left: 4px !important;
+  right: var(--responsive-top-ui-right) !important;
+  grid-template-columns: 88px minmax(0, 1fr) !important;
+  gap: 3px !important;
+}
+
+html[data-responsive-mode="mobile-small"] #phase-chip {
+  min-height: 16px !important;
+  padding: 2px 4px !important;
+  font-size: 8px !important;
+}
+
+html[data-responsive-mode="mobile-small"] #status-panel p {
+  padding: 3px 4px !important;
+  font-size: 9px !important;
+}
+
+html[data-responsive-mode="mobile-small"] #bottom-ui {
+  left: 4px !important;
+  right: 4px !important;
+  gap: 5px !important;
+}
+
+html[data-responsive-mode="mobile-small"] #message-panel {
+  display: none !important;
+}
+
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #day-scenario-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #order-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #bm-contract-shop-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #result-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #upgrade-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #reward-inbox-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #daily-mission-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #settings-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #customer-event-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #ending-modal.modal:not(.hidden),
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #infinite-game-over-modal.modal:not(.hidden) {
+  position: fixed !important;
+  inset: auto !important;
+  left: var(--game-frame-left) !important;
+  top: var(--game-frame-top) !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: var(--game-frame-width) !important;
+  height: var(--game-frame-height) !important;
+  max-width: var(--game-frame-width) !important;
+  max-height: var(--game-frame-height) !important;
+  padding: var(--responsive-modal-padding) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transform: none !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) .modal:not(.hidden) > .modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #day-scenario-modal .day-scenario-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #order-modal .order-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #bm-contract-shop-modal .bm-shop-modern-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #bm-contract-shop-modal .bm-contract-shop-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #result-modal .result-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #upgrade-modal .upgrade-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #reward-inbox-modal .reward-inbox-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #daily-mission-modal .daily-mission-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #settings-modal .settings-modal-content {
+  max-width: var(--responsive-modal-max-width) !important;
+  max-height: var(--responsive-modal-max-height) !important;
+  box-sizing: border-box !important;
+  overflow: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #order-modal .order-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #bm-contract-shop-modal .bm-shop-modern-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #bm-contract-shop-modal .bm-contract-shop-content {
+  width: min(100%, var(--responsive-modal-max-width)) !important;
+  height: min(92%, var(--responsive-modal-max-height)) !important;
+}
+
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #result-modal .result-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #upgrade-modal .upgrade-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #reward-inbox-modal .reward-inbox-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #daily-mission-modal .daily-mission-modal-content,
+html[data-responsive-compact="true"] body:not(.is-tutorial-active) #settings-modal .settings-modal-content {
+  width: min(92%, var(--responsive-modal-max-width)) !important;
+}
+
+html[data-responsive-compact="true"] body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  width: min(300px, calc(var(--game-frame-width) - 20px)) !important;
+  max-width: min(300px, calc(var(--game-frame-width) - 20px)) !important;
+  max-height: min(250px, calc(var(--game-frame-height) - 20px)) !important;
+  padding: 9px 11px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  box-sizing: border-box !important;
+}
+
+html[data-responsive-mode="mobile-small"] body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-card {
+  width: min(260px, calc(var(--game-frame-width) - 16px)) !important;
+  max-width: min(260px, calc(var(--game-frame-width) - 16px)) !important;
+  max-height: min(210px, calc(var(--game-frame-height) - 16px)) !important;
+  padding: 8px 10px !important;
+}
+
+html[data-responsive-compact="true"] body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-description,
+html[data-responsive-compact="true"] body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] .tutorial-action-guide {
+  font-size: 11px !important;
+  line-height: 1.28 !important;
+}
+
+html[data-responsive-compact="true"] body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-next-button,
+html[data-responsive-compact="true"] body.is-tutorial-active .tutorial-overlay[data-mode="interactive"] #tutorial-skip-button {
+  min-height: 24px !important;
+  padding: 0 10px !important;
+  font-size: 10px !important;
+}

@@ -28,6 +28,7 @@ import { StaffAssistSystem } from "./systems/StaffAssistSystem.js";
 import { DebugSystem } from "./systems/DebugSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
 import { PauseSystem } from "./systems/PauseSystem.js";
+import { ResponsiveLayoutSystem } from "./systems/ResponsiveLayoutSystem.js";
 
 import { MobileUI } from "./ui/MobileUI.js";
 import { MobileInputSystem } from "./systems/MobileInputSystem.js";
@@ -207,7 +208,12 @@ function bindCustomerStockShortagePenalty() {
 }
 
 function initGame() {
+  ResponsiveLayoutSystem.init();
   UIManager.init();
+  ResponsiveLayoutSystem.subscribe(() => {
+    UIManager.updateWorldCameraTransform?.();
+    UIManager.refreshTutorialAnchoredLayout?.();
+  });
   GameFlowSystem.init();
   ResultSystem.init();
   UpgradeSystem.init();
