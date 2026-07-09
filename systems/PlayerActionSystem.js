@@ -59,6 +59,14 @@ const VALID_CARRYING_BOX_TYPES = new Set([
   "refrigerated"
 ]);
 
+const SHELF_INTERACTION_POINT_DISTANCE_CAP = Object.freeze({
+  default: 64,
+  fridge: 72
+});
+const SHELF_INTERACTION_RECT_EDGE_BUFFER = 8;
+const COUNTER_INTERACTION_DISTANCE_CAP = 68;
+const CLEANING_INTERACTION_DISTANCE_CAP = 62;
+
 export const PlayerActionSystem = {
   isInitialized: false,
   checkoutSequence: 0,
@@ -646,8 +654,7 @@ export const PlayerActionSystem = {
     const availableWarehouseStock = this.getAvailableWarehouseStock(resolvedProductId);
     const interactionInfo = this.getShelfInteractionInfo(targetShelf);
     const distance = interactionInfo.distance;
-    const interactionDistance =
-      Number(targetShelf.interactionDistance) || this.interactionDistance;
+    const interactionDistance = this.getShelfFallbackInteractionDistance(targetShelf);
 
     return {
       type: "shelf",
@@ -720,8 +727,8 @@ export const PlayerActionSystem = {
       return rectRankGap;
     }
 
-    const firstDistance = Number(first.pointDistance ?? first.distance);
-    const secondDistance = Number(second.pointDistance ?? second.distance);
+    const firstDistance = Number(first.rectDistance ?? first.pointDistance ?? first.distance);
+    const secondDistance = Number(second.rectDistance ?? second.pointDistance ?? second.distance);
 
     if (Number.isFinite(firstDistance) && Number.isFinite(secondDistance)) {
       const distanceGap = firstDistance - secondDistance;
@@ -782,14 +789,17 @@ export const PlayerActionSystem = {
       shelf?.instanceId ?? shelf?.shelfInstanceId ?? shelf?.shelfId ?? shelf
     );
     const interactionInfo = this.getShelfInteractionInfo(targetShelf);
-    const interactionDistance =
-      Number(targetShelf.interactionDistance) || this.interactionDistance;
+    const interactionDistance = this.getShelfFallbackInteractionDistance(targetShelf);
 
     return (
       interactionInfo.isInsideRect === true ||
       (
-        interactionInfo.distance !== null &&
-        interactionInfo.distance <= interactionDistance
+        interactionInfo.rectDistance !== null &&
+        interactionInfo.rectDistance <= SHELF_INTERACTION_RECT_EDGE_BUFFER
+      ) ||
+      (
+        interactionInfo.pointDistance !== null &&
+        interactionInfo.pointDistance <= interactionDistance
       )
     );
   },
@@ -803,9 +813,16 @@ export const PlayerActionSystem = {
       return true;
     }
 
+    if (
+      target.rectDistance !== null &&
+      target.rectDistance <= SHELF_INTERACTION_RECT_EDGE_BUFFER
+    ) {
+      return true;
+    }
+
     return (
-      target.distance !== null &&
-      target.distance <= target.interactionDistance
+      target.pointDistance !== null &&
+      target.pointDistance <= target.interactionDistance
     );
   },
 
@@ -835,6 +852,44 @@ export const PlayerActionSystem = {
     };
   },
 
+  getShelfInteractionAnchor(shelf = this.shelf, zoneCenter = null) {
+    if (!shelf) {
+      return zoneCenter ?? null;
+    }
+
+    if (
+      Number.isFinite(Number(shelf.interactionX)) &&
+      Number.isFinite(Number(shelf.interactionY))
+    ) {
+      return {
+        x: Number(shelf.interactionX),
+        y: Number(shelf.interactionY)
+      };
+    }
+
+    if (
+      Number.isFinite(Number(shelf.standX)) &&
+      Number.isFinite(Number(shelf.standY))
+    ) {
+      return {
+        x: Number(shelf.standX),
+        y: Number(shelf.standY)
+      };
+    }
+
+    return zoneCenter ?? this.getZoneCenter(shelf.nodeId, shelf);
+  },
+
+  getShelfFallbackInteractionDistance(shelf = this.shelf) {
+    const sourceDistance = Number(shelf?.interactionDistance) || this.interactionDistance;
+    const isFridgeShelf = shelf?.shelfId === PRODUCT_SHELF_IDS.FRIDGE;
+    const cap = isFridgeShelf
+      ? SHELF_INTERACTION_POINT_DISTANCE_CAP.fridge
+      : SHELF_INTERACTION_POINT_DISTANCE_CAP.default;
+
+    return Math.max(48, Math.min(sourceDistance, cap));
+  },
+
   getShelfInteractionRect(shelf = this.shelf, zoneCenter = null) {
     if (!shelf) {
       return null;
@@ -842,18 +897,23 @@ export const PlayerActionSystem = {
 
     const width = Math.max(80, Number(shelf.width) || 100);
     const height = Math.max(80, Number(shelf.height) || 100);
-    const center = zoneCenter ?? this.getZoneCenter(shelf.nodeId, shelf);
+    const anchor = this.getShelfInteractionAnchor(shelf, zoneCenter);
 
-    if (!center) {
+    if (!anchor) {
       return null;
     }
 
-    // 진열대는 길쭉한 오브젝트라 한 점 원형 판정보다 앞면 사각형 판정이 안정적이다.
-    // 기존 interactionX/Y를 중심으로 쓰되, 플레이어 발 위치가 닿는 앞쪽/아래쪽으로 범위를 넓힌다.
-    const rectWidth = Math.max(150, Math.round(width * 1.35));
-    const rectHeight = Math.max(132, Math.round(height * 1.2));
-    const centerX = Number(center.x) || 0;
-    const centerY = (Number(center.y) || 0) + Math.max(24, height * 0.22);
+    // 배포용 최종 판정: 진열대 앞면만 안정적으로 잡고, 옆/뒤/멀리 있는 범위는 줄인다.
+    // 기존처럼 큰 원형으로 잡으면 계산대/청소/옆 진열대와 겹쳐서 엉뚱한 행동이 실행된다.
+    const isFridgeShelf = shelf.shelfId === PRODUCT_SHELF_IDS.FRIDGE;
+    const rectWidth = isFridgeShelf
+      ? Math.min(120, Math.max(96, Math.round(width * 0.78)))
+      : Math.min(106, Math.max(86, Math.round(width * 0.9)));
+    const rectHeight = isFridgeShelf
+      ? Math.min(74, Math.max(58, Math.round(height * 0.44)))
+      : Math.min(62, Math.max(50, Math.round(height * 0.48)));
+    const centerX = Number(anchor.x) || 0;
+    const centerY = Number(anchor.y) || 0;
 
     return {
       x: centerX - rectWidth / 2,
@@ -891,7 +951,9 @@ export const PlayerActionSystem = {
   },
 
   getCounterInteractionDistance() {
-    return Math.max(40, Number(this.checkoutInteractionDistance) || 75);
+    const sourceDistance = Math.max(40, Number(this.checkoutInteractionDistance) || 75);
+
+    return Math.min(sourceDistance, COUNTER_INTERACTION_DISTANCE_CAP);
   },
 
   isNearCounter() {
@@ -900,11 +962,19 @@ export const PlayerActionSystem = {
     return distance !== null && distance <= this.getCounterInteractionDistance();
   },
 
+  getCleaningInteractionDistance(activeCleaningPoint = null) {
+    const sourceDistance =
+      Number(activeCleaningPoint?.interactionDistance) ||
+      this.cleaningZone.interactionDistance ||
+      this.interactionDistance;
+
+    return Math.max(42, Math.min(sourceDistance, CLEANING_INTERACTION_DISTANCE_CAP));
+  },
+
   isNearCleaningZone() {
     const activeCleaningPoint = this.getActiveCleaningPoint();
     const distance = this.getDistanceToZone("cleaning-zone", activeCleaningPoint);
-    const interactionDistance =
-      Number(activeCleaningPoint.interactionDistance) || this.interactionDistance;
+    const interactionDistance = this.getCleaningInteractionDistance(activeCleaningPoint);
 
     return distance !== null && distance <= interactionDistance;
   },
@@ -966,8 +1036,7 @@ export const PlayerActionSystem = {
 
     const activeCleaningPoint = this.getActiveCleaningPoint();
     const cleaningDistance = this.getDistanceToZone("cleaning-zone", activeCleaningPoint);
-    const cleaningInteractionDistance =
-      Number(activeCleaningPoint.interactionDistance) || this.interactionDistance;
+    const cleaningInteractionDistance = this.getCleaningInteractionDistance(activeCleaningPoint);
 
     if (
       cleaningDistance !== null &&

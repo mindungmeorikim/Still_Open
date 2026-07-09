@@ -40,8 +40,12 @@ import { RewardInboxUI } from "./RewardInboxUI.js";
 import { BM_ASSETS } from "../data/BMAssetMap.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
-const INTERACTION_FEEDBACK_DISTANCE = 100;
-const COUNTER_INTERACTION_FEEDBACK_DISTANCE = 75;
+const INTERACTION_FEEDBACK_DISTANCE = 72;
+const COUNTER_INTERACTION_FEEDBACK_DISTANCE = 64;
+const SHELF_INTERACTION_FEEDBACK_DISTANCE_CAP = Object.freeze({
+  default: 66,
+  fridge: 74
+});
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
@@ -5569,10 +5573,12 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         shelfId: shelf.shelfId,
         shelfInstanceId: shelf.instanceId,
         isInteractable: true,
-        distance: Number(shelf.interactionDistance) || INTERACTION_FEEDBACK_DISTANCE,
+        distance: this.getShelfInteractionFeedbackDistance(shelf),
         fallback: {
           x: shelf.x,
           y: shelf.y,
+          width: shelf.width,
+          height: shelf.height,
           interactionX: shelf.interactionX,
           interactionY: shelf.interactionY
         }
@@ -5589,6 +5595,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   ];
 },
 
+  getShelfInteractionFeedbackDistance(shelf = null) {
+    const sourceDistance = Number(shelf?.interactionDistance) || INTERACTION_FEEDBACK_DISTANCE;
+    const isFridgeShelf = shelf?.shelfId === PRODUCT_SHELF_IDS.FRIDGE;
+    const cap = isFridgeShelf
+      ? SHELF_INTERACTION_FEEDBACK_DISTANCE_CAP.fridge
+      : SHELF_INTERACTION_FEEDBACK_DISTANCE_CAP.default;
+
+    return Math.max(46, Math.min(sourceDistance, cap));
+  },
+
   getInteractionPlayerCenter() {
     if (!GameState.player) {
       return null;
@@ -5600,7 +5616,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     return {
       x: (Number(GameState.player.x) || 0) + playerWidth / 2,
-      y: (Number(GameState.player.y) || 0) + playerHeight / 2
+      y: (Number(GameState.player.y) || 0) + playerHeight * 0.86
     };
   },
 
