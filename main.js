@@ -232,8 +232,6 @@ function initGame() {
   bindCustomerStockShortagePenalty();
   EventBus.emit(EVENTS.GAME_INIT);
   requestAnimationFrame(gameloop);
-
-  console.log("오늘도 정상영업 v3.1 발주/택배/상호작용 시스템 초기화 완료");
 }
 
 function gameloop() {

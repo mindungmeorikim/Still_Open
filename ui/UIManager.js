@@ -274,7 +274,8 @@ export const UIManager = {
     RewardInboxUI.init();
     this.bindButtons();
     this.bindGameEvents();
-    this.bindDebugCoordinateMode();
+    // 배포본에서는 F8 좌표 출력/충돌 박스 모드를 비활성화합니다.
+    // this.bindDebugCoordinateMode();
     this.bindDayStartEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
@@ -694,6 +695,12 @@ export const UIManager = {
   handleTutorialInputCapture(event, eventType = "click") {
     if (!this.isInteractiveTutorialActive()) return true;
 
+    // 상점 구매/업그레이드 결과 팝업은 튜토리얼 입력 가드보다 우선 처리한다.
+    // 튜토리얼 도중 상점을 열어도 [예/아니요]/[확인] 버튼이 막히지 않게 한다.
+    if (this.isBMShopModalControlTarget(event?.target)) {
+      return true;
+    }
+
     if (this.tryActivateTutorialTargetProxyFromEvent(event, eventType)) {
       return false;
     }
@@ -704,6 +711,16 @@ export const UIManager = {
 
     this.blockTutorialInputEvent(event, eventType);
     return false;
+  },
+
+  isBMShopModalControlTarget(target) {
+    const element = target instanceof Element ? target : target?.parentElement;
+
+    if (!element) return false;
+
+    return Boolean(element.closest(
+      "#bm-shop-result-ok, .bm-shop-result-ok, #bm-purchase-confirm-yes, #bm-purchase-confirm-no, .bm-purchase-confirm-yes, .bm-purchase-confirm-no"
+    ));
   },
 
   tryActivateTutorialTargetProxyFromEvent(event, eventType = "click") {
@@ -3451,39 +3468,11 @@ export const UIManager = {
 
 
 
-// 진열대 배치 좌표 확인용 코드 추후 주석처리 필요  
+// 진열대 배치 좌표 확인용 코드: 배포본에서는 비활성화
 bindDebugCoordinateMode() {
-  if (this.isDebugCoordinateModeBound) return;
-
-  this.isDebugCoordinateModeBound = true;
-  this.isDebugCoordinateModeVisible = false;
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key !== "F8") return;
-
-    event.preventDefault();
-    this.isDebugCoordinateModeVisible = !this.isDebugCoordinateModeVisible;
-    this.renderDebugCoordinatePanel();
-    this.renderDebugCollisionBoxes();
-  });
-
-  document.addEventListener("mousemove", (event) => {
-    if (!this.isDebugCoordinateModeVisible) return;
-
-    this.updateDebugCoordinatePanel(event);
-  });
-
-  document.addEventListener("click", (event) => {
-    if (!this.isDebugCoordinateModeVisible) return;
-
-    const worldPoint = this.getDebugWorldPoint(event);
-
-    console.log(
-      `[좌표 복사용] x: ${worldPoint.x}, y: ${worldPoint.y}`
-    );
-  });
+  // F8 좌표 패널/충돌 박스가 사용자에게 노출되지 않도록 배포본에서는 바인딩하지 않습니다.
+  return;
 },
-
 renderDebugCoordinatePanel() {
   let panel = document.getElementById("debug-coordinate-panel");
 
@@ -6779,11 +6768,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     if (shopShortcutButton) {
-      shopShortcutButton.disabled = [
-        GAME_PHASE.STORE_RUNNING,
-        GAME_PHASE.DAY_END,
-        GAME_PHASE.RESULT
-      ].includes(GameState.phase);
+      // 상점은 플레이 중에도 언제든 열 수 있게 유지한다.
+      // 튜토리얼 중에는 guardTutorialAction이 필요한 단계 외 클릭만 막는다.
+      shopShortcutButton.disabled = false;
+      shopShortcutButton.removeAttribute("aria-disabled");
     }
   },
 
@@ -9784,8 +9772,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   createBMShopResultModal() {
-    if (document.getElementById("bm-shop-result-modal")) {
-      this.bmShopResultModal = document.getElementById("bm-shop-result-modal");
+    const existingModal = document.getElementById("bm-shop-result-modal");
+    const shopContent = this.bmContractShopModal?.querySelector?.(".bm-shop-modern-content, .bm-contract-shop-content");
+
+    if (existingModal) {
+      if (shopContent && existingModal.parentElement !== shopContent) {
+        shopContent.appendChild(existingModal);
+      }
+
+      this.bmShopResultModal = existingModal;
+      this.bindBMShopResultModalEvents();
       return;
     }
 
@@ -9805,7 +9801,6 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       </div>
     `;
 
-    const shopContent = this.bmContractShopModal?.querySelector?.(".bm-shop-modern-content, .bm-contract-shop-content");
     if (shopContent) {
       shopContent.appendChild(modal);
     } else {
@@ -9813,6 +9808,58 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     this.bmShopResultModal = modal;
+    this.bindBMShopResultModalEvents();
+  },
+
+  bindBMShopResultModalEvents() {
+    const modal = this.bmShopResultModal ?? document.getElementById("bm-shop-result-modal");
+
+    if (!modal) return;
+
+    const okButton = modal.querySelector("#bm-shop-result-ok, .bm-shop-result-ok");
+    this.bindBMShopResultConfirmButton(okButton);
+
+    if (modal.dataset.bmShopResultBound === "true") return;
+
+    modal.dataset.bmShopResultBound = "true";
+
+    const hideFromConfirm = (event) => {
+      const eventTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+      const confirmButton = eventTarget?.closest?.("#bm-shop-result-ok, .bm-shop-result-ok");
+
+      if (!confirmButton || !modal.contains(confirmButton)) return;
+
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      this.hideBMShopResultModal();
+    };
+
+    modal.addEventListener("click", hideFromConfirm, true);
+    modal.addEventListener("pointerdown", hideFromConfirm, true);
+    modal.addEventListener("touchend", hideFromConfirm, true);
+
+    modal.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      hideFromConfirm(event);
+    }, true);
+  },
+
+  bindBMShopResultConfirmButton(okButton) {
+    if (!okButton) return;
+
+    const confirm = (event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      this.hideBMShopResultModal();
+    };
+
+    okButton.onclick = confirm;
+    okButton.onpointerdown = confirm;
+    okButton.ontouchend = confirm;
+    okButton.onkeydown = (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      confirm(event);
+    };
   },
 
   createBMShopResultOptions(eventName, data = {}) {
@@ -9906,10 +9953,10 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     const modal = this.bmShopResultModal;
-    const title = document.getElementById("bm-shop-result-title");
-    const badge = document.getElementById("bm-shop-result-badge");
-    const body = document.getElementById("bm-shop-result-body");
-    const okButton = document.getElementById("bm-shop-result-ok");
+    const title = modal?.querySelector?.("#bm-shop-result-title");
+    const badge = modal?.querySelector?.("#bm-shop-result-badge");
+    const body = modal?.querySelector?.("#bm-shop-result-body");
+    const okButton = modal?.querySelector?.("#bm-shop-result-ok");
 
     if (!modal || !title || !body || !okButton) {
       this.showMessage(options.message ?? options.title ?? "처리가 완료되었습니다.");
@@ -9941,9 +9988,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     `;
 
     okButton.textContent = options.confirmText ?? "확인";
-    okButton.onclick = () => this.hideBMShopResultModal();
+    this.bindBMShopResultConfirmButton(okButton);
 
+    this.bindBMShopResultModalEvents();
     modal.classList.remove("hidden");
+    modal.removeAttribute("aria-hidden");
     this.focusElementSafely(okButton);
   },
 
@@ -9951,6 +10000,19 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (!this.bmShopResultModal) return;
 
     this.bmShopResultModal.classList.add("hidden");
+    this.bmShopResultModal.setAttribute("aria-hidden", "true");
+    this.refreshBMShopAfterResultClose();
+  },
+
+  refreshBMShopAfterResultClose() {
+    window.requestAnimationFrame(() => {
+      this.requestBMContractShopRender();
+      this.renderProductCards();
+      this.renderInventorySummary();
+      this.renderStaffSummary();
+      this.renderControlButtons();
+      this.renderStoreObjectVisuals();
+    });
   },
 
   createBMContractShopModal() {
@@ -10345,15 +10407,15 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         ${diamondProducts.map((product) => {
           const discountLabel = this.getBMDiscountLabelPath(product.discountRate);
           return `
-            <article class="bm-contract-shop-card bm-shop-action-card bm-currency-card is-purchasable">
+            <article class="bm-contract-shop-card bm-shop-action-card bm-currency-card ${BMSystem.isPaymentSdkReady() ? "is-purchasable" : "is-not-available"}">
               ${this.createBMAssetImageMarkup(this.getBMDiamondProductImagePath(product), product.name)}
               <div class="bm-contract-product-copy">
                 <strong>${product.name}</strong>
-                <span>${product.priceWon.toLocaleString("ko-KR")}원 테스트 구매</span>
+                <span>${BMSystem.isPaymentSdkReady() ? `${product.priceWon.toLocaleString("ko-KR")}원` : "결제 준비 중"}</span>
                 <em>${product.discountRate > 0 ? `${product.discountRate}% 할인` : "기본 상품"}</em>
               </div>
               ${discountLabel ? this.createBMAssetImageMarkup(discountLabel, `${product.discountRate}% 할인`, "bm-shop-card-label") : ""}
-              <button class="bm-diamond-product-button" type="button" data-product-id="${product.id}">구매</button>
+              <button class="bm-diamond-product-button" type="button" data-product-id="${product.id}" ${BMSystem.isPaymentSdkReady() ? "" : "disabled"}>${BMSystem.isPaymentSdkReady() ? "구매" : "준비 중"}</button>
             </article>
           `;
         }).join("")}
@@ -10868,9 +10930,9 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
         this.showBMShopPurchaseConfirm({
           product: { ...product, imagePath: this.getBMDiamondProductImagePath(product) },
-          priceText: `${product.priceWon.toLocaleString("ko-KR")}원 테스트 구매`,
-          description: "실제 결제 SDK 없이 테스트로 다이아를 지급합니다.",
-          confirmMessage: "해당 다이아 상품을 구매하시겠습니까?"
+          priceText: BMSystem.isPaymentSdkReady() ? `${product.priceWon.toLocaleString("ko-KR")}원` : "결제 준비 중",
+          description: BMSystem.isPaymentSdkReady() ? "결제 완료 후 다이아가 지급됩니다." : "결제 기능은 현재 준비 중입니다.",
+          confirmMessage: BMSystem.isPaymentSdkReady() ? "해당 다이아 상품을 구매하시겠습니까?" : "현재 결제 기능은 준비 중입니다."
         }, () => {
           EventBus.emit(BM_EVENTS.DIAMOND_PRODUCT_PURCHASE_REQUESTED, { productId: button.dataset.productId });
         });

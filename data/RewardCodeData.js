@@ -6,16 +6,8 @@
   운영 단계에서는 서버 API에서 코드 검증과 지급 가능 여부를 판단해야 합니다.
 */
 
-export const REWARD_CODE_MOCKS = Object.freeze([
-  Object.freeze({
-    code: "LAUNCH-DIA-100",
-    rewardType: "diamond",
-    amount: 100,
-    campaignId: "launch_event_01",
-    expiresAt: null,
-    maxUsePerUser: 1
-  })
-]);
+// 배포본에서는 클라이언트에 테스트/이벤트 보상 코드를 하드코딩하지 않습니다.
+export const REWARD_CODE_MOCKS = Object.freeze([]);
 
 export function normalizeRewardCode(code) {
   return String(code ?? "")

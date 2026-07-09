@@ -28685,3 +28685,22 @@ body.is-game-paused .staff-character * {
   animation-play-state: paused !important;
   transition-duration: 0s !important;
 }
+
+/* ========================================================================== */
+/* [v8.10.3] BM Shop Result Popup Close Safety Override                       */
+/* - 성공 팝업 확인 버튼 클릭/터치 보장 및 hidden 상태 강제 적용.             */
+/* ========================================================================== */
+#bm-shop-result-modal.bm-shop-result-modal.hidden,
+#bm-contract-shop-modal #bm-shop-result-modal.bm-shop-result-modal.hidden {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#bm-shop-result-modal .bm-shop-result-ok {
+  position: relative !important;
+  z-index: 3 !important;
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+}
