@@ -29351,3 +29351,331 @@ body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not(
     padding: 8px 10px !important;
   }
 }
+
+/* ===========================================================================
+   [v8.10.11] BlueStacks 16:9 top HUD polish final override
+   - Day 카드의 영업 준비 칩이 카드 테두리 밖으로 삐져나오지 않게 내부 폭/box-sizing을 고정한다.
+   - 일시정지 버튼만 다른 상단 아이콘보다 커 보이지 않게 같은 38x38 규격으로 맞춘다.
+   - 월드/카메라/game-world transform/오브젝트 좌표는 이 CSS 블록에서 수정하지 않는다.
+   =========================================================================== */
+#day-card {
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+#day-card > div {
+  min-width: 0 !important;
+}
+
+#phase-chip {
+  justify-self: stretch !important;
+  align-self: stretch !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 4px 6px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#game-root > #top-icon-menu .game-pause-button,
+#top-icon-menu .game-pause-button,
+.game-pause-button.hud-icon-button {
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  padding: 4px !important;
+  border-radius: 12px !important;
+  font-size: 8px !important;
+  line-height: 1 !important;
+}
+
+.game-pause-button-icon {
+  width: 22px !important;
+  height: 17px !important;
+  margin: 0 auto 1px !important;
+  font-size: 14px !important;
+  line-height: 1 !important;
+}
+
+.game-pause-button-label {
+  max-width: 100% !important;
+  font-size: 7px !important;
+  line-height: 1 !important;
+  letter-spacing: -0.08em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #phase-chip {
+    min-height: 22px !important;
+    padding: 3px 5px !important;
+    font-size: 9.5px !important;
+  }
+
+  #game-root > #top-icon-menu .game-pause-button,
+  #top-icon-menu .game-pause-button,
+  .game-pause-button.hud-icon-button {
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    padding: 4px !important;
+  }
+
+  .game-pause-button-icon {
+    width: 22px !important;
+    height: 17px !important;
+    font-size: 14px !important;
+  }
+
+  .game-pause-button-label {
+    font-size: 7px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.12] Day 카드 overflow 복구
+   - v8.10.11에서 영업 준비 칩을 가두려고 #day-card overflow:hidden을 적용하면서
+     Day 카드 아래에 붙는 목표/구역 패널까지 잘리는 문제가 생겼다.
+   - Day 카드 바깥 좌측 정보 패널은 다시 보이게 하고, 영업 준비 칩 자체만 내부에서 말줄임 처리한다.
+   - 월드/카메라/game-world transform/오브젝트 좌표는 수정하지 않는다.
+   =========================================================================== */
+#day-card {
+  overflow: visible !important;
+}
+
+#phase-chip {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#day-card > #daily-goal-panel,
+#daily-goal-panel,
+.focused-zone-panel {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ===========================================================================
+   [v8.10.13] Day 카드 영업 준비 칩 단독 overflow 재수정
+   - Day 카드 자체 overflow는 visible로 유지해 목표/구역 패널은 절대 숨기지 않는다.
+   - 파란색 영업 준비 칩만 카드 내부 폭보다 작게 고정해 좌우로 삐져나오지 않게 한다.
+   - 월드/카메라/game-world transform/오브젝트 좌표는 수정하지 않는다.
+   =========================================================================== */
+#day-card {
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+#day-card > #phase-chip {
+  grid-column: 1 / -1 !important;
+  justify-self: center !important;
+  align-self: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  inline-size: calc(100% - 12px) !important;
+  width: calc(100% - 12px) !important;
+  max-inline-size: calc(100% - 12px) !important;
+  max-width: calc(100% - 12px) !important;
+  min-inline-size: 0 !important;
+  min-width: 0 !important;
+  margin: 2px 6px 0 !important;
+  padding: 4px 4px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  transform: none !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #day-card > #phase-chip {
+    inline-size: calc(100% - 12px) !important;
+    width: calc(100% - 12px) !important;
+    max-inline-size: calc(100% - 12px) !important;
+    max-width: calc(100% - 12px) !important;
+    margin: 2px 6px 0 !important;
+    padding: 3px 4px !important;
+    font-size: 9.5px !important;
+    min-height: 22px !important;
+  }
+}
+
+#day-card > #daily-goal-panel,
+#daily-goal-panel,
+.focused-zone-panel {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* ===========================================================================
+   [v8.10.14] BlueStacks 좌측 HUD 정렬/크기 최종 보정
+   - Day 카드 전체를 숨기지 않고, 파란 영업 준비 칩만 검은 Day 카드 내부 중앙에 고정한다.
+   - 목표 패널과 구역 패널의 카드 폭/본문 주요 텍스트 크기를 통일한다.
+   - 매출 목표 금액은 구역명과 같은 중요도로 보이도록 글자 크기를 키운다.
+   - 월드/카메라/game-world transform/오브젝트 좌표는 수정하지 않는다.
+   =========================================================================== */
+#day-card {
+  position: relative !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  padding-bottom: 36px !important;
+}
+
+#day-card > div {
+  min-width: 0 !important;
+}
+
+#day-card > #phase-chip,
+#phase-chip {
+  position: absolute !important;
+  left: 10px !important;
+  right: 10px !important;
+  bottom: 8px !important;
+  grid-column: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  inline-size: auto !important;
+  max-width: none !important;
+  max-inline-size: none !important;
+  min-width: 0 !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 4px 8px !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  transform: none !important;
+}
+
+#day-card > #daily-goal-panel,
+#daily-goal-panel,
+.focused-zone-panel {
+  width: 136px !important;
+  min-width: 136px !important;
+  max-width: 136px !important;
+  box-sizing: border-box !important;
+}
+
+#day-card > #daily-goal-panel,
+#daily-goal-panel {
+  padding: 8px 9px 9px !important;
+}
+
+.focused-zone-panel {
+  padding: 8px 9px 9px !important;
+}
+
+.daily-goal-panel-header,
+.focused-zone-panel-header {
+  min-width: 0 !important;
+  margin-bottom: 6px !important;
+}
+
+.daily-goal-panel-header strong,
+.focused-zone-panel-header strong {
+  min-height: 20px !important;
+  padding: 3px 7px !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+}
+
+#daily-goal-day-label,
+.focused-zone-panel-header span {
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+}
+
+.daily-goal-panel-body,
+.focused-zone-panel-body {
+  gap: 5px !important;
+}
+
+.daily-goal-main {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.daily-goal-main span,
+.focused-zone-panel-body span,
+.daily-goal-sub {
+  font-size: 10.5px !important;
+  line-height: 1.2 !important;
+}
+
+#daily-goal-revenue-text,
+.focused-zone-panel-body strong {
+  min-width: 0 !important;
+  color: #ffffff !important;
+  font-size: 12.5px !important;
+  font-weight: 950 !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.04em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#daily-goal-revenue-text {
+  justify-self: end !important;
+  text-align: right !important;
+}
+
+.daily-goal-progress {
+  height: 5px !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #day-card {
+    padding-bottom: 33px !important;
+  }
+
+  #day-card > #phase-chip,
+  #phase-chip {
+    left: 9px !important;
+    right: 9px !important;
+    bottom: 7px !important;
+    min-height: 22px !important;
+    padding: 3px 7px !important;
+    font-size: 9.5px !important;
+  }
+
+  #day-card > #daily-goal-panel,
+  #daily-goal-panel,
+  .focused-zone-panel {
+    width: 136px !important;
+    min-width: 136px !important;
+    max-width: 136px !important;
+  }
+
+  .daily-goal-panel-header strong,
+  .focused-zone-panel-header strong,
+  #daily-goal-day-label,
+  .focused-zone-panel-header span,
+  .daily-goal-main span,
+  .focused-zone-panel-body span,
+  .daily-goal-sub {
+    font-size: 10px !important;
+  }
+
+  #daily-goal-revenue-text,
+  .focused-zone-panel-body strong {
+    font-size: 12px !important;
+  }
+}

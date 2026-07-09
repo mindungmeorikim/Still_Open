@@ -3401,6 +3401,105 @@ export const UIManager = {
     this.renderPlayerCleaningTool(playerNode);
     playerNode.dataset.direction = direction;
     this.renderPlayerCarryingBox(playerNode, GameState.player.carryingBoxType ?? null);
+    this.updateWorldDepthOrdering();
+  },
+
+  getElementWorldDepthY(node, fallbackHeight = 0, fallbackY = null) {
+    if (!node || node.hidden || node.style?.display === "none") {
+      return null;
+    }
+
+    const styleLeft = Number.parseFloat(node.style?.left);
+    const styleTop = Number.parseFloat(node.style?.top);
+    const top = Number.isFinite(styleTop)
+      ? styleTop
+      : Number.isFinite(Number(node.dataset?.customerVisualY))
+        ? Number(node.dataset.customerVisualY)
+        : Number.isFinite(Number(fallbackY))
+          ? Number(fallbackY)
+          : 0;
+    const height = node.offsetHeight || Number.parseFloat(node.style?.height) || fallbackHeight || 0;
+    const depthOffset = Number.parseFloat(node.dataset?.depthOffsetY);
+
+    return Math.round(top + (Number.isFinite(depthOffset) ? depthOffset : height));
+  },
+
+  setElementWorldDepth(node, depthY, priority = 0) {
+    if (!node || depthY === null || depthY === undefined || Number.isNaN(Number(depthY))) {
+      return;
+    }
+
+    const zIndex = Math.max(42, Math.min(980, Math.round(90 + Number(depthY) + priority)));
+
+    node.style.setProperty("z-index", String(zIndex), "important");
+    node.style.setProperty("--world-depth-y", `${Math.round(Number(depthY))}px`);
+  },
+
+  updateWorldDepthOrdering() {
+    const interactionLayer = document.getElementById("store-interaction-layer");
+
+    if (!interactionLayer) {
+      return;
+    }
+
+    const customerLayer = document.getElementById("customer-layer");
+
+    if (customerLayer) {
+      // customerLayer 자체가 stacking context를 만들면 손님이 오브젝트와 깊이 정렬되지 않는다.
+      customerLayer.style.setProperty("z-index", "auto", "important");
+    }
+
+    SHELF_INSTANCES.forEach((shelf) => {
+      const node = document.getElementById(shelf.nodeId);
+
+      if (!node || node.hidden) return;
+
+      const fallbackHeight = Number(shelf.height) || 110;
+      const fallbackY = Number(shelf.y) || 0;
+      const depthY = this.getElementWorldDepthY(node, fallbackHeight, fallbackY);
+
+      this.setElementWorldDepth(node, depthY, 0);
+    });
+
+    [
+      { id: "counter-zone", height: 112, priority: 4 },
+      { id: "warehouse-box-zone", height: 88, priority: 2 },
+      { id: "delivery-box-zone", height: 112, priority: 2 },
+      { id: "cleaning-zone", height: 66, priority: 1 }
+    ].forEach((item) => {
+      const node = document.getElementById(item.id);
+
+      if (!node || node.hidden) return;
+
+      this.setElementWorldDepth(
+        node,
+        this.getElementWorldDepthY(node, item.height),
+        item.priority
+      );
+    });
+
+    const playerNode = document.getElementById("player-zone");
+
+    if (playerNode && !playerNode.hidden) {
+      const playerHeight = playerNode.offsetHeight || 102;
+      const playerDepthY = this.getElementWorldDepthY(playerNode, playerHeight * 0.88);
+
+      this.setElementWorldDepth(playerNode, playerDepthY, 18);
+    }
+
+    const staffNode = document.getElementById("staff-character");
+
+    if (staffNode && !staffNode.hidden) {
+      const staffDepthY = this.getElementWorldDepthY(staffNode, 92);
+
+      this.setElementWorldDepth(staffNode, staffDepthY, 16);
+    }
+
+    document.querySelectorAll("#customer-layer .customer-npc").forEach((customerNode) => {
+      const customerDepthY = this.getElementWorldDepthY(customerNode, 87 * 0.88);
+
+      this.setElementWorldDepth(customerNode, customerDepthY, 14);
+    });
   },
 
   renderPlayerCarryingBox(playerNode, carryingBoxType = null) {
@@ -4236,6 +4335,8 @@ renderDebugCollisionBoxes() {
       customerNode.title = `${customer.typeName} / ${customer.wantedProductName}`;
       customerNode.dataset.lastCustomerZone = customer.currentZone ?? "";
     });
+
+    this.updateWorldDepthOrdering();
   },
 
   applyCustomerTargetPosition(customerNode, customer, index = 0) {
@@ -4429,6 +4530,7 @@ renderDebugCollisionBoxes() {
     customerNode.dataset.customerVisualY = String(nextPosition.y);
     customerNode.style.setProperty("left", `${nextPosition.x}px`, "important");
     customerNode.style.setProperty("top", `${nextPosition.y}px`, "important");
+    this.updateWorldDepthOrdering();
   },
 
   getCustomerNodeStoredPosition(customerNode) {
@@ -5026,6 +5128,7 @@ renderDebugCollisionBoxes() {
     this.renderPlayer();
     this.prepareUiImageButtons();
     this.renderDeliveryBox(this.orderDeliveredData);
+    this.updateWorldDepthOrdering();
     this.renderInteractionFeedback();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
     document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
@@ -5128,6 +5231,7 @@ renderDebugCollisionBoxes() {
       });
     });
     this.renderDebugCollisionBoxes();
+    this.updateWorldDepthOrdering();
   },
 
   renderWarehouseBox() {
@@ -5166,6 +5270,7 @@ renderDebugCollisionBoxes() {
     );
     warehouseBox.dataset.boxState = isOpen ? "open" : "closed";
     this.ensureWarehouseBoxVisuals(warehouseBox, imagePath);
+    this.updateWorldDepthOrdering();
   },
 
   ensureWarehouseBoxVisuals(warehouseBox, imagePath) {
@@ -6634,6 +6739,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (countNode && countNode.textContent !== countText) {
       countNode.textContent = countText;
     }
+
+    this.updateWorldDepthOrdering();
   },
 
   getStaffCharacterMark(staff = {}) {
@@ -7349,10 +7456,9 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (!playerPoint) return null;
 
     const playerFocusPoint = this.getPlayerCameraFocusPoint();
+    const unlockedStoreZoneCount = this.getUnlockedStoreZoneCount();
 
     if (this.isPlayerInsideUnlockedStoreFloor(playerPoint)) {
-      const unlockedStoreZoneCount = this.getUnlockedStoreZoneCount();
-
       if (unlockedStoreZoneCount >= 2 && playerFocusPoint) {
         return {
           mode: "expanded_player",
@@ -7372,6 +7478,24 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       }
     }
 
+    /*
+      [v8.10.11] BlueStacks 16:9 단칸 매장 전면 구도 보정.
+      기본 매장만 열린 상태에서 플레이어가 입구/전면 보도에 있으면 플레이어 머리를 화면 중앙에 놓지 않는다.
+      대신 기본 매장 안쪽을 카메라 기준점으로 잡아 냉장고/진열대가 바닥 중앙에 떠 있는 것처럼 보이지 않게 한다.
+      월드 좌표, 오브젝트 좌표, 충돌 범위, 상호작용 범위는 변경하지 않는다.
+    */
+    if (unlockedStoreZoneCount <= 1 && this.isPlayerNearBasicStoreFrontCameraArea(playerPoint)) {
+      const basicStoreFocusPoint = this.getBasicStoreShowcaseCameraFocusPoint();
+
+      if (basicStoreFocusPoint) {
+        return {
+          mode: "basic_store_showcase",
+          focusPoint: basicStoreFocusPoint,
+          playerPoint
+        };
+      }
+    }
+
     return {
       mode: "player_head",
       focusPoint: playerFocusPoint,
@@ -7385,6 +7509,80 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       .length;
   },
 
+  isCompactLandscapeStoreViewport(viewportWidth = 960, viewportHeight = 540) {
+    const width = Math.max(1, Number(viewportWidth) || 960);
+    const height = Math.max(1, Number(viewportHeight) || 540);
+    const aspectRatio = width / height;
+
+    return aspectRatio >= 1.55 && height <= 760;
+  },
+
+  isBasicStoreOnlyCameraContext(context = null) {
+    return (
+      ["store_center", "basic_store_showcase"].includes(context?.mode) &&
+      this.getUnlockedStoreZoneCount() <= 1
+    );
+  },
+
+  isPlayerNearBasicStoreFrontCameraArea(point = null) {
+    if (!point) return false;
+
+    const x = Number(point.x) || 0;
+    const y = Number(point.y) || 0;
+
+    return (
+      x >= 260 &&
+      x <= 830 &&
+      y >= 585 &&
+      y <= 860
+    );
+  },
+
+  getBasicStoreShowcaseCameraFocusPoint() {
+    const basicZone = this.getExpansionZoneViewModels(this.expansionState)
+      .find((zone) => zone.id === "zone_basic" || zone.level === 1);
+    const scene = basicZone ? this.getSpaceSceneViewModel(basicZone) : null;
+
+    if (!scene) {
+      return { x: 694, y: 554 };
+    }
+
+    return {
+      x: (Number(scene.focusX) || scene.x + scene.width / 2) + 20,
+      y: (Number(scene.focusY) || scene.y + scene.height / 2) + 40
+    };
+  },
+
+  getResponsiveStoreFollowZoom(viewportWidth = 960, viewportHeight = 540, context = null) {
+    const isLandscape = viewportWidth > viewportHeight;
+    const compactLandscape = this.isCompactLandscapeStoreViewport(viewportWidth, viewportHeight);
+    const baseFollowZoom = Number(this.worldCamera.followZoom) || 1.08;
+
+    /*
+      [v8.10.3] BlueStacks/모바일 16:9 단칸 매장 보정.
+      작은 가로 화면에서 기본 매장을 너무 넓게 잡으면 냉장고/진열대가 화면 중앙에 떠 있는 것처럼 보인다.
+      오브젝트 좌표/충돌/상호작용 범위는 그대로 두고, 기본 매장 카메라 최소 줌만 올려
+      웹 브라우저에서 보던 1구역 구도를 유지한다.
+    */
+    if (compactLandscape && context?.mode === "basic_store_showcase") {
+      return Math.max(baseFollowZoom, 1.54);
+    }
+
+    if (compactLandscape && this.isBasicStoreOnlyCameraContext(context)) {
+      return Math.max(baseFollowZoom, 1.48);
+    }
+
+    if (isLandscape && (viewportWidth <= 980 || viewportHeight <= 560)) {
+      return Math.max(baseFollowZoom, 1.24);
+    }
+
+    if (viewportWidth <= 1180 || viewportHeight <= 720) {
+      return Math.max(baseFollowZoom, 1.16);
+    }
+
+    return baseFollowZoom;
+  },
+
   getPlayerCameraTargetForContext(followContext = null, options = {}) {
     const viewport = document.getElementById("store-area");
     const context = followContext || this.getPlayerCameraFollowContext();
@@ -7394,20 +7592,27 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const viewportWidth = viewport.clientWidth || 960;
     const viewportHeight = viewport.clientHeight || 560;
     const safeArea = this.getStoreCameraSafeArea(viewportWidth, viewportHeight);
-    const targetScreenX = safeArea.left + safeArea.width / 2;
+    const isCompactBasicStore =
+      this.isCompactLandscapeStoreViewport(viewportWidth, viewportHeight) &&
+      this.isBasicStoreOnlyCameraContext(context);
+    const targetScreenX = context.mode === "basic_store_showcase" && isCompactBasicStore
+      ? safeArea.left + safeArea.width * 0.46
+      : safeArea.left + safeArea.width / 2;
 
-    const targetScreenY = context.mode === "store_center"
-      ? safeArea.top + safeArea.height * 0.52
-      : context.mode === "expanded_player"
-        ? safeArea.top + safeArea.height * 0.54
-        : Math.min(
-            viewportHeight - Math.max(96, viewportHeight * 0.18),
-            safeArea.top + safeArea.height * 0.62
-          );
+    const targetScreenY = context.mode === "basic_store_showcase"
+      ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.52 : 0.54)
+      : context.mode === "store_center"
+        ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.48 : 0.52)
+        : context.mode === "expanded_player"
+          ? safeArea.top + safeArea.height * 0.54
+          : Math.min(
+              viewportHeight - Math.max(96, viewportHeight * 0.18),
+              safeArea.top + safeArea.height * 0.62
+            );
 
     const minimumFollowZoom = Math.max(
       this.getWorldCoverZoom(),
-      Number(this.worldCamera.followZoom) || 1.08
+      this.getResponsiveStoreFollowZoom(viewportWidth, viewportHeight, context)
     );
     const requestedZoom = Math.max(Number(this.worldCamera.zoom) || 0, minimumFollowZoom);
     const zoom = options.applyZoom === true
@@ -7803,9 +8008,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const heightZoom = safeArea.height / (sceneHeight * 1.18);
     const coverZoom = this.getWorldCoverZoom();
     const targetZoom = Math.min(widthZoom, heightZoom, this.worldCamera.maxZoom);
+    const compactBasicStoreZoom =
+      this.isCompactLandscapeStoreViewport(viewportWidth, viewportHeight) &&
+      Number(scene.depth) === 1 &&
+      this.getUnlockedStoreZoneCount() <= 1
+        ? 1.48
+        : 0;
 
     return Math.max(
       coverZoom + 0.16,
+      compactBasicStoreZoom,
       Math.min(this.worldCamera.maxZoom, targetZoom)
     );
   },
@@ -12095,6 +12307,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     this.clearInteractionFeedbackNode("delivery-box-zone");
     this.ensureDeliveryBoxVisuals(deliveryBox, remainingCount);
     this.syncOrderDeliveryTutorialArrival();
+    this.updateWorldDepthOrdering();
 
     deliveryBox.onpointerdown = (event) => {
       event.preventDefault();
