@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260711-v1";
+const CACHE_NAME = "still-open-release-20260711-v2-analytics-dev";
 
 const APP_SHELL = [
   "./",
@@ -6,6 +6,8 @@ const APP_SHELL = [
   "./style.css",
   "./mobile_ui.css",
   "./main.js",
+  "./config/analytics.config.js",
+  "./systems/AnalyticsSystem.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

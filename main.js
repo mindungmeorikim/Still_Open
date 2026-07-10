@@ -28,6 +28,7 @@ import { StaffAssistSystem } from "./systems/StaffAssistSystem.js";
 import { DebugSystem } from "./systems/DebugSystem.js";
 import { AudioSystem } from "./systems/AudioSystem.js";
 import { PauseSystem } from "./systems/PauseSystem.js";
+import { AnalyticsSystem } from "./systems/AnalyticsSystem.js";
 
 import { MobileUI } from "./ui/MobileUI.js";
 import { MobileInputSystem } from "./systems/MobileInputSystem.js";
@@ -226,10 +227,12 @@ function initGame() {
   DebugSystem.init();
   AudioSystem.init();
   PauseSystem.init();
+  AnalyticsSystem.init();
   MobileUI.init();
   MobileInputSystem.init();
   bindCustomerEventModalFlow();
   bindCustomerStockShortagePenalty();
+  UIManager.showAnalyticsConsentIfNeeded();
   EventBus.emit(EVENTS.GAME_INIT);
   requestAnimationFrame(gameloop);
 }

@@ -30,6 +30,7 @@ import {
 } from "../data/AssetData.js";
 import { SaveSystem } from "../systems/SaveSystem.js";
 import { AudioSystem } from "../systems/AudioSystem.js";
+import { AnalyticsSystem } from "../systems/AnalyticsSystem.js";
 import { CURRENCY_EVENTS } from "../systems/EconomySystem.js";
 import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
 import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
@@ -212,6 +213,7 @@ export const UIManager = {
   tutorialTargetProxyClickHandler: null,
   settingsModal: null,
   settingsEscapeKeyBound: false,
+  analyticsConsentModal: null,
   topStatusResizeObserver: null,
   topStatusLayoutFrameId: null,
   topStatusObservedWidth: null,
@@ -327,6 +329,7 @@ export const UIManager = {
     this.createCustomerEventModal();
     this.createTitleScreen();
     this.createSettingsModal();
+    this.createAnalyticsConsentModal();
     this.createDailyRewardModal();
     this.createDailyMissionModal();
     this.createTutorialOverlay();
@@ -2960,6 +2963,14 @@ export const UIManager = {
                 <input id="settings-bgm-volume" type="range" min="0" max="100" step="5" />
               </label>
             </div>
+            <div class="settings-option-row settings-analytics-row">
+              <label class="settings-analytics-toggle">
+                <span>플레이 데이터 수집</span>
+                <input id="settings-analytics-enabled" type="checkbox" />
+              </label>
+              <p id="settings-analytics-status" class="settings-analytics-status"></p>
+              <button id="settings-analytics-details-button" class="settings-analytics-details-button" type="button">수집 항목 보기</button>
+            </div>
           </div>
         </div>
       `;
@@ -2980,6 +2991,8 @@ export const UIManager = {
     const bgmEnabledInput = document.getElementById("settings-bgm-enabled");
     const sfxVolumeInput = document.getElementById("settings-sfx-volume");
     const bgmVolumeInput = document.getElementById("settings-bgm-volume");
+    const analyticsEnabledInput = document.getElementById("settings-analytics-enabled");
+    const analyticsDetailsButton = document.getElementById("settings-analytics-details-button");
 
     if (closeButton) {
       closeButton.onclick = () => {
@@ -3015,6 +3028,30 @@ export const UIManager = {
       };
     }
 
+    if (analyticsEnabledInput) {
+      analyticsEnabledInput.onchange = () => {
+        AnalyticsSystem.setConsent(analyticsEnabledInput.checked);
+        this.syncSettingsAnalyticsControls();
+
+        if (analyticsEnabledInput.checked && !AnalyticsSystem.isConfigured()) {
+          this.showMessage("분석 수집을 허용했습니다. Game Key와 Secret Key를 입력하면 연결됩니다.", { duration: 3600 });
+        } else {
+          this.showMessage(
+            analyticsEnabledInput.checked
+              ? "플레이 데이터 수집을 허용했습니다."
+              : "플레이 데이터 수집을 중지했습니다.",
+            { duration: 2600 }
+          );
+        }
+      };
+    }
+
+    if (analyticsDetailsButton) {
+      analyticsDetailsButton.onclick = () => {
+        this.showAnalyticsConsentModal({ allowClose: true });
+      };
+    }
+
     this.settingsModal.onclick = (event) => {
       if (event.target === this.settingsModal) {
         this.hideSettingsModal();
@@ -3035,6 +3072,7 @@ export const UIManager = {
     }
 
     this.syncSettingsAudioControls();
+    this.syncSettingsAnalyticsControls();
   },
 
   syncSettingsAudioControls() {
@@ -3078,6 +3116,39 @@ export const UIManager = {
     }
   },
 
+  syncSettingsAnalyticsControls() {
+    const input = document.getElementById("settings-analytics-enabled");
+    const statusNode = document.getElementById("settings-analytics-status");
+    const status = AnalyticsSystem.getStatus();
+
+    if (input) {
+      input.checked = status.consent === "granted";
+    }
+
+    if (!statusNode) {
+      return;
+    }
+
+    if (status.consent === "granted" && status.configured) {
+      statusNode.textContent = status.sdkLoaded
+        ? `${status.environment} 분석 연결됨`
+        : `${status.environment} 분석 연결 준비 중`;
+      return;
+    }
+
+    if (status.consent === "granted") {
+      statusNode.textContent = "수집 허용됨 · DEV 키 입력 필요";
+      return;
+    }
+
+    if (status.consent === "denied") {
+      statusNode.textContent = "플레이 데이터 수집 안 함";
+      return;
+    }
+
+    statusNode.textContent = "아직 선택하지 않음";
+  },
+
   openSettingsModal(source = "ingame") {
     if (!this.settingsModal) {
       this.createSettingsModal();
@@ -3086,6 +3157,7 @@ export const UIManager = {
     this.settingsModal.dataset.source = source;
     this.setElementHiddenSafely(this.settingsModal, false);
     this.syncSettingsAudioControls();
+    this.syncSettingsAnalyticsControls();
     this.prepareUiImageButtons(this.settingsModal);
 
     window.requestAnimationFrame(() => {
@@ -3103,6 +3175,130 @@ export const UIManager = {
 
     this.setElementHiddenSafely(this.settingsModal, true);
     this.focusElementSafely(returnFocusTarget);
+  },
+
+  createAnalyticsConsentModal() {
+    let modal = document.getElementById("analytics-consent-modal");
+
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = "analytics-consent-modal";
+      modal.className = "modal analytics-consent-modal hidden";
+      modal.setAttribute("aria-hidden", "true");
+      modal.innerHTML = `
+        <article
+          class="analytics-consent-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="analytics-consent-title"
+          aria-describedby="analytics-consent-description"
+        >
+          <header class="analytics-consent-header">
+            <div>
+              <p class="analytics-consent-kicker">게임 개선 안내</p>
+              <h2 id="analytics-consent-title">플레이 데이터 수집</h2>
+            </div>
+            <button id="analytics-consent-close-button" class="analytics-consent-close-button hidden" type="button" aria-label="안내 닫기">닫기</button>
+          </header>
+
+          <div class="analytics-consent-body">
+            <p id="analytics-consent-description">
+              게임의 난이도와 편의성을 개선하기 위해 GameAnalytics를 통해 플레이 데이터를 수집합니다.
+              동의하지 않아도 게임의 모든 기능을 이용할 수 있습니다.
+            </p>
+            <ul>
+              <li>게임 실행 및 플레이 세션 정보</li>
+              <li>Day 진행, 상점 이용, 재화 획득·소비 같은 게임 행동</li>
+              <li>브라우저·기기 환경과 기술 오류 정보</li>
+            </ul>
+            <p class="analytics-consent-note">
+              게임에서 이름, 이메일, 채팅 내용은 분석 이벤트로 전송하지 않습니다. 설정에서 언제든 수집을 중지할 수 있습니다.
+            </p>
+          </div>
+
+          <footer class="analytics-consent-actions">
+            <button id="analytics-consent-deny-button" class="analytics-consent-button analytics-consent-button--secondary" type="button">동의하지 않음</button>
+            <button id="analytics-consent-accept-button" class="analytics-consent-button analytics-consent-button--primary" type="button">동의</button>
+          </footer>
+        </article>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    this.analyticsConsentModal = modal;
+
+    const acceptButton = document.getElementById("analytics-consent-accept-button");
+    const denyButton = document.getElementById("analytics-consent-deny-button");
+    const closeButton = document.getElementById("analytics-consent-close-button");
+
+    if (acceptButton) {
+      acceptButton.onclick = () => {
+        const initialized = AnalyticsSystem.setConsent(true);
+        this.hideAnalyticsConsentModal();
+        this.syncSettingsAnalyticsControls();
+        this.showMessage(
+          initialized
+            ? "플레이 데이터 수집에 동의했습니다. DEV 분석 연결을 시작합니다."
+            : "수집 동의를 저장했습니다. DEV 키를 입력하면 분석 연결이 시작됩니다.",
+          { duration: 3600 }
+        );
+      };
+    }
+
+    if (denyButton) {
+      denyButton.onclick = () => {
+        AnalyticsSystem.setConsent(false);
+        this.hideAnalyticsConsentModal();
+        this.syncSettingsAnalyticsControls();
+        this.showMessage("플레이 데이터 수집 없이 게임을 시작합니다.", { duration: 2800 });
+      };
+    }
+
+    if (closeButton) {
+      closeButton.onclick = () => {
+        this.hideAnalyticsConsentModal();
+      };
+    }
+
+    return modal;
+  },
+
+  showAnalyticsConsentIfNeeded() {
+    if (AnalyticsSystem.getConsent() !== null) {
+      return false;
+    }
+
+    this.showAnalyticsConsentModal({ allowClose: false });
+    return true;
+  },
+
+  showAnalyticsConsentModal({ allowClose = false } = {}) {
+    if (!this.analyticsConsentModal) {
+      this.createAnalyticsConsentModal();
+    }
+
+    const closeButton = document.getElementById("analytics-consent-close-button");
+
+    if (closeButton) {
+      closeButton.classList.toggle("hidden", allowClose !== true);
+    }
+
+    this.analyticsConsentModal.dataset.allowClose = allowClose ? "true" : "false";
+    this.setElementHiddenSafely(this.analyticsConsentModal, false);
+    document.body.classList.add("is-analytics-consent-active");
+
+    window.requestAnimationFrame(() => {
+      this.focusElementSafely(document.getElementById("analytics-consent-accept-button"));
+    });
+  },
+
+  hideAnalyticsConsentModal() {
+    if (!this.analyticsConsentModal) {
+      return;
+    }
+
+    this.setElementHiddenSafely(this.analyticsConsentModal, true);
+    document.body.classList.remove("is-analytics-consent-active");
   },
 
   createDailyRewardModal() {
