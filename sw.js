@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-pwa-v1";
+const CACHE_NAME = "still-open-release-20260711-v1";
 
 const APP_SHELL = [
   "./",
@@ -35,42 +35,78 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+function shouldUseNetworkFirst(request, requestUrl) {
+  if (request.mode === "navigate") {
+    return true;
+  }
+
+  if (["script", "style", "worker"].includes(request.destination)) {
+    return true;
+  }
+
+  return /\.(?:js|css|html|json)$/i.test(requestUrl.pathname);
+}
+
+async function fetchNetworkFirst(request) {
+  try {
+    const response = await fetch(request, { cache: "no-store" });
+
+    if (response && response.status === 200 && response.type === "basic") {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+
+    return response;
+  } catch (_error) {
+    const cachedResponse = await caches.match(request);
+
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    if (request.mode === "navigate") {
+      return caches.match("./index.html");
+    }
+
+    return Response.error();
+  }
+}
+
+async function fetchCacheFirst(request) {
+  const cachedResponse = await caches.match(request);
+
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+
+  try {
+    const response = await fetch(request);
+
+    if (response && response.status === 200 && response.type === "basic") {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+
+    return response;
+  } catch (_error) {
+    return Response.error();
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
     return;
   }
 
   const requestUrl = new URL(event.request.url);
+
   if (requestUrl.origin !== self.location.origin) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(event.request)
-        .then((response) => {
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return response;
-          }
-
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-
-          return response;
-        })
-        .catch(() => {
-          if (event.request.mode === "navigate") {
-            return caches.match("./index.html");
-          }
-
-          return Response.error();
-        });
-    })
+    shouldUseNetworkFirst(event.request, requestUrl)
+      ? fetchNetworkFirst(event.request)
+      : fetchCacheFirst(event.request)
   );
 });

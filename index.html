@@ -8,6 +8,9 @@
   <meta name="apple-mobile-web-app-title" content="오늘도 정상영업" />
   <title>오늘도 정상영업</title>
   <link rel="manifest" href="./manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="./style.css" />
   <link rel="stylesheet" href="./mobile_ui.css" />
 </head>
@@ -28,7 +31,7 @@
         <p id="diamond-info">다이아 0</p>
         <p id="satisfaction-info">만족도 100</p>
         <p id="mental-info">멘탈 100</p>
-        <p id="stock-info">재고 0/40</p>
+        <p id="stock-info">창고 0/60</p>
       </div>
 
       <nav id="top-icon-menu" aria-label="상단 빠른 메뉴">
@@ -66,9 +69,26 @@
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./sw.js").catch((error) => {
-          console.warn("Service worker registration failed:", error);
-        });
+        const hadActiveController = Boolean(navigator.serviceWorker.controller);
+        let isReloadingForUpdate = false;
+
+        if (hadActiveController) {
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (isReloadingForUpdate) {
+              return;
+            }
+
+            isReloadingForUpdate = true;
+            window.location.reload();
+          });
+        }
+
+        navigator.serviceWorker
+          .register("./sw.js", { updateViaCache: "none" })
+          .then((registration) => registration.update())
+          .catch((error) => {
+            console.warn("Service worker registration failed:", error);
+          });
       });
     }
   </script>

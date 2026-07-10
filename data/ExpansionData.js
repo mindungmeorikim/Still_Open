@@ -7,8 +7,8 @@
   - v6.0 월드맵 카메라 배치 좌표/에셋 경로 정의
 
   규칙:
-  - 실제 Date 사용 금지
-  - 모든 확장 조건은 GameState.day 기준 Day 단위로 정의
+  - 확장 해금 조건(requiredDay)은 GameState.day 기준
+  - 공사 대기시간(constructionDurationHours)은 실제 경과 시간 기준
 */
 
 const createExpansionZone = (zone) => {
@@ -90,7 +90,7 @@ export const EXPANSION_ZONES = Object.freeze([
     level: 2,
     name: "Lv.2 추가 진열 구역",
     unlockCost: 67500,
-    constructionDays: 1,
+    constructionDurationHours: 24,
     instantDiamondPrice: 60,
     requiredDay: 2,
     previousZoneId: "zone_basic",
@@ -147,7 +147,7 @@ export const EXPANSION_ZONES = Object.freeze([
     level: 3,
     name: "Lv.3 냉장·도시락 구역",
     unlockCost: 135000,
-    constructionDays: 1,
+    constructionDurationHours: 24,
     instantDiamondPrice: 90,
     requiredDay: 3,
     previousZoneId: "zone_extra_shelf",
@@ -203,7 +203,7 @@ export const EXPANSION_ZONES = Object.freeze([
     level: 4,
     name: "Lv.4 프리미엄 매장 구역",
     unlockCost: 270000,
-    constructionDays: 1,
+    constructionDurationHours: 24,
     instantDiamondPrice: 150,
     requiredDay: 5,
     previousZoneId: "zone_cold_food",

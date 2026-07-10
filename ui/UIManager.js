@@ -9,7 +9,7 @@ import { EVENTS, GAME_PHASE } from "../core/Constants.js";
 import { GameState } from "../core/GameState.js";
 import { CustomerSystem } from "../systems/CustomerSystem.js";
 import { PRODUCTS, PRODUCT_SHELF_IDS } from "../data/ProductData.js";
-import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
+import { SHELF_INSTANCES, getResponsiveShelfInstances } from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 import {
@@ -40,6 +40,7 @@ import { RewardInboxUI } from "./RewardInboxUI.js";
 import { BM_ASSETS } from "../data/BMAssetMap.js";
 
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
+const EXPANSION_TIMER_UPDATED = "EXPANSION_TIMER_UPDATED";
 const INTERACTION_FEEDBACK_DISTANCE = 72;
 const COUNTER_INTERACTION_FEEDBACK_DISTANCE = 64;
 const SHELF_INTERACTION_FEEDBACK_DISTANCE_CAP = Object.freeze({
@@ -50,6 +51,21 @@ const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
+const WAREHOUSE_INVENTORY_OPENED = "WAREHOUSE_INVENTORY_OPENED";
+const WAREHOUSE_INVENTORY_ACTION = "warehouse_inventory";
+const WAREHOUSE_INVENTORY_CATEGORY_TABS = Object.freeze([
+  Object.freeze({ id: "all", label: "전체" }),
+  Object.freeze({ id: "basic_shelf", label: "기본" }),
+  Object.freeze({ id: "fridge", label: "냉장" }),
+  Object.freeze({ id: "fresh_shelf", label: "신선" }),
+  Object.freeze({ id: "warmer", label: "온장" })
+]);
+const WAREHOUSE_INVENTORY_STATUS_TABS = Object.freeze([
+  Object.freeze({ id: "all", label: "전체" }),
+  Object.freeze({ id: "out", label: "재고 없음" }),
+  Object.freeze({ id: "low", label: "부족" }),
+  Object.freeze({ id: "enough", label: "충분" })
+]);
 const DEFAULT_WAREHOUSE_BOX_POSITION = Object.freeze({ x: 210, y: 575 });
 const DEFAULT_CLEANING_POINT = Object.freeze(getCleaningPointByZoneId());
 const CUSTOMER_ENTRY_ROUTE_STEP_MS = 640;
@@ -196,6 +212,9 @@ export const UIManager = {
   tutorialTargetProxyClickHandler: null,
   settingsModal: null,
   settingsEscapeKeyBound: false,
+  topStatusResizeObserver: null,
+  topStatusLayoutFrameId: null,
+  topStatusObservedWidth: null,
   dailyRewardModal: null,
   dailyMissionModal: null,
   resultModal: null,
@@ -204,6 +223,10 @@ export const UIManager = {
   infiniteGameOverModal: null,
   dayScenarioModal: null,
   orderModal: null,
+  warehouseInventoryModal: null,
+  warehouseInventoryActiveCategory: "all",
+  warehouseInventoryActiveStatus: "all",
+  warehouseInventoryListScrollTop: 0,
   bmContractShopModal: null,
   bmPurchaseConfirmModal: null,
   bmShopResultModal: null,
@@ -232,6 +255,8 @@ export const UIManager = {
   lastStoreExpansionTilesSignature: "",
   expansionCarouselIndex: 0,
   selectedExpansionZoneId: null,
+  expansionConditionModalActiveZoneId: null,
+  isExpansionConditionModalVisible: false,
   currentFocusedZoneId: "zone_basic",
   isStoreExpansionPopoverVisible: false,
   inventoryByProductId: {},
@@ -278,8 +303,8 @@ export const UIManager = {
     RewardInboxUI.init();
     this.bindButtons();
     this.bindGameEvents();
-    // 배포본에서는 F8 좌표 출력/충돌 박스 모드를 비활성화합니다.
-    // this.bindDebugCoordinateMode();
+    // 배포 빌드에서는 디버그 좌표/충돌 박스 표시가 비활성화됩니다.
+    this.bindDebugCoordinateMode();
     this.bindDayStartEvents();
     this.bindInventoryEvents();
     this.bindExpansionEvents();
@@ -290,6 +315,8 @@ export const UIManager = {
     this.bindStaffEvents();
     this.createDayScenarioModal();
     this.createOrderModal();
+    this.createWarehouseInventoryModal();
+    this.bindWarehouseInventoryTriggers();
     this.createBMContractShopModal();
     this.createBMShopPurchaseConfirmModal();
     this.createStaffHireModal();
@@ -309,6 +336,7 @@ export const UIManager = {
     this.createStaffSummary();
     this.createDailyGoalPanel();
     this.createSanitationHud();
+    this.bindTopStatusAdaptiveLayout();
     this.createFocusedZonePanel();
     this.moveTopIconMenuToRoot();
     this.configureTopSettingsMenu();
@@ -3306,13 +3334,13 @@ export const UIManager = {
     dailyMissionButton.disabled = false;
     dailyMissionButton.hidden = false;
     dailyMissionButton.tabIndex = 0;
-    dailyMissionButton.title = "일일 미션";
-    dailyMissionButton.setAttribute("aria-label", "일일 미션 확인");
+    dailyMissionButton.title = "미션";
+    dailyMissionButton.setAttribute("aria-label", "미션 확인");
     dailyMissionButton.setAttribute("aria-disabled", "false");
     dailyMissionButton.removeAttribute("aria-hidden");
     dailyMissionButton.innerHTML = `
       <img src="${BM_ASSETS.rewardIcons.reward}" alt="" draggable="false" />
-      <span class="top-icon-button-label">일일 미션</span>
+      <span class="top-icon-button-label">미션</span>
     `;
     dailyMissionButton.onclick = () => {
       this.showDailyMissionModal();
@@ -3449,14 +3477,26 @@ export const UIManager = {
       customerLayer.style.setProperty("z-index", "auto", "important");
     }
 
-    SHELF_INSTANCES.forEach((shelf) => {
+    // 진열대의 화면 깊이는 이미지 DOM 높이가 아니라 실제 F8 충돌 박스의 하단선을 기준으로 정렬한다.
+    // 캐릭터 발이 충돌 박스 아래에 있으면 캐릭터가 앞에, 위에 있으면 뒤에 보이도록 하여
+    // 발 충돌은 정상인데 몸만 진열대 뒤로 숨는 현상을 방지한다.
+    const shelfCollisionBySourceId = new Map(
+      getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds)
+        .filter((rect) => rect?.kind === "shelf" && rect?.sourceId)
+        .map((rect) => [rect.sourceId, rect])
+    );
+
+    this.getShelfLayoutInstances().forEach((shelf) => {
       const node = document.getElementById(shelf.nodeId);
 
       if (!node || node.hidden) return;
 
+      const collisionRect = shelfCollisionBySourceId.get(shelf.instanceId);
       const fallbackHeight = Number(shelf.height) || 110;
       const fallbackY = Number(shelf.y) || 0;
-      const depthY = this.getElementWorldDepthY(node, fallbackHeight, fallbackY);
+      const depthY = collisionRect
+        ? Number(collisionRect.y) + Number(collisionRect.height)
+        : this.getElementWorldDepthY(node, fallbackHeight, fallbackY);
 
       this.setElementWorldDepth(node, depthY, 0);
     });
@@ -3482,7 +3522,11 @@ export const UIManager = {
 
     if (playerNode && !playerNode.hidden) {
       const playerHeight = playerNode.offsetHeight || 102;
-      const playerDepthY = this.getElementWorldDepthY(playerNode, playerHeight * 0.88);
+      const playerTop = Number(GameState.player?.y);
+      const playerFootOffsetY = 6;
+      const playerDepthY = Number.isFinite(playerTop)
+        ? playerTop + playerHeight - playerFootOffsetY
+        : this.getElementWorldDepthY(playerNode, playerHeight * 0.88);
 
       this.setElementWorldDepth(playerNode, playerDepthY, 18);
     }
@@ -3533,6 +3577,11 @@ export const UIManager = {
       imageNode.src = imagePath;
     }
   },
+
+  getShelfLayoutInstances() {
+    return getResponsiveShelfInstances();
+  },
+
   renderPlayerCleaningTool(playerNode) {
     if (!playerNode) {
       return;
@@ -3571,10 +3620,85 @@ export const UIManager = {
 
 
 
-// 진열대 배치 좌표 확인용 코드: 배포본에서는 비활성화
+// QA 전용: F8 좌표 패널과 실제 충돌 박스를 표시합니다.
 bindDebugCoordinateMode() {
-  // F8 좌표 패널/충돌 박스가 사용자에게 노출되지 않도록 배포본에서는 바인딩하지 않습니다.
-  return;
+  const DEBUG_COORDINATE_MODE_ENABLED = false;
+
+  if (!DEBUG_COORDINATE_MODE_ENABLED) {
+    this.isDebugCoordinateModeVisible = false;
+    document.getElementById("debug-coordinate-panel")?.remove();
+    this.getStoreInteractionLayer?.()
+      ?.querySelectorAll?.(".debug-collision-box")
+      ?.forEach?.((node) => node.remove());
+    return;
+  }
+
+  if (this.isDebugCoordinateModeBound) {
+    return;
+  }
+
+  this.isDebugCoordinateModeBound = true;
+  this.isDebugCoordinateModeVisible = true;
+
+  const refreshDebugOverlay = () => {
+    this.renderDebugCoordinatePanel();
+    this.renderDebugCollisionBoxes();
+  };
+
+  window.addEventListener("keydown", (event) => {
+    const target = event.target;
+    const tag = target?.tagName?.toLowerCase?.();
+
+    if (
+      target?.isContentEditable ||
+      tag === "input" ||
+      tag === "textarea" ||
+      tag === "select"
+    ) {
+      return;
+    }
+
+    if (event.code !== "F8") {
+      return;
+    }
+
+    event.preventDefault();
+    this.isDebugCoordinateModeVisible = !this.isDebugCoordinateModeVisible;
+    refreshDebugOverlay();
+  });
+
+  window.addEventListener("mousemove", (event) => {
+    if (!this.isDebugCoordinateModeVisible) {
+      return;
+    }
+
+    this.updateDebugCoordinatePanel(event);
+  });
+
+  window.addEventListener("click", (event) => {
+    if (!this.isDebugCoordinateModeVisible) {
+      return;
+    }
+
+    const worldPoint = this.getDebugWorldPoint(event);
+    const nearestShelf = this.getNearestDebugShelf(worldPoint);
+
+    console.table({
+      mouseWorldX: worldPoint.x,
+      mouseWorldY: worldPoint.y,
+      playerX: Math.round(Number(GameState.player?.x) || 0),
+      playerY: Math.round(Number(GameState.player?.y) || 0),
+      nearestShelf: nearestShelf?.instanceId ?? "none",
+      shelfX: nearestShelf?.x ?? "",
+      shelfY: nearestShelf?.y ?? "",
+      interactionX: nearestShelf?.interactionX ?? "",
+      interactionY: nearestShelf?.interactionY ?? "",
+      distance: nearestShelf?.distance ?? ""
+    });
+  }, true);
+
+  // QA 빌드는 시작 즉시 충돌 박스를 보여준다.
+  window.requestAnimationFrame(refreshDebugOverlay);
 },
 renderDebugCoordinatePanel() {
   let panel = document.getElementById("debug-coordinate-panel");
@@ -3667,7 +3791,7 @@ getDebugWorldPoint(event) {
 getNearestDebugShelf(point) {
   if (!point) return null;
 
-  return SHELF_INSTANCES
+  return this.getShelfLayoutInstances()
     .map((shelf) => {
       const x = Number(shelf.interactionX ?? shelf.x) || 0;
       const y = Number(shelf.interactionY ?? shelf.y) || 0;
@@ -3856,6 +3980,10 @@ renderDebugCollisionBoxes() {
 
     EventBus.on(SHELF_STOCK_CHANGED, () => {
       this.renderStoreObjectVisuals();
+
+      if (this.isWarehouseInventoryModalVisible()) {
+        this.renderWarehouseInventoryModal({ preserveScroll: true });
+      }
     });
 
     EventBus.on(EVENTS.RESTOCK_COMPLETED, (data = {}) => {
@@ -3989,6 +4117,10 @@ renderDebugCollisionBoxes() {
   },
 
   bindInventoryEvents() {
+    EventBus.on(WAREHOUSE_INVENTORY_OPENED, () => {
+      this.showWarehouseInventoryModal({ source: "warehouse_object" });
+    });
+
     EventBus.on(EVENTS.INVENTORY_CHANGED, (data) => {
       const items = Array.isArray(data.items) ? data.items : [];
 
@@ -4001,6 +4133,10 @@ renderDebugCollisionBoxes() {
       this.renderInventorySummary();
       this.renderProductCards();
       this.renderStoreObjectVisuals();
+
+      if (this.isWarehouseInventoryModalVisible()) {
+        this.renderWarehouseInventoryModal({ preserveScroll: true });
+      }
 
       if (data.source === "products_unlocked" && Array.isArray(data.unlockedProductIds) && data.unlockedProductIds.length > 0) {
         this.playAssetEffectToast("unlock", `신규 상품 ${data.unlockedProductIds.length}종 해금!`);
@@ -4016,7 +4152,27 @@ renderDebugCollisionBoxes() {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.renderFocusedZonePanel(this.currentFocusedZoneId);
+      this.renderExpansionConditionModal();
       this.playAssetEffectToast("loading", "공사 진행 중...");
+    });
+
+    EventBus.on(EXPANSION_TIMER_UPDATED, (data = {}) => {
+      this.expansionState = data.expansionState ?? this.expansionState;
+      this.renderFocusedZonePanel(this.currentFocusedZoneId);
+
+      if (this.isExpansionConditionModalVisible) {
+        this.renderExpansionConditionModal();
+      }
+
+      if (this.isStoreExpansionPopoverVisible && this.selectedExpansionZoneId) {
+        const zone = this.getExpansionZoneViewModels(this.expansionState)
+          .find((candidate) => candidate.id === this.selectedExpansionZoneId);
+
+        if (zone) {
+          this.renderStoreExpansionPopover(zone);
+        }
+      }
     });
 
     EventBus.on(EVENTS.EXPANSION_COMPLETED, (data) => {
@@ -4026,9 +4182,14 @@ renderDebugCollisionBoxes() {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.renderFocusedZonePanel(data.zoneId);
+      this.renderExpansionConditionModal();
       this.playAssetEffectToast("construction", "공사 완료!");
       this.playStoreExpansionUnlockEffect(data.animation?.zoneId ?? data.zoneId);
       this.renderStoreObjectVisuals();
+      if (this.isWarehouseInventoryModalVisible()) {
+        this.renderWarehouseInventoryModal({ preserveScroll: true });
+      }
       this.renderInteractionFeedback();
       this.renderFocusedZonePanel(data.zoneId);
     });
@@ -4040,16 +4201,23 @@ renderDebugCollisionBoxes() {
       this.showExpansionMessage(message);
       this.showMessage(message);
       this.renderExpansionZones(this.expansionState);
+      this.renderFocusedZonePanel(this.currentFocusedZoneId);
+      this.renderExpansionConditionModal();
     });
   },
 
   bindBMEvents() {
     EventBus.on(CURRENCY_EVENTS.CHANGED, () => {
       this.requestBMContractShopRender();
+      this.renderFocusedZonePanel(this.currentFocusedZoneId);
+      this.renderExpansionConditionModal();
     });
 
     EventBus.on(BM_EVENTS.STATE_CHANGED, () => {
       this.requestBMContractShopRender();
+      if (this.isWarehouseInventoryModalVisible()) {
+        this.renderWarehouseInventoryModal({ preserveScroll: true });
+      }
     });
 
     EventBus.on(DAILY_MISSION_EVENTS.STATE_CHANGED, () => {
@@ -4622,17 +4790,7 @@ renderDebugCollisionBoxes() {
       return null;
     }
 
-    const targetX = Number(customer.targetX);
-    const targetY = Number(customer.targetY);
-
-    if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
-      return {
-        x: targetX,
-        y: targetY
-      };
-    }
-
-    const shelfInstance = SHELF_INSTANCES.find((shelf) => {
+    const shelfInstance = this.getShelfLayoutInstances().find((shelf) => {
       return shelf.instanceId === customer.targetShelfInstanceId;
     });
 
@@ -4644,6 +4802,16 @@ renderDebugCollisionBoxes() {
       return {
         x: Number(shelfInstance.standX),
         y: Number(shelfInstance.standY)
+      };
+    }
+
+    const targetX = Number(customer.targetX);
+    const targetY = Number(customer.targetY);
+
+    if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
+      return {
+        x: targetX,
+        y: targetY
       };
     }
 
@@ -5018,7 +5186,8 @@ renderDebugCollisionBoxes() {
     const state = this.normalizeSanitationState(this.sanitationState);
 
     this.sanitationState = state;
-    sanitationNode.textContent = `위생 ${state.value}`;
+    this.setTopStatusText(sanitationNode, `위생 ${state.value}`);
+    this.scheduleTopStatusAdaptiveLayout();
     sanitationNode.dataset.sanitationStatus = state.status;
     sanitationNode.classList.toggle("is-warning", state.status === "warning" || state.status === "critical");
     sanitationNode.classList.toggle("is-cleaning", state.isCleaning === true);
@@ -5109,6 +5278,146 @@ renderDebugCollisionBoxes() {
     labelNode.textContent = "주변 청소";
   },
 
+  formatTopStatusUnit(value, divisor, suffix) {
+    const safeValue = Math.max(0, Number(value) || 0);
+    const scaled = safeValue / divisor;
+    const rounded = scaled >= 100
+      ? Math.round(scaled)
+      : Math.round(scaled * 10) / 10;
+    const label = Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(1).replace(/\.0$/, "");
+
+    return `${label}${suffix}`;
+  },
+
+  formatTopStatusMoney(value) {
+    const safeValue = Math.max(0, Math.floor(Number(value) || 0));
+
+    if (safeValue >= 100000000) {
+      return this.formatTopStatusUnit(safeValue, 100000000, "억");
+    }
+
+    if (safeValue >= 10000) {
+      return this.formatTopStatusUnit(safeValue, 10000, "만");
+    }
+
+    return safeValue.toLocaleString("ko-KR");
+  },
+
+  formatTopStatusCount(value) {
+    const safeValue = Math.max(0, Math.floor(Number(value) || 0));
+
+    if (safeValue >= 10000) {
+      return this.formatTopStatusUnit(safeValue, 10000, "만");
+    }
+
+    if (safeValue >= 1000) {
+      return this.formatTopStatusUnit(safeValue, 1000, "천");
+    }
+
+    return safeValue.toLocaleString("ko-KR");
+  },
+
+  setTopStatusText(node, fullText, compactText = fullText) {
+    if (!node) return;
+
+    node.dataset.fullText = String(fullText);
+    node.dataset.compactText = String(compactText);
+    node.textContent = String(fullText);
+    node.title = String(fullText);
+  },
+
+  getTopStatusNodes() {
+    return [
+      document.getElementById("money-info"),
+      document.getElementById("diamond-info"),
+      document.getElementById("satisfaction-info"),
+      document.getElementById("mental-info"),
+      document.getElementById("sanitation-info"),
+      document.getElementById("stock-info")
+    ].filter(Boolean);
+  },
+
+  isTopStatusOverflowing(panel, nodes) {
+    if (!panel || nodes.length === 0) return false;
+
+    if (panel.scrollWidth > panel.clientWidth + 1) {
+      return true;
+    }
+
+    return nodes.some((node) => node.scrollWidth > node.clientWidth + 1);
+  },
+
+  applyTopStatusAdaptiveLayout() {
+    const panel = document.getElementById("status-panel");
+    const nodes = this.getTopStatusNodes();
+
+    if (!panel || nodes.length === 0) return;
+
+    panel.classList.remove("is-compact", "is-condensed", "is-abbreviated");
+    nodes.forEach((node) => {
+      node.textContent = node.dataset.fullText || node.textContent || "";
+    });
+
+    // 1단계: 기본 간격과 글자 크기
+    if (!this.isTopStatusOverflowing(panel, nodes)) return;
+
+    // 2단계: 간격과 글자 크기를 아주 조금 축소
+    panel.classList.add("is-compact");
+    if (!this.isTopStatusOverflowing(panel, nodes)) return;
+
+    // 3단계: 한 번 더 최소 폭으로 압축
+    panel.classList.add("is-condensed");
+    if (!this.isTopStatusOverflowing(panel, nodes)) return;
+
+    // 마지막 단계: 긴 숫자만 축약해 표시하고 전체 값은 title로 유지
+    panel.classList.add("is-abbreviated");
+    nodes.forEach((node) => {
+      node.textContent = node.dataset.compactText || node.dataset.fullText || node.textContent || "";
+    });
+  },
+
+  scheduleTopStatusAdaptiveLayout() {
+    if (this.topStatusLayoutFrameId) {
+      cancelAnimationFrame(this.topStatusLayoutFrameId);
+    }
+
+    this.topStatusLayoutFrameId = requestAnimationFrame(() => {
+      this.topStatusLayoutFrameId = null;
+      this.applyTopStatusAdaptiveLayout();
+    });
+  },
+
+  bindTopStatusAdaptiveLayout() {
+    const panel = document.getElementById("status-panel");
+
+    if (!panel || panel.dataset.adaptiveLayoutBound === "true") return;
+
+    panel.dataset.adaptiveLayoutBound = "true";
+
+    if (typeof ResizeObserver === "function") {
+      this.topStatusResizeObserver = new ResizeObserver((entries = []) => {
+        const observedWidth = Number(entries[0]?.contentRect?.width) || panel.clientWidth || 0;
+
+        if (
+          this.topStatusObservedWidth !== null &&
+          Math.abs(observedWidth - this.topStatusObservedWidth) < 0.5
+        ) {
+          return;
+        }
+
+        this.topStatusObservedWidth = observedWidth;
+        this.scheduleTopStatusAdaptiveLayout();
+      });
+      this.topStatusResizeObserver.observe(panel);
+    } else {
+      window.addEventListener("resize", () => {
+        this.scheduleTopStatusAdaptiveLayout();
+      });
+    }
+  },
+
   render() {
     this.renderInventorySummary();
     this.renderStaffSummary();
@@ -5131,17 +5440,32 @@ renderDebugCollisionBoxes() {
     this.updateWorldDepthOrdering();
     this.renderInteractionFeedback();
     document.getElementById("day-info").textContent = `Day ${GameState.day}`;
-    document.getElementById("money-info").textContent = `₩${GameState.money.toLocaleString()}`;
+
+    const moneyInfoNode = document.getElementById("money-info");
     const diamondInfoNode = document.getElementById("diamond-info");
+    const satisfactionInfoNode = document.getElementById("satisfaction-info");
+    const mentalInfoNode = document.getElementById("mental-info");
+    const diamond = BMSystem.getBMState().diamond;
 
-    if (diamondInfoNode) {
-      const diamond = BMSystem.getBMState().diamond;
-
-      diamondInfoNode.textContent = diamond.toLocaleString("ko-KR");
-    }
-
-    document.getElementById("satisfaction-info").textContent = `만족도 ${GameState.satisfaction}`;
-    document.getElementById("mental-info").textContent = `멘탈 ${GameState.mental}`;
+    this.setTopStatusText(
+      moneyInfoNode,
+      `₩${Math.max(0, Number(GameState.money) || 0).toLocaleString("ko-KR")}`,
+      `₩${this.formatTopStatusMoney(GameState.money)}`
+    );
+    this.setTopStatusText(
+      diamondInfoNode,
+      Math.max(0, Number(diamond) || 0).toLocaleString("ko-KR"),
+      this.formatTopStatusCount(diamond)
+    );
+    this.setTopStatusText(
+      satisfactionInfoNode,
+      `만족도 ${GameState.satisfaction}`
+    );
+    this.setTopStatusText(
+      mentalInfoNode,
+      `멘탈 ${GameState.mental}`
+    );
+    this.scheduleTopStatusAdaptiveLayout();
   },
 
   renderStoreObjectVisuals() {
@@ -5149,7 +5473,7 @@ renderDebugCollisionBoxes() {
 
     if (!interactionLayer) return;
 
-    const objectConfigs = SHELF_INSTANCES.map((shelf) => {
+    const objectConfigs = this.getShelfLayoutInstances().map((shelf) => {
       return {
         nodeId: shelf.nodeId,
         instanceId: shelf.instanceId,
@@ -5245,8 +5569,9 @@ renderDebugCollisionBoxes() {
       warehouseBox = document.createElement("div");
       warehouseBox.id = "warehouse-box-zone";
       warehouseBox.className = "warehouse-box-zone";
-      warehouseBox.setAttribute("role", "img");
-      warehouseBox.setAttribute("aria-label", "창고 박스");
+      warehouseBox.setAttribute("role", "button");
+      warehouseBox.setAttribute("aria-label", "창고 재고 현황 열기");
+      warehouseBox.setAttribute("tabindex", "0");
       interactionLayer.appendChild(warehouseBox);
     } else if (warehouseBox.parentElement !== interactionLayer) {
       interactionLayer.appendChild(warehouseBox);
@@ -5269,6 +5594,22 @@ renderDebugCollisionBoxes() {
       "important"
     );
     warehouseBox.dataset.boxState = isOpen ? "open" : "closed";
+    warehouseBox.dataset.playerAction = WAREHOUSE_INVENTORY_ACTION;
+    warehouseBox.title = "창고 재고 현황";
+
+    if (warehouseBox.dataset.inventoryKeyboardBound !== "true") {
+      warehouseBox.dataset.inventoryKeyboardBound = "true";
+      warehouseBox.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        warehouseBox.dispatchEvent(new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        }));
+      });
+    }
+
     this.ensureWarehouseBoxVisuals(warehouseBox, imagePath);
     this.updateWorldDepthOrdering();
   },
@@ -5633,7 +5974,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   },
 
   clearShelfInteractionFeedback() {
-    SHELF_INSTANCES.forEach((shelf) => {
+    this.getShelfLayoutInstances().forEach((shelf) => {
       this.clearInteractionFeedbackNode(shelf.nodeId);
     });
   },
@@ -5643,7 +5984,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       "counter-zone",
       "warehouse-box-zone",
       "delivery-box-zone",
-      ...SHELF_INSTANCES.map((shelf) => shelf.nodeId).filter(Boolean)
+      ...this.getShelfLayoutInstances().map((shelf) => shelf.nodeId).filter(Boolean)
     ]);
 
     nodeIds.forEach((nodeId) => {
@@ -5672,7 +6013,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   const shouldSuppressShelf = options.suppressShelf === true;
   const shelfTargets = shouldSuppressShelf
     ? []
-    : SHELF_INSTANCES.map((shelf) => {
+    : this.getShelfLayoutInstances().map((shelf) => {
       return {
         nodeId: shelf.nodeId,
         shelfId: shelf.shelfId,
@@ -6002,7 +6343,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         classNames: ["ui-special-button", "ui-special-continue-button"]
       },
       {
-        selector: ".store-expansion-popover-close, #settings-close-button, #bm-contract-shop-close-button, #order-modal-close-button",
+        selector: ".store-expansion-popover-close, .zone-expansion-condition-close, #settings-close-button, #bm-contract-shop-close-button, #order-modal-close-button",
         variant: "iconClose",
         classNames: ["ui-icon-image-button", "ui-icon-button-close"]
       },
@@ -6158,13 +6499,36 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     panel.innerHTML = `
       <div class="focused-zone-panel-header">
         <strong>구역</strong>
-        <span id="focused-zone-status-label">확대 보기</span>
+        <button
+          id="focused-zone-status-label"
+          class="focused-zone-condition-button"
+          type="button"
+          aria-label="구역 확장 조건 열기"
+        >확장 조건</button>
       </div>
       <div class="focused-zone-panel-body">
         <strong id="focused-zone-name">기본 매장</strong>
         <span id="focused-zone-hint">기본 플레이 구역</span>
       </div>
     `;
+
+    panel.addEventListener("click", (event) => {
+      const conditionButton = event.target?.closest?.("#focused-zone-status-label, .focused-zone-condition-button");
+
+      if (!conditionButton || !panel.contains(conditionButton)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+      const expandableZone = this.getNextAvailableExpansionZone(zoneStates);
+      const attentionZone = this.getExpansionConditionAttentionZone(
+        zoneStates,
+        this.currentFocusedZoneId
+      );
+
+      this.openExpansionConditionModal(attentionZone?.id ?? expandableZone?.id ?? "zone_extra_shelf");
+    });
 
     const goalPanel = this.createDailyGoalPanel();
     const parent = dayCard ?? topUi;
@@ -6190,8 +6554,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const hintNode = document.getElementById("focused-zone-hint");
     const statusNode = document.getElementById("focused-zone-status-label");
     const isOverview = storeArea?.classList.contains("is-world-overview") ?? false;
+    const expandableZone = this.getNextAvailableExpansionZone(zoneStates);
+    const constructingZone = zoneStates.find((candidate) => candidate.isConstructing) ?? null;
+    const attentionZone = this.getExpansionConditionAttentionZone(zoneStates, zone?.id);
 
     panel.classList.toggle("hidden", isOverview || !zone);
+    panel.classList.toggle("has-expandable-zone", Boolean(expandableZone));
+    panel.dataset.expansionNotice = expandableZone ? "available" : "idle";
 
     if (!zone) return;
 
@@ -6200,18 +6569,246 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     if (hintNode) {
-      hintNode.textContent = zone.level === 1
-        ? "기본 플레이 구역"
-        : zone.isUnlocked
-          ? "확장 완료"
-          : zone.isConstructing
-            ? "공사 중"
-            : "눌러서 조건 확인";
+      hintNode.textContent = expandableZone
+        ? `${expandableZone.name} 확장 가능!`
+        : constructingZone
+          ? `${constructingZone.name} 공사 중 · ${this.formatExpansionRemainingTime(constructingZone.constructionRemainingMs)}`
+          : zone.level === 1
+            ? "기본 플레이 구역"
+            : zone.isUnlocked
+              ? "확장 완료"
+              : "조건 확인 가능";
     }
 
     if (statusNode) {
-      statusNode.textContent = isOverview ? "전체 보기" : "확대 보기";
+      statusNode.innerHTML = `
+        <span>확장 조건</span>
+        ${expandableZone ? '<em class="focused-zone-alert-badge" aria-label="확장 가능">!</em>' : ""}
+      `;
+      statusNode.disabled = false;
+      statusNode.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.openExpansionConditionModal(attentionZone?.id ?? expandableZone?.id ?? "zone_extra_shelf");
+      };
     }
+  },
+
+  getNextAvailableExpansionZone(zoneStates = this.getExpansionZoneViewModels(this.expansionState)) {
+    return zoneStates.find((zone) => zone.level > 1 && zone.isAvailable) ?? null;
+  },
+
+  getNextPendingExpansionZone(zoneStates = this.getExpansionZoneViewModels(this.expansionState)) {
+    return zoneStates
+      .filter((zone) => zone.level > 1)
+      .sort((a, b) => a.level - b.level)
+      .find((zone) => !zone.isUnlocked) ?? null;
+  },
+
+  getExpansionConditionAttentionZone(zoneStates = this.getExpansionZoneViewModels(this.expansionState), preferredZoneId = null) {
+    // 좌측 구역 패널의 확장 조건 모달은 현재 진행해야 하는 다음 구역 1개만 보여준다.
+    // 전체 보기에서 특정 구역을 누르는 동작은 별도의 지도 팝오버 경로를 사용한다.
+    return this.getNextPendingExpansionZone(zoneStates);
+  },
+
+  createExpansionConditionModal() {
+    let modal = document.getElementById("zone-expansion-condition-modal");
+
+    if (modal) return modal;
+
+    const gameScreen = document.getElementById("game-screen") ?? document.body;
+
+    modal = document.createElement("section");
+    modal.id = "zone-expansion-condition-modal";
+    modal.className = "zone-expansion-condition-modal hidden";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.setAttribute("aria-labelledby", "zone-expansion-condition-title");
+    modal.innerHTML = `
+      <div class="zone-expansion-condition-backdrop" data-zone-condition-close="true"></div>
+      <article class="zone-expansion-condition-card">
+        <header class="zone-expansion-condition-header">
+          <div>
+            <span>구역 관리</span>
+            <strong id="zone-expansion-condition-title">구역 확장 조건</strong>
+          </div>
+          <button class="zone-expansion-condition-close ui-icon-image-button ui-icon-button-close" type="button" aria-label="구역 확장 조건 닫기">
+            <span>닫기</span>
+          </button>
+        </header>
+        <div class="zone-expansion-condition-list" id="zone-expansion-condition-list"></div>
+      </article>
+    `;
+
+    gameScreen.appendChild(modal);
+
+    modal.addEventListener("click", (event) => {
+      if (event.target?.dataset?.zoneConditionClose === "true") {
+        this.closeExpansionConditionModal();
+      }
+    });
+
+    const closeButton = modal.querySelector(".zone-expansion-condition-close");
+
+    if (closeButton) {
+      closeButton.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeExpansionConditionModal();
+      };
+    }
+
+    return modal;
+  },
+
+  openExpansionConditionModal(zoneId = null) {
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const fallbackZone = this.getExpansionConditionAttentionZone(zoneStates, zoneId);
+
+    this.expansionConditionModalActiveZoneId = fallbackZone?.id ?? null;
+    this.isExpansionConditionModalVisible = true;
+    this.closeStoreExpansionPopover();
+    this.createExpansionConditionModal();
+    this.renderExpansionConditionModal();
+  },
+
+  closeExpansionConditionModal() {
+    const modal = document.getElementById("zone-expansion-condition-modal");
+
+    this.isExpansionConditionModalVisible = false;
+    this.expansionConditionModalActiveZoneId = null;
+
+    if (modal) {
+      modal.classList.add("hidden");
+      modal.classList.remove("is-visible");
+    }
+  },
+
+  renderExpansionConditionModal() {
+    const modal = this.createExpansionConditionModal();
+    const listNode = document.getElementById("zone-expansion-condition-list");
+
+    if (!modal || !listNode) return;
+
+    if (!this.isExpansionConditionModalVisible) {
+      modal.classList.add("hidden");
+      modal.classList.remove("is-visible");
+      return;
+    }
+
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const targetZone = this.getExpansionConditionAttentionZone(zoneStates, this.expansionConditionModalActiveZoneId);
+    const activeZoneId = targetZone?.id ?? "coming-soon";
+
+    this.expansionConditionModalActiveZoneId = targetZone?.id ?? null;
+    modal.classList.remove("hidden");
+    modal.classList.add("is-visible");
+    modal.dataset.activeZone = activeZoneId;
+
+    if (!targetZone) {
+      listNode.innerHTML = `
+        <section class="zone-expansion-condition-coming-soon" aria-live="polite">
+          <strong>Coming Soon..</strong>
+          <p>현재 준비된 1~4구역 확장이 모두 완료되었습니다.</p>
+          <span>다음 업데이트에서 새로운 매장 확장을 기대해주세요!</span>
+        </section>
+      `;
+      return;
+    }
+
+    const zone = targetZone;
+    const costText = zone.unlockCost > 0
+      ? `₩${zone.unlockCost.toLocaleString("ko-KR")}`
+      : "기본 구역";
+    const statusText = this.getExpansionStatusLabel(zone.status);
+    const actionText = zone.isUnlocked
+      ? "완료"
+      : zone.isConstructing
+        ? "공사 중"
+        : zone.isAvailable
+          ? "확장하기"
+          : "조건 부족";
+    const missingText = zone.missingRequirements.length > 0
+      ? zone.missingRequirements.join(" / ")
+      : zone.isUnlocked
+        ? "이미 확장 완료된 구역입니다."
+        : zone.isConstructing
+          ? `실제 시간 기준 ${this.formatExpansionRemainingTime(zone.constructionRemainingMs)} 후 완료됩니다.`
+          : "모든 조건 충족";
+    const availableClass = zone.isAvailable ? " is-expandable" : "";
+
+    listNode.innerHTML = `
+      <article class="zone-expansion-condition-item zone-expansion-${zone.status} is-selected${availableClass}" data-zone-id="${zone.id}">
+        <div class="zone-expansion-condition-item-top">
+          <div>
+            <span class="zone-expansion-condition-status">${statusText}</span>
+            <strong>${zone.name}</strong>
+          </div>
+          ${zone.isAvailable ? '<em class="zone-expansion-condition-badge">확장 가능</em>' : ""}
+        </div>
+        <p>${zone.description}</p>
+        <dl class="zone-expansion-condition-requirements">
+          <div class="${zone.conditions.hasRequiredDay ? "is-met" : "is-missing"}">
+            <dt>필요 Day</dt>
+            <dd>${zone.requiredDay}</dd>
+          </div>
+          <div class="${zone.conditions.hasEnoughMoney ? "is-met" : "is-missing"}">
+            <dt>확장 비용</dt>
+            <dd>${costText}</dd>
+          </div>
+          <div class="${zone.conditions.previousUnlocked ? "is-met" : "is-missing"}">
+            <dt>이전 구역</dt>
+            <dd>${zone.previousZoneName}</dd>
+          </div>
+          <div>
+            <dt>현재 상태</dt>
+            <dd>${statusText}</dd>
+          </div>
+        </dl>
+        <div class="zone-expansion-condition-missing">${missingText}</div>
+        <div class="zone-expansion-condition-actions">
+          <button
+            class="zone-expansion-condition-action"
+            type="button"
+            data-zone-id="${zone.id}"
+            ${zone.isAvailable ? "" : "disabled"}
+          >${actionText}</button>
+          <button
+            class="zone-expansion-condition-instant-action"
+            type="button"
+            data-zone-id="${zone.id}"
+            ${(!zone.isUnlocked && (zone.isAvailable || zone.isConstructing)) ? "" : "disabled"}
+          >즉시 완료 · ${Number(zone.instantDiamondPrice || 0).toLocaleString("ko-KR")}다이아</button>
+        </div>
+      </article>
+    `;
+
+    this.prepareUiImageButtons(modal);
+
+    listNode.querySelectorAll(".zone-expansion-condition-action").forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled) return;
+        EventBus.emit(EVENTS.EXPANSION_REQUESTED, {
+          day: GameState.day,
+          zoneId: button.dataset.zoneId
+        });
+      };
+    });
+
+    listNode.querySelectorAll(".zone-expansion-condition-instant-action").forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (button.disabled) return;
+        EventBus.emit(EVENTS.EXPANSION_REQUESTED, {
+          day: GameState.day,
+          zoneId: button.dataset.zoneId,
+          instantComplete: true
+        });
+      };
+    });
   },
 
   renderDailyGoalPanel() {
@@ -6868,8 +7465,12 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       Math.floor(Number(BMSystem.getWarehouseCapacity?.()) || 60)
     );
 
-    stockInfo.textContent =
-      `재고 ${resolvedTotalQuantity.toLocaleString("ko-KR")}/${stockCapacity.toLocaleString("ko-KR")}`;
+    this.setTopStatusText(
+      stockInfo,
+      `창고 ${resolvedTotalQuantity.toLocaleString("ko-KR")}/${stockCapacity.toLocaleString("ko-KR")}`,
+      `창고 ${this.formatTopStatusCount(resolvedTotalQuantity)}/${this.formatTopStatusCount(stockCapacity)}`
+    );
+    this.scheduleTopStatusAdaptiveLayout();
   },
 
   renderControlButtons() {
@@ -7194,7 +7795,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     [
       "entrance-zone",
-      ...SHELF_INSTANCES.map((shelf) => shelf.nodeId),
+      ...this.getShelfLayoutInstances().map((shelf) => shelf.nodeId),
       "counter-zone",
       "warehouse-box-zone",
       "player-zone",
@@ -7262,7 +7863,13 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     window.addEventListener("resize", () => {
       window.clearTimeout(this.worldCamera.resizeTimerId);
       this.worldCamera.resizeTimerId = window.setTimeout(() => {
-        const activeZoneId = this.selectedExpansionZoneId || "zone_basic";
+        const didFollowPlayer = this.followPlayerCamera({ force: true });
+
+        if (didFollowPlayer) {
+          return;
+        }
+
+        const activeZoneId = this.selectedExpansionZoneId || this.currentFocusedZoneId || "zone_basic";
 
         if (this.worldCamera.zoom <= this.getStoreCameraMinZoom() + 0.08) {
           this.fitStoreWorld();
@@ -7287,13 +7894,17 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       return false;
     }
 
-    const playerZoneId = this.getStoreZoneIdAtWorldPoint(
-      followContext.playerPoint.x,
-      followContext.playerPoint.y
-    );
+    if (followContext.zoneId) {
+      this.currentFocusedZoneId = followContext.zoneId;
+    } else {
+      const playerZoneId = this.getStoreZoneIdAtWorldPoint(
+        followContext.playerPoint.x,
+        followContext.playerPoint.y
+      );
 
-    if (playerZoneId) {
-      this.currentFocusedZoneId = playerZoneId;
+      if (playerZoneId) {
+        this.currentFocusedZoneId = playerZoneId;
+      }
     }
 
     this.worldCamera.followMode = followContext.mode;
@@ -7399,13 +8010,14 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     if (!context) return false;
 
-    if (context.mode === "store_center") {
+    if (["store_center", "basic_zone_composition", "zone_composition"].includes(context.mode)) {
       const target = this.getPlayerCameraTargetForContext(context, { applyZoom: false });
 
       if (!target) return false;
 
       return (
         this.worldCamera.followMode !== context.mode ||
+        (context.zoneId && this.currentFocusedZoneId !== context.zoneId) ||
         Math.abs(target.camera.x - this.worldCamera.x) > 2 ||
         Math.abs(target.camera.y - this.worldCamera.y) > 2
       );
@@ -7452,54 +8064,150 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   getPlayerCameraFollowContext() {
     const playerPoint = this.getPlayerCameraFootPoint() || this.getPlayerCameraFocusPoint();
-
-    if (!playerPoint) return null;
-
     const playerFocusPoint = this.getPlayerCameraFocusPoint();
-    const unlockedStoreZoneCount = this.getUnlockedStoreZoneCount();
 
-    if (this.isPlayerInsideUnlockedStoreFloor(playerPoint)) {
-      if (unlockedStoreZoneCount >= 2 && playerFocusPoint) {
-        return {
-          mode: "expanded_player",
-          focusPoint: playerFocusPoint,
-          playerPoint
-        };
-      }
-
-      const storeFocusPoint = this.getUnlockedStoreCenterCameraFocusPoint();
-
-      if (storeFocusPoint) {
-        return {
-          mode: "store_center",
-          focusPoint: storeFocusPoint,
-          playerPoint
-        };
-      }
-    }
+    if (!playerPoint || !playerFocusPoint) return null;
 
     /*
-      [v8.10.11] BlueStacks 16:9 단칸 매장 전면 구도 보정.
-      기본 매장만 열린 상태에서 플레이어가 입구/전면 보도에 있으면 플레이어 머리를 화면 중앙에 놓지 않는다.
-      대신 기본 매장 안쪽을 카메라 기준점으로 잡아 냉장고/진열대가 바닥 중앙에 떠 있는 것처럼 보이지 않게 한다.
-      월드 좌표, 오브젝트 좌표, 충돌 범위, 상호작용 범위는 변경하지 않는다.
+      [camera-only fix] 모든 화면 비율과 구역 해금 상태에서 동일하게 플레이어 머리를 추적한다.
+      기존 basic_zone_composition / zone_composition 분기는 매장 중심을 고정해서
+      플레이어가 이동해도 카메라가 따라오지 않는 원인이었다.
+
+      이 변경은 카메라 목표점만 바꾸며 오브젝트 좌표, 충돌, 상호작용,
+      플레이어/알바/손님 이동 데이터는 수정하지 않는다.
     */
-    if (unlockedStoreZoneCount <= 1 && this.isPlayerNearBasicStoreFrontCameraArea(playerPoint)) {
-      const basicStoreFocusPoint = this.getBasicStoreShowcaseCameraFocusPoint();
-
-      if (basicStoreFocusPoint) {
-        return {
-          mode: "basic_store_showcase",
-          focusPoint: basicStoreFocusPoint,
-          playerPoint
-        };
-      }
-    }
-
     return {
       mode: "player_head",
       focusPoint: playerFocusPoint,
       playerPoint
+    };
+  },
+
+  getZoneCompositionCameraContext(playerPoint = null, playerFocusPoint = null, unlockedStoreZoneCount = 1) {
+    if (!playerPoint) return null;
+
+    const unlockedZones = this.getUnlockedStoreZoneViewModels();
+
+    if (unlockedZones.length <= 0) return null;
+
+    const zoneId = Number(unlockedStoreZoneCount) <= 1
+      ? "zone_basic"
+      : this.getCameraZoneIdForPlayerPoint(playerPoint, unlockedZones);
+    const zone = unlockedZones.find((candidate) => candidate.id === zoneId) ?? unlockedZones[0];
+    const focusPoint = this.getZoneCompositionCameraFocusPoint(zone);
+
+    if (!zone || !focusPoint) return null;
+
+    return {
+      mode: Number(unlockedStoreZoneCount) <= 1
+        ? "basic_zone_composition"
+        : "zone_composition",
+      zoneId: zone.id,
+      focusPoint,
+      playerPoint,
+      playerFocusPoint
+    };
+  },
+
+  getUnlockedStoreZoneViewModels() {
+    return this.getExpansionZoneViewModels(this.expansionState)
+      .filter((zone) => zone.isUnlocked || zone.level === 1);
+  },
+
+  getCameraZoneIdForPlayerPoint(point = null, unlockedZones = this.getUnlockedStoreZoneViewModels()) {
+    if (!point || !Array.isArray(unlockedZones) || unlockedZones.length <= 0) {
+      return "zone_basic";
+    }
+
+    const movementZoneId = this.getStoreZoneIdFromMovementBounds(point, unlockedZones);
+
+    if (movementZoneId) {
+      return movementZoneId;
+    }
+
+    const sceneZoneId = this.getStoreZoneIdAtWorldPoint(point.x, point.y);
+
+    if (sceneZoneId && unlockedZones.some((zone) => zone.id === sceneZoneId)) {
+      return sceneZoneId;
+    }
+
+    if (this.currentFocusedZoneId && unlockedZones.some((zone) => zone.id === this.currentFocusedZoneId)) {
+      const currentZone = unlockedZones.find((zone) => zone.id === this.currentFocusedZoneId);
+      const currentScene = this.getSpaceSceneViewModel(currentZone);
+      const dx = point.x - (Number(currentScene.focusX) || currentScene.x + currentScene.width / 2);
+      const dy = point.y - (Number(currentScene.focusY) || currentScene.y + currentScene.height / 2);
+      const keepRadius = Math.max(currentScene.width, currentScene.height) * 0.72;
+
+      if ((dx * dx + dy * dy) <= keepRadius * keepRadius) {
+        return currentZone.id;
+      }
+    }
+
+    return this.getNearestStoreZoneIdForPoint(point, unlockedZones);
+  },
+
+  getStoreZoneIdFromMovementBounds(point = null, unlockedZones = this.getUnlockedStoreZoneViewModels()) {
+    if (!point) return null;
+
+    const worldMap = document.getElementById("store-world-map");
+    const worldWidth = Number(worldMap?.offsetWidth) || 1672;
+    const worldHeight = Number(worldMap?.offsetHeight) || 941;
+
+    return unlockedZones.find((zone) => {
+      const bounds = Array.isArray(zone.movementBounds) ? zone.movementBounds : [];
+
+      return bounds.some((bound) => {
+        const x = Number(bound.x) * worldWidth;
+        const y = Number(bound.y) * worldHeight;
+        const width = Number(bound.width) * worldWidth;
+        const height = Number(bound.height) * worldHeight;
+
+        return (
+          point.x >= x &&
+          point.x <= x + width &&
+          point.y >= y &&
+          point.y <= y + height
+        );
+      });
+    })?.id ?? null;
+  },
+
+  getNearestStoreZoneIdForPoint(point = null, unlockedZones = this.getUnlockedStoreZoneViewModels()) {
+    if (!point || !Array.isArray(unlockedZones) || unlockedZones.length <= 0) {
+      return "zone_basic";
+    }
+
+    return unlockedZones
+      .map((zone) => {
+        const scene = this.getSpaceSceneViewModel(zone);
+        const centerX = Number(scene.focusX) || scene.x + scene.width / 2;
+        const centerY = Number(scene.focusY) || scene.y + scene.height / 2;
+        const dx = point.x - centerX;
+        const dy = point.y - centerY;
+
+        return {
+          zone,
+          distance: dx * dx + dy * dy
+        };
+      })
+      .sort((first, second) => first.distance - second.distance)[0]?.zone?.id ?? "zone_basic";
+  },
+
+  getZoneCompositionCameraFocusPoint(zone = {}) {
+    const scene = this.getSpaceSceneViewModel(zone);
+    const focusX = Number(scene.focusX) || scene.x + scene.width / 2;
+    const focusY = Number(scene.focusY) || scene.y + scene.height / 2;
+
+    if (zone.id === "zone_basic" || Number(zone.level) === 1) {
+      return {
+        x: focusX + 34,
+        y: focusY + 18
+      };
+    }
+
+    return {
+      x: focusX + (Number(scene.focusOffsetX) || 0),
+      y: focusY + (Number(scene.focusOffsetY) || 0)
     };
   },
 
@@ -7519,7 +8227,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   isBasicStoreOnlyCameraContext(context = null) {
     return (
-      ["store_center", "basic_store_showcase"].includes(context?.mode) &&
+      ["store_center", "basic_store_showcase", "basic_zone_composition"].includes(context?.mode) &&
       this.getUnlockedStoreZoneCount() <= 1
     );
   },
@@ -7559,11 +8267,27 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const baseFollowZoom = Number(this.worldCamera.followZoom) || 1.08;
 
     /*
-      [v8.10.3] BlueStacks/모바일 16:9 단칸 매장 보정.
-      작은 가로 화면에서 기본 매장을 너무 넓게 잡으면 냉장고/진열대가 화면 중앙에 떠 있는 것처럼 보인다.
-      오브젝트 좌표/충돌/상호작용 범위는 그대로 두고, 기본 매장 카메라 최소 줌만 올려
-      웹 브라우저에서 보던 1구역 구도를 유지한다.
+      [v8.10.15] BlueStacks/모바일 16:9 구역 기반 카메라.
+      작은 화면에서 플레이어를 화면 중앙에 계속 놓으면 기본 매장 오브젝트가 바닥 중앙에 떠 보인다.
+      따라서 기본 매장은 보기 좋은 매장 컷을 우선하고, 확장 후에는 플레이어가 속한 구역 프리셋을 따라간다.
     */
+    if (context?.mode === "basic_zone_composition") {
+      return compactLandscape
+        ? Math.max(baseFollowZoom, 1.58)
+        : Math.max(baseFollowZoom, 1.48);
+    }
+
+    if (context?.mode === "zone_composition") {
+      const zone = this.getUnlockedStoreZoneViewModels()
+        .find((candidate) => candidate.id === context.zoneId);
+      const scene = zone ? this.getSpaceSceneViewModel(zone) : null;
+      const sceneZoom = Number(scene?.focusZoom) || this.worldCamera.focusZoom || 1.45;
+
+      return compactLandscape
+        ? Math.max(baseFollowZoom, Math.min(1.5, sceneZoom * 0.92))
+        : Math.max(baseFollowZoom, Math.min(1.42, sceneZoom * 0.88));
+    }
+
     if (compactLandscape && context?.mode === "basic_store_showcase") {
       return Math.max(baseFollowZoom, 1.54);
     }
@@ -7595,20 +8319,27 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const isCompactBasicStore =
       this.isCompactLandscapeStoreViewport(viewportWidth, viewportHeight) &&
       this.isBasicStoreOnlyCameraContext(context);
-    const targetScreenX = context.mode === "basic_store_showcase" && isCompactBasicStore
-      ? safeArea.left + safeArea.width * 0.46
-      : safeArea.left + safeArea.width / 2;
+    const targetScreenX = context.mode === "basic_zone_composition" && isCompactBasicStore
+      ? safeArea.left + safeArea.width * 0.62
+      : context.mode === "zone_composition"
+        ? safeArea.left + safeArea.width * 0.52
+        : context.mode === "basic_store_showcase" && isCompactBasicStore
+          ? safeArea.left + safeArea.width * 0.46
+          : context.mode === "player_head"
+            ? safeArea.left + safeArea.width * 0.5
+            : safeArea.left + safeArea.width / 2;
 
-    const targetScreenY = context.mode === "basic_store_showcase"
-      ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.52 : 0.54)
-      : context.mode === "store_center"
-        ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.48 : 0.52)
-        : context.mode === "expanded_player"
-          ? safeArea.top + safeArea.height * 0.54
-          : Math.min(
-              viewportHeight - Math.max(96, viewportHeight * 0.18),
-              safeArea.top + safeArea.height * 0.62
-            );
+    const targetScreenY = context.mode === "basic_zone_composition"
+      ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.60 : 0.56)
+      : context.mode === "zone_composition"
+        ? safeArea.top + safeArea.height * 0.54
+        : context.mode === "basic_store_showcase"
+          ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.52 : 0.54)
+          : context.mode === "store_center"
+            ? safeArea.top + safeArea.height * (isCompactBasicStore ? 0.48 : 0.52)
+            : context.mode === "expanded_player"
+              ? safeArea.top + safeArea.height * 0.54
+              : safeArea.top + safeArea.height * 0.54;
 
     const minimumFollowZoom = Math.max(
       this.getWorldCoverZoom(),
@@ -7702,9 +8433,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       - 0.30은 현재 58x102 캐릭터 에셋 기준 얼굴/머리 쪽에 가까운 지점이다.
       - 상호작용 판정은 getInteractionPlayerCenter()를 그대로 쓰므로 이동/계산/진열 판정에는 영향 없음.
     */
+    const cameraLookAheadY = 30;
+
     return {
       x: (Number(GameState.player.x) || 0) + playerWidth / 2,
-      y: (Number(GameState.player.y) || 0) + playerHeight * 0.3
+      y: (Number(GameState.player.y) || 0) + playerHeight * 0.3 - cameraLookAheadY
     };
   },
 
@@ -7741,7 +8474,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     if (event.button !== undefined && event.button !== 0) return;
 
     const isBlockedTarget = event.target.closest?.(
-      ".store-expansion-popover, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, #cleaning-zone, .cleaning-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, button[data-player-action]"
+      ".store-expansion-popover, .zone-expansion-condition-modal, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, #cleaning-zone, .cleaning-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, [data-player-action]"
     );
 
     if (isBlockedTarget) return;
@@ -7784,7 +8517,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
   handleStoreCameraViewportClick(event) {
     const isBlockedTarget = event.target.closest?.(
-      ".store-expansion-popover, .store-space-popover-trigger, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, #cleaning-zone, .cleaning-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, #message-panel, #top-ui, #bottom-ui, button[data-player-action]"
+      ".store-expansion-popover, .zone-expansion-condition-modal, .store-space-popover-trigger, .store-camera-controls, .store-zone, .delivery-box-zone, #delivery-box-zone, #cleaning-zone, .cleaning-zone, .expansion-space-hotspot, .dock-button, .primary-start-button, #message-panel, #top-ui, #bottom-ui, [data-player-action]"
     );
 
     if (isBlockedTarget || this.worldCamera.wasDragging) {
@@ -7799,6 +8532,23 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     event.preventDefault();
     event.stopPropagation();
+
+    const storeArea = document.getElementById("store-area");
+    const isOverview = storeArea?.classList.contains("is-world-overview");
+
+    if (isOverview && hitZone.level > 1) {
+      this.openStoreExpansionPopover(hitZone.id);
+      this.showMessage(
+        hitZone.isUnlocked
+          ? "확장 완료된 구역입니다."
+          : hitZone.isConstructing
+            ? "현재 공사 중인 구역입니다."
+            : hitZone.isAvailable
+              ? "확장 가능한 구역입니다."
+              : `${hitZone.name} 확장 조건을 확인하세요.`
+      );
+      return;
+    }
 
     this.closeStoreExpansionPopover();
     this.focusStoreSpace(hitZone.id, { zoom: "auto" });
@@ -7991,7 +8741,18 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const centerX = (Number(scene.focusX) || scene.x + scene.width / 2) + (Number(scene.focusOffsetX) || 0);
     const centerY = (Number(scene.focusY) || scene.y + scene.height / 2) + (Number(scene.focusOffsetY) || 0);
 
-    this.worldCamera.x = Math.round(viewportCenterX - centerX * zoom);
+    /*
+      [zone 1 focus composition]
+      1구역 버튼/타일을 눌렀을 때만 카메라를 왼쪽으로 이동시켜
+      기본 매장 화면이 오른쪽으로 약 16% 이동해 보이도록 한다.
+      플레이어 추적 카메라(getPlayerCameraTargetForContext)는 별도 경로이므로
+      플레이어 중심 추적 구도에는 영향을 주지 않는다.
+    */
+    const zoneFocusScreenOffsetX = zone.id === "zone_basic"
+      ? Math.round(safeArea.width * 0.16)
+      : 0;
+
+    this.worldCamera.x = Math.round(viewportCenterX - centerX * zoom + zoneFocusScreenOffsetX);
     this.worldCamera.y = Math.round(viewportCenterY - centerY * zoom);
     this.setStoreViewMode("focus");
     this.updateWorldCameraTransform();
@@ -8150,13 +8911,12 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       button.onclick = () => {
         if (!zone) return;
 
-        this.focusStoreSpace(zone.id, { zoom: "auto" });
-
         if (zone.level > 1 && !zone.isUnlocked) {
-          this.selectedExpansionZoneId = zone.id;
-          this.isStoreExpansionPopoverVisible = true;
-          this.renderStoreExpansionPopover(zone);
+          this.openExpansionConditionModal(zone.id);
+          return;
         }
+
+        this.focusStoreSpace(zone.id, { zoom: "auto" });
       };
     });
 
@@ -8385,6 +9145,37 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
         if (!zone) return;
 
+        const storeArea = document.getElementById("store-area");
+        const isOverview = storeArea?.classList.contains("is-world-overview");
+
+        // 전체 보기에서는 2·3·4구역을 누른 바로 그 위치에 해당 구역 팝오버를 연다.
+        // 좌측 패널의 "다음 구역" 모달 경로와 섞지 않는다.
+        if (isOverview && zone.level > 1) {
+          this.openStoreExpansionPopover(zone.id);
+          this.showMessage(
+            zone.isUnlocked
+              ? "확장 완료된 구역입니다."
+              : zone.isConstructing
+                ? "현재 공사 중인 구역입니다."
+                : zone.isAvailable
+                  ? "확장 가능한 구역입니다."
+                  : `${zone.name} 확장 조건을 확인하세요.`
+          );
+          return;
+        }
+
+        if (zone.level > 1 && !zone.isUnlocked) {
+          this.openStoreExpansionPopover(zone.id);
+          this.showMessage(
+            zone.isConstructing
+              ? "현재 공사 중인 구역입니다."
+              : zone.isAvailable
+                ? "확장 가능한 구역입니다."
+                : `${zone.name} 확장 조건을 확인하세요.`
+          );
+          return;
+        }
+
         this.closeStoreExpansionPopover();
         this.focusStoreSpace(zone.id, { zoom: "auto" });
 
@@ -8427,28 +9218,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
           return;
         }
 
-        const isSameVisibleZone =
-          this.isStoreExpansionPopoverVisible &&
-          this.selectedExpansionZoneId === zone.id;
-
-        if (isSameVisibleZone) {
-          this.closeStoreExpansionPopover();
-          return;
-        }
-
-        this.selectedExpansionZoneId = zone.id;
-        this.isStoreExpansionPopoverVisible = true;
-        this.focusStoreSpace(zone.id, { zoom: "auto" });
+        this.openStoreExpansionPopover(zone.id);
         this.showMessage(
           zone.isUnlocked
             ? "확장 완료된 구역입니다."
             : zone.isConstructing
               ? "현재 공사 중인 구역입니다."
-              : "아직 확장되지 않은 구역입니다."
+              : zone.isAvailable
+                ? "확장 가능한 구역입니다."
+                : `${zone.name} 확장 조건을 확인하세요.`
         );
-        window.setTimeout(() => {
-          this.renderStoreExpansionZones(this.getExpansionZoneViewModels(this.expansionState));
-        }, 0);
       };
 
       triggerNode.onpointerdown = (event) => {
@@ -8655,6 +9434,26 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       });
   },
 
+  openStoreExpansionPopover(zoneId) {
+    const zoneStates = this.getExpansionZoneViewModels(this.expansionState);
+    const zone = zoneStates.find((candidate) => candidate.id === zoneId && candidate.level > 1);
+
+    if (!zone) return;
+
+    // 전체 보기의 구역 팝오버와 좌측 패널의 큰 조건 모달은 동시에 열지 않는다.
+    this.closeExpansionConditionModal();
+    this.selectedExpansionZoneId = zone.id;
+    this.isStoreExpansionPopoverVisible = true;
+
+    document.querySelectorAll(".store-space-tile").forEach((tile) => {
+      const isSelected = tile.dataset.zoneId === zone.id;
+      tile.classList.toggle("is-selected", isSelected);
+      tile.setAttribute("aria-expanded", isSelected ? "true" : "false");
+    });
+
+    this.renderStoreExpansionPopover(zone);
+  },
+
   closeStoreExpansionPopover() {
     const popover = document.getElementById("store-expansion-popover");
 
@@ -8693,9 +9492,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const statusText = this.getStoreExpansionStatusText(zone);
     const actionText = zone.isUnlocked
       ? "확장 완료"
-      : zone.isAvailable
-        ? "확장하기"
-        : "조건 부족";
+      : zone.isConstructing
+        ? "공사 중"
+        : zone.isAvailable
+          ? "확장하기"
+          : "조건 부족";
 
     popover.classList.remove("hidden");
     popover.classList.add("is-visible");
@@ -8714,7 +9515,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         >×</button>
       </div>
       <p class="store-expansion-popover-message">
-        ${zone.isUnlocked ? "확장 완료된 구역입니다." : "아직 확장되지 않은 구역입니다."}
+        ${zone.isUnlocked
+          ? "확장 완료된 구역입니다."
+          : zone.isConstructing
+            ? `공사 완료까지 ${this.formatExpansionRemainingTime(zone.constructionRemainingMs)} 남았습니다.`
+            : "아직 확장되지 않은 구역입니다."}
       </p>
       <dl class="store-expansion-condition-list">
         <div class="${zone.conditions.hasRequiredDay ? "is-met" : "is-missing"}">
@@ -8955,6 +9760,21 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   getExpansionZoneViewModels(expansionState = null) {
     const stateUnlockedZoneIds = expansionState?.unlockedZoneIds;
     const constructionZoneId = expansionState?.constructionZoneId ?? null;
+    const constructionStartedAt = Number(
+      expansionState?.constructionStartedAt ?? GameState.expansion?.constructionStartedAt
+    ) || null;
+    const constructionCompletesAt = Number(
+      expansionState?.constructionCompletesAt ?? GameState.expansion?.constructionCompletesAt
+    ) || null;
+    const rawStateRemainingMs = expansionState?.constructionRemainingMs;
+    const stateRemainingMs = Number(rawStateRemainingMs);
+    const constructionRemainingMs = rawStateRemainingMs !== undefined &&
+      rawStateRemainingMs !== null &&
+      Number.isFinite(stateRemainingMs)
+      ? Math.max(0, stateRemainingMs)
+      : constructionCompletesAt
+        ? Math.max(0, constructionCompletesAt - Date.now())
+        : 0;
     const isAnyConstructionActive = Boolean(constructionZoneId);
     const unlockedZoneIds = new Set(
       Array.isArray(stateUnlockedZoneIds)
@@ -8994,7 +9814,9 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         isConstructing,
         isAvailable,
         previousZoneName: previousZone?.name ?? "없음",
-        constructionCompleteDay: this.expansionState?.constructionCompleteDay ?? GameState.expansion?.constructionCompleteDay ?? null,
+        constructionStartedAt: isConstructing ? constructionStartedAt : null,
+        constructionCompletesAt: isConstructing ? constructionCompletesAt : null,
+        constructionRemainingMs: isConstructing ? constructionRemainingMs : 0,
         instantDiamondPrice: Number(zone.instantDiamondPrice) || 0,
         missingRequirements: this.getExpansionMissingRequirements(zone, {
           previousZone,
@@ -9173,7 +9995,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     if (zone.isConstructing) {
-      return `${zone.name} 공사 진행 중입니다. Day ${zone.constructionCompleteDay ?? "다음"}에 완료되며, 즉시 완료권으로 대기 시간을 제거할 수 있습니다.`;
+      return `${zone.name} 공사 진행 중입니다. 실제 시간 ${this.formatExpansionRemainingTime(zone.constructionRemainingMs)} 후 완료되며, 즉시 완료권으로 남은 시간을 제거할 수 있습니다.`;
     }
 
     if (zone.isAvailable) {
@@ -9181,6 +10003,17 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     return `${zone.name} 확장 조건: ${zone.missingRequirements.join(" / ")}`;
+  },
+
+  formatExpansionRemainingTime(remainingMs = 0) {
+    const totalSeconds = Math.max(0, Math.ceil((Number(remainingMs) || 0) / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [hours, minutes, seconds]
+      .map((value) => String(value).padStart(2, "0"))
+      .join(":");
   },
 
   showExpansionMessage(message) {
@@ -9299,7 +10132,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
               class="product-image"
               src="${product.imagePath}"
               alt="${displayName}"
-              loading="eager"
+              loading="lazy"
               decoding="async"
             />
             <span class="${badgeClass}" ${badgeText ? "" : "hidden"}>${badgeText}</span>
@@ -9800,7 +10633,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         <div class="staff-hire-header">
           <span class="staff-hire-kicker">Day 3 오픈</span>
           <h2 id="staff-hire-title">알바 고용 게시판</h2>
-          <p>오늘부터 3시간 단기 알바를 고용할 수 있습니다. 알바는 창고에서 재고를 가져오고, 진열대 보충과 청소를 보조합니다.</p>
+          <p>오늘 하루 함께할 알바를 고용하세요. 알바는 창고·진열·청소 업무를 보조합니다.</p>
         </div>
         <div id="staff-hire-list" class="staff-hire-list"></div>
         <button id="staff-hire-skip-button" class="staff-hire-skip-button" type="button">
@@ -9835,32 +10668,71 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       const expectedDailyWage = Number(candidate.expectedDailyWage) ||
         hourlyWage * shiftHours;
 
+      const candidateStats = candidate.stats && typeof candidate.stats === "object"
+        ? candidate.stats
+        : {};
+      const skillItems = [
+        { key: "warehouse", label: "창고" },
+        { key: "shelf", label: "진열" },
+        { key: "cleaning", label: "청소" }
+      ].map((skill) => ({
+        ...skill,
+        value: Math.max(0, Math.min(3, Math.floor(Number(candidateStats[skill.key]) || 0)))
+      }));
+      const strongestSkillValue = Math.max(...skillItems.map((skill) => skill.value), 0);
+      const strongestSkillLabel = skillItems
+        .filter((skill) => skill.value === strongestSkillValue)
+        .map((skill) => skill.label)
+        .join("·");
+      const candidateSummary = strongestSkillValue > 0
+        ? `${strongestSkillLabel} 업무에 강한 보조형 알바`
+        : "창고·진열·청소를 돕는 보조형 알바";
+      const skillRows = skillItems.map((skill) => {
+        const meter = Array.from({ length: 3 }, (_item, index) => {
+          const activeClass = index < skill.value ? " is-active" : "";
+          return `<span class="staff-skill-meter-segment${activeClass}" aria-hidden="true"></span>`;
+        }).join("");
+
+        return `
+          <div class="staff-skill-row">
+            <span class="staff-skill-label">${skill.label}</span>
+            <span class="staff-skill-meter" aria-label="${skill.label} 능력 ${skill.value}단계">${meter}</span>
+            <strong class="staff-skill-value">Lv.${skill.value}</strong>
+          </div>
+        `;
+      }).join("");
+
       return `
         <article class="staff-candidate-card" data-staff-id="${candidate.id}">
-          <div class="staff-candidate-visual" aria-hidden="true">
-            <img class="staff-candidate-frame" src="${BM_ASSETS.staff.cardFrame}" alt="" loading="eager" decoding="async" />
-            <img class="staff-candidate-sprite" src="${this.getStaffPortraitAssetPath(candidate)}" alt="" loading="eager" decoding="async" />
-            <img class="staff-candidate-hire-icon" src="${BM_ASSETS.staff.hire}" alt="" loading="eager" decoding="async" />
+          <div class="staff-candidate-profile">
+            <div class="staff-candidate-visual" aria-hidden="true">
+              <img class="staff-candidate-frame" src="${BM_ASSETS.staff.cardFrame}" alt="" loading="eager" decoding="async" />
+              <img class="staff-candidate-sprite" src="${this.getStaffPortraitAssetPath(candidate)}" alt="" loading="eager" decoding="async" />
+              <img class="staff-candidate-hire-icon" src="${BM_ASSETS.staff.hire}" alt="" loading="eager" decoding="async" />
+            </div>
+            <div class="staff-candidate-title">
+              <strong>${candidate.name}</strong>
+              <span>${candidate.type}</span>
+              <p class="staff-candidate-summary">${candidateSummary}</p>
+            </div>
           </div>
-          <div class="staff-candidate-title">
-            <strong>${candidate.name}</strong>
-            <span>${candidate.type}</span>
+          <div class="staff-candidate-skills" aria-label="업무 능력">
+            ${skillRows}
           </div>
           <dl class="staff-candidate-stats">
+            <div>
+              <dt>근태</dt>
+              <dd>${candidate.attendance}%</dd>
+            </div>
             <div>
               <dt>시급</dt>
               <dd>₩${hourlyWage.toLocaleString("ko-KR")}</dd>
             </div>
             <div>
-              <dt>예상 일급</dt>
+              <dt>오늘 임금</dt>
               <dd>₩${expectedDailyWage.toLocaleString("ko-KR")}</dd>
             </div>
-            <div>
-              <dt>근태</dt>
-              <dd>${candidate.attendance}%</dd>
-            </div>
           </dl>
-          <p class="staff-candidate-ability">${candidate.ability}</p>
           <button class="staff-hire-button" type="button" data-staff-id="${candidate.id}">
             고용하기
           </button>
@@ -11546,6 +12418,433 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         this.renderOrderDraft();
       };
     });
+  },
+
+  createWarehouseInventoryModal() {
+    const existingModal = document.getElementById("warehouse-inventory-modal");
+
+    if (existingModal) {
+      this.warehouseInventoryModal = existingModal;
+      this.bindWarehouseInventoryModalControls();
+      return existingModal;
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "warehouse-inventory-modal";
+    modal.className = "modal hidden warehouse-inventory-modal";
+    modal.setAttribute("aria-hidden", "true");
+    modal.innerHTML = `
+      <div class="modal-content warehouse-inventory-modal-content" role="dialog" aria-modal="true" aria-labelledby="warehouse-inventory-title">
+        <div class="warehouse-inventory-frame">
+          <header class="warehouse-inventory-topbar">
+            <div>
+              <span class="warehouse-inventory-kicker">WAREHOUSE STOCK</span>
+              <h2 id="warehouse-inventory-title">창고 재고 현황</h2>
+            </div>
+            <button id="warehouse-inventory-close-button" class="warehouse-inventory-close-button" type="button" aria-label="창고 재고 현황 닫기">×</button>
+          </header>
+          <div id="warehouse-inventory-body" class="warehouse-inventory-body"></div>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    this.warehouseInventoryModal = modal;
+    this.bindWarehouseInventoryModalControls();
+    return modal;
+  },
+
+  bindWarehouseInventoryTriggers() {
+    const stockInfo = document.getElementById("stock-info");
+
+    if (!stockInfo || stockInfo.dataset.warehouseInventoryBound === "true") {
+      return;
+    }
+
+    stockInfo.dataset.warehouseInventoryBound = "true";
+    stockInfo.classList.add("warehouse-inventory-hud-trigger");
+    stockInfo.setAttribute("role", "button");
+    stockInfo.setAttribute("tabindex", "0");
+    stockInfo.setAttribute("aria-label", "창고 재고 현황 열기");
+    stockInfo.title = "상품별 창고 재고 보기";
+
+    const openInventory = (event) => {
+      if (!this.guardTutorialAction("warehouse:inventory", event)) return;
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+      this.showWarehouseInventoryModal({ source: "hud" });
+    };
+
+    stockInfo.addEventListener("click", openInventory);
+    stockInfo.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      openInventory(event);
+    });
+  },
+
+  bindWarehouseInventoryModalControls() {
+    const modal = this.warehouseInventoryModal ?? document.getElementById("warehouse-inventory-modal");
+    const closeButton = document.getElementById("warehouse-inventory-close-button");
+
+    if (!modal) return;
+
+    if (closeButton && closeButton.dataset.bound !== "true") {
+      closeButton.dataset.bound = "true";
+      closeButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.hideWarehouseInventoryModal();
+      });
+    }
+
+    if (modal.dataset.backdropBound !== "true") {
+      modal.dataset.backdropBound = "true";
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          this.hideWarehouseInventoryModal();
+        }
+      });
+    }
+  },
+
+  showWarehouseInventoryModal(options = {}) {
+    if (this.isInteractiveTutorialActive?.()) {
+      this.showMessage("튜토리얼 진행 중에는 안내된 기능을 먼저 완료해주세요.", { duration: 2200 });
+      return;
+    }
+
+    if (!this.warehouseInventoryModal) {
+      this.createWarehouseInventoryModal();
+    }
+
+    this.warehouseInventoryActiveCategory = options.keepFilters
+      ? this.warehouseInventoryActiveCategory
+      : "all";
+    this.warehouseInventoryActiveStatus = options.keepFilters
+      ? this.warehouseInventoryActiveStatus
+      : "all";
+    this.warehouseInventoryListScrollTop = 0;
+    this.renderWarehouseInventoryModal();
+    this.warehouseInventoryModal.classList.remove("hidden");
+    this.warehouseInventoryModal.setAttribute("aria-hidden", "false");
+    document.body.classList.add("is-warehouse-inventory-open");
+  },
+
+  hideWarehouseInventoryModal() {
+    if (!this.warehouseInventoryModal) return;
+
+    const list = this.warehouseInventoryModal.querySelector(".warehouse-inventory-product-list");
+    this.warehouseInventoryListScrollTop = list?.scrollTop ?? 0;
+    this.warehouseInventoryModal.classList.add("hidden");
+    this.warehouseInventoryModal.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("is-warehouse-inventory-open");
+  },
+
+  isWarehouseInventoryModalVisible() {
+    return Boolean(
+      this.warehouseInventoryModal &&
+      !this.warehouseInventoryModal.classList.contains("hidden")
+    );
+  },
+
+  getWarehouseInventoryShelfStock(product = {}) {
+    const productId = String(product.id ?? "").trim();
+    let currentStock = 0;
+    let maxStock = 0;
+
+    Object.values(GameState.shelfStocks ?? {}).forEach((shelfStock) => {
+      const productStock = shelfStock?.products?.[productId];
+
+      if (!productStock) return;
+
+      currentStock += Math.max(0, Math.floor(Number(productStock.currentStock) || 0));
+      maxStock += Math.max(1, Math.floor(Number(productStock.maxStock) || 8));
+    });
+
+    if (maxStock <= 0) {
+      maxStock = Math.max(
+        1,
+        Math.floor(Number(BMSystem.getShelfCapacity?.(product.shelfId)) || 10)
+      );
+    }
+
+    return {
+      currentStock,
+      maxStock
+    };
+  },
+
+  getWarehouseInventoryCategoryLabel(categoryId = "all") {
+    return WAREHOUSE_INVENTORY_CATEGORY_TABS.find((tab) => tab.id === categoryId)?.label ?? "기타";
+  },
+
+  getWarehouseInventoryProductViewModels() {
+    const snapshotItems = Array.isArray(this.inventorySnapshot?.items)
+      ? this.inventorySnapshot.items
+      : [];
+    const snapshotMap = new Map(
+      snapshotItems.map((item) => [item.productId, item])
+    );
+    const statusPriority = {
+      out: 0,
+      low: 1,
+      enough: 2
+    };
+
+    return PRODUCTS
+      .map((product) => {
+        const inventoryItem = snapshotMap.get(product.id) ?? this.inventoryByProductId[product.id] ?? null;
+        const warehouseQuantity = Math.max(
+          0,
+          Math.floor(Number(inventoryItem?.quantity) || 0)
+        );
+        const shelfStock = this.getWarehouseInventoryShelfStock(product);
+        const isAvailableProduct = Boolean(
+          BMSystem.canSellProduct?.(product.id) ||
+          BMSystem.canOrderProduct?.(product.id) ||
+          warehouseQuantity > 0 ||
+          shelfStock.currentStock > 0
+        );
+        const lowThreshold = Math.max(2, Math.ceil(shelfStock.maxStock * 0.3));
+        const status = warehouseQuantity <= 0
+          ? "out"
+          : warehouseQuantity <= lowThreshold
+            ? "low"
+            : "enough";
+
+        return {
+          product,
+          productId: product.id,
+          displayName: BMSystem.getProductDisplayName(product),
+          categoryId: product.displayCategory ?? "basic_shelf",
+          categoryLabel: this.getWarehouseInventoryCategoryLabel(product.displayCategory),
+          warehouseQuantity,
+          shelfCurrentStock: shelfStock.currentStock,
+          shelfMaxStock: shelfStock.maxStock,
+          status,
+          statusPriority: statusPriority[status] ?? 99,
+          isAvailableProduct
+        };
+      })
+      .filter((item) => item.isAvailableProduct)
+      .sort((first, second) => {
+        if (first.statusPriority !== second.statusPriority) {
+          return first.statusPriority - second.statusPriority;
+        }
+
+        if (first.categoryId !== second.categoryId) {
+          return first.categoryId.localeCompare(second.categoryId, "ko");
+        }
+
+        return first.displayName.localeCompare(second.displayName, "ko");
+      });
+  },
+
+  renderWarehouseInventoryFilterButtons(tabs = [], activeId = "all", dataKey = "category") {
+    return tabs.map((tab) => {
+      const isActive = tab.id === activeId;
+
+      return `
+        <button
+          type="button"
+          class="warehouse-inventory-filter-button${isActive ? " is-active" : ""}"
+          data-warehouse-filter-type="${dataKey}"
+          data-warehouse-filter-value="${tab.id}"
+          aria-pressed="${isActive ? "true" : "false"}"
+        >${tab.label}</button>
+      `;
+    }).join("");
+  },
+
+  renderWarehouseInventoryModal(options = {}) {
+    const body = document.getElementById("warehouse-inventory-body");
+
+    if (!body) return;
+
+    const previousList = body.querySelector(".warehouse-inventory-product-list");
+    const previousScrollTop = options.preserveScroll
+      ? previousList?.scrollTop ?? this.warehouseInventoryListScrollTop
+      : 0;
+    const allProducts = this.getWarehouseInventoryProductViewModels();
+    const visibleProducts = allProducts.filter((item) => {
+      const matchesCategory = this.warehouseInventoryActiveCategory === "all" ||
+        item.categoryId === this.warehouseInventoryActiveCategory;
+      const matchesStatus = this.warehouseInventoryActiveStatus === "all" ||
+        item.status === this.warehouseInventoryActiveStatus;
+
+      return matchesCategory && matchesStatus;
+    });
+    const totalQuantity = Math.max(
+      0,
+      Math.floor(Number(this.inventorySnapshot?.totalQuantity) ||
+        allProducts.reduce((sum, item) => sum + item.warehouseQuantity, 0))
+    );
+    const warehouseCapacity = Math.max(
+      1,
+      Math.floor(Number(BMSystem.getWarehouseCapacity?.()) || 60)
+    );
+    const usagePercent = Math.min(100, Math.round((totalQuantity / warehouseCapacity) * 100));
+    const outCount = allProducts.filter((item) => item.status === "out").length;
+    const lowCount = allProducts.filter((item) => item.status === "low").length;
+    const canOpenOrder = this.isOrderDraftShortcutPhase() && !this.hasActiveOrderDelivery();
+
+    body.innerHTML = `
+      <section class="warehouse-inventory-summary" aria-label="창고 요약">
+        <div class="warehouse-inventory-capacity-row">
+          <div>
+            <span>창고 사용량</span>
+            <strong>${totalQuantity.toLocaleString("ko-KR")} / ${warehouseCapacity.toLocaleString("ko-KR")}개</strong>
+          </div>
+          <div class="warehouse-inventory-alert-summary">
+            <span class="is-out">재고 없음 ${outCount}</span>
+            <span class="is-low">부족 ${lowCount}</span>
+          </div>
+        </div>
+        <div class="warehouse-inventory-capacity-track" aria-label="창고 사용량 ${usagePercent}%">
+          <span style="width:${usagePercent}%"></span>
+        </div>
+      </section>
+
+      <section class="warehouse-inventory-toolbar" aria-label="재고 필터">
+        <div class="warehouse-inventory-filter-group">
+          <strong>카테고리</strong>
+          <div class="warehouse-inventory-filter-row">
+            ${this.renderWarehouseInventoryFilterButtons(
+              WAREHOUSE_INVENTORY_CATEGORY_TABS,
+              this.warehouseInventoryActiveCategory,
+              "category"
+            )}
+          </div>
+        </div>
+        <div class="warehouse-inventory-filter-group warehouse-inventory-status-filter-group">
+          <strong>재고 상태</strong>
+          <div class="warehouse-inventory-filter-row">
+            ${this.renderWarehouseInventoryFilterButtons(
+              WAREHOUSE_INVENTORY_STATUS_TABS,
+              this.warehouseInventoryActiveStatus,
+              "status"
+            )}
+          </div>
+        </div>
+        <p class="warehouse-inventory-result-summary">
+          <strong>${visibleProducts.length}개 상품</strong>
+          <span>재고 없음과 부족 상품부터 표시됩니다.</span>
+        </p>
+      </section>
+
+      <section class="warehouse-inventory-product-list" aria-live="polite">
+        ${visibleProducts.length > 0
+          ? visibleProducts.map((item) => {
+              const statusLabel = item.status === "out"
+                ? "재고 없음"
+                : item.status === "low"
+                  ? "부족"
+                  : "충분";
+              const warehouseText = item.warehouseQuantity <= 0
+                ? "재고 없음"
+                : `남은 재고 ${item.warehouseQuantity.toLocaleString("ko-KR")}개`;
+
+              return `
+                <article class="warehouse-inventory-product-card is-${item.status}" data-product-id="${item.productId}">
+                  <div class="warehouse-inventory-product-image-box">
+                    <span class="warehouse-inventory-product-category">${item.categoryLabel}</span>
+                    <img
+                      src="${item.product.imagePath}"
+                      alt="${item.displayName}"
+                      loading="lazy"
+                      decoding="async"
+                      onerror="this.hidden=true;this.nextElementSibling.hidden=false;"
+                    />
+                    <span class="warehouse-inventory-product-fallback" hidden>${this.getProductFallbackIcon(item.product)}</span>
+                  </div>
+                  <div class="warehouse-inventory-product-main">
+                    <strong>${item.displayName}</strong>
+                    <span class="warehouse-inventory-stock-status is-${item.status}">${statusLabel}</span>
+                  </div>
+                  <div class="warehouse-inventory-product-stock-lines">
+                    <p class="warehouse-inventory-warehouse-stock${item.warehouseQuantity <= 0 ? " is-empty" : ""}">
+                      <span>창고</span>
+                      <strong>${warehouseText}</strong>
+                    </p>
+                    <p>
+                      <span>진열</span>
+                      <strong>${item.shelfCurrentStock.toLocaleString("ko-KR")} / ${item.shelfMaxStock.toLocaleString("ko-KR")}개</strong>
+                    </p>
+                  </div>
+                </article>
+              `;
+            }).join("")
+          : `
+            <div class="warehouse-inventory-empty-state">
+              <strong>조건에 맞는 상품이 없어요.</strong>
+              <span>다른 카테고리나 재고 상태를 선택해보세요.</span>
+            </div>
+          `}
+      </section>
+
+      <footer class="warehouse-inventory-footer">
+        <button id="warehouse-inventory-bottom-close-button" type="button" class="warehouse-inventory-secondary-button">닫기</button>
+        <button
+          id="warehouse-inventory-order-button"
+          type="button"
+          class="warehouse-inventory-primary-button"
+          ${canOpenOrder ? "" : "disabled"}
+          title="${canOpenOrder ? "부족 상품을 발주하러 갑니다." : "발주는 영업 준비 중에만 가능합니다."}"
+        >${canOpenOrder ? "발주하러 가기" : "영업 준비 때 발주 가능"}</button>
+      </footer>
+    `;
+
+    this.bindWarehouseInventoryDynamicControls();
+
+    const nextList = body.querySelector(".warehouse-inventory-product-list");
+    if (nextList) {
+      nextList.scrollTop = previousScrollTop;
+    }
+  },
+
+  bindWarehouseInventoryDynamicControls() {
+    const body = document.getElementById("warehouse-inventory-body");
+
+    if (!body) return;
+
+    body.querySelectorAll(".warehouse-inventory-filter-button").forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const filterType = button.dataset.warehouseFilterType;
+        const filterValue = button.dataset.warehouseFilterValue ?? "all";
+        const list = body.querySelector(".warehouse-inventory-product-list");
+        this.warehouseInventoryListScrollTop = list?.scrollTop ?? 0;
+
+        if (filterType === "category") {
+          this.warehouseInventoryActiveCategory = filterValue;
+        } else if (filterType === "status") {
+          this.warehouseInventoryActiveStatus = filterValue;
+        }
+
+        this.warehouseInventoryListScrollTop = 0;
+        this.renderWarehouseInventoryModal();
+      };
+    });
+
+    const closeButton = document.getElementById("warehouse-inventory-bottom-close-button");
+    if (closeButton) {
+      closeButton.onclick = () => this.hideWarehouseInventoryModal();
+    }
+
+    const orderButton = document.getElementById("warehouse-inventory-order-button");
+    if (orderButton) {
+      orderButton.onclick = () => {
+        if (orderButton.disabled) {
+          this.showMessage("발주는 Day 시작 후 영업 시작 전까지만 가능합니다.", { duration: 2400 });
+          return;
+        }
+
+        this.hideWarehouseInventoryModal();
+        this.openOrderDraftFromDock();
+      };
+    }
   },
 
   createOrderModal() {

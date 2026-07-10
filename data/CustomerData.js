@@ -83,6 +83,10 @@ export const CUSTOMER_WANTED_PRODUCTS = [
     name: "소시지 핫바"
   },
   {
+    id: "microwave_hotbar",
+    name: "전자레인지 핫바"
+  },
+  {
     id: "spicy_shrimp_snack",
     name: "새우스낵"
   },

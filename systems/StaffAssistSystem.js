@@ -13,11 +13,16 @@ import { InventorySystem } from "./InventorySystem.js";
 import { PlayerActionSystem } from "./PlayerActionSystem.js";
 import { CustomerSystem } from "./CustomerSystem.js";
 import { SanitationSystem } from "./SanitationSystem.js";
-import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
+import {
+  SHELF_INSTANCES,
+  getResponsiveShelfInstances,
+  getShelfInstanceById
+} from "../data/ShelfPlacementData.js";
 import { getCleaningPointByZoneId } from "../data/CleaningPointData.js";
 import { getProductById } from "../data/ProductData.js";
 import { getStoreObjectCollisionRects } from "../data/CollisionData.js";
 import {
+  WALKABLE_WORLD_SIZE,
   getStoreWalkableAreas,
   isPointInCenterProbeWalkableArea,
   isPointInWalkableAreas
@@ -51,7 +56,16 @@ const STAFF_IDLE_CLEANING_TOOL_OFFSET = Object.freeze({ x: -35, y: 12, direction
 const STAFF_ROUTE_POINTS = Object.freeze({
   entryAisle: Object.freeze({ x: 500, y: 645 }),
   mainAisle: Object.freeze({ x: 520, y: 640 }),
-  // 계산대 앞 손님 대기열이 있을 때 알바가 줄을 관통하지 않도록 아래쪽 통로로 우회하는 지점입니다.
+  // 계산대 우측 하단은 1구역 이동 가능 바닥 밖이므로 출근/복귀 경로로 사용하지 않습니다.
+  // 아래 경유점들은 계산대와 손님 대기열을 모두 피해서 계산대 뒤쪽 상단으로 도는 알바 전용 경로입니다.
+  counterBypassLowerLeft: Object.freeze({ x: 464, y: 540 }),
+  counterBypassLeft: Object.freeze({ x: 464, y: 482 }),
+  counterBypassUpperLeft: Object.freeze({ x: 520, y: 428 }),
+  counterBypassUpperMiddle: Object.freeze({ x: 644, y: 424 }),
+  counterBypassUpperRight: Object.freeze({ x: 724, y: 424 }),
+  counterBypassRight: Object.freeze({ x: 724, y: 484 }),
+  counterIdleApproach: Object.freeze({ x: 702, y: 498 }),
+  // 기존 작업 경로 호환용 좌표입니다. 출근/대기 복귀에는 사용하지 않습니다.
   counterQueueBypassAisle: Object.freeze({ x: 735, y: 620 }),
   // 플레이어가 발주 박스 정리 시 서는 위치를 기준으로 한 입구 바깥 물류 경유지입니다.
   deliveryBoxAisle: Object.freeze({ x: 510, y: 630 }),
@@ -75,27 +89,24 @@ const STAFF_ROUTE_POINTS_BY_ZONE_ID = Object.freeze({
   zone_premium_store: Object.freeze([STAFF_ROUTE_POINTS.mainAisle, STAFF_ROUTE_POINTS.zone4Aisle])
 });
 
-const STAFF_CHARACTER_ANCHOR = Object.freeze({ x: 56, y: 58 });
+// staff-character의 left/top은 CSS transform 기준으로 캐릭터 발 위치를 뜻합니다.
+// 과거 112px 캐릭터 기준 +56/+58 보정이 남아 있으면 보이는 알바와 충돌 판정이
+// 서로 다른 좌표를 사용하므로, 이동/충돌/경로 탐색을 발 좌표 하나로 통일합니다.
+const STAFF_CHARACTER_ANCHOR = Object.freeze({ x: 0, y: 0 });
 const STAFF_FOOT_COLLISION_BOX = Object.freeze({
   width: 28,
   height: 16,
   offsetX: -14,
   offsetY: -8
 });
-// 이동 가능 영역은 발 중심점 1개만 보지만,
-// 계산대/진열대 같은 매장 오브젝트는 하단 몸통 폭까지 막아야
-// 알바가 오브젝트 위를 넘어다니는 것처럼 보이지 않는다.
+// 플레이어와 동일하게 발 영역으로 매장 오브젝트 충돌을 검사합니다.
+// 몸 전체 폭을 과하게 막으면 계산대-진열대 사이의 실제 통로가 사라져
+// 알바가 재탐색을 반복하거나 목표점으로 스냅되는 문제가 생깁니다.
 const STAFF_OBJECT_COLLISION_BOX = Object.freeze({
-  width: 46,
-  height: 24,
-  offsetX: -23,
-  offsetY: -18
-});
-const STAFF_OBJECT_COLLISION_PADDING_BY_KIND = Object.freeze({
-  counter: Object.freeze({ x: 16, y: 10 }),
-  shelf: Object.freeze({ x: 6, y: 8 }),
-  cleaning_tools: Object.freeze({ x: 4, y: 4 }),
-  warehouse_box: Object.freeze({ x: 4, y: 4 })
+  width: STAFF_FOOT_COLLISION_BOX.width,
+  height: STAFF_FOOT_COLLISION_BOX.height,
+  offsetX: STAFF_FOOT_COLLISION_BOX.offsetX,
+  offsetY: STAFF_FOOT_COLLISION_BOX.offsetY
 });
 const STAFF_COUNTER_CUSTOMER_COLLISION_BOX = Object.freeze({
   width: 74,
@@ -166,6 +177,15 @@ const STAFF_ARRIVAL_SNAP_DISTANCE = 1.25;
 const STAFF_ENTRY_START_DELAY_MS = 180;
 const STAFF_ENTRY_ESCAPE_STATUS = "entering";
 const STAFF_ENTRY_CHECK_DELAY_MS = 900;
+const STAFF_MOVE_STALL_TIMEOUT_MS = 1200;
+const STAFF_MOVE_STALL_RETRY_DELAY_MS = 180;
+const STAFF_MOVE_STALL_RETRY_LIMIT = 1;
+const STAFF_MOVE_REROUTE_RETRY_DELAY_MS = 420;
+const STAFF_PATHFINDING_GRID_SIZE = 10;
+const STAFF_PATHFINDING_MARGIN = 220;
+const STAFF_PATHFINDING_MAX_VISITS = 16000;
+const STAFF_PATH_SEGMENT_SAMPLE_STEP = 4;
+const STAFF_MOVE_MIN_PROGRESS_DISTANCE = 0.05;
 const CLEANING_RECOVERY = 25;
 const PRODUCT_NO_STOCK_MESSAGE_COOLDOWN_MS = 15000;
 const GLOBAL_GUIDE_MESSAGE_COOLDOWN_MS = 5000;
@@ -976,12 +996,17 @@ export const StaffAssistSystem = {
 
   moveStaffFromEntryToIdle(reason = "enter_store", attendanceFields = {}) {
     const idlePosition = this.getIdlePosition();
-    const entryPath = this.compactMovementPath([
-      STAFF_ROUTE_POINTS.entryAisle,
-      STAFF_ROUTE_POINTS.mainAisle,
-      STAFF_ROUTE_POINTS.lowerRightAisle,
-      idlePosition
-    ]);
+    const currentPosition = this.normalizePoint(
+      { x: this.state.x, y: this.state.y },
+      POSITIONS.entry
+    );
+    // 고정 경유점은 맵/충돌 박스가 바뀔 때 시각 위치와 어긋날 수 있으므로,
+    // 출근 시점의 실제 F8 오브젝트 충돌과 해금된 이동 가능 영역으로 경로를 계산합니다.
+    const entryPath = this.findCollisionSafeStaffPath(
+      currentPosition,
+      idlePosition,
+      "entering"
+    );
     const arriveIdle = () => {
       const nextIdlePosition = this.getIdlePosition();
 
@@ -1053,9 +1078,15 @@ export const StaffAssistSystem = {
       return;
     }
 
-    const movementPath = this.createMovementPath(status, options, targetPosition);
+    // 업무 종류별 고정 직선 루트보다 현재 해금 구역/오브젝트 충돌을 기준으로
+    // 안전 경로를 우선 계산합니다. 손님 NPC는 기존 기획대로 경로 차단 대상이 아닙니다.
+    const movementPath = this.findCollisionSafeStaffPath(
+      currentPosition,
+      targetPosition,
+      status
+    );
 
-    if (movementPath.length <= 1) {
+    if (movementPath.length <= 0) {
       this.moveStaffDirectToState(status, {
         ...options,
         position: targetPosition
@@ -1133,6 +1164,7 @@ export const StaffAssistSystem = {
     });
 
     let lastFrameAtMs = this.getNowMs();
+    let lastProgressAtMs = lastFrameAtMs;
 
     const step = () => {
       if (sequence !== this.moveSequence) {
@@ -1181,6 +1213,69 @@ export const StaffAssistSystem = {
         rawNextY,
         status
       );
+      const movedDistance = this.getPointDistance(
+        currentX,
+        currentY,
+        safeNextPosition.x,
+        safeNextPosition.y
+      );
+
+      if (movedDistance > STAFF_MOVE_MIN_PROGRESS_DISTANCE) {
+        lastProgressAtMs = nowMs;
+      } else if (nowMs - lastProgressAtMs >= STAFF_MOVE_STALL_TIMEOUT_MS) {
+        const retryCount = Math.max(
+          0,
+          Math.floor(Number(options.movementStallRetryCount) || 0)
+        );
+
+        this.moveRafId = null;
+        this.updateState(status, {
+          ...options,
+          position: { x: currentX, y: currentY },
+          direction: this.state.direction ?? movementDirection,
+          isMoving: false,
+          reason: `${options.reason ?? status}_movement_stalled`
+        });
+
+        if (retryCount < STAFF_MOVE_STALL_RETRY_LIMIT) {
+          this.setTaskTimer(() => {
+            this.moveStaffDirectToState(status, {
+              ...options,
+              movementStallRetryCount: retryCount + 1
+            }, onArrive);
+          }, STAFF_MOVE_STALL_RETRY_DELAY_MS);
+          return;
+        }
+
+        // 막힌 경유점을 도착한 것으로 처리하면 다음 경유점을 향해 직선 이동하면서
+        // 진열대/계산대 충돌을 건너뛸 수 있다. 현재 위치에서 목표 지점까지
+        // 실제 충돌을 통과하지 않는 경로를 다시 계산하고, 찾지 못하면 정지 상태로 재탐색한다.
+        const reroutePath = this.findCollisionSafeStaffPath(
+          { x: currentX, y: currentY },
+          { x: targetX, y: targetY },
+          status
+        );
+
+        if (reroutePath.length > 0) {
+          this.setTaskTimer(() => {
+            this.moveStaffAlongPath(status, {
+              ...options,
+              movementStallRetryCount: 0,
+              reason: `${options.reason ?? status}_collision_reroute`
+            }, reroutePath, onArrive);
+          }, STAFF_MOVE_STALL_RETRY_DELAY_MS);
+          return;
+        }
+
+        this.setTaskTimer(() => {
+          this.moveStaffDirectToState(status, {
+            ...options,
+            movementStallRetryCount: 0,
+            reason: `${options.reason ?? status}_waiting_for_safe_route`
+          }, onArrive);
+        }, STAFF_MOVE_REROUTE_RETRY_DELAY_MS);
+        return;
+      }
 
       this.updateState(status, {
         ...options,
@@ -1211,7 +1306,8 @@ export const StaffAssistSystem = {
     if (
       status === STAFF_ENTRY_ESCAPE_STATUS &&
       !this.isStaffPositionInsideWalkableArea(currentPosition) &&
-      !this.isStaffPositionOverlappingStoreObject(currentPosition)
+      !this.isStaffPositionOverlappingStoreObject(currentPosition) &&
+      !this.isStaffPositionOverlappingStoreObject(nextPosition)
     ) {
       return nextPosition;
     }
@@ -1238,6 +1334,273 @@ export const StaffAssistSystem = {
     return this.isStaffPositionOverlappingStoreObject(position);
   },
 
+  isStaffTravelSegmentClear(start = {}, end = {}, status = null) {
+    const startX = Number(start.x) || 0;
+    const startY = Number(start.y) || 0;
+    const endX = Number(end.x) || 0;
+    const endY = Number(end.y) || 0;
+    const distance = this.getPointDistance(startX, startY, endX, endY);
+    const sampleCount = Math.max(1, Math.ceil(distance / STAFF_PATH_SEGMENT_SAMPLE_STEP));
+    let hasEnteredWalkableArea = this.isStaffPositionInsideWalkableArea({ x: startX, y: startY });
+
+    for (let index = 1; index <= sampleCount; index += 1) {
+      const ratio = index / sampleCount;
+      const position = {
+        x: startX + (endX - startX) * ratio,
+        y: startY + (endY - startY) * ratio
+      };
+
+      // 출근 연출 좌표가 매장 밖에 있더라도 오브젝트 충돌은 한 프레임도 예외로 두지 않는다.
+      if (this.isStaffPositionOverlappingStoreObject(position)) {
+        return false;
+      }
+
+      const isInsideWalkableArea = this.isStaffPositionInsideWalkableArea(position);
+
+      if (isInsideWalkableArea) {
+        hasEnteredWalkableArea = true;
+        continue;
+      }
+
+      if (
+        status === STAFF_ENTRY_ESCAPE_STATUS &&
+        !hasEnteredWalkableArea
+      ) {
+        continue;
+      }
+
+      return false;
+    }
+
+    return true;
+  },
+
+  findCollisionSafeStaffPath(start = {}, target = {}, status = null) {
+    const normalizedStart = this.normalizePoint(start, { x: this.state.x, y: this.state.y });
+    const normalizedTarget = this.normalizePoint(target, normalizedStart);
+
+    if (this.isStaffTravelSegmentClear(normalizedStart, normalizedTarget, status)) {
+      return [normalizedTarget];
+    }
+
+    const gridSize = STAFF_PATHFINDING_GRID_SIZE;
+    const minX = Math.max(0, Math.floor((Math.min(normalizedStart.x, normalizedTarget.x) - STAFF_PATHFINDING_MARGIN) / gridSize) * gridSize);
+    const maxX = Math.min(WALKABLE_WORLD_SIZE.width, Math.ceil((Math.max(normalizedStart.x, normalizedTarget.x) + STAFF_PATHFINDING_MARGIN) / gridSize) * gridSize);
+    const minY = Math.max(0, Math.floor((Math.min(normalizedStart.y, normalizedTarget.y) - STAFF_PATHFINDING_MARGIN) / gridSize) * gridSize);
+    const maxY = Math.min(WALKABLE_WORLD_SIZE.height, Math.ceil((Math.max(normalizedStart.y, normalizedTarget.y) + STAFF_PATHFINDING_MARGIN) / gridSize) * gridSize);
+
+    const toKey = (x, y) => `${x},${y}`;
+    const fromKey = (key) => {
+      const [x, y] = key.split(",").map(Number);
+      return { x, y };
+    };
+    const snap = (value) => Math.round(value / gridSize) * gridSize;
+    const isInBounds = (point) => (
+      point.x >= minX && point.x <= maxX && point.y >= minY && point.y <= maxY
+    );
+    const isValidGridPoint = (point) => (
+      isInBounds(point) && !this.isStaffPositionBlocked(point)
+    );
+    const findNearestValidGridPoint = (point) => {
+      const snapped = { x: snap(point.x), y: snap(point.y) };
+
+      if (isValidGridPoint(snapped)) {
+        return snapped;
+      }
+
+      for (let radius = 1; radius <= 10; radius += 1) {
+        const candidates = [];
+
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          candidates.push(
+            { x: snapped.x + dx * gridSize, y: snapped.y - radius * gridSize },
+            { x: snapped.x + dx * gridSize, y: snapped.y + radius * gridSize }
+          );
+        }
+
+        for (let dy = -radius + 1; dy < radius; dy += 1) {
+          candidates.push(
+            { x: snapped.x - radius * gridSize, y: snapped.y + dy * gridSize },
+            { x: snapped.x + radius * gridSize, y: snapped.y + dy * gridSize }
+          );
+        }
+
+        const validCandidate = candidates
+          .filter(isValidGridPoint)
+          .sort((left, right) => {
+            return this.getPointDistance(left.x, left.y, point.x, point.y)
+              - this.getPointDistance(right.x, right.y, point.x, point.y);
+          })[0];
+
+        if (validCandidate) {
+          return validCandidate;
+        }
+      }
+
+      return null;
+    };
+
+    const startNode = findNearestValidGridPoint(normalizedStart);
+    const targetNode = findNearestValidGridPoint(normalizedTarget);
+
+    if (!startNode || !targetNode) {
+      return [];
+    }
+
+    const startKey = toKey(startNode.x, startNode.y);
+    const targetKey = toKey(targetNode.x, targetNode.y);
+    const openKeys = [startKey];
+    const openKeySet = new Set(openKeys);
+    const cameFrom = new Map();
+    const gScore = new Map([[startKey, 0]]);
+    const fScore = new Map([[
+      startKey,
+      this.getPointDistance(startNode.x, startNode.y, targetNode.x, targetNode.y)
+    ]]);
+    const directions = [
+      { x: -gridSize, y: 0 },
+      { x: gridSize, y: 0 },
+      { x: 0, y: -gridSize },
+      { x: 0, y: gridSize },
+      { x: -gridSize, y: -gridSize },
+      { x: gridSize, y: -gridSize },
+      { x: -gridSize, y: gridSize },
+      { x: gridSize, y: gridSize }
+    ];
+    const buildResolvedPath = (endKey) => {
+      if (!endKey || endKey === startKey) {
+        return [];
+      }
+
+      const gridPath = [];
+      let traceKey = endKey;
+
+      while (traceKey) {
+        gridPath.push(fromKey(traceKey));
+        traceKey = cameFrom.get(traceKey) ?? null;
+      }
+
+      gridPath.reverse();
+      const rawPath = [normalizedStart, ...gridPath.slice(1)];
+      const lastPoint = rawPath[rawPath.length - 1];
+
+      if (this.isStaffTravelSegmentClear(lastPoint, normalizedTarget, status)) {
+        rawPath.push(normalizedTarget);
+      }
+
+      return this.compactCollisionSafeStaffPath(rawPath, status);
+    };
+    let bestReachableKey = startKey;
+    let bestReachableDistance = this.getPointDistance(
+      startNode.x,
+      startNode.y,
+      targetNode.x,
+      targetNode.y
+    );
+    let visitCount = 0;
+
+    while (openKeys.length > 0 && visitCount < STAFF_PATHFINDING_MAX_VISITS) {
+      visitCount += 1;
+      let bestIndex = 0;
+
+      for (let index = 1; index < openKeys.length; index += 1) {
+        if ((fScore.get(openKeys[index]) ?? Infinity) < (fScore.get(openKeys[bestIndex]) ?? Infinity)) {
+          bestIndex = index;
+        }
+      }
+
+      const currentKey = openKeys.splice(bestIndex, 1)[0];
+      openKeySet.delete(currentKey);
+      const currentPoint = fromKey(currentKey);
+      const distanceToTarget = this.getPointDistance(
+        currentPoint.x,
+        currentPoint.y,
+        targetNode.x,
+        targetNode.y
+      );
+
+      if (distanceToTarget < bestReachableDistance) {
+        bestReachableDistance = distanceToTarget;
+        bestReachableKey = currentKey;
+      }
+
+      if (currentKey === targetKey) {
+        return buildResolvedPath(currentKey);
+      }
+
+      const currentG = gScore.get(currentKey) ?? Infinity;
+
+      directions.forEach((direction) => {
+        const neighbor = {
+          x: currentPoint.x + direction.x,
+          y: currentPoint.y + direction.y
+        };
+
+        if (!isValidGridPoint(neighbor)) {
+          return;
+        }
+
+        if (!this.isStaffTravelSegmentClear(currentPoint, neighbor, status)) {
+          return;
+        }
+
+        const neighborKey = toKey(neighbor.x, neighbor.y);
+        const tentativeG = currentG + this.getPointDistance(
+          currentPoint.x,
+          currentPoint.y,
+          neighbor.x,
+          neighbor.y
+        );
+
+        if (tentativeG >= (gScore.get(neighborKey) ?? Infinity)) {
+          return;
+        }
+
+        cameFrom.set(neighborKey, currentKey);
+        gScore.set(neighborKey, tentativeG);
+        fScore.set(
+          neighborKey,
+          tentativeG + this.getPointDistance(neighbor.x, neighbor.y, targetNode.x, targetNode.y)
+        );
+
+        if (!openKeySet.has(neighborKey)) {
+          openKeys.push(neighborKey);
+          openKeySet.add(neighborKey);
+        }
+      });
+    }
+
+    return buildResolvedPath(bestReachableKey);
+  },
+
+  compactCollisionSafeStaffPath(points = [], status = null) {
+    const safePoints = points.map((point) => this.normalizePoint(point, point));
+
+    if (safePoints.length <= 2) {
+      return safePoints.slice(1);
+    }
+
+    const compacted = [];
+    let anchorIndex = 0;
+
+    while (anchorIndex < safePoints.length - 1) {
+      let nextIndex = safePoints.length - 1;
+
+      while (nextIndex > anchorIndex + 1) {
+        if (this.isStaffTravelSegmentClear(safePoints[anchorIndex], safePoints[nextIndex], status)) {
+          break;
+        }
+
+        nextIndex -= 1;
+      }
+
+      compacted.push(safePoints[nextIndex]);
+      anchorIndex = nextIndex;
+    }
+
+    return compacted;
+  },
+
   isStaffPositionOverlappingStoreObject(position = {}) {
     const objectProbeRect = this.getStaffObjectCollisionRect(position);
     const collisionRects = this.getStaffStoreObjectCollisionRects();
@@ -1248,22 +1611,9 @@ export const StaffAssistSystem = {
   },
 
   getStaffStoreObjectCollisionRects() {
-    return getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds)
-      .map((rect) => this.expandCollisionRectForStaff(rect));
-  },
-
-  expandCollisionRectForStaff(rect = {}) {
-    const padding = STAFF_OBJECT_COLLISION_PADDING_BY_KIND[rect.kind] ?? Object.freeze({ x: 0, y: 0 });
-    const paddingX = Math.max(0, Number(padding.x) || 0);
-    const paddingY = Math.max(0, Number(padding.y) || 0);
-
-    return {
-      ...rect,
-      x: Math.round((Number(rect.x) || 0) - paddingX),
-      y: Math.round((Number(rect.y) || 0) - paddingY),
-      width: Math.max(0, Math.round((Number(rect.width) || 0) + paddingX * 2)),
-      height: Math.max(0, Math.round((Number(rect.height) || 0) + paddingY * 2))
-    };
+    // 플레이어가 사용하는 F8 빨간 오브젝트 충돌 박스를 그대로 사용합니다.
+    // 알바 전용 확장 패딩은 좁은 실제 통로를 막으므로 추가하지 않습니다.
+    return getStoreObjectCollisionRects(GameState.expansion?.unlockedZoneIds);
   },
 
   isStaffPositionInsideWalkableArea(position = {}) {
@@ -1546,36 +1896,65 @@ export const StaffAssistSystem = {
   getWarehouseAssistPosition() {
     const warehouseZone = PlayerActionSystem.warehouseZone ?? {};
     const fallback = POSITIONS.warehouseAssist;
+    let playerStandPosition = null;
 
-    // 창고 박스 이미지 자체의 left/top 좌표가 아니라,
-    // 플레이어가 창고 박스를 정리할 때 쓰는 같은 상호작용 도착 좌표(standX/standY)를 사용합니다.
-    // 이렇게 해야 알바가 박스 이미지와 어긋난 임의 좌표가 아니라 창고 박스 기준 위치에 도착합니다.
     if (
       Number.isFinite(Number(warehouseZone.standX)) &&
       Number.isFinite(Number(warehouseZone.standY))
     ) {
-      return this.normalizePoint({
+      playerStandPosition = {
         x: Number(warehouseZone.standX),
-        y: Number(warehouseZone.standY),
-        direction: "up_left"
-      }, fallback);
-    }
-
-    if (typeof PlayerActionSystem.getPlayerStandPositionForZone === "function") {
-      return this.normalizePoint(
-        PlayerActionSystem.getPlayerStandPositionForZone("warehouse-box-zone", warehouseZone),
-        fallback
+        y: Number(warehouseZone.standY)
+      };
+    } else if (typeof PlayerActionSystem.getPlayerStandPositionForZone === "function") {
+      playerStandPosition = PlayerActionSystem.getPlayerStandPositionForZone(
+        "warehouse-box-zone",
+        warehouseZone
       );
     }
 
-    return this.normalizePoint(fallback, fallback);
+    if (!playerStandPosition) {
+      return this.normalizePoint(fallback, fallback);
+    }
+
+    // PlayerActionSystem의 standX/standY는 플레이어 DOM의 좌상단 좌표입니다.
+    // 알바 좌표는 발 기준이므로 플레이어가 실제로 서는 발 위치로 변환합니다.
+    const playerNode = typeof document !== "undefined"
+      ? document.getElementById("player-zone")
+      : null;
+    const playerWidth = playerNode?.offsetWidth || 58;
+    const playerHeight = playerNode?.offsetHeight || 102;
+    const playerFootHeight = 14;
+    const playerFootOffsetY = 6;
+
+    return this.normalizePoint({
+      x: Number(playerStandPosition.x) + playerWidth / 2,
+      y: Number(playerStandPosition.y) + playerHeight - playerFootOffsetY - playerFootHeight / 2,
+      direction: "up_left"
+    }, fallback);
+  },
+
+  getMainAisleToIdleRoutePoints() {
+    return [
+      STAFF_ROUTE_POINTS.counterBypassLowerLeft,
+      STAFF_ROUTE_POINTS.counterBypassLeft,
+      STAFF_ROUTE_POINTS.counterBypassUpperLeft,
+      STAFF_ROUTE_POINTS.counterBypassUpperMiddle,
+      STAFF_ROUTE_POINTS.counterBypassUpperRight,
+      STAFF_ROUTE_POINTS.counterBypassRight,
+      STAFF_ROUTE_POINTS.counterIdleApproach
+    ];
+  },
+
+  getIdleToMainAisleRoutePoints() {
+    return [...this.getMainAisleToIdleRoutePoints()].reverse();
   },
 
   getStaffIdleToWarehouseRoutePoints() {
-    // 알바 진열 보충 전용: 청소 대기 위치에서 바로 창고로 꺾지 않고,
-    // 입구 방향 통로를 경유해 창고 상호작용 위치로 이동한다.
-    // 손님 NPC는 알바 충돌 대상으로 보지 않고, 계산대/진열대 등 매장 오브젝트만 회피한다.
+    // 청소 도구함 왼쪽 대기 위치에서 계산대와 손님 대기열을 피한 뒤
+    // 입구 방향 통로를 거쳐 창고 상호작용 위치로 이동한다.
     return [
+      ...this.getIdleToMainAisleRoutePoints(),
       STAFF_ROUTE_POINTS.mainAisle,
       STAFF_ROUTE_POINTS.entryAisle,
       this.getDeliveryBoxRoutePoint()
@@ -1728,8 +2107,7 @@ export const StaffAssistSystem = {
     if (status === "returning") {
       return [
         STAFF_ROUTE_POINTS.mainAisle,
-        ...this.getCounterQueueAvoidanceRoutePoints(),
-        STAFF_ROUTE_POINTS.lowerRightAisle
+        ...this.getMainAisleToIdleRoutePoints()
       ];
     }
 
@@ -1770,7 +2148,9 @@ export const StaffAssistSystem = {
       return null;
     }
 
-    return SHELF_INSTANCES.find((shelf) => shelf.instanceId === instanceId)?.zoneId ?? null;
+    return getShelfInstanceById(instanceId)?.zoneId ??
+      SHELF_INSTANCES.find((shelf) => shelf.instanceId === instanceId)?.zoneId ??
+      null;
   },
 
   cancelStaffMovement() {
@@ -1813,15 +2193,38 @@ export const StaffAssistSystem = {
 
   getShelfSlots() {
     if (typeof PlayerActionSystem.getShelfSlots === "function") {
-      return PlayerActionSystem.getShelfSlots();
+      return PlayerActionSystem.getShelfSlots().map((shelf) => {
+        return this.applyResponsiveShelfLayout(shelf);
+      });
     }
 
-    return SHELF_INSTANCES.map((shelf) => ({
+    return getResponsiveShelfInstances().map((shelf) => ({
       ...shelf,
       productId: this.getDefaultProductIdForShelf(shelf.shelfId),
       currentStock: 0,
       maxStock: 3
     }));
+  },
+
+  applyResponsiveShelfLayout(shelf = {}) {
+    if (!shelf?.instanceId) {
+      return shelf;
+    }
+
+    const responsiveShelf = getShelfInstanceById(shelf.instanceId);
+
+    if (!responsiveShelf) {
+      return shelf;
+    }
+
+    return {
+      ...shelf,
+      ...responsiveShelf,
+      productId: shelf.productId,
+      products: shelf.products,
+      currentStock: shelf.currentStock,
+      maxStock: shelf.maxStock
+    };
   },
 
   getUnlockedZoneIds() {
@@ -1847,9 +2250,11 @@ export const StaffAssistSystem = {
   },
 
   getShelfSlotByInstanceId(instanceId) {
-    return this.getShelfSlots().find((shelf) => {
-      return shelf.instanceId === instanceId;
+    const shelf = this.getShelfSlots().find((candidate) => {
+      return candidate.instanceId === instanceId;
     }) ?? null;
+
+    return shelf ? this.applyResponsiveShelfLayout(shelf) : null;
   },
 
   normalizeShelfSlot(shelf = {}) {
@@ -1995,13 +2400,22 @@ export const StaffAssistSystem = {
       0,
       Math.ceil(this.cooldownUntilMs - nowMs)
     );
+    const rawPositionX = Number(position.x);
+    const rawPositionY = Number(position.y);
+    const fallbackPosition = this.getDefaultPositionForStatus("idle");
+    const resolvedPositionX = Number.isFinite(rawPositionX) ? rawPositionX : fallbackPosition.x;
+    const resolvedPositionY = Number.isFinite(rawPositionY) ? rawPositionY : fallbackPosition.y;
+    const isMoving = options.isMoving === true;
     const nextState = {
       status,
       label,
-      x: Math.round(Number(position.x) || this.getDefaultPositionForStatus("idle").x),
-      y: Math.round(Number(position.y) || this.getDefaultPositionForStatus("idle").y),
+      // 이동 중 매 프레임 정수 반올림을 하면 완만한 대각선의 작은 축 변화가 사라져
+      // 안전 경로와 다른 수평/수직선으로 진행하다 오브젝트에 걸립니다.
+      // 시스템 좌표는 소수점을 유지하고, DOM 렌더링 단계에서만 픽셀 반올림합니다.
+      x: isMoving ? resolvedPositionX : Math.round(resolvedPositionX),
+      y: isMoving ? resolvedPositionY : Math.round(resolvedPositionY),
       direction: options.direction ?? position.direction ?? this.state.direction ?? "down",
-      isMoving: options.isMoving === true,
+      isMoving,
       isWorking: this.isWorking,
       taskType: options.taskType ?? null,
       targetShelfInstanceId: options.targetShelfInstanceId ?? null,

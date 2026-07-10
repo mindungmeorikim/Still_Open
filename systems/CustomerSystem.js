@@ -772,6 +772,35 @@ export const CustomerSystem = {
     return shelfInstance;
   },
 
+  getCustomerResponsiveShelfTargetPosition(customer = {}) {
+    const shelfInstanceId = customer.targetShelfInstanceId ??
+      getShelfInstanceIdByProductId(customer.wantedProductId);
+    const shelfInstance = shelfInstanceId ? getShelfInstanceById(shelfInstanceId) : null;
+
+    if (
+      shelfInstance &&
+      Number.isFinite(Number(shelfInstance.standX)) &&
+      Number.isFinite(Number(shelfInstance.standY))
+    ) {
+      return {
+        x: Number(shelfInstance.standX),
+        y: Number(shelfInstance.standY)
+      };
+    }
+
+    const targetX = Number(customer.targetX);
+    const targetY = Number(customer.targetY);
+
+    if (Number.isFinite(targetX) && Number.isFinite(targetY)) {
+      return {
+        x: targetX,
+        y: targetY
+      };
+    }
+
+    return null;
+  },
+
   canCustomerChooseProduct(product) {
     return (
       Boolean(product?.id) &&
@@ -1322,6 +1351,8 @@ export const CustomerSystem = {
   },
 
   createCustomerPayload(customer) {
+    const shelfTargetPosition = this.getCustomerResponsiveShelfTargetPosition(customer);
+
     return {
       day: GameState.day,
 
@@ -1338,8 +1369,8 @@ export const CustomerSystem = {
       wantedShelfId: customer.wantedShelfId ?? null,
       carriedShelfId: customer.carriedShelfId ?? null,
       targetShelfInstanceId: customer.targetShelfInstanceId ?? null,
-      targetX: customer.targetX ?? null,
-      targetY: customer.targetY ?? null,
+      targetX: shelfTargetPosition?.x ?? customer.targetX ?? null,
+      targetY: shelfTargetPosition?.y ?? customer.targetY ?? null,
 
       status: customer.status,
       currentZone: customer.currentZone,
@@ -1360,6 +1391,8 @@ export const CustomerSystem = {
   },
 
   createRenderableCustomerPayload(customer) {
+    const shelfTargetPosition = this.getCustomerResponsiveShelfTargetPosition(customer);
+
     return {
       customerId: customer.id,
       typeId: customer.typeId,
@@ -1376,8 +1409,8 @@ export const CustomerSystem = {
       wantedShelfId: customer.wantedShelfId ?? null,
       carriedShelfId: customer.carriedShelfId ?? null,
       targetShelfInstanceId: customer.targetShelfInstanceId ?? null,
-      targetX: customer.targetX ?? null,
-      targetY: customer.targetY ?? null,
+      targetX: shelfTargetPosition?.x ?? customer.targetX ?? null,
+      targetY: shelfTargetPosition?.y ?? customer.targetY ?? null,
       status: customer.status,
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,

@@ -85,16 +85,18 @@ export const AudioSystem = {
     if (typeof Audio === "undefined") return;
 
     Object.entries(BGM).forEach(([key, config]) => {
-      const audio = new Audio(toAudioPath(config.src));
+      const audio = new Audio();
+      audio.preload = "none";
+      audio.src = toAudioPath(config.src);
       audio.loop = true;
-      audio.preload = "auto";
       audio.volume = this.getBgmVolume(config);
       this.bgmAudio[key] = audio;
     });
 
     Object.entries(SFX).forEach(([key, config]) => {
-      const audio = new Audio(toAudioPath(config.src));
-      audio.preload = "auto";
+      const audio = new Audio();
+      audio.preload = "none";
+      audio.src = toAudioPath(config.src);
       audio.volume = this.getSfxVolume(config);
       this.sfxAudio[key] = audio;
     });

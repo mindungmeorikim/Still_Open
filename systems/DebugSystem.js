@@ -21,7 +21,7 @@ import {
 
 import { SHELF_INSTANCES } from "../data/ShelfPlacementData.js";
 
-const DEBUG_ENABLED = false; // 배포 전 false로 변경
+const DEBUG_ENABLED = false; // 배포 빌드에서는 반드시 false
 
 function toSafeNumber(value, fallback = 0) {
   const number = Number(value);
@@ -46,6 +46,16 @@ export const DebugSystem = {
     this.isInitialized = true;
     this.bindConsoleCommands();
     this.bindHotkeys();
+
+    // QA 전용 빌드: 초기화 직후 전체 구역/상품/재고를 자동 세팅한다.
+    window.setTimeout(() => {
+      if (!DEBUG_ENABLED || typeof window.QA?.master !== "function") {
+        return;
+      }
+
+      const result = window.QA.master();
+      console.info(result);
+    }, 0);
   },
 
   bindConsoleCommands() {

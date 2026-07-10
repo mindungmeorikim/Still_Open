@@ -44,6 +44,8 @@ const ORDER_DELIVERY_PICKUP_REQUESTED = "ORDER_DELIVERY_PICKUP_REQUESTED";
 const SANITATION_CLEANING_REQUESTED = "SANITATION_CLEANING_REQUESTED";
 const SHELF_STOCK_CONSUMED = "SHELF_STOCK_CONSUMED";
 const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
+const WAREHOUSE_INVENTORY_OPENED = "WAREHOUSE_INVENTORY_OPENED";
+const WAREHOUSE_INVENTORY_ACTION = "warehouse_inventory";
 const SANITATION_CLEANING_STARTED = "SANITATION_CLEANING_STARTED";
 const SANITATION_CLEANING_COMPLETED = "SANITATION_CLEANING_COMPLETED";
 const SANITATION_CLEANING_FAILED = "SANITATION_CLEANING_FAILED";
@@ -65,7 +67,7 @@ const SHELF_INTERACTION_POINT_DISTANCE_CAP = Object.freeze({
 });
 const SHELF_INTERACTION_RECT_EDGE_BUFFER = 8;
 const COUNTER_INTERACTION_DISTANCE_CAP = 68;
-const CLEANING_INTERACTION_DISTANCE_CAP = 62;
+const CLEANING_INTERACTION_DISTANCE_CAP = 78;
 
 export const PlayerActionSystem = {
   isInitialized: false,
@@ -155,7 +157,7 @@ export const PlayerActionSystem = {
   cleaningZone: {
     x: 735,
     y: 490,
-    interactionDistance: 55
+    interactionDistance: 72
   },
 
   init() {
@@ -536,6 +538,44 @@ export const PlayerActionSystem = {
 
       this.handleCheckoutAction();
     }
+  },
+
+  handleWarehouseInventoryAction() {
+    if (!GameState.player) {
+      this.showActionMessage("플레이어 위치를 불러오는 중입니다.");
+      return;
+    }
+
+    const distance = this.getDistanceToZone("warehouse-box-zone", this.warehouseZone);
+    const interactionDistance = Math.max(
+      72,
+      Number(this.warehouseZone?.interactionDistance) || 96
+    );
+    const openInventory = () => {
+      this.isPlayerBusy = false;
+      this.restockPhase = null;
+      EventBus.emit(WAREHOUSE_INVENTORY_OPENED, {
+        day: GameState.day,
+        source: "warehouse_box",
+        playerPosition: {
+          x: Number(GameState.player?.x) || 0,
+          y: Number(GameState.player?.y) || 0
+        }
+      });
+    };
+
+    if (distance !== null && distance <= interactionDistance) {
+      openInventory();
+      return;
+    }
+
+    this.isPlayerBusy = true;
+    this.restockPhase = "warehouse_inventory_move";
+    this.showActionMessage("창고로 이동 중입니다.");
+    this.movePlayerToWarehouse(() => {
+      this.showActionMessage("창고 재고 현황을 확인합니다.");
+      openInventory();
+    });
   },
 
   handleShelfRestockAction(options = {}) {
@@ -1030,10 +1070,8 @@ export const PlayerActionSystem = {
   },
 
   getCleaningInteractionTarget() {
-    if (!this.isCleaningActionAvailable()) {
-      return null;
-    }
-
+    // 청소 필요 여부와 무관하게 가까이 서면 청소도구를 상호작용 대상으로 잡는다.
+    // 실제 청소 가능 여부는 handleCleaningAction에서 판단해 정확한 안내 문구를 보여준다.
     const activeCleaningPoint = this.getActiveCleaningPoint();
     const cleaningDistance = this.getDistanceToZone("cleaning-zone", activeCleaningPoint);
     const cleaningInteractionDistance = this.getCleaningInteractionDistance(activeCleaningPoint);
@@ -1085,8 +1123,12 @@ export const PlayerActionSystem = {
     return unlockedZoneIds.includes(shelf?.zoneId);
   },
 
+  getShelfLayoutInstances() {
+    return SHELF_INSTANCES;
+  },
+
   getShelfSlots() {
-    const slots = SHELF_INSTANCES
+    const slots = this.getShelfLayoutInstances()
       .filter((shelf) => this.isShelfZoneUnlocked(shelf))
       .map((shelf) => {
         const stockKey = shelf.instanceId;
@@ -2232,6 +2274,11 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
       });
 
       this.handleCheckoutAction();
+      return;
+    }
+
+    if (actionType === WAREHOUSE_INVENTORY_ACTION) {
+      this.handleWarehouseInventoryAction();
       return;
     }
 

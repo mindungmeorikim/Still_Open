@@ -21998,7 +21998,8 @@ body.is-title-screen-active #game-root {
 }
 
 #staff-character[data-staff-moving="true"] .staff-character-sprite {
-  animation: staffWalkStep 0.42s ease-in-out infinite;
+  animation: staffWalkStep 0.34s linear infinite;
+  transform-origin: 50% 100%;
 }
 
 @keyframes staffWalkBob {
@@ -22006,16 +22007,19 @@ body.is-title-screen-active #game-root {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-3px);
+    transform: translateY(0);
   }
 }
 
 @keyframes staffWalkStep {
+  /* 기본 중앙 정렬 translateX(-50%)를 애니메이션 중에도 반드시 유지한다.
+     기존 키프레임이 translateX를 덮어써 이동 중 스프라이트가 오른쪽으로 밀렸다가
+     도착 순간 원위치로 붙는 현상이 발생했다. 위아래 바운스는 제거한다. */
   0%, 100% {
-    transform: rotate(-1.5deg);
+    transform: translateX(-50%) rotate(-0.65deg);
   }
   50% {
-    transform: rotate(1.5deg);
+    transform: translateX(-50%) rotate(0.65deg);
   }
 }
 
@@ -29677,5 +29681,2635 @@ body:not(.is-tutorial-active) #bm-purchase-confirm-modal.modal:not(.hidden):not(
   #daily-goal-revenue-text,
   .focused-zone-panel-body strong {
     font-size: 12px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.15] BlueStacks 좌측 HUD 안전 정렬 재고정
+   - 카메라 패치와 별개로, 좌측 Day/목표/구역 HUD가 화면 왼쪽으로 밀려 잘리지 않게 마지막 override에서 기준선을 다시 고정한다.
+   - 파란 영업 준비 칩은 Day 카드 내부 중앙에만 배치하고, 목표/구역 패널은 같은 폭으로 통일한다.
+   =========================================================================== */
+#top-ui {
+  left: 10px !important;
+  right: 112px !important;
+  width: auto !important;
+  overflow: visible !important;
+  grid-template-columns: 136px minmax(260px, min(44vw, 430px)) !important;
+  gap: 6px 8px !important;
+}
+
+#day-card {
+  width: 136px !important;
+  min-width: 136px !important;
+  max-width: 136px !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  padding: 8px 9px 34px !important;
+}
+
+#day-card > #phase-chip,
+#phase-chip {
+  position: absolute !important;
+  left: 10px !important;
+  right: 10px !important;
+  bottom: 7px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 23px !important;
+  margin: 0 !important;
+  padding: 3px 7px !important;
+  box-sizing: border-box !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  transform: none !important;
+}
+
+#day-card > #daily-goal-panel,
+#daily-goal-panel,
+.focused-zone-panel {
+  left: 0 !important;
+  width: 136px !important;
+  min-width: 136px !important;
+  max-width: 136px !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #top-ui {
+    left: 8px !important;
+    right: 106px !important;
+    grid-template-columns: 132px minmax(232px, min(42vw, 380px)) !important;
+    gap: 5px 7px !important;
+  }
+
+  #day-card {
+    width: 132px !important;
+    min-width: 132px !important;
+    max-width: 132px !important;
+    padding: 7px 8px 32px !important;
+  }
+
+  #day-card > #phase-chip,
+  #phase-chip {
+    left: 9px !important;
+    right: 9px !important;
+    bottom: 7px !important;
+    min-height: 22px !important;
+    padding: 3px 6px !important;
+    font-size: 9.5px !important;
+  }
+
+  #day-card > #daily-goal-panel,
+  #daily-goal-panel,
+  .focused-zone-panel {
+    width: 132px !important;
+    min-width: 132px !important;
+    max-width: 132px !important;
+  }
+
+  #daily-goal-revenue-text,
+  .focused-zone-panel-body strong {
+    font-size: 12px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.16] BlueStacks 1구역 순차 보정: HUD 고정 기준선
+   - 웹 브라우저 기본 폭에서는 적용하지 않고, 작은 16:9 가로 화면에서만 좌측 HUD 기준선을 다시 고정한다.
+   - Day 카드/목표/구역 패널의 왼쪽 기준과 폭을 통일하고, 파란 영업 준비 칩만 카드 안쪽 중앙에 둔다.
+   - 월드/카메라/game-world transform은 수정하지 않는다.
+   =========================================================================== */
+@media (max-width: 1100px) and (max-height: 700px) and (orientation: landscape) {
+  #top-ui {
+    position: absolute !important;
+    top: 8px !important;
+    left: 8px !important;
+    right: 94px !important;
+    bottom: auto !important;
+    inset: 8px 94px auto 8px !important;
+    display: grid !important;
+    grid-template-columns: 128px minmax(236px, min(44vw, 390px)) !important;
+    grid-template-rows: auto !important;
+    gap: 6px 8px !important;
+    width: auto !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    transform: none !important;
+    box-sizing: border-box !important;
+  }
+
+  #day-card {
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+    position: relative !important;
+    width: 128px !important;
+    min-width: 128px !important;
+    max-width: 128px !important;
+    min-height: 70px !important;
+    padding: 7px 8px 31px !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+  }
+
+  #day-card > #phase-chip,
+  #phase-chip {
+    position: absolute !important;
+    left: 8px !important;
+    right: 8px !important;
+    bottom: 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: 21px !important;
+    margin: 0 !important;
+    padding: 3px 6px !important;
+    box-sizing: border-box !important;
+    font-size: 9.5px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    transform: none !important;
+  }
+
+  #day-card > #daily-goal-panel,
+  #daily-goal-panel,
+  .focused-zone-panel {
+    left: 0 !important;
+    width: 128px !important;
+    min-width: 128px !important;
+    max-width: 128px !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+  }
+
+  #day-card > #daily-goal-panel,
+  #daily-goal-panel {
+    top: calc(100% + 6px) !important;
+    padding: 7px 8px 8px !important;
+  }
+
+  .focused-zone-panel {
+    top: calc(100% + 86px) !important;
+    padding: 7px 8px 8px !important;
+  }
+
+  .daily-goal-main {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 5px !important;
+  }
+
+  #daily-goal-revenue-text,
+  .focused-zone-panel-body strong {
+    font-size: 11.5px !important;
+    font-weight: 950 !important;
+    line-height: 1.15 !important;
+    letter-spacing: -0.04em !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .daily-goal-main span,
+  .daily-goal-sub,
+  .focused-zone-panel-body span {
+    font-size: 9.5px !important;
+    line-height: 1.15 !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.18] 좌측 HUD 공통 레이아웃 복구
+   - Day/목표/구역 HUD는 웹 브라우저와 BlueStacks/16:9에서 같은 기준으로 보이게 한다.
+   - v8.10.16의 작은 16:9 전용 128px 축소값을 마지막 override에서 덮어쓴다.
+   - 월드/카메라/game-world transform/오브젝트 좌표는 수정하지 않는다.
+   =========================================================================== */
+#top-ui {
+  position: absolute !important;
+  top: 10px !important;
+  left: 10px !important;
+  right: 112px !important;
+  bottom: auto !important;
+  inset: 10px 112px auto 10px !important;
+  display: grid !important;
+  grid-template-columns: 136px minmax(260px, min(44vw, 430px)) !important;
+  grid-template-rows: auto !important;
+  align-items: start !important;
+  gap: 6px 8px !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+}
+
+#day-card {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  position: relative !important;
+  width: 136px !important;
+  min-width: 136px !important;
+  max-width: 136px !important;
+  min-height: 76px !important;
+  padding: 8px 9px 34px !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+#day-card > div:not(#daily-goal-panel):not(#focused-zone-panel) {
+  min-width: 0 !important;
+}
+
+#day-card > #phase-chip,
+#phase-chip {
+  position: absolute !important;
+  left: 10px !important;
+  right: 10px !important;
+  bottom: 7px !important;
+  grid-column: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  inline-size: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  min-height: 23px !important;
+  margin: 0 !important;
+  padding: 3px 7px !important;
+  box-sizing: border-box !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  transform: none !important;
+}
+
+#day-card > #daily-goal-panel,
+#daily-goal-panel {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(100% + 7px) !important;
+  width: 136px !important;
+  min-width: 136px !important;
+  max-width: 136px !important;
+  padding: 8px 9px 9px !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#day-card > #focused-zone-panel,
+#focused-zone-panel,
+.focused-zone-panel {
+  position: absolute !important;
+  left: 0 !important;
+  top: calc(100% + 88px) !important;
+  width: 162px !important;
+  min-width: 162px !important;
+  max-width: 162px !important;
+  padding: 8px 9px 9px !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+
+.daily-goal-panel-header,
+.focused-zone-panel-header {
+  min-width: 0 !important;
+  margin-bottom: 6px !important;
+}
+
+.daily-goal-panel-header strong,
+.focused-zone-panel-header strong {
+  min-height: 20px !important;
+  padding: 3px 7px !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+}
+
+#daily-goal-day-label,
+.focused-zone-panel-header span {
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+}
+
+.daily-goal-panel-body,
+.focused-zone-panel-body {
+  gap: 5px !important;
+}
+
+.daily-goal-main {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.daily-goal-main span,
+.focused-zone-panel-body span,
+.daily-goal-sub {
+  font-size: 10.5px !important;
+  line-height: 1.2 !important;
+}
+
+#daily-goal-revenue-text,
+.focused-zone-panel-body strong {
+  min-width: 0 !important;
+  color: #ffffff !important;
+  font-size: 12.5px !important;
+  font-weight: 950 !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.04em !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+#daily-goal-revenue-text {
+  justify-self: end !important;
+  text-align: right !important;
+}
+
+.daily-goal-progress {
+  height: 5px !important;
+}
+
+/* ===========================================================================
+   [v8.10.19] 좌측 HUD 구역 패널 크기 통일
+   - 구역 패널만 목표/매출 패널보다 크게 보이지 않게 같은 폭으로 맞춘다.
+   - 웹 브라우저와 BlueStacks/16:9에 공통 적용한다.
+   - 월드/카메라/오브젝트 좌표/충돌/상호작용은 수정하지 않는다.
+   =========================================================================== */
+#day-card > #focused-zone-panel,
+#focused-zone-panel,
+.focused-zone-panel {
+  width: 136px !important;
+  min-width: 136px !important;
+  max-width: 136px !important;
+}
+
+.focused-zone-panel-body strong {
+  font-size: 12.5px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.04em !important;
+}
+
+/* ===========================================================================
+   [v8.10.20] 좌측 HUD 구역 패널 간격 보정
+   - 구역 패널이 목표 패널과 너무 붙어 보이지 않도록 살짝 아래로 내린다.
+   - 웹 브라우저와 BlueStacks/16:9에 공통 적용한다.
+   - 월드/카메라/오브젝트 좌표/충돌/상호작용은 수정하지 않는다.
+   =========================================================================== */
+#day-card > #focused-zone-panel,
+#focused-zone-panel,
+.focused-zone-panel {
+  top: calc(100% + 96px) !important;
+}
+
+/* =========================================================
+   v260710 확장 조건 UX 개선 최종 override
+   - 구역 카드의 확대 보기 → 확장 조건 버튼화
+   - 월드 자물쇠/구름을 누르지 않아도 조건 확인 가능
+   - 확장 가능 배지 표시
+   ========================================================= */
+.focused-zone-panel-header .focused-zone-condition-button,
+#focused-zone-status-label.focused-zone-condition-button {
+  appearance: none !important;
+  border: 0 !important;
+  margin: 0 !important;
+  padding: 2px 7px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.1 !important;
+  letter-spacing: -0.03em !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transform: none !important;
+}
+
+.focused-zone-panel-header .focused-zone-condition-button:active,
+#focused-zone-status-label.focused-zone-condition-button:active {
+  transform: translateY(1px) !important;
+}
+
+.focused-zone-panel.has-expandable-zone .focused-zone-condition-button,
+#focused-zone-panel.has-expandable-zone #focused-zone-status-label.focused-zone-condition-button {
+  background: rgba(255, 212, 82, 0.22) !important;
+  color: #ffe991 !important;
+}
+
+.focused-zone-alert-badge {
+  width: 13px !important;
+  height: 13px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 999px !important;
+  background: #ff5b45 !important;
+  color: #fff !important;
+  font-size: 9px !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28) !important;
+}
+
+.zone-expansion-condition-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 99990 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: clamp(12px, 3vh, 28px) !important;
+  pointer-events: auto !important;
+}
+
+.zone-expansion-condition-modal.hidden {
+  display: none !important;
+}
+
+.zone-expansion-condition-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.46) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+.zone-expansion-condition-card {
+  position: relative !important;
+  width: min(680px, calc(100vw - 28px)) !important;
+  max-height: min(86vh, 540px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  border-radius: 24px !important;
+  border: 2px solid rgba(255, 230, 160, 0.9) !important;
+  background: linear-gradient(180deg, rgba(255, 250, 226, 0.98), rgba(255, 239, 199, 0.98)) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+  color: #3c2a15 !important;
+}
+
+.zone-expansion-condition-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 14px !important;
+  padding: 17px 18px 12px !important;
+  border-bottom: 1px solid rgba(103, 72, 24, 0.16) !important;
+  background: rgba(255, 245, 210, 0.72) !important;
+}
+
+.zone-expansion-condition-header span {
+  display: block !important;
+  margin-bottom: 2px !important;
+  color: #9a6a20 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.zone-expansion-condition-header strong {
+  display: block !important;
+  color: #2f2110 !important;
+  font-size: 20px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.zone-expansion-condition-close {
+  appearance: none !important;
+  flex: 0 0 auto !important;
+  width: 34px !important;
+  height: 34px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(72, 49, 22, 0.14) !important;
+  color: #3f2b13 !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+}
+
+.zone-expansion-condition-list {
+  display: grid !important;
+  gap: 10px !important;
+  padding: 14px 16px 18px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+.zone-expansion-condition-item {
+  border-radius: 18px !important;
+  border: 1px solid rgba(111, 78, 31, 0.16) !important;
+  background: rgba(255, 255, 255, 0.66) !important;
+  padding: 13px !important;
+  box-shadow: 0 8px 18px rgba(95, 64, 22, 0.12) !important;
+}
+
+.zone-expansion-condition-item.is-selected {
+  border-color: rgba(255, 167, 38, 0.9) !important;
+  box-shadow: 0 0 0 3px rgba(255, 190, 75, 0.26), 0 10px 24px rgba(95, 64, 22, 0.16) !important;
+}
+
+.zone-expansion-condition-item.is-expandable {
+  background: linear-gradient(180deg, rgba(255, 251, 224, 0.96), rgba(255, 243, 193, 0.94)) !important;
+}
+
+.zone-expansion-condition-item-top {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 6px !important;
+}
+
+.zone-expansion-condition-status {
+  display: inline-flex !important;
+  margin-bottom: 3px !important;
+  padding: 2px 7px !important;
+  border-radius: 999px !important;
+  background: rgba(42, 120, 92, 0.12) !important;
+  color: #287355 !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+}
+
+.zone-expansion-condition-item-top strong {
+  display: block !important;
+  color: #332212 !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.zone-expansion-condition-badge {
+  flex: 0 0 auto !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  background: #ff8f1f !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-style: normal !important;
+  font-weight: 900 !important;
+  box-shadow: 0 4px 10px rgba(255, 143, 31, 0.28) !important;
+}
+
+.zone-expansion-condition-item p {
+  margin: 0 0 9px !important;
+  color: rgba(59, 38, 15, 0.74) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1.35 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.zone-expansion-condition-requirements {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  margin: 0 0 8px !important;
+}
+
+.zone-expansion-condition-requirements > div {
+  min-width: 0 !important;
+  padding: 7px 6px !important;
+  border-radius: 12px !important;
+  background: rgba(255, 244, 208, 0.88) !important;
+}
+
+.zone-expansion-condition-requirements dt,
+.zone-expansion-condition-requirements dd {
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+}
+
+.zone-expansion-condition-requirements dt {
+  color: rgba(70, 44, 16, 0.6) !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+}
+
+.zone-expansion-condition-requirements dd {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  color: #392511 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+}
+
+.zone-expansion-condition-requirements .is-met dd {
+  color: #287355 !important;
+}
+
+.zone-expansion-condition-requirements .is-missing dd {
+  color: #c84b37 !important;
+}
+
+.zone-expansion-condition-missing {
+  margin-bottom: 9px !important;
+  color: rgba(74, 48, 17, 0.76) !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.zone-expansion-condition-actions {
+  display: flex !important;
+  gap: 8px !important;
+}
+
+.zone-expansion-condition-action,
+.zone-expansion-condition-instant-action {
+  appearance: none !important;
+  flex: 1 1 0 !important;
+  min-height: 32px !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  padding: 7px 10px !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.03em !important;
+  cursor: pointer !important;
+}
+
+.zone-expansion-condition-action {
+  background: linear-gradient(180deg, #ffb237, #f58116) !important;
+  color: #fff !important;
+  box-shadow: 0 5px 12px rgba(245, 129, 22, 0.28) !important;
+}
+
+.zone-expansion-condition-instant-action {
+  background: linear-gradient(180deg, #57c5ff, #3189df) !important;
+  color: #fff !important;
+  box-shadow: 0 5px 12px rgba(49, 137, 223, 0.24) !important;
+}
+
+.zone-expansion-condition-action:disabled,
+.zone-expansion-condition-instant-action:disabled {
+  background: rgba(96, 80, 58, 0.22) !important;
+  color: rgba(60, 40, 16, 0.46) !important;
+  box-shadow: none !important;
+  cursor: default !important;
+}
+
+.zone-expansion-condition-empty {
+  margin: 12px !important;
+  color: #4b3518 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  .zone-expansion-condition-modal {
+    padding: 10px 12px !important;
+  }
+
+  .zone-expansion-condition-card {
+    width: min(620px, calc(100vw - 24px)) !important;
+    max-height: calc(100vh - 22px) !important;
+    border-radius: 20px !important;
+  }
+
+  .zone-expansion-condition-header {
+    padding: 12px 14px 9px !important;
+  }
+
+  .zone-expansion-condition-header strong {
+    font-size: 17px !important;
+  }
+
+  .zone-expansion-condition-list {
+    gap: 8px !important;
+    padding: 10px 12px 12px !important;
+  }
+
+  .zone-expansion-condition-item {
+    padding: 10px !important;
+    border-radius: 15px !important;
+  }
+
+  .zone-expansion-condition-requirements {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .zone-expansion-condition-actions {
+    gap: 6px !important;
+  }
+
+  .zone-expansion-condition-action,
+  .zone-expansion-condition-instant-action {
+    min-height: 30px !important;
+    padding: 6px 8px !important;
+    font-size: 11px !important;
+  }
+}
+
+
+/* ===========================================================================
+   [v8.10.22] 구역 확장 조건 버튼 클릭 핫픽스
+   - 기존 좌측 구역 패널의 pointer-events:none 상속을 마지막 override에서 확실히 해제한다.
+   - 버튼/팝업 클릭만 보정하며 월드/카메라/오브젝트 좌표는 수정하지 않는다.
+   =========================================================================== */
+#day-card > #focused-zone-panel,
+#focused-zone-panel,
+.focused-zone-panel {
+  pointer-events: auto !important;
+  z-index: 900 !important;
+}
+
+#focused-zone-panel *,
+.focused-zone-panel * {
+  pointer-events: auto !important;
+}
+
+#focused-zone-status-label.focused-zone-condition-button,
+.focused-zone-panel-header .focused-zone-condition-button {
+  pointer-events: auto !important;
+  touch-action: manipulation !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.zone-expansion-condition-modal,
+.zone-expansion-condition-modal *,
+.zone-expansion-condition-backdrop,
+.zone-expansion-condition-card,
+.zone-expansion-condition-close,
+.zone-expansion-condition-action,
+.zone-expansion-condition-instant-action {
+  pointer-events: auto !important;
+}
+
+.zone-expansion-condition-modal.is-visible {
+  display: flex !important;
+}
+
+.store-space-tile,
+.store-space-tile .store-space-label,
+.store-space-tile .store-space-cloud,
+.store-space-tile .store-space-lock,
+.store-space-popover-trigger {
+  pointer-events: auto !important;
+}
+
+/* ===========================================================================
+   [v8.10.23] 구역 확장 조건 순차 표시
+   - 확장 조건 팝업은 현재 다음 확장 대상 1개만 보여준다.
+   - 4구역까지 모두 해금되면 Coming Soon 안내만 표시한다.
+   =========================================================================== */
+.zone-expansion-condition-list {
+  gap: 0 !important;
+}
+
+.zone-expansion-condition-card {
+  width: min(620px, calc(100vw - 28px)) !important;
+  max-height: min(82vh, 480px) !important;
+}
+
+.zone-expansion-condition-item {
+  cursor: default !important;
+}
+
+.zone-expansion-condition-coming-soon {
+  display: grid !important;
+  place-items: center !important;
+  min-height: 220px !important;
+  padding: 26px 18px !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(111, 78, 31, 0.16) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 246, 219, 0.82)) !important;
+  color: #3c2a15 !important;
+  text-align: center !important;
+  box-shadow: 0 8px 18px rgba(95, 64, 22, 0.12) !important;
+}
+
+.zone-expansion-condition-coming-soon strong {
+  display: block !important;
+  margin-bottom: 8px !important;
+  color: #2f2110 !important;
+  font-size: clamp(28px, 4.2vw, 42px) !important;
+  font-weight: 1000 !important;
+  letter-spacing: -0.05em !important;
+}
+
+.zone-expansion-condition-coming-soon p {
+  margin: 0 0 6px !important;
+  color: rgba(59, 38, 15, 0.78) !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.04em !important;
+}
+
+.zone-expansion-condition-coming-soon span {
+  color: rgba(59, 38, 15, 0.58) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  .zone-expansion-condition-card {
+    width: min(540px, calc(100vw - 24px)) !important;
+    max-height: calc(100vh - 22px) !important;
+  }
+
+  .zone-expansion-condition-coming-soon {
+    min-height: 150px !important;
+    padding: 18px 14px !important;
+  }
+
+  .zone-expansion-condition-coming-soon strong {
+    font-size: 28px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.24] 구역 확장 조건 팝업 16:9 프레임 중앙 정렬/닫기 버튼 통일
+   - 구역 확장 조건 팝업도 16:9 게임 프레임 안쪽 중앙에 배치한다.
+   - 닫기 버튼은 상점 닫기 버튼과 같은 이미지 버튼 규격으로 통일한다.
+   - 월드/카메라/오브젝트 좌표/충돌/상호작용은 수정하지 않는다.
+   =========================================================================== */
+body:not(.is-tutorial-active) #zone-expansion-condition-modal.zone-expansion-condition-modal.is-visible:not(.hidden) {
+  position: fixed !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: var(--so-ui-frame-left) !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: var(--so-ui-frame-width) !important;
+  height: var(--so-ui-frame-height) !important;
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: var(--so-ui-frame-pad) !important;
+  overflow: hidden !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}
+
+body:not(.is-tutorial-active) #zone-expansion-condition-modal.zone-expansion-condition-modal.is-visible:not(.hidden) .zone-expansion-condition-backdrop {
+  position: absolute !important;
+  inset: 0 !important;
+}
+
+body:not(.is-tutorial-active) #zone-expansion-condition-modal.zone-expansion-condition-modal.is-visible:not(.hidden) .zone-expansion-condition-card {
+  width: min(560px, calc(var(--so-ui-frame-width) - (var(--so-ui-frame-pad) * 2))) !important;
+  max-width: 100% !important;
+  max-height: calc(var(--so-ui-frame-height) - (var(--so-ui-frame-pad) * 2)) !important;
+  margin: auto !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+#zone-expansion-condition-modal .zone-expansion-condition-close.ui-icon-image-button,
+#zone-expansion-condition-modal .zone-expansion-condition-close.ui-icon-button-close,
+#zone-expansion-condition-modal .zone-expansion-condition-close {
+  flex: 0 0 auto !important;
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: transparent !important;
+  background-image: var(--ui-button-image-current, var(--ui-button-image-normal, url("./assets/ui/buttons/icon/ui_icon_close_normal.png"))) !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  background-size: 100% 100% !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  text-indent: -9999px !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+}
+
+#zone-expansion-condition-modal .zone-expansion-condition-close span {
+  display: block !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  body:not(.is-tutorial-active) #zone-expansion-condition-modal.zone-expansion-condition-modal.is-visible:not(.hidden) {
+    padding: clamp(6px, 1.2vmin, 10px) !important;
+  }
+
+  body:not(.is-tutorial-active) #zone-expansion-condition-modal.zone-expansion-condition-modal.is-visible:not(.hidden) .zone-expansion-condition-card {
+    width: min(520px, calc(var(--so-ui-frame-width) - 20px)) !important;
+    max-height: calc(var(--so-ui-frame-height) - 20px) !important;
+  }
+
+  #zone-expansion-condition-modal .zone-expansion-condition-header {
+    padding: 10px 12px 8px !important;
+  }
+
+  #zone-expansion-condition-modal .zone-expansion-condition-close.ui-icon-image-button,
+  #zone-expansion-condition-modal .zone-expansion-condition-close.ui-icon-button-close,
+  #zone-expansion-condition-modal .zone-expansion-condition-close {
+    width: 38px !important;
+    min-width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.21] 16:9 shelf visual coordinate restoration
+   - 작은 가로 화면의 공통 .store-zone 축소가 진열대 인스턴스에 적용되면서
+     웹 기준 translate(-50%, -50%) 앵커가 사라지는 문제만 복구한다.
+   - ShelfPlacementData/CollisionData/카메라/접근점/상호작용 좌표는 변경하지 않는다.
+   - 진열대 노드의 자식인 이미지와 경고/재고 표시는 동일 좌표계로 함께 정렬된다.
+   =========================================================================== */
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #store-interaction-layer > .store-object-zone {
+    transform: translate(-50%, -50%) !important;
+    transform-origin: center !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.25] 알바 고용 게시판 비교형 UX 정리
+   - 팝업 프레임/고용 로직은 유지하고 카드 내부 정보만 비교하기 쉽게 재배치한다.
+   - 실제 창고/진열/청소 수치를 3단계 미터로 표시한다.
+   - 16:9에서는 세 지원자와 하단 버튼이 한 화면에 보이도록 내부 스크롤을 제거한다.
+   =========================================================================== */
+body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden) .staff-hire-modal-content {
+  width: min(100%, 880px) !important;
+  height: min(100%, 510px) !important;
+  max-height: 100% !important;
+  padding: 14px 18px 12px !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-header {
+  flex: 0 0 auto !important;
+  gap: 3px !important;
+  margin-bottom: 9px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-kicker {
+  padding: 3px 9px !important;
+  font-size: 11px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-header h2 {
+  font-size: 20px !important;
+  line-height: 1.2 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-header p {
+  max-width: 720px !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden) .staff-hire-list {
+  flex: 1 1 auto !important;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: stretch !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  padding: 0 2px 3px !important;
+  overflow: hidden !important;
+  scrollbar-gutter: auto !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-card {
+  display: grid !important;
+  grid-template-rows: auto auto auto minmax(38px, auto) !important;
+  align-content: stretch !important;
+  gap: 8px !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  padding: 10px !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-profile {
+  display: grid !important;
+  grid-template-columns: 66px minmax(0, 1fr) !important;
+  align-items: center !important;
+  gap: 9px !important;
+  min-width: 0 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-visual {
+  position: relative !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 66px !important;
+  height: 72px !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-frame,
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-sprite {
+  grid-area: 1 / 1 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 66px !important;
+  height: 72px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-sprite {
+  width: 54px !important;
+  height: 58px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-hire-icon {
+  position: absolute !important;
+  right: -2px !important;
+  bottom: -2px !important;
+  width: 25px !important;
+  height: 25px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-title {
+  display: grid !important;
+  align-content: center !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-title strong {
+  font-size: 17px !important;
+  line-height: 1.12 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-title > span {
+  max-width: 100% !important;
+  padding: 3px 7px !important;
+  font-size: 10px !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-summary {
+  display: -webkit-box !important;
+  min-height: 27px !important;
+  margin: 0 !important;
+  color: var(--tycoon-sub) !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  line-height: 1.35 !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+  overflow: hidden !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-skills {
+  display: grid !important;
+  gap: 5px !important;
+  padding: 7px 8px !important;
+  border: 1px solid rgba(191, 234, 208, 0.95) !important;
+  border-radius: 13px !important;
+  background: rgba(232, 255, 240, 0.72) !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-row {
+  display: grid !important;
+  grid-template-columns: 31px minmax(45px, 1fr) 30px !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-height: 17px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-label,
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-value {
+  color: var(--tycoon-mint-dark) !important;
+  font-size: 10px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-value {
+  text-align: right !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-meter {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 3px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-meter-segment {
+  height: 7px !important;
+  border: 1px solid rgba(62, 150, 111, 0.26) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-skill-meter-segment.is-active {
+  border-color: rgba(45, 115, 85, 0.72) !important;
+  background: linear-gradient(180deg, #6bd09a 0%, #3e966f 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45) !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-stats {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+  margin: 0 !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-stats > div {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  justify-items: center !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+  padding: 6px 3px !important;
+  border-radius: 11px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-stats dt {
+  font-size: 9px !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-stats dd {
+  max-width: 100% !important;
+  font-size: 10px !important;
+  line-height: 1.15 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-ability {
+  display: none !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-button {
+  align-self: end !important;
+  width: 100% !important;
+  min-height: 38px !important;
+  height: 38px !important;
+  margin: 0 !important;
+  padding: 0 12px !important;
+  border-radius: 13px !important;
+  font-size: 13px !important;
+}
+
+body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-skip-button,
+body:not(.is-tutorial-active) #staff-hire-modal #staff-hire-skip-button {
+  flex: 0 0 auto !important;
+  width: min(225px, 42%) !important;
+  min-width: 180px !important;
+  max-width: 225px !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  margin: 8px auto 0 !important;
+  padding: 0 18px !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden) .staff-hire-modal-content {
+    height: min(100%, 500px) !important;
+    padding: 10px 14px 9px !important;
+    border-radius: 24px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-header {
+    gap: 2px !important;
+    margin-bottom: 7px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-header h2 {
+    font-size: 18px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-header p {
+    font-size: 11px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-card {
+    gap: 6px !important;
+    padding: 8px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-profile {
+    grid-template-columns: 58px minmax(0, 1fr) !important;
+    gap: 7px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-visual,
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-frame {
+    width: 58px !important;
+    height: 62px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-sprite {
+    width: 48px !important;
+    height: 50px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-title strong {
+    font-size: 15px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-skills {
+    gap: 4px !important;
+    padding: 6px 7px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-stats > div {
+    padding: 5px 2px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-hire-skip-button,
+  body:not(.is-tutorial-active) #staff-hire-modal #staff-hire-skip-button {
+    margin-top: 6px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  body:not(.is-tutorial-active) #staff-hire-modal.modal:not(.hidden) .staff-hire-list {
+    grid-template-columns: none !important;
+    grid-auto-flow: column !important;
+    grid-auto-columns: min(82vw, 280px) !important;
+    justify-content: start !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scroll-snap-type: x mandatory !important;
+    padding-bottom: 6px !important;
+  }
+
+  body:not(.is-tutorial-active) #staff-hire-modal .staff-candidate-card {
+    scroll-snap-align: center !important;
+  }
+}
+
+/* ========================================================================== */
+/* [v8.10.23] 창고 상품별 재고 현황 UX                                      */
+/* - 상단 재고 HUD 및 창고 박스에서 동일한 재고 현황창을 연다.               */
+/* - 발주창 카드 스타일을 계승하되 재고 확인 전용 정보 구조를 사용한다.      */
+/* ========================================================================== */
+#stock-info.warehouse-inventory-hud-trigger,
+#status-panel #stock-info.warehouse-inventory-hud-trigger {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: manipulation !important;
+  transition: transform 120ms ease, filter 120ms ease !important;
+}
+
+#stock-info.warehouse-inventory-hud-trigger:hover,
+#status-panel #stock-info.warehouse-inventory-hud-trigger:hover {
+  filter: brightness(1.08) !important;
+}
+
+#stock-info.warehouse-inventory-hud-trigger:active,
+#status-panel #stock-info.warehouse-inventory-hud-trigger:active {
+  transform: translateY(1px) scale(0.98) !important;
+}
+
+#stock-info.warehouse-inventory-hud-trigger:focus-visible,
+#status-panel #stock-info.warehouse-inventory-hud-trigger:focus-visible {
+  outline: 3px solid rgba(255, 217, 91, 0.95) !important;
+  outline-offset: 2px !important;
+}
+
+#store-interaction-layer > #warehouse-box-zone.warehouse-box-zone[data-player-action="warehouse_inventory"],
+#warehouse-box-zone.warehouse-box-zone[data-player-action="warehouse_inventory"] {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  touch-action: manipulation !important;
+}
+
+#warehouse-box-zone[data-player-action="warehouse_inventory"] .warehouse-box-hitbox {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+#warehouse-box-zone[data-player-action="warehouse_inventory"]:focus-visible {
+  outline: 3px solid rgba(255, 217, 91, 0.95) !important;
+  outline-offset: 4px !important;
+}
+
+#warehouse-inventory-modal.warehouse-inventory-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 12500 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 18px !important;
+  background: rgba(18, 20, 24, 0.72) !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  pointer-events: auto !important;
+}
+
+#warehouse-inventory-modal.warehouse-inventory-modal.hidden {
+  display: none !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-modal-content {
+  width: min(1060px, calc(100vw - 36px)) !important;
+  height: min(720px, calc(100vh - 36px)) !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 4px solid #5a3f25 !important;
+  border-radius: 24px !important;
+  overflow: hidden !important;
+  background: #f7eed8 !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42), inset 0 0 0 2px rgba(255, 255, 255, 0.42) !important;
+  pointer-events: auto !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-frame {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-topbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px !important;
+  min-height: 76px !important;
+  padding: 12px 18px 11px !important;
+  border-bottom: 3px solid #5a3f25 !important;
+  background: linear-gradient(180deg, #fff8df 0%, #edd7aa 100%) !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-topbar > div {
+  min-width: 0 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-kicker {
+  display: block !important;
+  margin-bottom: 2px !important;
+  color: #8a6533 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.16em !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-topbar h2 {
+  margin: 0 !important;
+  color: #3e2917 !important;
+  font-size: 26px !important;
+  line-height: 1.1 !important;
+  font-weight: 950 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-close-button {
+  flex: 0 0 auto !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
+  border: 3px solid #5a3f25 !important;
+  border-radius: 13px !important;
+  background: #fffaf0 !important;
+  color: #4c311d !important;
+  font-size: 27px !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  box-shadow: 0 3px 0 #ad8757 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-close-button:active {
+  transform: translateY(2px) !important;
+  box-shadow: 0 1px 0 #ad8757 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-body {
+  display: grid !important;
+  grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  padding: 12px 14px 14px !important;
+  overflow: hidden !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-summary {
+  padding: 10px 12px !important;
+  border: 2px solid rgba(90, 63, 37, 0.48) !important;
+  border-radius: 16px !important;
+  background: rgba(255, 252, 239, 0.82) !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-capacity-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-capacity-row > div:first-child {
+  display: flex !important;
+  align-items: baseline !important;
+  gap: 9px !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-capacity-row span {
+  color: #70502c !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-capacity-row strong {
+  color: #352313 !important;
+  font-size: 17px !important;
+  font-weight: 950 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-alert-summary {
+  display: flex !important;
+  gap: 7px !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-alert-summary span {
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-alert-summary .is-out {
+  background: #ffe0db !important;
+  color: #a43125 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-alert-summary .is-low {
+  background: #fff0c6 !important;
+  color: #8b5b05 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-capacity-track {
+  height: 9px !important;
+  margin-top: 8px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(90, 63, 37, 0.45) !important;
+  border-radius: 999px !important;
+  background: #d8c7a7 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-capacity-track > span {
+  display: block !important;
+  height: 100% !important;
+  border-radius: inherit !important;
+  background: linear-gradient(90deg, #5fa855 0%, #e2b43e 72%, #d76b42 100%) !important;
+  transition: width 180ms ease !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-toolbar {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.82fr) auto !important;
+  align-items: end !important;
+  gap: 12px !important;
+  padding: 9px 10px !important;
+  border: 2px solid rgba(90, 63, 37, 0.34) !important;
+  border-radius: 16px !important;
+  background: rgba(238, 218, 180, 0.62) !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-filter-group {
+  min-width: 0 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-filter-group > strong {
+  display: block !important;
+  margin: 0 0 5px 2px !important;
+  color: #5e4023 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-filter-row {
+  display: flex !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-filter-row::-webkit-scrollbar {
+  display: none !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-filter-button {
+  flex: 0 0 auto !important;
+  min-height: 31px !important;
+  padding: 6px 10px !important;
+  border: 2px solid #8a6a45 !important;
+  border-radius: 999px !important;
+  background: #fffaf0 !important;
+  color: #63431f !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  white-space: nowrap !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-filter-button.is-active {
+  border-color: #3d6e3a !important;
+  background: #4f8b49 !important;
+  color: #fff !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-result-summary {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  min-width: 154px !important;
+  margin: 0 !important;
+  text-align: right !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-result-summary strong {
+  color: #3e2917 !important;
+  font-size: 14px !important;
+  font-weight: 950 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-result-summary span {
+  margin-top: 2px !important;
+  color: #806445 !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-list {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-content: start !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  padding: 2px 4px 8px 2px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-card {
+  display: grid !important;
+  grid-template-columns: 78px minmax(0, 1fr) !important;
+  grid-template-rows: auto auto !important;
+  gap: 7px 9px !important;
+  min-width: 0 !important;
+  min-height: 132px !important;
+  padding: 9px !important;
+  border: 2px solid #94734b !important;
+  border-radius: 16px !important;
+  background: #fffdf4 !important;
+  box-shadow: 0 3px 0 rgba(113, 78, 39, 0.25) !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-card.is-out {
+  border-color: #c46b5f !important;
+  background: #fff6f3 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-card.is-low {
+  border-color: #c69b3a !important;
+  background: #fffaf0 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-image-box {
+  position: relative !important;
+  grid-row: 1 / span 2 !important;
+  width: 78px !important;
+  height: 102px !important;
+  overflow: hidden !important;
+  border: 2px solid rgba(112, 78, 43, 0.4) !important;
+  border-radius: 13px !important;
+  background: #efe4cc !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-image-box img,
+#warehouse-inventory-modal .warehouse-inventory-product-fallback {
+  position: absolute !important;
+  inset: 22px 5px 5px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: calc(100% - 10px) !important;
+  height: calc(100% - 27px) !important;
+  object-fit: contain !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-fallback {
+  font-size: 32px !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-fallback[hidden] {
+  display: none !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-category {
+  position: absolute !important;
+  top: 4px !important;
+  left: 4px !important;
+  right: 4px !important;
+  z-index: 2 !important;
+  padding: 2px 4px !important;
+  overflow: hidden !important;
+  border-radius: 7px !important;
+  background: rgba(79, 65, 45, 0.88) !important;
+  color: #fff !important;
+  font-size: 9px !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-main {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-main > strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: #3d2917 !important;
+  font-size: 14px !important;
+  font-weight: 950 !important;
+  line-height: 1.22 !important;
+  text-overflow: ellipsis !important;
+  display: -webkit-box !important;
+  -webkit-box-orient: vertical !important;
+  -webkit-line-clamp: 2 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-stock-status {
+  flex: 0 0 auto !important;
+  padding: 4px 7px !important;
+  border-radius: 999px !important;
+  font-size: 9px !important;
+  font-style: normal !important;
+  font-weight: 950 !important;
+  white-space: nowrap !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-stock-status.is-out {
+  background: #f6d3ce !important;
+  color: #9c2e23 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-stock-status.is-low {
+  background: #ffe9af !important;
+  color: #825205 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-stock-status.is-enough {
+  background: #d9efd3 !important;
+  color: #2d672a !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-stock-lines {
+  display: grid !important;
+  gap: 5px !important;
+  align-self: end !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-stock-lines p {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 6px 7px !important;
+  border-radius: 9px !important;
+  background: #f3ead8 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-stock-lines p > span {
+  color: #7b6042 !important;
+  font-size: 10px !important;
+  font-weight: 850 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-product-stock-lines p > strong {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  color: #342313 !important;
+  font-size: 11px !important;
+  font-weight: 950 !important;
+  text-align: right !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-warehouse-stock.is-empty > strong {
+  color: #a43227 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-empty-state {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 170px !important;
+  padding: 24px !important;
+  border: 2px dashed rgba(112, 78, 43, 0.48) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 252, 241, 0.68) !important;
+  text-align: center !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-empty-state strong {
+  color: #4a321c !important;
+  font-size: 17px !important;
+  font-weight: 950 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-empty-state span {
+  margin-top: 5px !important;
+  color: #806446 !important;
+  font-size: 12px !important;
+  font-weight: 750 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-footer {
+  display: grid !important;
+  grid-template-columns: minmax(120px, 0.38fr) minmax(200px, 0.62fr) !important;
+  gap: 9px !important;
+  padding-top: 2px !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-footer button {
+  min-height: 45px !important;
+  padding: 9px 14px !important;
+  border: 3px solid #5a3f25 !important;
+  border-radius: 14px !important;
+  font-size: 14px !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-secondary-button {
+  background: #fff9ed !important;
+  color: #51351c !important;
+  box-shadow: 0 3px 0 #a9875e !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-primary-button {
+  background: linear-gradient(180deg, #73ad58 0%, #4b843e 100%) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 0 #2e5d27 !important;
+}
+
+#warehouse-inventory-modal .warehouse-inventory-primary-button:disabled {
+  border-color: #8f806c !important;
+  background: #c9c0b1 !important;
+  color: #766c5d !important;
+  box-shadow: none !important;
+  cursor: default !important;
+}
+
+@media (max-width: 860px) {
+  #warehouse-inventory-modal .warehouse-inventory-toolbar {
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: stretch !important;
+    gap: 7px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-result-summary {
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    min-width: 0 !important;
+    text-align: left !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  #warehouse-inventory-modal.warehouse-inventory-modal {
+    padding: 8px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-modal-content {
+    width: min(980px, calc(100vw - 16px)) !important;
+    height: min(540px, calc(100vh - 16px)) !important;
+    border-radius: 18px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-topbar {
+    min-height: 54px !important;
+    padding: 7px 12px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-kicker {
+    font-size: 8px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-topbar h2 {
+    font-size: 18px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-close-button {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    border-radius: 10px !important;
+    font-size: 22px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-body {
+    gap: 6px !important;
+    padding: 7px 9px 8px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-summary {
+    padding: 6px 8px !important;
+    border-radius: 12px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-capacity-row strong {
+    font-size: 13px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-alert-summary span {
+    padding: 3px 7px !important;
+    font-size: 9px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-capacity-track {
+    height: 6px !important;
+    margin-top: 5px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-toolbar {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.8fr) auto !important;
+    gap: 7px !important;
+    padding: 5px 7px !important;
+    border-radius: 12px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-filter-group > strong {
+    margin-bottom: 3px !important;
+    font-size: 9px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-filter-button {
+    min-height: 25px !important;
+    padding: 4px 8px !important;
+    border-width: 1px !important;
+    font-size: 9px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-result-summary {
+    min-width: 126px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-result-summary strong {
+    font-size: 11px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-result-summary span {
+    font-size: 8px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 7px !important;
+    padding-bottom: 4px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-card {
+    grid-template-columns: 57px minmax(0, 1fr) !important;
+    gap: 4px 6px !important;
+    min-height: 92px !important;
+    padding: 6px !important;
+    border-radius: 12px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-image-box {
+    width: 57px !important;
+    height: 76px !important;
+    border-radius: 9px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-image-box img,
+  #warehouse-inventory-modal .warehouse-inventory-product-fallback {
+    inset: 17px 4px 4px !important;
+    width: calc(100% - 8px) !important;
+    height: calc(100% - 21px) !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-category {
+    top: 3px !important;
+    left: 3px !important;
+    right: 3px !important;
+    padding: 1px 3px !important;
+    font-size: 7px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-main > strong {
+    font-size: 11px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-stock-status {
+    padding: 3px 5px !important;
+    font-size: 7px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-stock-lines {
+    gap: 3px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-stock-lines p {
+    padding: 4px 5px !important;
+    border-radius: 7px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-stock-lines p > span {
+    font-size: 8px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-stock-lines p > strong {
+    font-size: 9px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-footer {
+    grid-template-columns: minmax(100px, 0.34fr) minmax(180px, 0.66fr) !important;
+    gap: 6px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-footer button {
+    min-height: 34px !important;
+    padding: 5px 10px !important;
+    border-width: 2px !important;
+    border-radius: 10px !important;
+    font-size: 11px !important;
+  }
+}
+
+@media (max-width: 620px) and (orientation: portrait) {
+  #warehouse-inventory-modal .warehouse-inventory-modal-content {
+    width: calc(100vw - 16px) !important;
+    height: calc(100vh - 16px) !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-capacity-row,
+  #warehouse-inventory-modal .warehouse-inventory-capacity-row > div:first-child {
+    align-items: flex-start !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-capacity-row {
+    flex-direction: column !important;
+    gap: 6px !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-product-list {
+    grid-template-columns: 1fr !important;
+  }
+
+  #warehouse-inventory-modal .warehouse-inventory-footer {
+    grid-template-columns: 1fr 1.35fr !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.26] 창고 재고창 16:9 프레임 중앙 정렬
+   - 브라우저 전체 viewport가 아니라 실제 16:9 게임 프레임을 기준으로 배치한다.
+   - 창고 재고 UI의 크기/필터/카드 구조만 보정하며 월드 좌표는 변경하지 않는다.
+   =========================================================================== */
+body:not(.is-tutorial-active) #warehouse-inventory-modal.warehouse-inventory-modal:not(.hidden) {
+  position: fixed !important;
+  inset: auto !important;
+  top: 0 !important;
+  left: var(--so-ui-frame-left) !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: var(--so-ui-frame-width) !important;
+  height: var(--so-ui-frame-height) !important;
+  max-width: 100vw !important;
+  max-height: 100dvh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: var(--so-ui-frame-pad) !important;
+  overflow: hidden !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+}
+
+body:not(.is-tutorial-active) #warehouse-inventory-modal.warehouse-inventory-modal:not(.hidden) > .warehouse-inventory-modal-content {
+  width: min(1060px, calc(var(--so-ui-frame-width) - (var(--so-ui-frame-pad) * 2))) !important;
+  height: min(720px, calc(var(--so-ui-frame-height) - (var(--so-ui-frame-pad) * 2))) !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  margin: auto !important;
+  transform: none !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  body:not(.is-tutorial-active) #warehouse-inventory-modal.warehouse-inventory-modal:not(.hidden) {
+    padding: 8px !important;
+  }
+
+  body:not(.is-tutorial-active) #warehouse-inventory-modal.warehouse-inventory-modal:not(.hidden) > .warehouse-inventory-modal-content {
+    width: calc(var(--so-ui-frame-width) - 16px) !important;
+    height: calc(var(--so-ui-frame-height) - 16px) !important;
+    max-width: calc(var(--so-ui-frame-width) - 16px) !important;
+    max-height: calc(var(--so-ui-frame-height) - 16px) !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.27] 창고 재고창 상점 비율형 축소
+   - 16:9 게임 프레임을 거의 가득 채우던 창고 재고창을 상점과 유사한 여백 비율로 축소한다.
+   - 중앙 정렬, 필터, 상품 카드, 월드/상호작용 로직은 변경하지 않는다.
+   =========================================================================== */
+body:not(.is-tutorial-active) #warehouse-inventory-modal.warehouse-inventory-modal:not(.hidden) > .warehouse-inventory-modal-content {
+  width: min(92%, 1060px) !important;
+  height: min(88%, 720px) !important;
+  max-width: min(92%, 1060px) !important;
+  max-height: min(88%, 720px) !important;
+}
+
+@media (max-height: 620px), (max-width: 980px) and (orientation: landscape) {
+  body:not(.is-tutorial-active) #warehouse-inventory-modal.warehouse-inventory-modal:not(.hidden) > .warehouse-inventory-modal-content {
+    width: min(92%, 900px) !important;
+    height: min(88%, 500px) !important;
+    max-width: min(92%, 900px) !important;
+    max-height: min(88%, 500px) !important;
+  }
+}
+
+
+/* ===========================================================================
+   [v8.10.32] 게임 전역 글꼴 테마
+   - 본문/정보: Gowun Dodum
+   - 제목/버튼: Jua
+   - 크기와 레이아웃은 유지하고 글꼴 계층만 분리한다.
+   =========================================================================== */
+:root {
+  --font-ui-body: "Gowun Dodum", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-ui-display: "Jua", "Gowun Dodum", system-ui, sans-serif;
+}
+
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-ui-body) !important;
+}
+
+button,
+[role="button"],
+h1,
+h2,
+h3,
+h4,
+.modal-title,
+.panel-title,
+.section-title,
+[class$="-title"],
+[class$="-title-block"] > strong,
+[class$="-header"] > strong,
+[class$="-header"] > h1,
+[class$="-header"] > h2,
+[class$="-header"] > h3 {
+  font-family: var(--font-ui-display) !important;
+  letter-spacing: -0.02em;
+}
+
+/* 긴 정보성 버튼은 본문 글꼴을 유지해 숫자·문장 가독성을 보호한다. */
+.quantity-button,
+.order-quantity-button,
+.shop-quantity-button,
+input[type="number"] {
+  font-family: var(--font-ui-body) !important;
+}
+
+/* ===========================================================================
+   [v8.10.33] 상단 상태바 양축 중앙 정렬
+   - 상태 항목의 아이콘과 텍스트를 각 셀 안에서 가로/세로 중앙 정렬한다.
+   - 상단바 크기, 항목 순서, 월드/UI 좌표는 변경하지 않는다.
+   =========================================================================== */
+#status-panel {
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+#status-panel p,
+#status-panel #diamond-info,
+#status-panel #stock-info,
+#status-panel #sanitation-info {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important;
+}
+
+#status-panel p::before,
+#status-panel p::after,
+#status-panel #diamond-info::before,
+#status-panel #diamond-info::after,
+#status-panel #stock-info::before,
+#status-panel #stock-info::after,
+#status-panel #sanitation-info::before,
+#status-panel #sanitation-info::after {
+  align-self: center !important;
+  flex: 0 0 auto !important;
+}
+
+/* ===========================================================================
+   [v8.10.34] 고운돋움 본문 가독성 보강
+   - 제목/버튼의 Jua는 유지한다.
+   - 얇게 보이던 정보성 본문만 한 단계 굵게 하고 연한 회색 문구를 진하게 조정한다.
+   - 글자 크기, 레이아웃, 버튼/모달 위치는 변경하지 않는다.
+   =========================================================================== */
+html,
+body,
+input,
+select,
+textarea {
+  font-weight: 600;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: auto;
+}
+
+/* 일반 본문 및 설명 문구 */
+p,
+li,
+label,
+small,
+.help-text,
+.muted-text,
+.description,
+.subtitle,
+.day-scenario-subtitle,
+.day-scenario-story,
+.day-scenario-tip,
+.day-scenario-features li,
+#day-scenario-market-message,
+.tutorial-card p,
+.tutorial-card li,
+.tutorial-guide-description,
+.staff-candidate-description,
+.warehouse-inventory-hint,
+.shop-description,
+.order-description {
+  font-weight: 600 !important;
+}
+
+/* 브리핑과 튜토리얼의 연한 회색 문구를 한 단계 진하게 */
+#day-scenario-modal .day-scenario-subtitle,
+#day-scenario-modal .day-scenario-story,
+#day-scenario-modal #day-scenario-market-message,
+#day-scenario-modal .day-scenario-features li,
+#day-scenario-modal .day-scenario-tip,
+.tutorial-card p,
+.tutorial-card li,
+.tutorial-guide-description {
+  color: #5d5145 !important;
+}
+
+/* 작은 수치/라벨은 뭉개지지 않게 너무 굵어지는 것을 방지 */
+input[type="number"],
+.quantity-button,
+.order-quantity-button,
+.shop-quantity-button,
+.status-value,
+.stat-value {
+  font-weight: 600 !important;
+}
+
+/* ===========================================================================
+   [v8.10.35] 상단 상태바 시각적 완전 중앙 정렬
+   - 각 자원 항목을 동일 폭 칸으로 나눠 가로 분배를 균일하게 한다.
+   - 서로 다른 아이콘(이미지/이모지)의 박스 크기를 통일해 세로 중심선을 맞춘다.
+   - 상단바 외곽 크기와 위치는 변경하지 않는다.
+   =========================================================================== */
+#status-panel {
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  justify-content: stretch !important;
+}
+
+#status-panel > p,
+#status-panel > #diamond-info,
+#status-panel > #stock-info,
+#status-panel > #sanitation-info {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+  padding: 0 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  text-align: center !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+#status-panel > p::before,
+#status-panel > p::after,
+#status-panel > #diamond-info::before,
+#status-panel > #diamond-info::after,
+#status-panel > #stock-info::before,
+#status-panel > #stock-info::after,
+#status-panel > #sanitation-info::before,
+#status-panel > #sanitation-info::after {
+  box-sizing: border-box !important;
+  flex: 0 0 20px !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  height: 20px !important;
+  min-height: 20px !important;
+  margin: 0 !important;
+  display: inline-grid !important;
+  place-items: center !important;
+  align-self: center !important;
+  line-height: 1 !important;
+  transform: none !important;
+  background-position: center center !important;
+  background-size: contain !important;
+  background-repeat: no-repeat !important;
+}
+
+#status-panel > #satisfaction-info::after,
+#status-panel > #mental-info::after,
+#status-panel > #stock-info::after {
+  font-size: 18px !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #status-panel > p,
+  #status-panel > #diamond-info,
+  #status-panel > #stock-info,
+  #status-panel > #sanitation-info {
+    min-height: 36px !important;
+    padding: 0 5px !important;
+    gap: 4px !important;
+  }
+
+  #status-panel > p::before,
+  #status-panel > p::after,
+  #status-panel > #diamond-info::before,
+  #status-panel > #diamond-info::after,
+  #status-panel > #stock-info::before,
+  #status-panel > #stock-info::after,
+  #status-panel > #sanitation-info::before,
+  #status-panel > #sanitation-info::after {
+    flex-basis: 18px !important;
+    width: 18px !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    min-height: 18px !important;
+  }
+
+  #status-panel > #satisfaction-info::after,
+  #status-panel > #mental-info::after,
+  #status-panel > #stock-info::after {
+    font-size: 16px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.36] 상단 상태바 확장 + 가변 폭 좌측 정렬
+   - 상태바 전체 폭을 조금 늘리고 화면 안에서 가로 중앙에 안정적으로 배치한다.
+   - 각 상태 셀은 아이콘/텍스트를 좌측 정렬하되 세로 중심은 유지한다.
+   - 골드/창고처럼 긴 값이 들어가는 셀은 더 많은 공간을 가져가도록 가변 flex를 사용한다.
+   =========================================================================== */
+#top-ui {
+  grid-template-columns: 136px minmax(360px, min(54vw, 540px)) !important;
+}
+
+#status-panel {
+  display: flex !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  width: 100% !important;
+  max-width: 540px !important;
+  justify-self: center !important;
+  overflow: hidden !important;
+}
+
+#status-panel > p,
+#status-panel > #diamond-info,
+#status-panel > #stock-info,
+#status-panel > #sanitation-info {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  width: auto !important;
+  padding: 0 9px !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+/* 값이 길어지는 항목은 주변 여유 폭을 더 가져간다. */
+#status-panel > #money-info {
+  flex-grow: 1.35 !important;
+}
+
+#status-panel > #diamond-info {
+  flex-grow: 0.72 !important;
+}
+
+#status-panel > #satisfaction-info,
+#status-panel > #mental-info,
+#status-panel > #sanitation-info {
+  flex-grow: 1 !important;
+}
+
+#status-panel > #stock-info {
+  flex-grow: 1.28 !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #top-ui {
+    grid-template-columns: 132px minmax(320px, min(50vw, 475px)) !important;
+  }
+
+  #status-panel {
+    max-width: 475px !important;
+  }
+
+  #status-panel > p,
+  #status-panel > #diamond-info,
+  #status-panel > #stock-info,
+  #status-panel > #sanitation-info {
+    padding: 0 6px !important;
+    gap: 4px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.37] 상단 상태바 단계별 폭 대응
+   - 전체 상단바 폭을 넘지 않도록 상태 셀을 가변 배치한다.
+   - 공간이 부족할 때만 간격/글자 크기를 순차적으로 소폭 축소한다.
+   - 그래도 부족할 때만 JS가 골드/다이아/창고 숫자를 한국식 단위로 축약한다.
+   - 우측 상단 메뉴와 일시정지/설정 버튼 순서는 변경하지 않는다.
+   =========================================================================== */
+#status-panel {
+  box-sizing: border-box !important;
+  max-inline-size: min(540px, 100%) !important;
+  contain: inline-size !important;
+}
+
+#status-panel > p,
+#status-panel > #diamond-info,
+#status-panel > #stock-info,
+#status-panel > #sanitation-info {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+  transition: padding 120ms ease, gap 120ms ease, font-size 120ms ease !important;
+}
+
+#status-panel.is-compact > p,
+#status-panel.is-compact > #diamond-info,
+#status-panel.is-compact > #stock-info,
+#status-panel.is-compact > #sanitation-info {
+  padding-inline: 6px !important;
+  gap: 4px !important;
+  font-size: 11.5px !important;
+}
+
+#status-panel.is-condensed > p,
+#status-panel.is-condensed > #diamond-info,
+#status-panel.is-condensed > #stock-info,
+#status-panel.is-condensed > #sanitation-info {
+  padding-inline: 4px !important;
+  gap: 3px !important;
+  font-size: 11px !important;
+  letter-spacing: -0.02em !important;
+}
+
+#status-panel.is-abbreviated > p,
+#status-panel.is-abbreviated > #diamond-info,
+#status-panel.is-abbreviated > #stock-info,
+#status-panel.is-abbreviated > #sanitation-info {
+  padding-inline: 3px !important;
+  gap: 2px !important;
+  font-size: 10.5px !important;
+  text-overflow: clip !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #status-panel {
+    max-inline-size: min(475px, 100%) !important;
+  }
+
+  #status-panel > p,
+  #status-panel > #diamond-info,
+  #status-panel > #stock-info,
+  #status-panel > #sanitation-info {
+    font-size: 11.5px !important;
+  }
+
+  #status-panel.is-compact > p,
+  #status-panel.is-compact > #diamond-info,
+  #status-panel.is-compact > #stock-info,
+  #status-panel.is-compact > #sanitation-info {
+    padding-inline: 4px !important;
+    gap: 3px !important;
+    font-size: 11px !important;
+  }
+
+  #status-panel.is-condensed > p,
+  #status-panel.is-condensed > #diamond-info,
+  #status-panel.is-condensed > #stock-info,
+  #status-panel.is-condensed > #sanitation-info,
+  #status-panel.is-abbreviated > p,
+  #status-panel.is-abbreviated > #diamond-info,
+  #status-panel.is-abbreviated > #stock-info,
+  #status-panel.is-abbreviated > #sanitation-info {
+    padding-inline: 3px !important;
+    gap: 2px !important;
+    font-size: 10.5px !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.38] 상단 상태바 만족도 셀 잘림 보정
+   - 전체 상태바 폭과 우측 아이콘 메뉴 순서는 유지한다.
+   - 만족도 셀에 필요한 폭을 더 배정하고, 짧은 셀에서 여유 폭을 회수한다.
+   =========================================================================== */
+#status-panel > #money-info {
+  flex-grow: 1.25 !important;
+}
+
+#status-panel > #diamond-info {
+  flex-grow: 0.65 !important;
+}
+
+#status-panel > #satisfaction-info {
+  flex-grow: 1.2 !important;
+}
+
+#status-panel > #mental-info,
+#status-panel > #sanitation-info {
+  flex-grow: 0.92 !important;
+}
+
+#status-panel > #stock-info {
+  flex-grow: 1.18 !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #status-panel > #satisfaction-info {
+    flex-grow: 1.24 !important;
+  }
+
+  #status-panel > #diamond-info {
+    flex-grow: 0.62 !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.39] 상단 상태바 다이아 셀 폭 복구
+   - 만족도 전체 표시는 유지하면서 다이아 아이콘/수치가 지나치게 압축되지 않도록 한다.
+   - 전체 상태바 폭과 우측 일시정지/설정 버튼 위치는 변경하지 않는다.
+   =========================================================================== */
+#status-panel > #money-info {
+  flex-grow: 1.18 !important;
+}
+
+#status-panel > #diamond-info {
+  flex-grow: 0.84 !important;
+  min-inline-size: 50px !important;
+}
+
+#status-panel > #satisfaction-info {
+  flex-grow: 1.18 !important;
+}
+
+#status-panel > #mental-info,
+#status-panel > #sanitation-info {
+  flex-grow: 0.88 !important;
+}
+
+#status-panel > #stock-info {
+  flex-grow: 1.12 !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #status-panel > #diamond-info {
+    flex-grow: 0.82 !important;
+    min-inline-size: 46px !important;
+  }
+
+  #status-panel > #satisfaction-info {
+    flex-grow: 1.2 !important;
+  }
+}
+
+/* ===========================================================================
+   [v8.10.40] 상단 상태바 전체 가로 폭 소폭 확장
+   - 칸별 비율은 유지하고 상태바 자체의 사용 가능 폭만 늘린다.
+   - 위생/만족도/다이아 텍스트가 기본 크기에서 여유 있게 표시되도록 한다.
+   - 우측 일시정지/설정 메뉴의 순서와 위치는 변경하지 않는다.
+   =========================================================================== */
+#top-ui {
+  grid-template-columns: 136px minmax(390px, min(57vw, 570px)) !important;
+}
+
+#status-panel {
+  max-width: 570px !important;
+  max-inline-size: min(570px, 100%) !important;
+}
+
+@media (max-height: 560px), (max-width: 980px) and (orientation: landscape) {
+  #top-ui {
+    grid-template-columns: 132px minmax(350px, min(54vw, 505px)) !important;
+  }
+
+  #status-panel {
+    max-width: 505px !important;
+    max-inline-size: min(505px, 100%) !important;
   }
 }

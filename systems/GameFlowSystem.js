@@ -50,7 +50,7 @@ const STAFF_CANDIDATES = Object.freeze([
     assetVariant: "staff_female_glasses",
     name: "김민지",
     type: "꼼꼼한 정리형 알바",
-    hourlyWage: 1200,
+    hourlyWage: 1300,
     attendance: 95,
     stats: Object.freeze({ warehouse: 1, shelf: 3, cleaning: 1 }),
     ability: "창고/진열/청소 보조를 모두 수행하지만, 진열 정리 능력이 조금 높은 알바입니다. 체크리스트를 보며 매장 정리를 꼼꼼하게 챙깁니다."
@@ -59,18 +59,18 @@ const STAFF_CANDIDATES = Object.freeze([
     id: "park_junho",
     assetVariant: "staff_male_cashier",
     name: "박준호",
-    type: "성실한 창고형 알바",
-    hourlyWage: 1350,
+    type: "재고 운반 특화 알바",
+    hourlyWage: 1200,
     attendance: 88,
     stats: Object.freeze({ warehouse: 3, shelf: 1, cleaning: 1 }),
-    ability: "창고/진열/청소 보조를 모두 수행하지만, 창고에서 재고를 가져오는 능력이 조금 높은 알바입니다. 시키면 착실히 해내는 신입 타입입니다."
+    ability: "창고·진열·청소 보조를 모두 수행하며, 창고에서 상품을 빠르게 꺼내오는 재고 운반 능력이 높은 알바입니다. 근태는 다소 불안정하지만 시급이 저렴합니다."
   }),
   Object.freeze({
     id: "lee_bora",
     assetVariant: "staff_female_friendly",
     name: "이보라",
     type: "밝고 침착한 위생형 알바",
-    hourlyWage: 1300,
+    hourlyWage: 1250,
     attendance: 90,
     stats: Object.freeze({ warehouse: 1, shelf: 1, cleaning: 3 }),
     ability: "창고/진열/청소 보조를 모두 수행하지만, 청소와 위생 유지 능력이 조금 높은 알바입니다. 밝고 침착한 미소로 매장을 정돈합니다."
@@ -237,6 +237,18 @@ export const GameFlowSystem = {
     if (!hired) return null;
     const candidate = STAFF_CANDIDATES.find((staffCandidate) => staffCandidate.id === hired.id);
     const sourceStats = candidate?.stats ?? hired.stats ?? {};
+
+    if (candidate) {
+      hired.assetVariant = candidate.assetVariant;
+      hired.name = candidate.name;
+      hired.type = candidate.type;
+      hired.hourlyWage = candidate.hourlyWage;
+      hired.attendance = candidate.attendance;
+      hired.ability = candidate.ability;
+      hired.shiftHours = Math.max(1, Number(hired.shiftHours) || STAFF_SHIFT_HOURS);
+      hired.expectedDailyWage = candidate.hourlyWage * hired.shiftHours;
+    }
+
     hired.stats = {
       warehouse: this.toStaffStat(sourceStats.warehouse),
       shelf: this.toStaffStat(sourceStats.shelf),
@@ -1025,12 +1037,13 @@ export const GameFlowSystem = {
     if (unlockedZoneIds.has(requiredZoneId)) return true;
 
     const constructionZoneId = expansion.constructionZoneId ?? null;
-    const completeDay = Math.floor(Number(expansion.constructionCompleteDay));
+    const completesAt = Number(expansion.constructionCompletesAt);
 
     return (
       constructionZoneId === requiredZoneId &&
-      Number.isFinite(completeDay) &&
-      completeDay <= GameState.day
+      Number.isFinite(completesAt) &&
+      completesAt > 0 &&
+      completesAt <= Date.now()
     );
   },
 

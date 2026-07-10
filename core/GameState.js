@@ -87,8 +87,8 @@ export const GameState = {
     movementBounds: [],
     customerAccessibleZones: ["door", "shelf", "counter", "exit"],
     constructionZoneId: null,
-    constructionStartDay: null,
-    constructionCompleteDay: null
+    constructionStartedAt: null,
+    constructionCompletesAt: null
   },
 
   difficulty: {

@@ -28,7 +28,7 @@ export const DAILY_MISSIONS = Object.freeze([
   Object.freeze({
     id: "nuisance_safe",
     title: "진상 대응 미션",
-    description: "진상 손님을 만족도 -10 이하로 끝내지 않기",
+    description: "화난 손님 없이 영업 종료하기",
     target: 1,
     progressKey: "nuisanceSafe"
   }),

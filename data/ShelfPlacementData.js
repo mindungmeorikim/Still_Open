@@ -4,6 +4,13 @@ import {
   STOCK_VISUAL_OBJECT_TYPES
 } from "./AssetData.js";
 
+
+// 최신 시스템 호환용: 웹 브라우저에서 확정한 원본 좌표를 그대로 반환한다.
+// 화면 크기나 16:9 여부에 따라 진열대 좌표를 별도로 이동하지 않는다.
+export function getResponsiveShelfInstances() {
+  return SHELF_INSTANCES;
+}
+
 export const SHELF_INSTANCES = [
   {
     instanceId: "zone1_basic_shelf_1",

@@ -26,6 +26,7 @@ const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
 const SAVE_VERSION = "v7.6.1";
 const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
+const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INFINITE_MODE_START_DAY = GAME_CONFIG.MAX_STORY_DAY + 1;
 const BASIC_BM_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
 const SAVEABLE_PHASES = new Set([
@@ -69,8 +70,12 @@ export const SaveSystem = {
       this.requestAutosave("stock_organized");
     });
 
+    EventBus.on(EXPANSION_CONSTRUCTION_STARTED, () => {
+      this.saveNow("expansion_construction_started", { allowUnsafePhase: true });
+    });
+
     EventBus.on(EVENTS.EXPANSION_COMPLETED, () => {
-      this.requestAutosave("expansion_completed");
+      this.saveNow("expansion_completed", { allowUnsafePhase: true });
     });
 
     EventBus.on(EVENTS.UPGRADE_SELECTED, () => {
@@ -142,7 +147,7 @@ export const SaveSystem = {
     return true;
   },
 
-  saveNow(reason = "manual") {
+  saveNow(reason = "manual", options = {}) {
     if (this.isResettingNewGame) {
       this.lastSaveStatus = {
         success: false,
@@ -161,7 +166,7 @@ export const SaveSystem = {
       return this.lastSaveStatus;
     }
 
-    if (!this.canAutosaveCurrentPhase()) {
+    if (!this.canAutosaveCurrentPhase() && options.allowUnsafePhase !== true) {
       this.lastSaveStatus = {
         success: false,
         reason: "unsafe_phase",
@@ -641,8 +646,8 @@ export const SaveSystem = {
     return {
       unlockedZoneIds,
       constructionZoneId: ExpansionSystem.constructionZoneId ?? null,
-      constructionStartDay: ExpansionSystem.constructionStartDay ?? GameState.expansion?.constructionStartDay ?? null,
-      constructionCompleteDay: ExpansionSystem.constructionCompleteDay ?? GameState.expansion?.constructionCompleteDay ?? null
+      constructionStartedAt: ExpansionSystem.constructionStartedAt ?? GameState.expansion?.constructionStartedAt ?? null,
+      constructionCompletesAt: ExpansionSystem.constructionCompletesAt ?? GameState.expansion?.constructionCompletesAt ?? null
     };
   },
 
@@ -1056,8 +1061,12 @@ export const SaveSystem = {
       unlockedZoneIds.length > 0 ? unlockedZoneIds : ["zone_basic"]
     );
     ExpansionSystem.constructionZoneId = snapshot.constructionZoneId ?? null;
-    ExpansionSystem.constructionStartDay = snapshot.constructionStartDay ?? null;
-    ExpansionSystem.constructionCompleteDay = snapshot.constructionCompleteDay ?? null;
+    ExpansionSystem.constructionStartedAt = snapshot.constructionStartedAt ?? null;
+    ExpansionSystem.constructionCompletesAt = snapshot.constructionCompletesAt ?? null;
+
+    if (typeof ExpansionSystem.migrateLegacyConstructionState === "function") {
+      ExpansionSystem.migrateLegacyConstructionState(snapshot);
+    }
 
     if (typeof ExpansionSystem.syncExpansionStateToGameState === "function") {
       ExpansionSystem.syncExpansionStateToGameState();
