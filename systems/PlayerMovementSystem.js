@@ -208,9 +208,9 @@ export const PlayerMovementSystem = {
 
     const player = GameState.player;
     const baseSpeed = Number(player.speed) || this.defaultPlayer.speed;
-    // 현재 체감 속도에서 20% 추가 감소: 원래 속도의 약 48%.
-    // WASD와 모바일 조이스틱에 동일 적용하며 저장 데이터는 변경하지 않는다.
-    const speed = baseSpeed * 0.48;
+    // 배포 플레이 기준 이동 체감만 소폭 상향: 원래 속도의 55%.
+    // WASD와 모바일 조이스틱에 동일 적용하며 저장 데이터·충돌 좌표는 변경하지 않는다.
+    const speed = baseSpeed * 0.55;
 
     let moveX = 0;
     let moveY = 0;

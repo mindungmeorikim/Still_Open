@@ -32313,3 +32313,10 @@ input[type="number"],
     max-inline-size: min(505px, 100%) !important;
   }
 }
+
+/* v8.0.13 order quantity number true-center fix (non-tutorial)
+   - 좁은 16:9 화면에서 가운데 수량 칸이 가변 폭이어도 숫자 pill을 칸 정중앙에 고정한다.
+   - 튜토리얼 발주 수량 단계 레이아웃은 변경하지 않는다. */
+body:not(.is-tutorial-step-order-quantity) #order-modal.modal:not(.hidden) #order-modal-body.order-modal-body--card-draft article.order-product-card .order-quantity-controls > strong {
+  justify-self: center !important;
+}
