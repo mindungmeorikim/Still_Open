@@ -94,6 +94,11 @@ export const RewardCodeUI = {
       const code = input.value;
       submitButton.disabled = true;
 
+      // 실제 쿠폰 문자열은 분석 이벤트에 포함하지 않습니다.
+      EventBus.emit(REWARD_CODE_EVENTS.SUBMIT_ATTEMPTED, {
+        source: "reward_inbox"
+      });
+
       const result = RewardCodeSystem.redeemCode(code);
       this.lastResult = result;
       this.renderResult(result, scope);

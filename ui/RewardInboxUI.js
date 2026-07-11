@@ -8,6 +8,7 @@ import { EventBus } from "../core/EventBus.js";
 import { RewardInboxSystem, REWARD_INBOX_EVENTS } from "../systems/RewardInboxSystem.js";
 import { BM_ASSETS } from "../data/BMAssetMap.js";
 import { RewardCodeUI } from "./RewardCodeUI.js";
+import { REWARD_CODE_EVENTS } from "../systems/RewardCodeSystem.js";
 
 export const RewardInboxUI = {
   isInitialized: false,
@@ -151,6 +152,11 @@ export const RewardInboxUI = {
 
   open() {
     this.showModal();
+
+    // 보상함을 열면 쿠폰 입력 영역이 함께 노출되므로 1회 노출로 기록합니다.
+    EventBus.emit(REWARD_CODE_EVENTS.PANEL_OPENED, {
+      source: "reward_inbox"
+    });
   },
 
   hideModal() {

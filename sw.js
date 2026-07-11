@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260711-v6-analytics-core";
+const CACHE_NAME = "still-open-release-20260711-v7-community-coupon-analytics";
 
 const APP_SHELL = [
   "./",
@@ -8,6 +8,9 @@ const APP_SHELL = [
   "./main.js",
   "./config/analytics.config.js",
   "./systems/AnalyticsSystem.js",
+  "./systems/RewardCodeSystem.js",
+  "./ui/RewardCodeUI.js",
+  "./ui/RewardInboxUI.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png"

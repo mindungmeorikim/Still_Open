@@ -3410,3 +3410,22 @@ Changed
 ### Safe
 - GameFlowSystem/ResultSystem의 게임 판정 로직은 수정하지 않고 기존 EventBus 이벤트만 구독했습니다.
 - 플레이어·손님·알바 이동, 좌표, 충돌, 상호작용, 재화, 정산 결과에는 변경이 없습니다.
+
+
+## 2026-07-11 - GameAnalytics 커뮤니티 쿠폰 이벤트 분석 연결
+### Added
+- 보상함의 쿠폰 입력 영역 노출, 입력 시도, 성공, 실패 원인을 Design Event로 기록합니다.
+- 쿠폰 성공 이벤트는 서버/데이터의 고정 `campaignId`만 사용하며 실제 쿠폰 문자열은 분석 서버로 보내지 않습니다.
+- 쿠폰 보상 지급량은 `community_event:coupon:reward:claim:<campaignId>`의 value와 Resource Event로 확인할 수 있습니다.
+- 쿠폰으로 지급된 골드/다이아는 `CommunityEvent` Resource Item Type으로 분리합니다.
+
+### Events
+- `community_event:coupon:view`
+- `community_event:coupon:submit`
+- `community_event:coupon:success:<campaignId>`
+- `community_event:coupon:reward:claim:<campaignId>`
+- `community_event:coupon:fail:invalid|expired|already_used|grant_failed|unknown`
+
+### Safe
+- 실제 쿠폰 코드, 사용자 닉네임, 이메일 등 개인정보는 GameAnalytics 이벤트에 포함하지 않습니다.
+- 플레이어/손님/알바 이동, 좌표, 충돌, 상호작용, HUD 및 기존 쿠폰 지급 판정은 변경하지 않았습니다.

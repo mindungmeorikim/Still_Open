@@ -25,6 +25,7 @@ export const ANALYTICS_CONFIG = Object.freeze({
     "AdReward",
     "IAP",
     "Coupon",
+    "CommunityEvent",
     "Contract",
     "Wage",
     "Compensation"

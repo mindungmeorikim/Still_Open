@@ -10,6 +10,7 @@ import {
 } from "../config/analytics.config.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_CONFIG } from "../core/Constants.js";
+import { REWARD_CODE_EVENTS } from "./RewardCodeSystem.js";
 
 const CONSENT_KEY = "still_open_analytics_consent";
 const SDK_SCRIPT_ID = "gameanalytics-sdk-script";
@@ -60,6 +61,7 @@ let lastErrorMessage = "";
 let gameProgressionListenersBound = false;
 let economyListenersBound = false;
 let shopListenersBound = false;
+let communityCouponListenersBound = false;
 let errorListenersBound = false;
 const pendingDesignEvents = [];
 const pendingProgressionEvents = [];
@@ -369,7 +371,7 @@ function getCurrencyResourceDescriptor(data = {}) {
     daily_mission_reward: ["Mission", `mission_reward_${meta.rewardCount ?? "step"}`],
     daily_attendance_reward: ["DailyReward", meta.rewardId ?? `attendance_${meta.attendanceDay ?? "day"}`],
     reward_inbox_claim: ["Compensation", meta.rewardId ?? "reward_inbox"],
-    reward_code: ["Compensation", meta.campaignId ?? "reward_code"],
+    reward_code: ["CommunityEvent", meta.campaignId ?? "reward_code"],
     diamond_granted: ["Compensation", "diamond_granted"]
   };
 
@@ -537,6 +539,48 @@ function bindShopEvents() {
   });
 }
 
+const COMMUNITY_COUPON_FAILURE_REASON = Object.freeze({
+  invalid_code: "invalid",
+  expired_code: "expired",
+  already_used: "already_used",
+  grant_failed: "grant_failed",
+  unsupported_reward_type: "grant_failed"
+});
+
+function getCommunityCampaignId(data = {}) {
+  return normalizeAnalyticsToken(data.campaignId, "unknown_campaign");
+}
+
+function bindCommunityCouponEvents() {
+  if (communityCouponListenersBound) return;
+  communityCouponListenersBound = true;
+
+  EventBus.on(REWARD_CODE_EVENTS.PANEL_OPENED, () => {
+    AnalyticsSystem.trackDesignEvent("community_event:coupon:view");
+  });
+
+  EventBus.on(REWARD_CODE_EVENTS.SUBMIT_ATTEMPTED, () => {
+    AnalyticsSystem.trackDesignEvent("community_event:coupon:submit");
+  });
+
+  EventBus.on(REWARD_CODE_EVENTS.REDEEM_SUCCEEDED, (data = {}) => {
+    const campaignId = getCommunityCampaignId(data);
+    const rewardAmount = Number(data.reward?.amount);
+
+    AnalyticsSystem.trackDesignEvent(`community_event:coupon:success:${campaignId}`);
+    AnalyticsSystem.trackDesignEvent(
+      `community_event:coupon:reward:claim:${campaignId}`,
+      Number.isFinite(rewardAmount) && rewardAmount > 0 ? rewardAmount : null
+    );
+  });
+
+  EventBus.on(REWARD_CODE_EVENTS.REDEEM_FAILED, (data = {}) => {
+    const rawReason = String(data.reason ?? "").trim();
+    const reason = COMMUNITY_COUPON_FAILURE_REASON[rawReason] ?? "unknown";
+    AnalyticsSystem.trackDesignEvent(`community_event:coupon:fail:${reason}`);
+  });
+}
+
 function sanitizeErrorMessage(value) {
   return String(value ?? "Unknown error")
     .replace(/[\r\n\t]+/g, " ")
@@ -683,6 +727,7 @@ export const AnalyticsSystem = {
     bindGameProgressionEvents();
     bindEconomyEvents();
     bindShopEvents();
+    bindCommunityCouponEvents();
     bindGlobalErrorEvents();
 
     if (this.getConsent() === "granted") {
