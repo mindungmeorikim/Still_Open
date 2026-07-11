@@ -3385,3 +3385,14 @@ Changed
 - 구역 패널 자체는 계속 보이게 두고, `확장 조건` 버튼/팝업/확장 조건 액션 버튼만 클릭 가능하도록 보정했습니다.
 - 잠긴 구역 자물쇠/구름/라벨 클릭으로도 같은 구역 확장 조건 팝업이 열리도록 클릭 가능 영역을 보강했습니다.
 - 월드/카메라/game-world transform/오브젝트 좌표/충돌/상호작용/알바·손님 이동 좌표는 수정하지 않았습니다.
+
+## 2026-07-11 - GameAnalytics Day 진행 이벤트 2차 연동
+### Added
+- 실제 `영업 시작` 완료 시점(`STORE_OPENED`)에 스토리 Day 1~5 Progression `Start` 이벤트를 전송하도록 연결했습니다.
+- 정산 결과 확정 시점(`RESULT_CALCULATED`)에 성공이면 `Complete`, 실패면 `Fail` Progression 이벤트를 전송하도록 연결했습니다.
+- Day 6 이후 무한모드는 이벤트 이름이 Day 수만큼 늘어나지 않도록 `endless:day:start|complete|fail` Design 이벤트와 숫자 value로 기록합니다.
+- SDK 초기화 전 발생한 Progression 이벤트도 대기열에 보관한 뒤 준비 완료 후 전송하도록 보완했습니다.
+
+### Safe
+- GameFlowSystem/ResultSystem의 게임 판정 로직은 수정하지 않고 기존 EventBus 이벤트만 구독했습니다.
+- 플레이어·손님·알바 이동, 좌표, 충돌, 상호작용, 재화, 정산 결과에는 변경이 없습니다.

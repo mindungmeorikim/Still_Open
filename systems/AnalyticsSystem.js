@@ -8,10 +8,18 @@ import {
   ANALYTICS_CONFIG,
   hasValidAnalyticsKeys
 } from "../config/analytics.config.js";
+import { EventBus } from "../core/EventBus.js";
+import { EVENTS, GAME_CONFIG } from "../core/Constants.js";
 
 const CONSENT_KEY = "still_open_analytics_consent";
 const SDK_SCRIPT_ID = "gameanalytics-sdk-script";
 const FIRST_EVENT_ID = "game:start";
+const STORY_PROGRESSION_ROOT = "main";
+const PROGRESSION_STATUS = Object.freeze({
+  START: 1,
+  COMPLETE: 2,
+  FAIL: 3
+});
 
 let initializationRequested = false;
 let initialized = false;
@@ -21,7 +29,9 @@ let sdkLoadPromise = null;
 let readyListenerRegistered = false;
 let firstEventSent = false;
 let lastErrorMessage = "";
+let gameProgressionListenersBound = false;
 const pendingDesignEvents = [];
+const pendingProgressionEvents = [];
 
 function safeStorageGet(key) {
   try {
@@ -121,6 +131,7 @@ function loadSdk() {
       readyListenerRegistered = false;
       firstEventSent = false;
       pendingDesignEvents.length = 0;
+      pendingProgressionEvents.length = 0;
 
       if (Array.isArray(window.GameAnalytics?.q)) {
         window.GameAnalytics.q.length = 0;
@@ -157,6 +168,117 @@ function flushPendingDesignEvents() {
   }
 }
 
+function normalizeProgressionStatus(status) {
+  if (Number.isInteger(status) && status >= 1 && status <= 3) {
+    return status;
+  }
+
+  const normalized = String(status ?? "").trim().toLowerCase();
+
+  if (normalized === "start") return PROGRESSION_STATUS.START;
+  if (normalized === "complete") return PROGRESSION_STATUS.COMPLETE;
+  if (normalized === "fail") return PROGRESSION_STATUS.FAIL;
+
+  return null;
+}
+
+function normalizeProgressionPart(value) {
+  return String(value ?? "").trim();
+}
+
+function sendProgressionEventNow({
+  status,
+  progression01,
+  progression02 = "",
+  progression03 = "",
+  score = null
+}) {
+  const args = [
+    "addProgressionEvent",
+    status,
+    progression01,
+    progression02,
+    progression03
+  ];
+
+  if (Number.isFinite(score)) {
+    args.push(Number(score));
+  }
+
+  return callGameAnalytics(...args);
+}
+
+function flushPendingProgressionEvents() {
+  while (pendingProgressionEvents.length > 0) {
+    sendProgressionEventNow(pendingProgressionEvents.shift());
+  }
+}
+
+function getNormalizedDay(value) {
+  const day = Math.floor(Number(value));
+  return Number.isFinite(day) && day > 0 ? day : null;
+}
+
+function getStoryDayId(day) {
+  return `day_${String(day).padStart(2, "0")}`;
+}
+
+function trackStoreOpenedProgression(data = {}) {
+  const day = getNormalizedDay(data.day);
+
+  if (!day) {
+    return;
+  }
+
+  const isEndlessMode = data.isEndlessMode === true || day > GAME_CONFIG.MAX_STORY_DAY;
+
+  if (isEndlessMode) {
+    AnalyticsSystem.trackDesignEvent("endless:day:start", day);
+    return;
+  }
+
+  AnalyticsSystem.trackProgressionEvent(
+    PROGRESSION_STATUS.START,
+    STORY_PROGRESSION_ROOT,
+    getStoryDayId(day)
+  );
+}
+
+function trackResultProgression(data = {}) {
+  const day = getNormalizedDay(data.day);
+
+  if (!day) {
+    return;
+  }
+
+  const success = data.success === true;
+  const isEndlessMode = day > GAME_CONFIG.MAX_STORY_DAY;
+
+  if (isEndlessMode) {
+    AnalyticsSystem.trackDesignEvent(
+      success ? "endless:day:complete" : "endless:day:fail",
+      day
+    );
+    return;
+  }
+
+  AnalyticsSystem.trackProgressionEvent(
+    success ? PROGRESSION_STATUS.COMPLETE : PROGRESSION_STATUS.FAIL,
+    STORY_PROGRESSION_ROOT,
+    getStoryDayId(day)
+  );
+}
+
+function bindGameProgressionEvents() {
+  if (gameProgressionListenersBound) {
+    return;
+  }
+
+  gameProgressionListenersBound = true;
+  EventBus.on(EVENTS.STORE_OPENED, trackStoreOpenedProgression);
+  EventBus.on(EVENTS.RESULT_CALCULATED, trackResultProgression);
+}
+
 function sendFirstSessionEvent() {
   if (firstEventSent || safeStorageGet(CONSENT_KEY) !== "granted") {
     return;
@@ -189,6 +311,7 @@ function markSdkReady() {
 
     sendFirstSessionEvent();
     flushPendingDesignEvents();
+    flushPendingProgressionEvents();
   }, 0);
 }
 
@@ -209,6 +332,8 @@ function registerSdkReadyListener() {
 
 export const AnalyticsSystem = {
   init() {
+    bindGameProgressionEvents();
+
     if (this.getConsent() === "granted") {
       this.initialize();
     }
@@ -297,6 +422,7 @@ export const AnalyticsSystem = {
     }
 
     pendingDesignEvents.length = 0;
+    pendingProgressionEvents.length = 0;
 
     if (initializationRequested) {
       callGameAnalytics("setEnabledEventSubmission", false);
@@ -327,5 +453,42 @@ export const AnalyticsSystem = {
     }
 
     return sendDesignEventNow(safeEventName, safeValue);
+  },
+
+  trackProgressionEvent(
+    status,
+    progression01,
+    progression02 = "",
+    progression03 = "",
+    score = null
+  ) {
+    if (this.getConsent() !== "granted" || !initializationRequested) {
+      return false;
+    }
+
+    const safeStatus = normalizeProgressionStatus(status);
+    const safeProgression01 = normalizeProgressionPart(progression01);
+    const safeProgression02 = normalizeProgressionPart(progression02);
+    const safeProgression03 = normalizeProgressionPart(progression03);
+    const safeScore = Number.isFinite(score) ? Number(score) : null;
+
+    if (!safeStatus || !safeProgression01) {
+      return false;
+    }
+
+    const event = {
+      status: safeStatus,
+      progression01: safeProgression01,
+      progression02: safeProgression02,
+      progression03: safeProgression03,
+      score: safeScore
+    };
+
+    if (!sdkReady) {
+      pendingProgressionEvents.push(event);
+      return true;
+    }
+
+    return sendProgressionEventNow(event);
   }
 };
