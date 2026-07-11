@@ -33,6 +33,13 @@ let gameProgressionListenersBound = false;
 const pendingDesignEvents = [];
 const pendingProgressionEvents = [];
 
+// BlueStacks/저사양 WebView에서는 SDK의 이벤트 직렬화·서명·DEV 로그가
+// 같은 프레임의 게임 렌더링과 겹치면 순간적인 프레임 드롭이 생길 수 있습니다.
+// 분석 이벤트는 한 번에 하나씩 브라우저 유휴 시간에 전송해 게임 렌더링과 분리합니다.
+const ANALYTICS_IDLE_TIMEOUT_MS = 2500;
+const ANALYTICS_FALLBACK_DELAY_MS = 350;
+let analyticsFlushScheduled = false;
+
 function safeStorageGet(key) {
   try {
     return window.localStorage.getItem(key);
@@ -161,11 +168,58 @@ function sendDesignEventNow(eventName, value = null) {
   return callGameAnalytics("addDesignEvent", eventName);
 }
 
-function flushPendingDesignEvents() {
-  while (pendingDesignEvents.length > 0) {
+function sendNextQueuedAnalyticsEvent() {
+  if (!sdkReady || safeStorageGet(CONSENT_KEY) !== "granted") {
+    return false;
+  }
+
+  // 한 유휴 구간에는 이벤트 하나만 처리하여 렌더링 프레임을 오래 점유하지 않습니다.
+  if (pendingDesignEvents.length > 0) {
     const event = pendingDesignEvents.shift();
     sendDesignEventNow(event.eventName, event.value);
+    return true;
   }
+
+  if (pendingProgressionEvents.length > 0) {
+    sendProgressionEventNow(pendingProgressionEvents.shift());
+    return true;
+  }
+
+  return false;
+}
+
+function scheduleAnalyticsFlush() {
+  if (
+    analyticsFlushScheduled ||
+    !sdkReady ||
+    safeStorageGet(CONSENT_KEY) !== "granted" ||
+    (pendingDesignEvents.length === 0 && pendingProgressionEvents.length === 0)
+  ) {
+    return;
+  }
+
+  analyticsFlushScheduled = true;
+
+  const run = () => {
+    analyticsFlushScheduled = false;
+
+    if (!sdkReady || safeStorageGet(CONSENT_KEY) !== "granted") {
+      return;
+    }
+
+    sendNextQueuedAnalyticsEvent();
+
+    if (pendingDesignEvents.length > 0 || pendingProgressionEvents.length > 0) {
+      scheduleAnalyticsFlush();
+    }
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(run, { timeout: ANALYTICS_IDLE_TIMEOUT_MS });
+    return;
+  }
+
+  window.setTimeout(run, ANALYTICS_FALLBACK_DELAY_MS);
 }
 
 function normalizeProgressionStatus(status) {
@@ -208,11 +262,6 @@ function sendProgressionEventNow({
   return callGameAnalytics(...args);
 }
 
-function flushPendingProgressionEvents() {
-  while (pendingProgressionEvents.length > 0) {
-    sendProgressionEventNow(pendingProgressionEvents.shift());
-  }
-}
 
 function getNormalizedDay(value) {
   const day = Math.floor(Number(value));
@@ -279,13 +328,17 @@ function bindGameProgressionEvents() {
   EventBus.on(EVENTS.RESULT_CALCULATED, trackResultProgression);
 }
 
-function sendFirstSessionEvent() {
+function queueFirstSessionEvent() {
   if (firstEventSent || safeStorageGet(CONSENT_KEY) !== "granted") {
     return;
   }
 
   firstEventSent = true;
-  sendDesignEventNow(FIRST_EVENT_ID);
+  // 첫 이벤트는 다른 대기 이벤트보다 먼저 처리합니다.
+  pendingDesignEvents.unshift({
+    eventName: FIRST_EVENT_ID,
+    value: null
+  });
 }
 
 function markSdkReady() {
@@ -302,17 +355,10 @@ function markSdkReady() {
     readyListenerRegistered = false;
   }
 
-  // SDK의 init 응답 처리와 session_start 생성이 끝난 다음 태스크에서
-  // 첫 커스텀 이벤트를 전송해 "SDK is disabled" 타이밍 오류를 방지합니다.
-  window.setTimeout(() => {
-    if (safeStorageGet(CONSENT_KEY) !== "granted") {
-      return;
-    }
-
-    sendFirstSessionEvent();
-    flushPendingDesignEvents();
-    flushPendingProgressionEvents();
-  }, 0);
+  // SDK의 init 응답과 session_start 생성이 끝난 뒤에도 같은 렌더링 프레임에서
+  // 커스텀 이벤트를 실행하지 않습니다. 유휴 시간 큐에서 순차 전송합니다.
+  queueFirstSessionEvent();
+  scheduleAnalyticsFlush();
 }
 
 const sdkReadyListener = Object.freeze({
@@ -383,8 +429,10 @@ export const AnalyticsSystem = {
     ensureCommandQueue();
     loadSdk();
 
-    callGameAnalytics("setEnabledInfoLog", ANALYTICS_CONFIG.debug === true);
-    callGameAnalytics("setEnabledVerboseLog", ANALYTICS_CONFIG.debug === true);
+    // DEV 환경에서도 SDK의 대용량 JSON 로그는 끕니다.
+    // BlueStacks/Android WebView 콘솔 출력이 게임 렌더링을 막는 현상을 방지합니다.
+    callGameAnalytics("setEnabledInfoLog", false);
+    callGameAnalytics("setEnabledVerboseLog", false);
     callGameAnalytics("configureBuild", ANALYTICS_CONFIG.build);
     callGameAnalytics(
       "configureAvailableResourceCurrencies",
@@ -444,15 +492,13 @@ export const AnalyticsSystem = {
 
     const safeValue = Number.isFinite(value) ? Number(value) : null;
 
-    if (!sdkReady) {
-      pendingDesignEvents.push({
-        eventName: safeEventName,
-        value: safeValue
-      });
-      return true;
-    }
+    pendingDesignEvents.push({
+      eventName: safeEventName,
+      value: safeValue
+    });
 
-    return sendDesignEventNow(safeEventName, safeValue);
+    scheduleAnalyticsFlush();
+    return true;
   },
 
   trackProgressionEvent(
@@ -484,11 +530,8 @@ export const AnalyticsSystem = {
       score: safeScore
     };
 
-    if (!sdkReady) {
-      pendingProgressionEvents.push(event);
-      return true;
-    }
-
-    return sendProgressionEventNow(event);
+    pendingProgressionEvents.push(event);
+    scheduleAnalyticsFlush();
+    return true;
   }
 };
