@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260711-v8-a11y-focus-fix";
+const CACHE_NAME = "still-open-release-20260712-v10-customer-ux-reward";
 
 const APP_SHELL = [
   "./",
@@ -6,8 +6,20 @@ const APP_SHELL = [
   "./style.css",
   "./mobile_ui.css",
   "./main.js",
+  "./core/GameState.js",
   "./config/analytics.config.js",
   "./systems/AnalyticsSystem.js",
+  "./systems/CustomerSystem.js",
+  "./systems/GameFlowSystem.js",
+  "./systems/PauseSystem.js",
+  "./systems/RandomEventSystem.js",
+  "./systems/ResultSystem.js",
+  "./systems/SanitationSystem.js",
+  "./systems/SaveSystem.js",
+  "./systems/StaffAssistSystem.js",
+  "./systems/ModalFlowGuardSystem.js",
+  "./systems/UserIdentitySystem.js",
+  "./ui/UIManager.js",
   "./systems/RewardCodeSystem.js",
   "./ui/RewardCodeUI.js",
   "./ui/RewardInboxUI.js",

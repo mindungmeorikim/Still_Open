@@ -541,7 +541,10 @@ export const StaffAssistSystem = {
           state: SanitationSystem.getState?.() ?? GameState.sanitation
         });
 
-        this.emitMessage(`${cleanedPoint.label} 청소 보조가 끝났어요.`, 2200);
+        this.emitMessage(
+          `${cleanedPoint.label} 청소 완료 · 위생 +${Math.max(0, nextValue - previousValue)}`,
+          2400
+        );
         this.completeTask({
           type: "cleaning",
           success: true,
@@ -629,7 +632,11 @@ export const StaffAssistSystem = {
             const result = this.completeShelfRefill(refreshedTask);
 
             if (result.success) {
-              this.emitMessage("진열 보조가 끝났어요.", 2200);
+              const productName = getProductById(result.productId)?.name ?? "상품";
+              this.emitMessage(
+                `${productName} ${Math.max(0, Number(result.quantity) || 0)}개 보충 완료`,
+                2400
+              );
             }
 
             this.completeTask(result);
@@ -712,6 +719,7 @@ export const StaffAssistSystem = {
     PlayerActionSystem.syncShelfStocksToGameState?.("staff_shelf_refill");
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
+    this.incrementStaffDailyCount("todayWarehouseHelpCount");
     this.incrementStaffDailyCount("todayShelfHelpCount");
 
     return {

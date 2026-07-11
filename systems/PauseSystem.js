@@ -16,12 +16,14 @@ const PAUSE_EVENTS = Object.freeze({
   PAUSED: "GAME_PAUSED",
   RESUMED: "GAME_RESUMED"
 });
+const PAUSE_RESUME_GRACE_MS = 1000;
 
 export const PauseSystem = {
   isInitialized: false,
   isPaused: false,
   button: null,
   overlay: null,
+  resumeGraceTimerId: null,
 
   init() {
     if (this.isInitialized) return;
@@ -250,6 +252,7 @@ export const PauseSystem = {
     }
 
     this.isPaused = true;
+    this.clearResumeGraceTimer();
     document.body?.classList?.add("is-game-paused");
 
     GameFlowSystem.pauseDayTimer();
@@ -277,9 +280,23 @@ export const PauseSystem = {
     this.isPaused = false;
     document.body?.classList?.remove("is-game-paused");
 
-    if (GameState.phase === GAME_PHASE.STORE_RUNNING) {
-      GameFlowSystem.resumeDayTimer();
-      CustomerSystem.resumeCustomerWaitTime();
+    if (
+      GameState.phase === GAME_PHASE.STORE_RUNNING &&
+      !document.body?.classList?.contains("is-modal-flow-guard-active")
+    ) {
+      CustomerSystem.resumeCustomerWaitTime({ graceMs: PAUSE_RESUME_GRACE_MS });
+      this.resumeGraceTimerId = window.setTimeout(() => {
+        this.resumeGraceTimerId = null;
+
+        if (
+          GameState.phase === GAME_PHASE.STORE_RUNNING &&
+          this.isPaused !== true &&
+          !this.isCustomerEventModalActive() &&
+          !document.body?.classList?.contains("is-modal-flow-guard-active")
+        ) {
+          GameFlowSystem.resumeDayTimer();
+        }
+      }, PAUSE_RESUME_GRACE_MS);
     }
 
     this.updatePauseUi();
@@ -296,6 +313,7 @@ export const PauseSystem = {
   forceResume(source = "unknown") {
     const wasPaused = this.isPaused;
 
+    this.clearResumeGraceTimer();
     this.isPaused = false;
     document.body?.classList?.remove("is-game-paused");
     this.updatePauseUi();
@@ -310,6 +328,14 @@ export const PauseSystem = {
       source,
       forced: true
     });
+  },
+
+  clearResumeGraceTimer() {
+    if (this.resumeGraceTimerId) {
+      window.clearTimeout(this.resumeGraceTimerId);
+    }
+
+    this.resumeGraceTimerId = null;
   },
 
   clearFocusInside(element) {

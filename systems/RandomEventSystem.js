@@ -588,6 +588,16 @@ export const RandomEventSystem = {
             this.isChoiceBlockedByMissingProductStock(choice);
           const disabled = forceEnableChoices ? false : stockBlocked;
 
+          const effects = this.createChoiceStatEffects(choice);
+
+          if (
+            this.getCurrentDay() === 1 &&
+            (detail.isNuisance === true || detail.type === CUSTOMER_EVENT_TYPES.NEGATIVE)
+          ) {
+            effects.satisfaction = Math.max(-2, Number(effects.satisfaction) || 0);
+            effects.mental = Math.max(-2, Number(effects.mental) || 0);
+          }
+
           return {
             choiceId: choice.id,
             label: choice.label,
@@ -604,7 +614,7 @@ export const RandomEventSystem = {
             inventoryChanges: Array.isArray(choice.inventoryChanges)
               ? choice.inventoryChanges.map((change) => ({ ...change }))
               : [],
-            effects: this.createChoiceStatEffects(choice)
+            effects
           };
         })
       : [];

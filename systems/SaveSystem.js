@@ -26,6 +26,7 @@ const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
 const SAVE_VERSION = "v7.6.1";
 const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
+const NEW_GAME_STATE_RESET = "NEW_GAME_STATE_RESET";
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const INFINITE_MODE_START_DAY = GAME_CONFIG.MAX_STORY_DAY + 1;
 const BASIC_BM_PRODUCT_IDS = Object.freeze(["potato_chips", "water"]);
@@ -291,6 +292,10 @@ export const SaveSystem = {
     this.applyExpansionSnapshot({ unlockedZoneIds: ["zone_basic"], constructionZoneId: null });
     this.resetRuntimeSnapshotsForNewRun();
 
+    EventBus.emit(NEW_GAME_STATE_RESET, {
+      day: GameState.day,
+      reason: "new_game"
+    });
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
     this.isResettingNewGame = false;
@@ -612,7 +617,17 @@ export const SaveSystem = {
       cleaningCount: 0,
       expiredLoss: 0,
       eventPenalty: 0,
-      bmBonus: 0
+      bmBonus: 0,
+      customerWaitTimeTotal: 0,
+      customerWaitSampleCount: 0,
+      maxCheckoutQueue: 0,
+      maxActiveCustomers: 0,
+      outOfStockSeconds: 0,
+      nuisanceEventCount: 0,
+      nuisanceTimeoutCount: 0,
+      nuisanceResponseTimeTotalMs: 0,
+      nuisanceResponseCount: 0,
+      positiveGuestCount: 0
     };
   },
 

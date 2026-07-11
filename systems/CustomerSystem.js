@@ -50,27 +50,126 @@ import {
 import { RandomEventSystem } from "./RandomEventSystem.js";
 import { BMSystem } from "./BMSystem.js";
 
-const NUISANCE_CUSTOMER_MENTAL_PENALTY = 3;
 const NUISANCE_CHECKOUT_DELAY_MS = 5000;
 const CUSTOMER_SHELF_ZONE_IDS = new Set(Object.values(PRODUCT_SHELF_IDS));
 
 const STAFF_ENTRY_FIRST_CUSTOMER_DELAY_MS = 2000;
 const STAFF_ATTENDANCE_LATE = "late";
 const SHELF_STOCK_CONSUMED = "SHELF_STOCK_CONSUMED";
+const POSITIVE_CUSTOMER_BONUS_GRANTED = "POSITIVE_CUSTOMER_BONUS_GRANTED";
+const CUSTOMER_FLOW_METRICS_UPDATED = "CUSTOMER_FLOW_METRICS_UPDATED";
+const CUSTOMER_EVENT_SAFE_WAIT_SECONDS = 2;
+const POST_MODAL_GRACE_MS = 1000;
+const POSITIVE_GUEST_TIP_GOLD = 300;
+const POSITIVE_GUEST_SATISFACTION = 1;
+const STORY_BASE_SPAWN_RATE_BY_DAY = Object.freeze({
+  1: 1,
+  2: 1.15,
+  3: 1.3,
+  4: 1.5,
+  5: 1.75
+});
+const CUSTOMER_FLOW_PROFILE_BY_DAY = Object.freeze({
+  1: Object.freeze({
+    targetCount: 18,
+    minIntervalMs: 4500,
+    maxIntervalMs: 10500,
+    burstChance: 0.2,
+    burstMinMs: 2000,
+    burstMaxMs: 3000,
+    maxActive: 3,
+    congestionRetryMs: 2000,
+    rushCount: 2,
+    rushRemainingSecondsMin: 40,
+    rushRemainingSecondsMax: 55,
+    positiveGuestChance: 0,
+    guaranteedPositiveGuest: true
+  }),
+  2: Object.freeze({
+    targetCount: 21,
+    minIntervalMs: 4000,
+    maxIntervalMs: 8500,
+    burstChance: 0.25,
+    burstMinMs: 1900,
+    burstMaxMs: 2800,
+    maxActive: 4,
+    congestionRetryMs: 1500,
+    rushCount: 3,
+    rushRemainingSecondsMin: 35,
+    rushRemainingSecondsMax: 60,
+    positiveGuestChance: 0.06,
+    guaranteedPositiveGuest: false
+  }),
+  3: Object.freeze({
+    targetCount: 24,
+    minIntervalMs: 3500,
+    maxIntervalMs: 7500,
+    burstChance: 0.3,
+    burstMinMs: 1700,
+    burstMaxMs: 2600,
+    maxActive: 5,
+    congestionRetryMs: 1000,
+    rushCount: 3,
+    rushRemainingSecondsMin: 45,
+    rushRemainingSecondsMax: 80,
+    positiveGuestChance: 0.08,
+    guaranteedPositiveGuest: false
+  }),
+  4: Object.freeze({
+    targetCount: 27,
+    minIntervalMs: 3200,
+    maxIntervalMs: 6800,
+    burstChance: 0.34,
+    burstMinMs: 1600,
+    burstMaxMs: 2400,
+    maxActive: 6,
+    congestionRetryMs: 900,
+    rushCount: 3,
+    rushRemainingSecondsMin: 35,
+    rushRemainingSecondsMax: 70,
+    positiveGuestChance: 0.09,
+    guaranteedPositiveGuest: false
+  }),
+  5: Object.freeze({
+    targetCount: 30,
+    minIntervalMs: 2800,
+    maxIntervalMs: 6200,
+    burstChance: 0.38,
+    burstMinMs: 1500,
+    burstMaxMs: 2300,
+    maxActive: 7,
+    congestionRetryMs: 800,
+    rushCount: 4,
+    rushRemainingSecondsMin: 30,
+    rushRemainingSecondsMax: 65,
+    positiveGuestChance: 0.1,
+    guaranteedPositiveGuest: false
+  })
+});
 
 export const CustomerSystem = {
   customers: [],
   customerIdCounter: 0,
   routeTimerId: null,
   spawnTimerId: null,
+  spawnDueAtMs: null,
+  spawnRemainingMs: 0,
   initialSpawnTimerId: null,
   initialSpawnDueAtMs: null,
   initialSpawnRemainingMs: 0,
+  postModalGraceTimerId: null,
   isWaitTimePaused: false,
   isCustomerFlowPaused: false,
   targetSpawnCount: 0,
   spawnedCustomerCount: 0,
   counterQueueOrderCounter: 0,
+  flowElapsedSeconds: 0,
+  rushRemainingSeconds: null,
+  rushTriggered: false,
+  rushSpawnRemaining: 0,
+  guaranteedNuisanceSpawnIndex: null,
+  guaranteedPositiveGuestSpawnIndex: null,
+  positiveGuestCount: 0,
   inventoryByProductId: {},
   pendingPickupQuantitiesByProductId: {},
 
@@ -97,10 +196,26 @@ export const CustomerSystem = {
   startCustomerFlow() {
     this.resetCustomersForDay();
 
+    const profile = this.getCustomerFlowProfile();
     this.targetSpawnCount = this.getSpawnCountByDay();
     this.spawnedCustomerCount = 0;
     this.isCustomerFlowPaused = false;
     this.isWaitTimePaused = false;
+    this.flowElapsedSeconds = 0;
+    this.rushRemainingSeconds = this.randomBetween(
+      profile.rushRemainingSecondsMin,
+      profile.rushRemainingSecondsMax
+    );
+    this.rushTriggered = false;
+    this.rushSpawnRemaining = 0;
+    this.guaranteedNuisanceSpawnIndex = GameState.day === 1
+      ? this.randomIntegerBetween(6, 9)
+      : null;
+    this.guaranteedPositiveGuestSpawnIndex = profile.guaranteedPositiveGuest
+      ? this.pickGuaranteedPositiveGuestIndex()
+      : null;
+    this.positiveGuestCount = 0;
+    this.ensureFlowStats();
 
     const initialCustomerDelayMs = this.getInitialCustomerDelayMs();
 
@@ -115,6 +230,7 @@ export const CustomerSystem = {
   },
 
   resetCustomersForDay() {
+    this.stopPostModalGraceTimer();
     this.stopInitialSpawnTimer();
     this.stopRouteTimer();
     this.stopSpawnTimer();
@@ -124,6 +240,13 @@ export const CustomerSystem = {
     this.targetSpawnCount = 0;
     this.spawnedCustomerCount = 0;
     this.counterQueueOrderCounter = 0;
+    this.flowElapsedSeconds = 0;
+    this.rushRemainingSeconds = null;
+    this.rushTriggered = false;
+    this.rushSpawnRemaining = 0;
+    this.guaranteedNuisanceSpawnIndex = null;
+    this.guaranteedPositiveGuestSpawnIndex = null;
+    this.positiveGuestCount = 0;
     this.pendingPickupQuantitiesByProductId = {};
     this.isCustomerFlowPaused = false;
     this.isWaitTimePaused = false;
@@ -138,21 +261,44 @@ export const CustomerSystem = {
     }, {});
   },
 
-  getSpawnCountByDay() {
-    const difficultyRate = GameState.difficulty?.customerSpawnRate ?? 1;
-    const targetRevenue = Math.max(
-      0,
-      Number(GameState.dailyGoal?.targetRevenue) || 0
-    );
-    const expectedAverageSalePrice = this.getExpectedAverageSalePrice();
-    const revenueBasedCount =
-      expectedAverageSalePrice > 0
-        ? Math.ceil((targetRevenue / expectedAverageSalePrice) * 1.1)
-        : 0;
-    const fallbackCount = 8 + Math.floor(GameState.day * 2);
-    const baseCount = Math.max(fallbackCount, revenueBasedCount);
+  getCustomerFlowProfile(day = GameState.day) {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const storyProfile = CUSTOMER_FLOW_PROFILE_BY_DAY[safeDay];
 
-    return Math.max(6, Math.min(60, Math.floor(baseCount * difficultyRate)));
+    if (storyProfile) {
+      return storyProfile;
+    }
+
+    const extraDay = Math.max(1, safeDay - 5);
+
+    return {
+      targetCount: Math.min(60, 30 + extraDay * 3),
+      minIntervalMs: Math.max(1800, 2800 - extraDay * 80),
+      maxIntervalMs: Math.max(4200, 6200 - extraDay * 90),
+      burstChance: Math.min(0.5, 0.38 + extraDay * 0.015),
+      burstMinMs: 1400,
+      burstMaxMs: 2200,
+      maxActive: Math.min(9, 7 + Math.floor(extraDay / 2)),
+      congestionRetryMs: 800,
+      rushCount: Math.min(5, 4 + Math.floor(extraDay / 4)),
+      rushRemainingSecondsMin: 28,
+      rushRemainingSecondsMax: 62,
+      positiveGuestChance: Math.min(0.14, 0.1 + extraDay * 0.005),
+      guaranteedPositiveGuest: false
+    };
+  },
+
+  getSpawnCountByDay() {
+    const safeDay = Math.max(1, Math.floor(Number(GameState.day) || 1));
+    const profile = this.getCustomerFlowProfile(safeDay);
+    const configuredRate = Math.max(0, Number(GameState.difficulty?.customerSpawnRate) || 1);
+    const storyBaseRate = STORY_BASE_SPAWN_RATE_BY_DAY[safeDay];
+    const expansionBonusRate = Number.isFinite(storyBaseRate)
+      ? Math.max(0, configuredRate - storyBaseRate)
+      : 0;
+    const expansionVisitors = Math.round(profile.targetCount * expansionBonusRate);
+
+    return Math.max(6, Math.min(60, profile.targetCount + expansionVisitors));
   },
 
   getExpectedAverageSalePrice() {
@@ -193,13 +339,17 @@ export const CustomerSystem = {
     const safeCount = Math.max(0, Math.floor(count));
 
     for (let i = 0; i < safeCount; i += 1) {
-      const customer = this.applyNuisanceSpawnEffects(this.createCustomer());
+      const spawnOrdinal = this.spawnedCustomerCount + i + 1;
+      const customer = this.applyNuisanceSpawnEffects(
+        this.createCustomer(spawnOrdinal)
+      );
 
       this.customers.push(customer);
 
       EventBus.emit(EVENTS.CUSTOMER_ENTERED, this.createCustomerPayload(customer));
     }
 
+    this.updateFlowMetrics();
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
   },
 
@@ -216,6 +366,10 @@ export const CustomerSystem = {
     this.addCustomers(1);
     this.spawnedCustomerCount += 1;
 
+    if (this.rushSpawnRemaining > 0) {
+      this.rushSpawnRemaining = Math.max(0, this.rushSpawnRemaining - 1);
+    }
+
     if (this.spawnedCustomerCount >= this.targetSpawnCount) {
       this.stopSpawnTimer();
     }
@@ -230,13 +384,84 @@ export const CustomerSystem = {
       return;
     }
 
-    this.spawnTimerId = setInterval(() => {
-      if (this.isCustomerFlowPaused) {
+    this.scheduleSpawnTimer(this.getNextSpawnDelayMs());
+  },
+
+  scheduleSpawnTimer(delayMs = this.getNextSpawnDelayMs()) {
+    this.stopSpawnTimer();
+
+    if (this.spawnedCustomerCount >= this.targetSpawnCount) {
+      return;
+    }
+
+    const safeDelayMs = Math.max(250, Math.floor(Number(delayMs) || 0));
+    this.spawnRemainingMs = safeDelayMs;
+
+    if (this.isCustomerFlowPaused || this.isGamePaused()) {
+      return;
+    }
+
+    this.spawnDueAtMs = this.getNowMs() + safeDelayMs;
+    this.spawnTimerId = setTimeout(() => {
+      this.spawnTimerId = null;
+      this.spawnDueAtMs = null;
+      this.spawnRemainingMs = 0;
+
+      if (this.isCustomerFlowPaused || this.isGamePaused()) {
+        this.spawnRemainingMs = safeDelayMs;
+        return;
+      }
+
+      if (this.shouldHoldCustomersForRush()) {
+        this.scheduleSpawnTimer(1000);
+        return;
+      }
+
+      const delayReason = this.getSpawnDelayReason();
+
+      if (delayReason) {
+        const profile = this.getCustomerFlowProfile();
+        this.scheduleSpawnTimer(profile.congestionRetryMs);
         return;
       }
 
       this.spawnNextCustomer();
-    }, this.getSpawnIntervalMsByDay());
+
+      if (this.spawnedCustomerCount < this.targetSpawnCount) {
+        this.scheduleSpawnTimer(this.getNextSpawnDelayMs());
+      }
+    }, safeDelayMs);
+  },
+
+  pauseSpawnTimer() {
+    if (!this.spawnTimerId) {
+      return;
+    }
+
+    this.spawnRemainingMs = Math.max(
+      0,
+      Math.ceil((Number(this.spawnDueAtMs) || this.getNowMs()) - this.getNowMs())
+    );
+    clearTimeout(this.spawnTimerId);
+    this.spawnTimerId = null;
+    this.spawnDueAtMs = null;
+  },
+
+  resumeSpawnTimer() {
+    if (
+      this.spawnTimerId ||
+      this.spawnedCustomerCount >= this.targetSpawnCount ||
+      this.isCustomerFlowPaused ||
+      this.isGamePaused()
+    ) {
+      return;
+    }
+
+    const delayMs = this.spawnRemainingMs > 0
+      ? this.spawnRemainingMs
+      : this.getNextSpawnDelayMs();
+
+    this.scheduleSpawnTimer(delayMs);
   },
 
   scheduleInitialSpawnTimer(delayMs = 0) {
@@ -296,10 +521,13 @@ export const CustomerSystem = {
   },
 
   stopSpawnTimer() {
-    if (!this.spawnTimerId) return;
+    if (this.spawnTimerId) {
+      clearTimeout(this.spawnTimerId);
+    }
 
-    clearInterval(this.spawnTimerId);
     this.spawnTimerId = null;
+    this.spawnDueAtMs = null;
+    this.spawnRemainingMs = 0;
   },
 
   shouldDelayFirstCustomerForStaffEntry() {
@@ -320,28 +548,224 @@ export const CustomerSystem = {
   },
 
   getSpawnIntervalMsByDay() {
-    const targetCount = Math.max(
-      1,
-      Math.floor(Number(this.targetSpawnCount) || 1)
-    );
-    const daySeconds = Math.max(
-      30,
-      Number(GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS) || 180
-    );
+    return this.getNextSpawnDelayMs();
+  },
 
-    if (targetCount <= 1) {
-      return 12000;
+  getNextSpawnDelayMs() {
+    const profile = this.getCustomerFlowProfile();
+    const useBurstInterval = this.rushSpawnRemaining > 0 || Math.random() < profile.burstChance;
+
+    if (useBurstInterval) {
+      return this.randomBetween(profile.burstMinMs, profile.burstMaxMs);
     }
 
-    const intervalSeconds = daySeconds / Math.max(1, targetCount - 1);
+    return this.randomBetween(profile.minIntervalMs, profile.maxIntervalMs);
+  },
 
-    return Math.floor(
-      Math.max(2000, Math.min(12000, intervalSeconds * 1000))
+  getSpawnDelayReason() {
+    const profile = this.getCustomerFlowProfile();
+    const activeCount = this.getActiveCustomers().length;
+
+    if (activeCount >= profile.maxActive) {
+      return "active_customer_limit";
+    }
+
+    if (this.getWorkloadPressureScore() >= 2) {
+      return "workload_pressure";
+    }
+
+    return null;
+  },
+
+  getWorkloadPressureScore() {
+    let score = 0;
+    const waitingCount = this.getWaitingCustomers().length;
+    const sanitationValue = Number(GameState.sanitation?.value);
+
+    if (waitingCount >= 2) {
+      score += 1;
+    }
+
+    if (this.getUrgentShelfCount() > 0) {
+      score += 1;
+    }
+
+    if (Number.isFinite(sanitationValue) && sanitationValue <= 50) {
+      score += 1;
+    }
+
+    if (this.hasBlockingModalOpen()) {
+      score += 1;
+    }
+
+    return score;
+  },
+
+  getUrgentShelfCount() {
+    const shelfStocks = GameState.shelfStocks && typeof GameState.shelfStocks === "object"
+      ? GameState.shelfStocks
+      : {};
+    let urgentCount = 0;
+
+    Object.values(shelfStocks).forEach((shelfStock) => {
+      Object.values(shelfStock?.products ?? {}).forEach((productStock) => {
+        const maxStock = Math.max(0, Number(productStock?.maxStock) || 0);
+        const currentStock = Math.max(0, Number(productStock?.currentStock) || 0);
+
+        if (maxStock > 0 && currentStock <= Math.max(1, Math.floor(maxStock * 0.3))) {
+          urgentCount += 1;
+        }
+      });
+    });
+
+    return urgentCount;
+  },
+
+  hasBlockingModalOpen() {
+    return Boolean(
+      document.querySelector(
+        ".modal:not(.hidden):not([hidden]), .bm-shop-result-modal:not(.hidden):not([hidden]), .zone-expansion-condition-modal:not(.hidden):not([hidden])"
+      )
     );
   },
 
-  createCustomer() {
-    const customerType = this.pickCustomerType();
+  shouldHoldCustomersForRush() {
+    if (this.rushTriggered) {
+      return false;
+    }
+
+    const profile = this.getCustomerFlowProfile();
+    const remainingCustomers = this.targetSpawnCount - this.spawnedCustomerCount;
+    const rushTriggerElapsedSeconds = Math.max(
+      0,
+      Number(GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS) - Number(this.rushRemainingSeconds || 0)
+    );
+
+    return (
+      remainingCustomers <= profile.rushCount &&
+      this.flowElapsedSeconds < rushTriggerElapsedSeconds
+    );
+  },
+
+  updateRushState() {
+    if (this.rushTriggered || !Number.isFinite(Number(this.rushRemainingSeconds))) {
+      return;
+    }
+
+    const rushTriggerElapsedSeconds = Math.max(
+      0,
+      Number(GAME_CONFIG.DEFAULT_DAY_TIME_SECONDS) - Number(this.rushRemainingSeconds)
+    );
+
+    if (this.flowElapsedSeconds < rushTriggerElapsedSeconds) {
+      return;
+    }
+
+    const profile = this.getCustomerFlowProfile();
+    const remainingCustomers = Math.max(0, this.targetSpawnCount - this.spawnedCustomerCount);
+
+    this.rushTriggered = true;
+    this.rushSpawnRemaining = Math.min(profile.rushCount, remainingCustomers);
+
+    if (this.rushSpawnRemaining > 0 && !this.isCustomerFlowPaused) {
+      this.scheduleSpawnTimer(this.randomBetween(profile.burstMinMs, profile.burstMaxMs));
+    }
+  },
+
+  ensureFlowStats() {
+    const stats = GameState.todayStats && typeof GameState.todayStats === "object"
+      ? GameState.todayStats
+      : {};
+
+    GameState.todayStats = {
+      ...stats,
+      customerWaitTimeTotal: Math.max(0, Number(stats.customerWaitTimeTotal) || 0),
+      customerWaitSampleCount: Math.max(0, Math.floor(Number(stats.customerWaitSampleCount) || 0)),
+      maxCheckoutQueue: Math.max(0, Math.floor(Number(stats.maxCheckoutQueue) || 0)),
+      maxActiveCustomers: Math.max(0, Math.floor(Number(stats.maxActiveCustomers) || 0)),
+      outOfStockSeconds: Math.max(0, Math.floor(Number(stats.outOfStockSeconds) || 0)),
+      nuisanceEventCount: Math.max(0, Math.floor(Number(stats.nuisanceEventCount) || 0)),
+      nuisanceTimeoutCount: Math.max(0, Math.floor(Number(stats.nuisanceTimeoutCount) || 0)),
+      nuisanceResponseTimeTotalMs: Math.max(0, Number(stats.nuisanceResponseTimeTotalMs) || 0),
+      nuisanceResponseCount: Math.max(0, Math.floor(Number(stats.nuisanceResponseCount) || 0)),
+      positiveGuestCount: Math.max(0, Math.floor(Number(stats.positiveGuestCount) || 0))
+    };
+  },
+
+  updateFlowMetrics() {
+    this.ensureFlowStats();
+    const waitingCount = this.getWaitingCustomers().length;
+    const activeCount = this.getActiveCustomers().length;
+    const previousMaxQueue = GameState.todayStats.maxCheckoutQueue;
+
+    GameState.todayStats.maxCheckoutQueue = Math.max(previousMaxQueue, waitingCount);
+    GameState.todayStats.maxActiveCustomers = Math.max(
+      GameState.todayStats.maxActiveCustomers,
+      activeCount
+    );
+
+    if (GameState.todayStats.maxCheckoutQueue !== previousMaxQueue) {
+      EventBus.emit(CUSTOMER_FLOW_METRICS_UPDATED, {
+        day: GameState.day,
+        maxCheckoutQueue: GameState.todayStats.maxCheckoutQueue,
+        maxActiveCustomers: GameState.todayStats.maxActiveCustomers
+      });
+    }
+  },
+
+  updateOutOfStockMetric(amount = 1) {
+    this.ensureFlowStats();
+
+    if (this.getEmptyShelfCount() > 0) {
+      GameState.todayStats.outOfStockSeconds += Math.max(0, Number(amount) || 0);
+    }
+  },
+
+  getEmptyShelfCount() {
+    const shelfStocks = GameState.shelfStocks && typeof GameState.shelfStocks === "object"
+      ? GameState.shelfStocks
+      : {};
+    let emptyCount = 0;
+
+    Object.values(shelfStocks).forEach((shelfStock) => {
+      Object.values(shelfStock?.products ?? {}).forEach((productStock) => {
+        const maxStock = Math.max(0, Number(productStock?.maxStock) || 0);
+        const currentStock = Math.max(0, Number(productStock?.currentStock) || 0);
+
+        if (maxStock > 0 && currentStock <= 0) {
+          emptyCount += 1;
+        }
+      });
+    });
+
+    return emptyCount;
+  },
+
+  pickGuaranteedPositiveGuestIndex() {
+    const nuisanceIndex = Number(this.guaranteedNuisanceSpawnIndex);
+    const candidates = [3, 4, 5].filter((index) => index !== nuisanceIndex);
+
+    return candidates[this.randomIntegerBetween(0, candidates.length - 1)] ?? 3;
+  },
+
+  randomBetween(min, max) {
+    const safeMin = Number(min) || 0;
+    const safeMax = Number(max) || safeMin;
+    const lower = Math.min(safeMin, safeMax);
+    const upper = Math.max(safeMin, safeMax);
+
+    return Math.round(lower + Math.random() * (upper - lower));
+  },
+
+  randomIntegerBetween(min, max) {
+    const lower = Math.ceil(Math.min(Number(min) || 0, Number(max) || 0));
+    const upper = Math.floor(Math.max(Number(min) || 0, Number(max) || 0));
+
+    return Math.floor(lower + Math.random() * (upper - lower + 1));
+  },
+
+  createCustomer(spawnOrdinal = this.spawnedCustomerCount + 1) {
+    const customerType = this.pickCustomerType(spawnOrdinal);
     const wantedProduct = this.decideWantedProduct(customerType);
     const wantedShelfInstance = this.getShelfInstanceForRequest(wantedProduct.id);
     const wantedShelfId = wantedShelfInstance?.shelfId ?? this.getShelfIdForRequest(wantedProduct.id);
@@ -364,10 +788,19 @@ export const CustomerSystem = {
       nuisanceProfileId,
       nuisanceAssetVariantId
     });
-    const entryDialogueText = this.pickCustomerEntryDialogue(
-      customerType,
-      this.customerIdCounter
+    const isPositiveGuest = this.shouldCreatePositiveGuest(
+      spawnOrdinal,
+      customerType
     );
+    const entryDialogueText = isPositiveGuest
+      ? this.pickPositiveGuestDialogue(this.customerIdCounter)
+      : this.pickCustomerEntryDialogue(customerType, this.customerIdCounter);
+
+    if (isPositiveGuest) {
+      this.positiveGuestCount += 1;
+      this.ensureFlowStats();
+      GameState.todayStats.positiveGuestCount += 1;
+    }
 
     return {
       id: customerId,
@@ -383,8 +816,13 @@ export const CustomerSystem = {
       nuisanceEventOpened: false,
       nuisanceEventResolved: false,
       nuisanceCheckoutDelayMs: 0,
+      isPositiveGuest,
+      positiveGuestBonusApplied: false,
+      positiveGuestTipGold: isPositiveGuest ? POSITIVE_GUEST_TIP_GOLD : 0,
+      positiveGuestSatisfaction: isPositiveGuest ? POSITIVE_GUEST_SATISFACTION : 0,
 
       patience: customerType.patience,
+      initialPatience: customerType.patience,
       spendBias: customerType.spendBias,
       eventChance: this.getCustomerEventChance(customerType),
 
@@ -406,6 +844,7 @@ export const CustomerSystem = {
       enteringTime: this.getDefaultEnteringTime(),
       shoppingTime: this.getShoppingTimeByCustomerType(customerType),
       waitTime: customerType.patience,
+      waitingElapsedTime: 0,
       queueOrder: null,
       mood: "neutral",
 
@@ -418,9 +857,38 @@ export const CustomerSystem = {
   },
 
   applyNuisanceSpawnEffects(customer) {
-    // 진상 손님의 멘탈 페널티는 입장 시점이 아니라
-    // 계산대 이벤트 모달이 실제로 열릴 때 main.js에서 1회만 적용한다.
+    // 진상 등장 자체로는 멘탈/만족도를 차감하지 않습니다.
+    // 실제 결과는 3초 소프트 타이머와 선택지 효과에서만 발생합니다.
     return customer;
+  },
+
+  shouldCreatePositiveGuest(spawnOrdinal, customerType = {}) {
+    if (customerType.id === "difficult") {
+      return false;
+    }
+
+    if (this.guaranteedPositiveGuestSpawnIndex === spawnOrdinal) {
+      return true;
+    }
+
+    const profile = this.getCustomerFlowProfile();
+
+    return (
+      this.positiveGuestCount < 2 &&
+      Math.random() < Math.max(0, Number(profile.positiveGuestChance) || 0)
+    );
+  },
+
+  pickPositiveGuestDialogue(seedValue = 0) {
+    const dialogues = [
+      "새로 인수하셨나 봐요. 잘 부탁해요!",
+      "매장이 깔끔하네요. 자주 올게요!",
+      "첫 영업 힘내세요. 계산 천천히 하셔도 돼요!",
+      "동네에 편의점이 생겨서 좋네요!"
+    ];
+    const seed = Math.max(0, Math.floor(Number(seedValue) || 0));
+
+    return dialogues[seed % dialogues.length];
   },
 
   pickNuisanceProfileIdForCustomer(customerType = {}, seedSource = "") {
@@ -474,8 +942,19 @@ export const CustomerSystem = {
     return dialogues[seed % dialogues.length];
   },
 
-  pickCustomerType() {
+  pickCustomerType(spawnOrdinal = this.spawnedCustomerCount + 1) {
+    if (
+      GameState.day === 1 &&
+      Number(spawnOrdinal) === Number(this.guaranteedNuisanceSpawnIndex)
+    ) {
+      return CUSTOMER_TYPES.find((type) => type.id === "difficult") ?? CUSTOMER_TYPES[0];
+    }
+
     const weightedTypes = CUSTOMER_TYPES.map((type) => {
+      if (GameState.day === 1 && type.id === "difficult") {
+        return { type, weight: 0 };
+      }
+
       return {
         type,
         weight: this.getCustomerTypeWeight(type)
@@ -615,18 +1094,53 @@ export const CustomerSystem = {
   },
 
   pauseCustomerWaitTime() {
+    this.stopPostModalGraceTimer();
     this.isWaitTimePaused = true;
     this.isCustomerFlowPaused = true;
     this.pauseInitialSpawnTimer();
+    this.pauseSpawnTimer();
   },
 
-  resumeCustomerWaitTime() {
+  resumeCustomerWaitTime(options = {}) {
+    const graceMs = Math.max(0, Math.floor(Number(options.graceMs) || 0));
+
+    this.stopPostModalGraceTimer();
+
+    if (GameState.phase !== GAME_PHASE.STORE_RUNNING) {
+      this.isWaitTimePaused = false;
+      this.isCustomerFlowPaused = true;
+      return;
+    }
+
+    if (graceMs > 0) {
+      this.isWaitTimePaused = true;
+      this.isCustomerFlowPaused = true;
+      this.postModalGraceTimerId = window.setTimeout(() => {
+        this.postModalGraceTimerId = null;
+        this.completeCustomerFlowResume();
+      }, graceMs);
+      return;
+    }
+
+    this.completeCustomerFlowResume();
+  },
+
+  completeCustomerFlowResume() {
     this.isWaitTimePaused = false;
     this.isCustomerFlowPaused = GameState.phase !== GAME_PHASE.STORE_RUNNING;
 
     if (!this.isCustomerFlowPaused) {
       this.resumeInitialSpawnTimer();
+      this.resumeSpawnTimer();
     }
+  },
+
+  stopPostModalGraceTimer() {
+    if (this.postModalGraceTimerId) {
+      window.clearTimeout(this.postModalGraceTimerId);
+    }
+
+    this.postModalGraceTimerId = null;
   },
 
   updateCustomersByTick(amount) {
@@ -634,8 +1148,12 @@ export const CustomerSystem = {
       return;
     }
 
+    const safeAmount = Math.max(0, Number(amount) || 0);
     let changed = false;
 
+    this.flowElapsedSeconds += safeAmount;
+    this.updateRushState();
+    this.updateOutOfStockMetric(safeAmount);
     this.pendingPickupQuantitiesByProductId = {};
 
     this.customers = this.customers.map((customer) => {
@@ -682,6 +1200,7 @@ export const CustomerSystem = {
     });
 
     this.pendingPickupQuantitiesByProductId = {};
+    this.updateFlowMetrics();
 
     if (changed) {
       EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
@@ -957,6 +1476,7 @@ export const CustomerSystem = {
     const updatedCustomer = {
       ...customer,
       waitTime: nextWaitTime,
+      waitingElapsedTime: Math.max(0, Number(customer.waitingElapsedTime) || 0) + safeAmount,
       mood: this.getMoodByWaitingPressure(customer, nextWaitTime)
     };
 
@@ -1167,8 +1687,9 @@ export const CustomerSystem = {
     const isWantedProductOutOfStock =
       reason === "wanted_product_out_of_stock";
 
+    const measuredCustomer = this.recordCustomerWaitMetric(customer);
     const leavingCustomer = {
-      ...customer,
+      ...measuredCustomer,
       status: CUSTOMER_STATUS.LEAVING,
       currentZone: isWantedProductOutOfStock
         ? CUSTOMER_ZONES.DOOR
@@ -1211,13 +1732,19 @@ export const CustomerSystem = {
 
     this.enrichCheckoutPayload(data, customer);
 
+    const measuredCustomer = this.recordCustomerWaitMetric(customer);
+    const shouldGrantPositiveBonus =
+      measuredCustomer.isPositiveGuest === true &&
+      measuredCustomer.positiveGuestBonusApplied !== true;
     const checkedOutCustomer = {
-      ...customer,
+      ...measuredCustomer,
       status: CUSTOMER_STATUS.LEAVING,
       currentZone: CUSTOMER_ZONES.EXIT,
       targetZone: CUSTOMER_ZONES.EXIT,
       isSatisfied: true,
       mood: "neutral",
+      positiveGuestBonusApplied:
+        measuredCustomer.positiveGuestBonusApplied === true || shouldGrantPositiveBonus,
 
       /*
         CUSTOMER_LEFT는 이탈/손실 손님 통계로 사용하기 때문에
@@ -1227,6 +1754,32 @@ export const CustomerSystem = {
     };
 
     this.replaceCustomer(checkedOutCustomer);
+
+    if (shouldGrantPositiveBonus) {
+      const tipGold = Math.max(0, Number(checkedOutCustomer.positiveGuestTipGold) || 0);
+      const satisfaction = Math.max(
+        0,
+        Number(checkedOutCustomer.positiveGuestSatisfaction) || 0
+      );
+
+      if (tipGold > 0) {
+        EventBus.emit(EVENTS.REVENUE_CHANGED, {
+          day: GameState.day,
+          amount: tipGold,
+          source: "positive_customer_tip",
+          customerId: checkedOutCustomer.id
+        });
+      }
+
+      EventBus.emit(POSITIVE_CUSTOMER_BONUS_GRANTED, {
+        day: GameState.day,
+        customerId: checkedOutCustomer.id,
+        customerTypeId: checkedOutCustomer.typeId,
+        tipGold,
+        satisfaction,
+        message: `단골 손님이 응원 팁 ₩${tipGold.toLocaleString("ko-KR")}을 남겼어요!`
+      });
+    }
 
     EventBus.emit(EVENTS.CUSTOMER_SATISFIED, {
       ...this.createCustomerPayload(checkedOutCustomer),
@@ -1238,6 +1791,25 @@ export const CustomerSystem = {
     });
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
+  },
+
+  recordCustomerWaitMetric(customer = {}) {
+    if (customer.waitMetricRecorded === true) {
+      return customer;
+    }
+
+    const waitSeconds = Math.max(0, Number(customer.waitingElapsedTime) || 0);
+
+    if (waitSeconds > 0) {
+      this.ensureFlowStats();
+      GameState.todayStats.customerWaitTimeTotal += waitSeconds;
+      GameState.todayStats.customerWaitSampleCount += 1;
+    }
+
+    return {
+      ...customer,
+      waitMetricRecorded: true
+    };
   },
 
   enrichCheckoutPayload(data = {}, customer = null) {
@@ -1376,7 +1948,20 @@ export const CustomerSystem = {
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,
       waitTime: customer.waitTime,
+      initialPatience: Math.max(1, Number(customer.initialPatience) || 1),
+      waitingElapsedTime: Math.max(0, Number(customer.waitingElapsedTime) || 0),
+      patienceRatio: Math.max(
+        0,
+        Math.min(
+          1,
+          (Number(customer.waitTime) || 0) /
+            Math.max(1, Number(customer.initialPatience) || 1)
+        )
+      ),
       mood: customer.mood,
+      isPositiveGuest: customer.isPositiveGuest === true,
+      positiveGuestTipGold: Math.max(0, Number(customer.positiveGuestTipGold) || 0),
+      positiveGuestSatisfaction: Number(customer.positiveGuestSatisfaction) || 0,
       nuisanceEffectApplied: customer.nuisanceEffectApplied === true,
       nuisanceTimeoutApplied: customer.nuisanceTimeoutApplied === true,
       isNuisance: this.isNuisanceCustomerTypeOrAsset(customer),
@@ -1415,7 +2000,20 @@ export const CustomerSystem = {
       currentZone: customer.currentZone,
       targetZone: customer.targetZone,
       waitTime: customer.waitTime,
+      initialPatience: Math.max(1, Number(customer.initialPatience) || 1),
+      waitingElapsedTime: Math.max(0, Number(customer.waitingElapsedTime) || 0),
+      patienceRatio: Math.max(
+        0,
+        Math.min(
+          1,
+          (Number(customer.waitTime) || 0) /
+            Math.max(1, Number(customer.initialPatience) || 1)
+        )
+      ),
       mood: customer.mood,
+      isPositiveGuest: customer.isPositiveGuest === true,
+      positiveGuestTipGold: Math.max(0, Number(customer.positiveGuestTipGold) || 0),
+      positiveGuestSatisfaction: Number(customer.positiveGuestSatisfaction) || 0,
       queueOrder: customer.queueOrder,
       isSatisfied: customer.isSatisfied,
       leaveReason: customer.leaveReason ?? null,
@@ -1715,8 +2313,17 @@ export const CustomerSystem = {
   getGuaranteedNuisanceEventTargetCustomer() {
     const candidates = this.getWaitingCustomers()
       .filter((customer) => {
+        const hasSafeCounterWait =
+          Math.max(0, Number(customer.waitingElapsedTime) || 0) >=
+          CUSTOMER_EVENT_SAFE_WAIT_SECONDS;
+        const hasRequiredDayOneCheckout =
+          GameState.day !== 1 ||
+          Math.max(0, Number(GameState.todayStats?.checkoutSuccessCount) || 0) >= 1;
+
         return (
           this.needsNuisanceEventBeforeCheckout(customer) &&
+          hasSafeCounterWait &&
+          hasRequiredDayOneCheckout &&
           RandomEventSystem.getGuaranteedNuisanceEventsForCustomer(
             customer,
             GameState.day

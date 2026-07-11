@@ -336,6 +336,20 @@ export const ResultSystem = {
         totalUnpaidWage: staffWageSettlement.totalUnpaidWage,
         wagePaymentStatus: staffWageSettlement.status
       },
+      customerFlowMetrics: {
+        averageWaitSeconds: Number(stats.customerWaitSampleCount) > 0
+          ? Number(stats.customerWaitTimeTotal || 0) / Number(stats.customerWaitSampleCount)
+          : 0,
+        maxCheckoutQueue: Math.max(0, Number(stats.maxCheckoutQueue) || 0),
+        maxActiveCustomers: Math.max(0, Number(stats.maxActiveCustomers) || 0),
+        outOfStockSeconds: Math.max(0, Number(stats.outOfStockSeconds) || 0),
+        nuisanceEventCount: Math.max(0, Number(stats.nuisanceEventCount) || 0),
+        nuisanceTimeoutCount: Math.max(0, Number(stats.nuisanceTimeoutCount) || 0),
+        averageNuisanceResponseMs: Number(stats.nuisanceResponseCount) > 0
+          ? Number(stats.nuisanceResponseTimeTotalMs || 0) / Number(stats.nuisanceResponseCount)
+          : 0,
+        positiveGuestCount: Math.max(0, Number(stats.positiveGuestCount) || 0)
+      },
       sanitation: sanitationPenalty.sanitation,
       sanitationPenalty,
 
@@ -672,7 +686,11 @@ export const ResultSystem = {
         shiftHours: 0,
         wageCost: 0,
         suspended: false,
-        previousUnpaidWage: unpaidWage
+        previousUnpaidWage: unpaidWage,
+        warehouseHelpCount: 0,
+        shelfHelpCount: 0,
+        cleaningHelpCount: 0,
+        totalAssistCount: 0
       };
     }
 
@@ -683,6 +701,19 @@ export const ResultSystem = {
       Number(hired.expectedDailyWage) || hourlyWage * shiftHours
     );
     const wageCost = isSuspended ? 0 : expectedDailyWage;
+
+    const warehouseHelpCount = Math.max(
+      0,
+      Number(staffState.todayWarehouseHelpCount) || 0
+    );
+    const shelfHelpCount = Math.max(
+      0,
+      Number(staffState.todayShelfHelpCount) || 0
+    );
+    const cleaningHelpCount = Math.max(
+      0,
+      Number(staffState.todayCleaningHelpCount) || 0
+    );
 
     return {
       hired: true,
@@ -696,7 +727,11 @@ export const ResultSystem = {
       wageCost,
       suspended: isSuspended,
       previousUnpaidWage: unpaidWage,
-      unpaidSinceDay: staffState.unpaidSinceDay ?? null
+      unpaidSinceDay: staffState.unpaidSinceDay ?? null,
+      warehouseHelpCount,
+      shelfHelpCount,
+      cleaningHelpCount,
+      totalAssistCount: warehouseHelpCount + shelfHelpCount + cleaningHelpCount
     };
   },
 

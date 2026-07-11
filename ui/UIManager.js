@@ -241,6 +241,9 @@ export const UIManager = {
   eventModal: null,
   eventModalOnClose: null,
   eventModalCloseTimerId: null,
+  customerEventResponseTimerId: null,
+  customerEventResponseOpenedAt: 0,
+  customerEventResponseTimedOut: false,
   isEventModalClosing: false,
   inventorySummary: null,
   staffSummary: null,
@@ -5219,7 +5222,9 @@ renderDebugCollisionBoxes() {
       options: {
         productName,
         productImagePath: customer.carriedProductImagePath,
-        context: "checkout"
+        context: "checkout",
+        patienceRatio: Number(customer.patienceRatio),
+        waitingElapsedTime: Number(customer.waitingElapsedTime) || 0
       }
     };
   },
@@ -5249,6 +5254,35 @@ renderDebugCollisionBoxes() {
     wantedText.className = "customer-wanted-text customer-dialogue-text";
     wantedText.textContent = String(dialogueText || "계산해주세요!").trim();
     bubble.appendChild(wantedText);
+
+    if (options.context === "checkout" && Number.isFinite(options.patienceRatio)) {
+      const patienceRatio = Math.max(0, Math.min(1, Number(options.patienceRatio)));
+      const urgency = document.createElement("span");
+      const urgencyLabel = document.createElement("span");
+      const urgencyTrack = document.createElement("span");
+      const urgencyFill = document.createElement("span");
+
+      urgency.className = "customer-wait-urgency";
+      urgency.dataset.level = patienceRatio <= 0.25
+        ? "critical"
+        : patienceRatio <= 0.5
+          ? "warning"
+          : "normal";
+      urgencyLabel.className = "customer-wait-urgency-label";
+      urgencyLabel.textContent = patienceRatio <= 0.25
+        ? "곧 떠나요!"
+        : patienceRatio <= 0.5
+          ? "기다리는 중"
+          : "계산 대기";
+      urgencyTrack.className = "customer-wait-urgency-track";
+      urgencyFill.className = "customer-wait-urgency-fill";
+      urgencyFill.style.width = `${Math.round(patienceRatio * 100)}%`;
+
+      urgencyTrack.appendChild(urgencyFill);
+      urgency.appendChild(urgencyLabel);
+      urgency.appendChild(urgencyTrack);
+      bubble.appendChild(urgency);
+    }
 
     return bubble;
   },
@@ -5331,6 +5365,14 @@ renderDebugCollisionBoxes() {
     const shelfClassName = this.isCustomerShelfZone(customer.currentZone)
       ? "customer-zone-shelf"
       : null;
+    const patienceRatio = Number(customer.patienceRatio);
+    const waitUrgencyClass = customer.currentZone === "counter" && Number.isFinite(patienceRatio)
+      ? patienceRatio <= 0.25
+        ? "customer-wait-critical"
+        : patienceRatio <= 0.5
+          ? "customer-wait-warning"
+          : null
+      : null;
 
     return [
       "customer-npc",
@@ -5338,7 +5380,9 @@ renderDebugCollisionBoxes() {
       `customer-status-${customer.status}`,
       `customer-mood-${customer.mood}`,
       `customer-zone-${customer.currentZone}`,
-      shelfClassName
+      shelfClassName,
+      waitUrgencyClass,
+      customer.isPositiveGuest === true ? "customer-positive-guest" : null
     ].filter(Boolean).join(" ");
   },
 
@@ -14223,11 +14267,19 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const staffUnpaidWage = Number(staffResult.unpaidWage ?? staffResult.wageSettlement?.unpaidAmount ?? 0) || 0;
     const staffTotalUnpaidWage = Number(staffResult.totalUnpaidWage ?? staffResult.wageSettlement?.totalUnpaidWage ?? 0) || 0;
     const staffSuspended = staffResult.suspended === true || staffResult.wagePaymentStatus === "suspended";
+    const staffWarehouseHelpCount = Math.max(0, Number(staffResult.warehouseHelpCount) || 0);
+    const staffShelfHelpCount = Math.max(0, Number(staffResult.shelfHelpCount) || 0);
+    const staffCleaningHelpCount = Math.max(0, Number(staffResult.cleaningHelpCount) || 0);
+    const staffTotalAssistCount = Math.max(
+      0,
+      Number(staffResult.totalAssistCount) ||
+        staffWarehouseHelpCount + staffShelfHelpCount + staffCleaningHelpCount
+    );
     const staffResultRows = staffResult.hired
       ? `
         <div class="result-row result-row-staff ${staffSuspended ? "is-warning" : ""}">
           <span>알바 보조</span>
-          <strong>${staffSuspended ? `${staffResult.name} 임금 미지급으로 출근 보류` : `${staffResult.name} 창고/진열/청소`}</strong>
+          <strong>${staffSuspended ? `${staffResult.name} 임금 미지급으로 출근 보류` : `${staffResult.name} 총 ${staffTotalAssistCount}회 · 창고 ${staffWarehouseHelpCount} / 진열 ${staffShelfHelpCount} / 청소 ${staffCleaningHelpCount}`}</strong>
         </div>
         <div class="result-row result-row-staff">
           <span>알바 인건비</span>
@@ -14682,6 +14734,15 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         <p id="customer-event-modal-meta" class="customer-event-modal-meta"></p>
         <p id="customer-event-modal-dialogue" class="customer-event-modal-dialogue"></p>
         <p id="customer-event-modal-summary" class="customer-event-modal-summary"></p>
+        <div id="customer-event-response-guide" class="customer-event-response-guide" hidden>
+          <div class="customer-event-response-guide-copy">
+            <strong>빠른 대응 보너스</strong>
+            <span id="customer-event-response-guide-text">3초 안에 선택하면 추가 만족도 감소가 없어요.</span>
+          </div>
+          <span class="customer-event-response-timer-track" aria-hidden="true">
+            <span id="customer-event-response-timer-fill" class="customer-event-response-timer-fill"></span>
+          </span>
+        </div>
         <div id="customer-event-choice-list" class="customer-event-choice-list"></div>
         <div id="customer-event-result-text" class="customer-event-result-text" hidden></div>
         <button id="customer-event-close-button" class="customer-event-close-button" type="button" hidden>
@@ -14871,11 +14932,25 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const meta = document.getElementById("customer-event-modal-meta");
     const dialogue = document.getElementById("customer-event-modal-dialogue");
     const summary = document.getElementById("customer-event-modal-summary");
+    const responseGuide = document.getElementById("customer-event-response-guide");
+    const responseGuideText = document.getElementById("customer-event-response-guide-text");
+    const responseTimerFill = document.getElementById("customer-event-response-timer-fill");
     const choiceList = document.getElementById("customer-event-choice-list");
     const resultText = document.getElementById("customer-event-result-text");
     const closeButton = document.getElementById("customer-event-close-button");
 
-    if (!title || !meta || !dialogue || !summary || !choiceList || !resultText || !closeButton) {
+    if (
+      !title ||
+      !meta ||
+      !dialogue ||
+      !summary ||
+      !responseGuide ||
+      !responseGuideText ||
+      !responseTimerFill ||
+      !choiceList ||
+      !resultText ||
+      !closeButton
+    ) {
       return;
     }
 
@@ -14903,6 +14978,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     this.eventModalOnClose = typeof onClose === "function" ? onClose : null;
     this.isEventModalClosing = false;
     this.customerEventResponseTimedOut = false;
+    this.customerEventResponseOpenedAt = Date.now();
     title.textContent = payload.eventTitle || "고객 이벤트";
     meta.textContent = metaParts.join(" / ");
     dialogue.textContent = payload.dialogue || "손님이 말을 걸었습니다.";
@@ -14918,6 +14994,19 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     resultText.innerHTML = "";
     resultText.hidden = true;
     closeButton.hidden = true;
+
+    const responseTimeoutMs = Number(payload.nuisanceTimeoutMs) || 0;
+    const shouldShowResponseGuide = payload.isNuisance === true && responseTimeoutMs > 0;
+    responseGuide.hidden = !shouldShowResponseGuide;
+    responseGuide.classList.remove("is-expired");
+    responseGuideText.textContent = `${Math.max(1, Math.round(responseTimeoutMs / 1000))}초 안에 선택하면 추가 만족도 감소가 없어요.`;
+    responseTimerFill.style.animation = "none";
+    responseTimerFill.style.setProperty("--customer-event-response-duration", `${responseTimeoutMs}ms`);
+
+    if (shouldShowResponseGuide) {
+      void responseTimerFill.offsetWidth;
+      responseTimerFill.style.animation = "customer-event-response-countdown var(--customer-event-response-duration) linear forwards";
+    }
 
     choices.forEach((choice) => {
       const button = document.createElement("button");
@@ -14956,12 +15045,18 @@ renderShelfWarningIcons(node, shelfInstanceId) {
           clearTimeout(this.customerEventResponseTimerId);
           this.customerEventResponseTimerId = null;
         }
+        responseTimerFill.style.animationPlayState = "paused";
         choiceList.querySelectorAll("button").forEach((choiceButton) => {
           choiceButton.disabled = true;
         });
 
+        const responseMeta = {
+          responseTimeMs: Math.max(0, Date.now() - this.customerEventResponseOpenedAt),
+          timedOut: this.customerEventResponseTimedOut === true
+        };
+
         const effectApplicationResult = choiceSelectedCallback
-          ? choiceSelectedCallback(choice, payload)
+          ? choiceSelectedCallback(choice, payload, responseMeta)
           : null;
         const resultChoice = {
           ...choice,
@@ -14969,6 +15064,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         };
 
         choiceList.hidden = true;
+        responseGuide.hidden = true;
         resultText.innerHTML = "";
         resultText.appendChild(this.createCustomerEventResultNode(resultChoice));
         resultText.hidden = false;
@@ -14993,8 +15089,6 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     this.eventModal.classList.remove("hidden");
 
-    const responseTimeoutMs = Number(payload.nuisanceTimeoutMs) || 0;
-
     if (payload.isNuisance === true && responseTimeoutMs > 0 && responseTimeoutCallback) {
       this.customerEventResponseTimerId = window.setTimeout(() => {
         this.customerEventResponseTimerId = null;
@@ -15008,6 +15102,9 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         }
 
         this.customerEventResponseTimedOut = true;
+        responseGuide.classList.add("is-expired");
+        responseGuideText.textContent = "응답이 늦어 만족도가 1 감소했어요. 선택은 계속할 수 있어요.";
+        responseTimerFill.style.animationPlayState = "paused";
         responseTimeoutCallback(payload);
       }, responseTimeoutMs);
     }
@@ -15027,6 +15124,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     this.eventModal.classList.add("hidden");
+    this.customerEventResponseOpenedAt = 0;
+    this.customerEventResponseTimedOut = false;
 
     const onClose = this.eventModalOnClose;
     this.eventModalOnClose = null;

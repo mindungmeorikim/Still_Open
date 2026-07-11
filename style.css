@@ -32564,3 +32564,154 @@ body.is-analytics-consent-active {
   visibility: visible !important;
   opacity: 1 !important;
 }
+
+/* =========================================================
+   2026-07-12 CUSTOMER FLOW / NUISANCE UX FINAL OVERRIDES
+   ========================================================= */
+.customer-wait-urgency {
+  display: grid;
+  gap: 3px;
+  min-width: 92px;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.customer-wait-urgency-label {
+  display: block;
+  text-align: center;
+}
+
+.customer-wait-urgency-track {
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  border: 1px solid rgba(51, 37, 25, 0.68);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.customer-wait-urgency-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #63bd70;
+  transition: width 160ms linear, background-color 160ms linear;
+}
+
+.customer-wait-urgency[data-level="warning"] .customer-wait-urgency-fill {
+  background: #edae3c;
+}
+
+.customer-wait-urgency[data-level="critical"] .customer-wait-urgency-fill {
+  background: #df5d55;
+}
+
+.customer-wait-warning .customer-dialogue-box {
+  box-shadow: 0 0 0 2px rgba(237, 174, 60, 0.72), 0 6px 14px rgba(37, 26, 18, 0.2);
+}
+
+.customer-wait-critical .customer-dialogue-box {
+  animation: customer-wait-critical-pulse 700ms ease-in-out infinite alternate;
+}
+
+.customer-positive-guest .customer-dialogue-box--entry {
+  box-shadow: 0 0 0 2px rgba(81, 181, 113, 0.76), 0 6px 14px rgba(37, 26, 18, 0.2);
+}
+
+.customer-event-response-guide {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  border: 2px solid rgba(94, 135, 199, 0.58);
+  border-radius: 12px;
+  background: rgba(232, 243, 255, 0.95);
+}
+
+.customer-event-response-guide[hidden] {
+  display: none;
+}
+
+.customer-event-response-guide-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: clamp(11px, 1.6vw, 14px);
+  line-height: 1.35;
+}
+
+.customer-event-response-guide-copy strong {
+  flex: 0 0 auto;
+  color: #2b5f9c;
+}
+
+.customer-event-response-guide-copy span {
+  text-align: right;
+  color: #344154;
+}
+
+.customer-event-response-timer-track {
+  display: block;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(42, 65, 93, 0.16);
+}
+
+.customer-event-response-timer-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: #4d94dd;
+  transform-origin: left center;
+}
+
+.customer-event-response-guide.is-expired {
+  border-color: rgba(211, 87, 77, 0.66);
+  background: rgba(255, 236, 233, 0.97);
+}
+
+.customer-event-response-guide.is-expired strong,
+.customer-event-response-guide.is-expired span {
+  color: #a73f38;
+}
+
+.customer-event-response-guide.is-expired .customer-event-response-timer-fill {
+  background: #d3574d;
+}
+
+@keyframes customer-event-response-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@keyframes customer-wait-critical-pulse {
+  from {
+    box-shadow: 0 0 0 2px rgba(223, 93, 85, 0.66), 0 6px 14px rgba(37, 26, 18, 0.2);
+  }
+  to {
+    box-shadow: 0 0 0 4px rgba(223, 93, 85, 0.28), 0 8px 18px rgba(37, 26, 18, 0.26);
+  }
+}
+
+@media (max-aspect-ratio: 16 / 9), (max-height: 720px) {
+  .customer-event-response-guide {
+    gap: 5px;
+    margin: 6px 0 8px;
+    padding: 7px 9px;
+  }
+
+  .customer-event-response-guide-copy {
+    font-size: 11px;
+  }
+
+  .customer-event-response-timer-track {
+    height: 6px;
+  }
+}

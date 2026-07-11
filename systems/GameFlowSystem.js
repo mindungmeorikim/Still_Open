@@ -913,7 +913,18 @@ export const GameFlowSystem = {
 
       expiredLoss: 0,
       eventPenalty: 0,
-      bmBonus: 0
+      bmBonus: 0,
+
+      customerWaitTimeTotal: 0,
+      customerWaitSampleCount: 0,
+      maxCheckoutQueue: 0,
+      maxActiveCustomers: 0,
+      outOfStockSeconds: 0,
+      nuisanceEventCount: 0,
+      nuisanceTimeoutCount: 0,
+      nuisanceResponseTimeTotalMs: 0,
+      nuisanceResponseCount: 0,
+      positiveGuestCount: 0
     };
   },
 

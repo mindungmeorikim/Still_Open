@@ -37,6 +37,13 @@ const WARNING_RESET_THRESHOLD = 60;
 const SETTLEMENT_SATISFACTION_PENALTY = -5;
 const SANITATION_AREA_PRESSURE_STEP = 0.25;
 const SANITATION_AREA_PRESSURE_MAX = 1.75;
+const CUSTOMER_TRAFFIC_MESS_PROFILE_BY_DAY = Object.freeze({
+  1: Object.freeze({ milestones: [12], penalty: 10 }),
+  2: Object.freeze({ milestones: [8, 16], penalty: 30 }),
+  3: Object.freeze({ milestones: [6, 12, 18], penalty: 20 }),
+  4: Object.freeze({ milestones: [5, 10, 15, 20, 25], penalty: 15 }),
+  5: Object.freeze({ milestones: [4, 8, 12, 16, 20, 24, 28], penalty: 15 })
+});
 
 export const SanitationSystem = {
   isInitialized: false,
@@ -96,6 +103,10 @@ export const SanitationSystem = {
       }
 
       this.applyCustomerMess(data, "difficult_customer_angry");
+    });
+
+    EventBus.on(EVENTS.CHECKOUT_COMPLETED, (data = {}) => {
+      this.applyCustomerTrafficMess(data);
     });
 
     EventBus.on(SANITATION_EVENTS.CUSTOMER_EVENT_TRIGGERED, (data = {}) => {
@@ -417,6 +428,64 @@ export const SanitationSystem = {
       sanitationValue: this.value,
       status: this.getStatus(this.value)
     };
+  },
+
+  getCustomerTrafficMessProfile(day = this.getCurrentDay()) {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const storyProfile = CUSTOMER_TRAFFIC_MESS_PROFILE_BY_DAY[safeDay];
+
+    if (storyProfile) {
+      return storyProfile;
+    }
+
+    const checkoutStep = Math.max(3, 4 - Math.floor((safeDay - 6) / 3));
+    const maxCheckoutCount = Math.max(30, Number(GameState.todayStats?.totalCustomers) || 45);
+    const milestones = [];
+
+    for (let count = checkoutStep; count <= maxCheckoutCount; count += checkoutStep) {
+      milestones.push(count);
+    }
+
+    return {
+      milestones,
+      penalty: Math.min(20, 15 + Math.floor((safeDay - 6) / 4))
+    };
+  },
+
+  applyCustomerTrafficMess(data = {}) {
+    const day = this.getCurrentDay();
+    const checkoutCount = Math.max(0, Math.floor(
+      Number(GameState.todayStats?.checkoutSuccessCount) || 0
+    ));
+    const profile = this.getCustomerTrafficMessProfile(day);
+
+    if (checkoutCount <= 0 || !profile.milestones.includes(checkoutCount)) {
+      return false;
+    }
+
+    const disruptionKey = `${day}:customer_traffic:${checkoutCount}`;
+
+    if (this.processedDisruptionKeys.has(disruptionKey)) {
+      return false;
+    }
+
+    this.processedDisruptionKeys.add(disruptionKey);
+    const pressureMultiplier = this.getAreaPressureMultiplier();
+    const basePenalty = Math.max(1, Math.floor(Number(profile.penalty) || 0));
+    const penalty = Math.max(basePenalty, Math.ceil(basePenalty * pressureMultiplier));
+    const dirtyPoint = this.ensureDirtyCleaningPoint(disruptionKey);
+    const result = this.decreaseSanitation(penalty, "customer_traffic_mess");
+
+    if (result.changed) {
+      EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
+        message: `손님이 몰려 ${dirtyPoint.label}이 어질러졌습니다. 위생 -${penalty}`,
+        duration: 3000,
+        customerId: data.customerId ?? null,
+        checkoutCount
+      });
+    }
+
+    return result.changed;
   },
 
   applyCustomerMess(data = {}, reason = "customer_mess") {

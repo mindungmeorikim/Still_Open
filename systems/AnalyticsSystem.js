@@ -11,6 +11,10 @@ import {
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_CONFIG } from "../core/Constants.js";
 import { REWARD_CODE_EVENTS } from "./RewardCodeSystem.js";
+import {
+  UserIdentitySystem,
+  USER_IDENTITY_EVENTS
+} from "./UserIdentitySystem.js";
 
 const CONSENT_KEY = "still_open_analytics_consent";
 const SDK_SCRIPT_ID = "gameanalytics-sdk-script";
@@ -28,6 +32,11 @@ const RESOURCE_FLOW = Object.freeze({
 const CURRENCY_CHANGED_EVENT = "CURRENCY_CHANGED";
 const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
 const STAFF_UNPAID_WAGE_PAID = "STAFF_UNPAID_WAGE_PAID";
+const STAFF_HIRED = "STAFF_HIRED";
+const CUSTOMER_EVENT_OPENED = "CUSTOMER_EVENT_OPENED";
+const CUSTOMER_EVENT_CHOICE_SELECTED = "CUSTOMER_EVENT_CHOICE_SELECTED";
+const CUSTOMER_EVENT_RESPONSE_TIMEOUT = "CUSTOMER_EVENT_RESPONSE_TIMEOUT";
+const STAFF_ASSIST_TASK_COMPLETED = "STAFF_ASSIST_TASK_COMPLETED";
 const ANALYTICS_ERROR_MESSAGE_LIMIT = 500;
 
 const SHOP_SUCCESS_EVENTS = Object.freeze({
@@ -63,6 +72,7 @@ let economyListenersBound = false;
 let shopListenersBound = false;
 let communityCouponListenersBound = false;
 let errorListenersBound = false;
+let gameplayUxListenersBound = false;
 const pendingDesignEvents = [];
 const pendingProgressionEvents = [];
 const pendingResourceEvents = [];
@@ -397,6 +407,26 @@ function trackCurrencyChange(data = {}) {
   }
 
   AnalyticsSystem.trackResourceEvent(flow, currency, amount, descriptor[0], descriptor[1]);
+
+  if (currency === "Diamond" && flow === RESOURCE_FLOW.SINK) {
+    trackFirstLoginRewardDiamondSpend(data);
+  }
+}
+
+function trackFirstLoginRewardDiamondSpend(data = {}) {
+  if (!UserIdentitySystem.hasClaimedFirstLoginReward()) return;
+
+  const markerKey = UserIdentitySystem.getScopedStorageKey(
+    "first_login_reward_first_diamond_spend_v1"
+  );
+
+  if (safeStorageGet(markerKey) === "tracked") return;
+
+  safeStorageSet(markerKey, "tracked");
+  AnalyticsSystem.trackDesignEvent(
+    `first_login_reward:first_spend:${normalizeAnalyticsToken(data.reason, "unknown")}`,
+    Number(data.amount) || null
+  );
 }
 
 function trackOrderCost(data = {}) {
@@ -674,6 +704,96 @@ function bindGameProgressionEvents() {
   EventBus.on(EVENTS.RESULT_CALCULATED, trackResultProgression);
 }
 
+function trackCustomerFlowMetrics(data = {}) {
+  const metrics = data.customerFlowMetrics ?? {};
+  const staff = data.staff ?? {};
+  const entries = [
+    ["ux:customer_wait:avg_seconds", Number(metrics.averageWaitSeconds)],
+    ["ux:checkout_queue:max", Number(metrics.maxCheckoutQueue)],
+    ["ux:active_customers:max", Number(metrics.maxActiveCustomers)],
+    ["ux:stockout:seconds", Number(metrics.outOfStockSeconds)],
+    ["ux:nuisance:count", Number(metrics.nuisanceEventCount)],
+    ["ux:nuisance:timeout_count", Number(metrics.nuisanceTimeoutCount)],
+    ["ux:nuisance:avg_response_ms", Number(metrics.averageNuisanceResponseMs)],
+    ["ux:positive_guest:count", Number(metrics.positiveGuestCount)],
+    ["ux:staff:warehouse_help", Number(staff.warehouseHelpCount)],
+    ["ux:staff:shelf_help", Number(staff.shelfHelpCount)],
+    ["ux:staff:cleaning_help", Number(staff.cleaningHelpCount)]
+  ];
+
+  entries.forEach(([eventName, value]) => {
+    if (Number.isFinite(value) && value >= 0) {
+      AnalyticsSystem.trackDesignEvent(eventName, value);
+    }
+  });
+}
+
+function bindGameplayUxEvents() {
+  if (gameplayUxListenersBound) return;
+  gameplayUxListenersBound = true;
+
+  EventBus.on(EVENTS.RESULT_CALCULATED, trackCustomerFlowMetrics);
+
+  EventBus.on(EVENTS.CUSTOMER_LEFT, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `customer:left:${normalizeAnalyticsToken(data.reason, "unknown")}`
+    );
+  });
+
+  EventBus.on(CUSTOMER_EVENT_OPENED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `nuisance:opened:${normalizeAnalyticsToken(data.eventId, "event")}`
+    );
+  });
+
+  EventBus.on(CUSTOMER_EVENT_CHOICE_SELECTED, (data = {}) => {
+    const eventId = normalizeAnalyticsToken(data.eventId, "event");
+    const choiceId = normalizeAnalyticsToken(data.choiceId, "choice");
+    AnalyticsSystem.trackDesignEvent(
+      `nuisance:choice:${eventId}:${choiceId}`,
+      Math.max(0, Number(data.responseTimeMs) || 0)
+    );
+  });
+
+  EventBus.on(CUSTOMER_EVENT_RESPONSE_TIMEOUT, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `nuisance:timeout:${normalizeAnalyticsToken(data.eventId, "event")}`
+    );
+  });
+
+  EventBus.on(STAFF_HIRED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `staff:hired:${normalizeAnalyticsToken(
+        data.candidateId ?? data.staff?.id ?? data.staffId ?? data.id,
+        "staff"
+      )}`,
+      Number(data.day) || null
+    );
+  });
+
+  EventBus.on(STAFF_ASSIST_TASK_COMPLETED, (data = {}) => {
+    if (data.success !== true) return;
+    AnalyticsSystem.trackDesignEvent(
+      `staff:assist:${normalizeAnalyticsToken(data.type, "task")}`,
+      Number(data.quantity ?? data.recoveredAmount) || null
+    );
+  });
+
+  EventBus.on(USER_IDENTITY_EVENTS.FIRST_LOGIN_REWARD_GRANTED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `first_login_reward:granted:${normalizeAnalyticsToken(data.identitySource, "unknown")}`,
+      Number(data.amount) || null
+    );
+  });
+
+  EventBus.on(USER_IDENTITY_EVENTS.FIRST_LOGIN_REWARD_CLAIMED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `first_login_reward:claimed:${normalizeAnalyticsToken(data.identitySource, "unknown")}`,
+      Number(data.amount) || null
+    );
+  });
+}
+
 function queueFirstSessionEvent() {
   if (firstEventSent || safeStorageGet(CONSENT_KEY) !== "granted") {
     return;
@@ -729,6 +849,7 @@ export const AnalyticsSystem = {
     bindShopEvents();
     bindCommunityCouponEvents();
     bindGlobalErrorEvents();
+    bindGameplayUxEvents();
 
     if (this.getConsent() === "granted") {
       this.initialize();
@@ -784,6 +905,7 @@ export const AnalyticsSystem = {
     callGameAnalytics("setEnabledInfoLog", false);
     callGameAnalytics("setEnabledVerboseLog", false);
     callGameAnalytics("configureBuild", ANALYTICS_CONFIG.build);
+    callGameAnalytics("configureUserId", UserIdentitySystem.getUserId());
     callGameAnalytics(
       "configureAvailableResourceCurrencies",
       [...ANALYTICS_CONFIG.resourceCurrencies]
