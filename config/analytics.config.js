@@ -1,17 +1,17 @@
 /*
   analytics.config.js
-  GameAnalytics DEV 연결 설정
+  GameAnalytics PROD 연결 설정
   - GameAnalytics 화면의 Game key / Secret key를 로컬에서 직접 붙여넣으세요.
   - 채팅, 이슈, 공개 문서에는 키를 다시 적지 마세요.
 */
 
 export const ANALYTICS_CONFIG = Object.freeze({
-  environment: "DEV",
-  gameKey: "f9ac3872a7e33b2326e2d7dfd9c1cef0",
-  secretKey: "f7b1514fa87c1704715a49fcda816209766c5623",
-  build: "web 1.0.0",
-  sdkUrl: "https://unpkg.com/gameanalytics@5.0.0/dist/GameAnalytics.js",
-  debug: true,
+  environment: "PROD",
+  gameKey: "fdc00e8aa32fa8964ffed6aca81bdfce",
+  secretKey: "4bf13de7abb5e7d052afe80db9a4a5b8354b7f92",
+  build: "web 1.0.1",
+  sdkUrl: "https://unpkg.com/gameanalytics@5.0.0/dist/GameAnalytics.min.js",
+  debug: false,
   resourceCurrencies: Object.freeze(["Gold", "Diamond"]),
   resourceItemTypes: Object.freeze([
     "Gameplay",
