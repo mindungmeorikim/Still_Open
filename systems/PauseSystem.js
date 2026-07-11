@@ -87,9 +87,11 @@ export const PauseSystem = {
 
     if (existingOverlay) {
       this.overlay = existingOverlay;
-      this.overlay.hidden = true;
-      this.overlay.classList.add("hidden");
+      this.clearFocusInside(this.overlay);
+      this.overlay.inert = true;
       this.overlay.setAttribute("aria-hidden", "true");
+      this.overlay.classList.add("hidden");
+      this.overlay.hidden = true;
       this.bindOverlayResumeButton();
       this.placePauseButtonNearSettings();
       return;
@@ -118,6 +120,7 @@ export const PauseSystem = {
     overlay.id = "game-pause-overlay";
     overlay.className = "game-pause-overlay hidden";
     overlay.hidden = true;
+    overlay.inert = true;
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-hidden", "true");
@@ -309,6 +312,37 @@ export const PauseSystem = {
     });
   },
 
+  clearFocusInside(element) {
+    const activeElement = document.activeElement;
+
+    if (activeElement instanceof HTMLElement && element?.contains?.(activeElement)) {
+      activeElement.blur();
+      return true;
+    }
+
+    return false;
+  },
+
+  focusSafely(element) {
+    if (!(element instanceof HTMLElement)) return false;
+
+    if (
+      element.disabled ||
+      element.hidden ||
+      element.getAttribute("aria-hidden") === "true" ||
+      element.closest(".hidden, [hidden], [inert], [aria-hidden='true']")
+    ) {
+      return false;
+    }
+
+    try {
+      element.focus({ preventScroll: true });
+      return document.activeElement === element;
+    } catch (_error) {
+      return false;
+    }
+  },
+
   updatePauseUi() {
     this.placePauseButtonNearSettings();
 
@@ -322,12 +356,22 @@ export const PauseSystem = {
     }
 
     if (this.button) {
+      if (!canShowButton && document.activeElement === this.button) {
+        this.button.blur();
+      }
+
       this.button.hidden = !canShowButton;
       this.button.disabled = !canShowButton;
       this.button.tabIndex = canShowButton ? 0 : -1;
       this.button.classList.toggle("is-active", this.isPaused);
       this.button.setAttribute("aria-pressed", this.isPaused ? "true" : "false");
       this.button.setAttribute("aria-label", this.isPaused ? "게임 계속하기" : "게임 일시정지");
+
+      if (canShowButton) {
+        this.button.removeAttribute("aria-hidden");
+      } else {
+        this.button.setAttribute("aria-hidden", "true");
+      }
 
       const icon = this.button.querySelector(".game-pause-button-icon");
       const label = this.button.querySelector(".game-pause-button-label");
@@ -337,9 +381,33 @@ export const PauseSystem = {
     }
 
     if (this.overlay) {
-      this.overlay.hidden = !this.isPaused;
-      this.overlay.classList.toggle("hidden", !this.isPaused);
-      this.overlay.setAttribute("aria-hidden", this.isPaused ? "false" : "true");
+      const wasVisible = !this.overlay.hidden && !this.overlay.classList.contains("hidden");
+
+      if (this.isPaused) {
+        this.overlay.hidden = false;
+        this.overlay.classList.remove("hidden");
+        this.overlay.inert = false;
+        this.overlay.setAttribute("aria-hidden", "false");
+
+        if (!wasVisible) {
+          window.requestAnimationFrame(() => {
+            this.focusSafely(this.overlay?.querySelector("#game-pause-resume-button"));
+          });
+        }
+      } else {
+        // 계속하기 버튼의 포커스를 먼저 제거한 후 오버레이를 숨긴다.
+        this.clearFocusInside(this.overlay);
+        this.overlay.inert = true;
+        this.overlay.setAttribute("aria-hidden", "true");
+        this.overlay.classList.add("hidden");
+        this.overlay.hidden = true;
+
+        if (wasVisible && canShowButton) {
+          window.requestAnimationFrame(() => {
+            this.focusSafely(this.button);
+          });
+        }
+      }
     }
   }
 };

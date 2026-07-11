@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260711-v8-gameanalytics-prod";
+const CACHE_NAME = "still-open-release-20260711-v8-a11y-focus-fix";
 
 const APP_SHELL = [
   "./",

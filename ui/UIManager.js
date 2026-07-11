@@ -227,12 +227,14 @@ export const UIManager = {
   dayScenarioModal: null,
   orderModal: null,
   warehouseInventoryModal: null,
+  warehouseInventoryReturnFocusElement: null,
   warehouseInventoryActiveCategory: "all",
   warehouseInventoryActiveStatus: "all",
   warehouseInventoryListScrollTop: 0,
   bmContractShopModal: null,
   bmPurchaseConfirmModal: null,
   bmShopResultModal: null,
+  bmShopResultReturnFocusElement: null,
   bmShopActiveTab: "recommend",
   bmShopRenderRafId: null,
   staffHireModal: null,
@@ -2929,15 +2931,31 @@ export const UIManager = {
   },
 
   focusElementSafely(element) {
+    if (!(element instanceof HTMLElement)) return false;
+
     if (
-      element instanceof HTMLElement &&
-      !element.disabled &&
-      !element.hidden &&
-      !element.closest(".hidden") &&
-      element.getAttribute("aria-hidden") !== "true"
+      element.disabled ||
+      element.hidden ||
+      element.getAttribute("aria-hidden") === "true" ||
+      element.closest(".hidden, [hidden], [inert], [aria-hidden='true']")
     ) {
-      element.focus?.({ preventScroll: true });
+      return false;
     }
+
+    try {
+      element.focus?.({ preventScroll: true });
+      return document.activeElement === element;
+    } catch (_error) {
+      return false;
+    }
+  },
+
+  restoreFocusSafely(element, fallbackElement = null) {
+    window.requestAnimationFrame(() => {
+      if (!this.focusElementSafely(element)) {
+        this.focusElementSafely(fallbackElement);
+      }
+    });
   },
 
   closeTitleScreen() {
@@ -3579,6 +3597,15 @@ export const UIManager = {
     }
 
     [...topIconMenu.querySelectorAll(".hud-icon-button")].forEach((button) => {
+      const isPauseButton = button.id === "game-pause-button";
+
+      // 일시정지 버튼의 표시/포커스 상태는 PauseSystem이 전담한다.
+      // 여기서 숨기면 포커스가 남은 버튼에 aria-hidden이 적용될 수 있다.
+      if (isPauseButton) {
+        button.classList.remove("top-icon-secondary-hidden");
+        return;
+      }
+
       const isSettingsButton = button === settingsButton;
       const isDailyMissionButton = button === dailyMissionButton;
       const isRewardInboxButton = button === rewardInboxButton;
@@ -11198,6 +11225,9 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       }
 
       this.bmShopResultModal = existingModal;
+      const isHidden = existingModal.classList.contains("hidden");
+      existingModal.inert = isHidden;
+      existingModal.setAttribute("aria-hidden", isHidden ? "true" : "false");
       this.bindBMShopResultModalEvents();
       return;
     }
@@ -11209,6 +11239,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
     modal.setAttribute("aria-labelledby", "bm-shop-result-title");
+    modal.setAttribute("aria-hidden", "true");
+    modal.inert = true;
     modal.innerHTML = `
       <div class="bm-shop-result-content">
         <div id="bm-shop-result-badge" class="bm-shop-result-badge" aria-hidden="true">✓</div>
@@ -11407,18 +11439,38 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     okButton.textContent = options.confirmText ?? "확인";
     this.bindBMShopResultConfirmButton(okButton);
 
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement && !modal.contains(activeElement)) {
+      this.bmShopResultReturnFocusElement = activeElement;
+    }
+
     this.bindBMShopResultModalEvents();
+    modal.inert = false;
     modal.classList.remove("hidden");
-    modal.removeAttribute("aria-hidden");
-    this.focusElementSafely(okButton);
+    modal.setAttribute("aria-hidden", "false");
+    window.requestAnimationFrame(() => {
+      this.focusElementSafely(okButton);
+    });
   },
 
   hideBMShopResultModal() {
-    if (!this.bmShopResultModal) return;
+    const modal = this.bmShopResultModal;
+    if (!modal) return;
 
-    this.bmShopResultModal.classList.add("hidden");
-    this.bmShopResultModal.setAttribute("aria-hidden", "true");
+    const returnFocusElement = this.bmShopResultReturnFocusElement;
+    this.bmShopResultReturnFocusElement = null;
+
+    // 숨기기 전에 내부 버튼의 포커스를 제거해야 aria-hidden 경고가 발생하지 않는다.
+    this.clearFocusInsideElement(modal);
+    modal.inert = true;
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.add("hidden");
     this.refreshBMShopAfterResultClose();
+
+    const fallbackElement = this.bmContractShopModal?.querySelector?.(
+      ".bm-shop-tab-button.is-active, #bm-contract-shop-close-button"
+    );
+    this.restoreFocusSafely(returnFocusElement, fallbackElement);
   },
 
   refreshBMShopAfterResultClose() {
@@ -12730,6 +12782,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     modal.id = "warehouse-inventory-modal";
     modal.className = "modal hidden warehouse-inventory-modal";
     modal.setAttribute("aria-hidden", "true");
+    modal.inert = true;
     modal.innerHTML = `
       <div class="modal-content warehouse-inventory-modal-content" role="dialog" aria-modal="true" aria-labelledby="warehouse-inventory-title">
         <div class="warehouse-inventory-frame">
@@ -12822,19 +12875,41 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       : "all";
     this.warehouseInventoryListScrollTop = 0;
     this.renderWarehouseInventoryModal();
-    this.warehouseInventoryModal.classList.remove("hidden");
-    this.warehouseInventoryModal.setAttribute("aria-hidden", "false");
+
+    const modal = this.warehouseInventoryModal;
+    const activeElement = document.activeElement;
+    if (activeElement instanceof HTMLElement && !modal.contains(activeElement)) {
+      this.warehouseInventoryReturnFocusElement = activeElement;
+    }
+
+    modal.inert = false;
+    modal.classList.remove("hidden");
+    modal.setAttribute("aria-hidden", "false");
     document.body.classList.add("is-warehouse-inventory-open");
+
+    window.requestAnimationFrame(() => {
+      this.focusElementSafely(document.getElementById("warehouse-inventory-close-button"));
+    });
   },
 
   hideWarehouseInventoryModal() {
-    if (!this.warehouseInventoryModal) return;
+    const modal = this.warehouseInventoryModal;
+    if (!modal) return;
 
-    const list = this.warehouseInventoryModal.querySelector(".warehouse-inventory-product-list");
+    const list = modal.querySelector(".warehouse-inventory-product-list");
     this.warehouseInventoryListScrollTop = list?.scrollTop ?? 0;
-    this.warehouseInventoryModal.classList.add("hidden");
-    this.warehouseInventoryModal.setAttribute("aria-hidden", "true");
+
+    const returnFocusElement = this.warehouseInventoryReturnFocusElement;
+    this.warehouseInventoryReturnFocusElement = null;
+
+    // 닫기 버튼에 남은 포커스를 제거한 후 접근성 트리에서 숨긴다.
+    this.clearFocusInsideElement(modal);
+    modal.inert = true;
+    modal.setAttribute("aria-hidden", "true");
+    modal.classList.add("hidden");
     document.body.classList.remove("is-warehouse-inventory-open");
+
+    this.restoreFocusSafely(returnFocusElement, document.getElementById("stock-info"));
   },
 
   isWarehouseInventoryModalVisible() {
