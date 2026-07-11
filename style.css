@@ -33026,3 +33026,13 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight
     font-size: 11px !important;
   }
 }
+
+
+/* =========================================================
+   v12.1 — 손님 성향 상시 배지 제거
+   - 성향 효과는 유지하고 필요한 순간의 말풍선/토스트로만 안내
+   - 이전 캐시나 기존 DOM에 남은 배지도 즉시 숨김
+   ========================================================= */
+.customer-trait-badge {
+  display: none !important;
+}

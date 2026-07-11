@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260712-v12-nuisance-profile-badge-fix";
+const CACHE_NAME = "still-open-release-20260712-v13-trait-badge-removed";
 
 const APP_SHELL = [
   "./",

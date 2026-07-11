@@ -5154,24 +5154,9 @@ renderDebugCollisionBoxes() {
   },
 
   syncCustomerTraitBadge(customerNode, customer = {}) {
-    let badge = customerNode.querySelector(":scope > .customer-trait-badge");
-    const icon = String(customer.traitIcon ?? "").trim();
-
-    if (!icon) {
-      badge?.remove();
-      return;
-    }
-
-    if (!badge) {
-      badge = document.createElement("span");
-      badge.className = "customer-trait-badge";
-      badge.setAttribute("aria-hidden", "true");
-      customerNode.appendChild(badge);
-    }
-
-    badge.textContent = icon;
-    badge.title = customer.traitLabel ?? "손님 성향";
-    badge.dataset.traitId = customer.traitId ?? "";
+    // 손님 성향은 행동과 상황별 말풍선으로만 전달한다.
+    // 이전 버전에서 생성된 배지가 남아 있어도 렌더링 시 즉시 제거한다.
+    customerNode.querySelector(":scope > .customer-trait-badge")?.remove();
   },
 
   syncCustomerSprite(customerNode, customer, assetPath, displayText) {
