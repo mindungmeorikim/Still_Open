@@ -13,11 +13,15 @@ const CONSENT_KEY = "still_open_analytics_consent";
 const SDK_SCRIPT_ID = "gameanalytics-sdk-script";
 const FIRST_EVENT_ID = "game:start";
 
+let initializationRequested = false;
 let initialized = false;
 let sdkLoaded = false;
+let sdkReady = false;
 let sdkLoadPromise = null;
-let firstEventQueued = false;
+let readyListenerRegistered = false;
+let firstEventSent = false;
 let lastErrorMessage = "";
+const pendingDesignEvents = [];
 
 function safeStorageGet(key) {
   try {
@@ -63,7 +67,6 @@ function callGameAnalytics(command, ...args) {
   }
 }
 
-
 function getResolvedSdkUrl() {
   const configuredUrl = String(ANALYTICS_CONFIG.sdkUrl ?? "").trim();
 
@@ -90,6 +93,7 @@ function loadSdk() {
     const existingScript = document.getElementById(SDK_SCRIPT_ID);
 
     if (existingScript?.dataset.loaded === "true") {
+      sdkLoaded = true;
       resolve(true);
       return;
     }
@@ -111,8 +115,12 @@ function loadSdk() {
       lastErrorMessage = "GameAnalytics SDK를 불러오지 못했습니다.";
       sdkLoadPromise = null;
       sdkLoaded = false;
+      sdkReady = false;
       initialized = false;
-      firstEventQueued = false;
+      initializationRequested = false;
+      readyListenerRegistered = false;
+      firstEventSent = false;
+      pendingDesignEvents.length = 0;
 
       if (Array.isArray(window.GameAnalytics?.q)) {
         window.GameAnalytics.q.length = 0;
@@ -134,13 +142,69 @@ function loadSdk() {
   return sdkLoadPromise;
 }
 
-function queueFirstSessionEvent() {
-  if (firstEventQueued) {
+function sendDesignEventNow(eventName, value = null) {
+  if (Number.isFinite(value)) {
+    return callGameAnalytics("addDesignEvent", eventName, Number(value));
+  }
+
+  return callGameAnalytics("addDesignEvent", eventName);
+}
+
+function flushPendingDesignEvents() {
+  while (pendingDesignEvents.length > 0) {
+    const event = pendingDesignEvents.shift();
+    sendDesignEventNow(event.eventName, event.value);
+  }
+}
+
+function sendFirstSessionEvent() {
+  if (firstEventSent || safeStorageGet(CONSENT_KEY) !== "granted") {
     return;
   }
 
-  firstEventQueued = true;
-  callGameAnalytics("addDesignEvent", FIRST_EVENT_ID);
+  firstEventSent = true;
+  sendDesignEventNow(FIRST_EVENT_ID);
+}
+
+function markSdkReady() {
+  if (sdkReady) {
+    return;
+  }
+
+  sdkReady = true;
+  initialized = true;
+  lastErrorMessage = "";
+
+  if (readyListenerRegistered) {
+    callGameAnalytics("removeRemoteConfigsListener", sdkReadyListener);
+    readyListenerRegistered = false;
+  }
+
+  // SDK의 init 응답 처리와 session_start 생성이 끝난 다음 태스크에서
+  // 첫 커스텀 이벤트를 전송해 "SDK is disabled" 타이밍 오류를 방지합니다.
+  window.setTimeout(() => {
+    if (safeStorageGet(CONSENT_KEY) !== "granted") {
+      return;
+    }
+
+    sendFirstSessionEvent();
+    flushPendingDesignEvents();
+  }, 0);
+}
+
+const sdkReadyListener = Object.freeze({
+  onRemoteConfigsUpdated() {
+    markSdkReady();
+  }
+});
+
+function registerSdkReadyListener() {
+  if (readyListenerRegistered) {
+    return;
+  }
+
+  readyListenerRegistered = true;
+  callGameAnalytics("addRemoteConfigsListener", sdkReadyListener);
 }
 
 export const AnalyticsSystem = {
@@ -167,16 +231,22 @@ export const AnalyticsSystem = {
     return Object.freeze({
       consent: this.getConsent(),
       configured: this.isConfigured(),
+      initializationRequested,
       initialized,
       sdkLoaded,
+      sdkReady,
       environment: ANALYTICS_CONFIG.environment,
       lastErrorMessage
     });
   },
 
   initialize() {
-    if (initialized) {
+    if (sdkReady) {
       callGameAnalytics("setEnabledEventSubmission", true);
+      return true;
+    }
+
+    if (initializationRequested) {
       return true;
     }
 
@@ -184,6 +254,7 @@ export const AnalyticsSystem = {
       return false;
     }
 
+    initializationRequested = true;
     ensureCommandQueue();
     loadSdk();
 
@@ -198,14 +269,17 @@ export const AnalyticsSystem = {
       "configureAvailableResourceItemTypes",
       [...ANALYTICS_CONFIG.resourceItemTypes]
     );
+
+    // init 완료 시 SDK가 호출하는 공식 remote-config ready listener를 먼저 등록합니다.
+    // 콜백은 remote config 사용 여부와 관계없이 init 응답 처리 과정에서 실행됩니다.
+    registerSdkReadyListener();
+
     callGameAnalytics(
       "initialize",
       ANALYTICS_CONFIG.gameKey,
       ANALYTICS_CONFIG.secretKey
     );
 
-    initialized = true;
-    queueFirstSessionEvent();
     return true;
   },
 
@@ -214,7 +288,7 @@ export const AnalyticsSystem = {
     safeStorageSet(CONSENT_KEY, consent);
 
     if (consent === "granted") {
-      if (initialized) {
+      if (sdkReady) {
         callGameAnalytics("setEnabledEventSubmission", true);
         return true;
       }
@@ -222,7 +296,9 @@ export const AnalyticsSystem = {
       return this.initialize();
     }
 
-    if (initialized) {
+    pendingDesignEvents.length = 0;
+
+    if (initializationRequested) {
       callGameAnalytics("setEnabledEventSubmission", false);
     }
 
@@ -230,7 +306,7 @@ export const AnalyticsSystem = {
   },
 
   trackDesignEvent(eventName, value = null) {
-    if (this.getConsent() !== "granted" || !initialized) {
+    if (this.getConsent() !== "granted" || !initializationRequested) {
       return false;
     }
 
@@ -240,10 +316,16 @@ export const AnalyticsSystem = {
       return false;
     }
 
-    if (Number.isFinite(value)) {
-      return callGameAnalytics("addDesignEvent", safeEventName, Number(value));
+    const safeValue = Number.isFinite(value) ? Number(value) : null;
+
+    if (!sdkReady) {
+      pendingDesignEvents.push({
+        eventName: safeEventName,
+        value: safeValue
+      });
+      return true;
     }
 
-    return callGameAnalytics("addDesignEvent", safeEventName);
+    return sendDesignEventNow(safeEventName, safeValue);
   }
 };

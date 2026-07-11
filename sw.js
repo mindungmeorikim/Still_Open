@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260711-v3-analytics-crypto-fix";
+const CACHE_NAME = "still-open-release-20260711-v4-analytics-event-ready";
 
 const APP_SHELL = [
   "./",
