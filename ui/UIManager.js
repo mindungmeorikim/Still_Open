@@ -200,6 +200,7 @@ export const UIManager = {
   tutorialActionHandler: null,
   tutorialHighlightedTargets: [],
   tutorialPendingStepId: null,
+  tutorialAnalyticsTrackedSteps: new Set(),
   pendingFirstRunTutorialAfterDailyReward: false,
   tutorialCompletedKey: "stillOpen.tutorial.completed",
   tutorialLegacyCompletedKeys: [],
@@ -483,6 +484,9 @@ export const UIManager = {
 
     if (skipButton) {
       skipButton.onclick = () => {
+        if (this.tutorialSessionStartedCompleted !== true) {
+          AnalyticsSystem.trackDesignEvent("tutorial:skip", this.tutorialStepIndex + 1);
+        }
         this.completeTutorialAndCleanup({
           markCompleted: true,
           message: "튜토리얼을 건너뛰었습니다. 필요하면 오른쪽 위 도움말 버튼에서 다시 볼 수 있어요."
@@ -952,11 +956,15 @@ export const UIManager = {
     }
 
     this.tutorialSessionStartedCompleted = this.isTutorialCompleted();
+    this.tutorialAnalyticsTrackedSteps = new Set();
     this.tutorialStepIndex = startIndex;
     // 기본 튜토리얼은 항상 작은 말풍선형 체험 모드로 보여준다.
     // 도움말에서 다시 열 때도 큰 팝업형 가이드로 돌아가지 않게 한다.
     this.tutorialMode = options.mode === "guide" ? "guide" : "interactive";
     this.tutorialPendingStepId = null;
+    if (this.tutorialMode === "interactive" && this.tutorialSessionStartedCompleted !== true) {
+      AnalyticsSystem.trackDesignEvent("tutorial:start");
+    }
     this.tutorialOverlay.dataset.mode = this.tutorialMode;
     this.tutorialOverlay.classList.remove("hidden");
     this.tutorialOverlay.setAttribute("aria-hidden", "false");
@@ -1200,6 +1208,9 @@ export const UIManager = {
     }
 
     if (nextIndex >= steps.length) {
+      if (this.tutorialSessionStartedCompleted !== true) {
+        AnalyticsSystem.trackDesignEvent("tutorial:complete");
+      }
       this.completeTutorialAndCleanup({
         markCompleted: true,
         message: "튜토리얼을 완료했습니다. 오른쪽 위 도움말 버튼에서 다시 볼 수 있어요."
@@ -1242,6 +1253,20 @@ export const UIManager = {
     if (this.syncOrderDeliveryTutorialArrival(step)) return;
 
     this.setTutorialStepClass(step.id);
+
+    if (
+      isInteractiveMode &&
+      this.tutorialSessionStartedCompleted !== true &&
+      !this.tutorialAnalyticsTrackedSteps.has(step.id)
+    ) {
+      this.tutorialAnalyticsTrackedSteps.add(step.id);
+      const analyticsStepId = String(step.id ?? "unknown")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, "_")
+        .slice(0, 32) || "unknown";
+      AnalyticsSystem.trackDesignEvent(`tutorial:step:${analyticsStepId}`);
+    }
 
     if (title) title.textContent = displayTitle;
     if (kicker) {
@@ -2272,6 +2297,10 @@ export const UIManager = {
     }
 
     const wasTutorialAlreadyCompleted = this.tutorialSessionStartedCompleted === true;
+
+    if (!wasTutorialAlreadyCompleted) {
+      AnalyticsSystem.trackDesignEvent("tutorial:complete");
+    }
 
     this.completeTutorialAndCleanup({
       markCompleted: true,
@@ -11054,6 +11083,16 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     this.prepareUiImageButtons(modal);
   },
 
+  getBMShopAnalyticsItemId(options = {}) {
+    const product = options.product ?? {};
+    return String(product.id ?? options.id ?? "bm_shop_action")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 32) || "bm_shop_action";
+  },
+
   showBMShopPurchaseConfirm(options = {}, onConfirm = null) {
     if (!this.bmPurchaseConfirmModal) {
       this.createBMShopPurchaseConfirmModal();
@@ -11069,6 +11108,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       name: options.name ?? "상점 상품",
       imagePath: options.imagePath ?? BM_ASSETS.rewardIcons.reward
     };
+    const analyticsItemId = this.getBMShopAnalyticsItemId({ ...options, product });
 
     if (!modal || !body || !yesButton || !noButton) {
       this.showMessage("구매 확인창을 열 수 없습니다. 다시 시도해주세요.");
@@ -11099,8 +11139,11 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       </article>
     `;
 
+    AnalyticsSystem.trackDesignEvent(`shop:purchase:attempt:${analyticsItemId}`);
+
     yesButton.onclick = () => {
       if (this.shouldBlockBMDiamondPurchase(options.requiredDiamond)) {
+        AnalyticsSystem.trackDesignEvent("shop:purchase:fail:not_enough_diamond");
         this.hideBMShopPurchaseConfirm();
         return;
       }
@@ -11111,6 +11154,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     };
 
     noButton.onclick = () => {
+      AnalyticsSystem.trackDesignEvent(`shop:purchase:cancel:${analyticsItemId}`);
       this.hideBMShopPurchaseConfirm();
     };
 
@@ -11466,6 +11510,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
 
     this.renderBMContractShopModal();
     this.bmContractShopModal.classList.remove("hidden");
+    AnalyticsSystem.trackDesignEvent("shop:open");
   },
 
   hideBMContractShopModal() {
@@ -11527,6 +11572,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       button.setAttribute("aria-selected", isActive ? "true" : "false");
       button.onclick = () => {
         this.bmShopActiveTab = button.dataset.tab || "recommend";
+        AnalyticsSystem.trackDesignEvent(`shop:tab:${this.bmShopActiveTab}`);
         this.renderBMContractShopModal();
       };
     });
@@ -12242,6 +12288,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         const subTab = button.dataset.subTab;
         if (!subTab) return;
         this.setBMShopActiveSubTab(mainTab, subTab);
+        AnalyticsSystem.trackDesignEvent(`shop:subtab:${mainTab}:${subTab}`);
         this.renderBMContractShopModal();
       };
     });
@@ -12253,6 +12300,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
         const targetTab = button.dataset.routeTab;
         if (!targetTab) return;
         this.bmShopActiveTab = targetTab;
+        AnalyticsSystem.trackDesignEvent(`shop:tab:${targetTab}`);
         this.renderBMContractShopModal();
       };
     });

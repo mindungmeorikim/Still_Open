@@ -1,5 +1,19 @@
 # 변경 이력
 
+## [v8.12.0] GameAnalytics 핵심 운영 데이터 연결
+
+### Added
+- Gold/Diamond Resource Event: 발주, 정산 매출, 손실/패널티, 임금, 강화, 확장, 미션·출석·보상, 상점 교환/구매를 Source/Sink로 기록합니다.
+- 상점 전환 이벤트: 상점 열기, 탭/세부 탭 이동, 구매 확인, 취소, 성공, 실패를 기록합니다.
+- 튜토리얼 이벤트: 최초 튜토리얼 시작, 단계 진입, 완료, 건너뛰기를 기록합니다.
+- 무한 모드 게임오버 원인을 Day 값과 함께 기록합니다.
+- window error와 unhandledrejection을 개인정보 노출을 줄인 Error Event로 기록합니다.
+
+### Safety
+- 이벤트는 기존 AnalyticsSystem 유휴 큐에서 한 번에 하나씩 전송합니다.
+- 저장 불러오기와 디버그 재화 지급은 Resource Source로 집계하지 않습니다.
+- 플레이어/손님/알바, 충돌, 좌표, 카메라, HUD 렌더링 로직은 변경하지 않았습니다.
+
 ## [v8.11.0] GameAnalytics DEV 1차 연동
 
 ### Added

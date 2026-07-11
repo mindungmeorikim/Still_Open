@@ -20,6 +20,34 @@ const PROGRESSION_STATUS = Object.freeze({
   COMPLETE: 2,
   FAIL: 3
 });
+const RESOURCE_FLOW = Object.freeze({
+  SOURCE: "Source",
+  SINK: "Sink"
+});
+const CURRENCY_CHANGED_EVENT = "CURRENCY_CHANGED";
+const EXPANSION_CONSTRUCTION_STARTED = "EXPANSION_CONSTRUCTION_STARTED";
+const STAFF_UNPAID_WAGE_PAID = "STAFF_UNPAID_WAGE_PAID";
+const ANALYTICS_ERROR_MESSAGE_LIMIT = 500;
+
+const SHOP_SUCCESS_EVENTS = Object.freeze({
+  BM_CONTRACT_PURCHASED: "contract",
+  BM_PREMIUM_PRODUCT_PURCHASED: "premium_product",
+  BM_CONTRACT_UNLOCK_SKIPPED: "contract_skip",
+  BM_DIAMOND_PRODUCT_PURCHASED: "diamond_pack",
+  BM_GOLD_PRODUCT_PURCHASED: "gold_pack",
+  BM_PEAK_COUPON_PURCHASED: "peak_coupon",
+  BM_WAREHOUSE_UPGRADED: "warehouse_upgrade",
+  BM_SHELF_UPGRADED: "shelf_upgrade",
+  BM_PRODUCT_UPGRADED: "product_upgrade",
+  BM_STAFF_ABILITY_UPGRADED: "staff_upgrade"
+});
+const SHOP_FAILURE_EVENTS = Object.freeze([
+  "BM_CONTRACT_PURCHASE_FAILED",
+  "BM_PREMIUM_PRODUCT_PURCHASE_FAILED",
+  "BM_CONTRACT_UNLOCK_SKIP_FAILED",
+  "BM_SHOP_PURCHASE_FAILED",
+  "BM_PEAK_COUPON_FAILED"
+]);
 
 let initializationRequested = false;
 let initialized = false;
@@ -30,8 +58,13 @@ let readyListenerRegistered = false;
 let firstEventSent = false;
 let lastErrorMessage = "";
 let gameProgressionListenersBound = false;
+let economyListenersBound = false;
+let shopListenersBound = false;
+let errorListenersBound = false;
 const pendingDesignEvents = [];
 const pendingProgressionEvents = [];
+const pendingResourceEvents = [];
+const pendingErrorEvents = [];
 
 // BlueStacks/저사양 WebView에서는 SDK의 이벤트 직렬화·서명·DEV 로그가
 // 같은 프레임의 게임 렌더링과 겹치면 순간적인 프레임 드롭이 생길 수 있습니다.
@@ -139,6 +172,8 @@ function loadSdk() {
       firstEventSent = false;
       pendingDesignEvents.length = 0;
       pendingProgressionEvents.length = 0;
+      pendingResourceEvents.length = 0;
+      pendingErrorEvents.length = 0;
 
       if (Array.isArray(window.GameAnalytics?.q)) {
         window.GameAnalytics.q.length = 0;
@@ -168,6 +203,21 @@ function sendDesignEventNow(eventName, value = null) {
   return callGameAnalytics("addDesignEvent", eventName);
 }
 
+function sendResourceEventNow({ flow, currency, amount, itemType, itemId }) {
+  return callGameAnalytics(
+    "addResourceEvent",
+    flow,
+    currency,
+    amount,
+    itemType,
+    itemId
+  );
+}
+
+function sendErrorEventNow({ severity, message }) {
+  return callGameAnalytics("addErrorEvent", severity, message);
+}
+
 function sendNextQueuedAnalyticsEvent() {
   if (!sdkReady || safeStorageGet(CONSENT_KEY) !== "granted") {
     return false;
@@ -185,6 +235,16 @@ function sendNextQueuedAnalyticsEvent() {
     return true;
   }
 
+  if (pendingResourceEvents.length > 0) {
+    sendResourceEventNow(pendingResourceEvents.shift());
+    return true;
+  }
+
+  if (pendingErrorEvents.length > 0) {
+    sendErrorEventNow(pendingErrorEvents.shift());
+    return true;
+  }
+
   return false;
 }
 
@@ -193,7 +253,12 @@ function scheduleAnalyticsFlush() {
     analyticsFlushScheduled ||
     !sdkReady ||
     safeStorageGet(CONSENT_KEY) !== "granted" ||
-    (pendingDesignEvents.length === 0 && pendingProgressionEvents.length === 0)
+    (
+      pendingDesignEvents.length === 0 &&
+      pendingProgressionEvents.length === 0 &&
+      pendingResourceEvents.length === 0 &&
+      pendingErrorEvents.length === 0
+    )
   ) {
     return;
   }
@@ -209,7 +274,12 @@ function scheduleAnalyticsFlush() {
 
     sendNextQueuedAnalyticsEvent();
 
-    if (pendingDesignEvents.length > 0 || pendingProgressionEvents.length > 0) {
+    if (
+      pendingDesignEvents.length > 0 ||
+      pendingProgressionEvents.length > 0 ||
+      pendingResourceEvents.length > 0 ||
+      pendingErrorEvents.length > 0
+    ) {
       scheduleAnalyticsFlush();
     }
   };
@@ -262,6 +332,238 @@ function sendProgressionEventNow({
   return callGameAnalytics(...args);
 }
 
+
+
+function normalizeAnalyticsToken(value, fallback = "unknown") {
+  const normalized = String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 32);
+
+  return normalized || fallback;
+}
+
+function getCurrencyResourceDescriptor(data = {}) {
+  const reason = String(data.reason ?? "").trim();
+  const meta = data.meta && typeof data.meta === "object" ? data.meta : {};
+
+  if (meta.source === "bm_debug_grant") {
+    return null;
+  }
+
+  const mappings = {
+    diamond_product_purchase: ["IAP", meta.productId ?? "diamond_pack"],
+    gold_product_purchase: ["Shop", meta.productId ?? "gold_exchange"],
+    gold_product_purchase_refund: ["Compensation", meta.productId ?? "gold_exchange_refund"],
+    ad_reward: ["AdReward", meta.rewardId ?? "ad_reward"],
+    peak_coupon_purchase: ["Coupon", meta.itemId ?? "peak_coupon"],
+    warehouse_upgrade: ["Upgrade", `warehouse_level_${meta.targetLevel ?? "next"}`],
+    shelf_upgrade: ["Upgrade", meta.shelfGroupId ?? meta.shelfId ?? "shelf_upgrade"],
+    product_upgrade: ["Upgrade", meta.productId ?? "product_upgrade"],
+    staff_ability_upgrade: ["Upgrade", `staff_${meta.abilityKey ?? "ability"}`],
+    contract_purchase: ["Contract", meta.productId ?? "product_contract"],
+    premium_product_purchase: ["Shop", meta.productId ?? "premium_product"],
+    contract_unlock_skip: ["Contract", "unlock_skip"],
+    daily_mission_reward: ["Mission", `mission_reward_${meta.rewardCount ?? "step"}`],
+    daily_attendance_reward: ["DailyReward", meta.rewardId ?? `attendance_${meta.attendanceDay ?? "day"}`],
+    reward_inbox_claim: ["Compensation", meta.rewardId ?? "reward_inbox"],
+    reward_code: ["Compensation", meta.campaignId ?? "reward_code"],
+    diamond_granted: ["Compensation", "diamond_granted"]
+  };
+
+  const descriptor = mappings[reason];
+
+  if (!descriptor) {
+    return ["Gameplay", normalizeAnalyticsToken(reason, "currency_change")];
+  }
+
+  return [descriptor[0], normalizeAnalyticsToken(descriptor[1])];
+}
+
+function trackCurrencyChange(data = {}) {
+  if (data.success !== true) return;
+
+  const amount = Number(data.amount);
+  const currency = data.type === "diamond" ? "Diamond" : data.type === "gold" ? "Gold" : "";
+  const flow = data.direction === "spend" ? RESOURCE_FLOW.SINK : data.direction === "add" ? RESOURCE_FLOW.SOURCE : "";
+  const descriptor = getCurrencyResourceDescriptor(data);
+
+  if (!currency || !flow || !Number.isFinite(amount) || amount <= 0 || !descriptor) {
+    return;
+  }
+
+  AnalyticsSystem.trackResourceEvent(flow, currency, amount, descriptor[0], descriptor[1]);
+}
+
+function trackOrderCost(data = {}) {
+  if (data.reason !== "order") return;
+  const amount = Number(data.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+
+  AnalyticsSystem.trackResourceEvent(
+    RESOURCE_FLOW.SINK,
+    "Gold",
+    amount,
+    "Order",
+    normalizeAnalyticsToken(data.orderId, "product_order")
+  );
+}
+
+function trackResultEconomy(data = {}) {
+  const revenue = Number(data.revenue);
+  const expiredLoss = Number(data.expiredLoss);
+  const eventPenalty = Number(data.eventPenalty);
+  const bmBonus = Number(data.bmBonus);
+  const wagePaid = Number(data.staff?.wagePaid ?? data.staff?.wageSettlement?.paidAmount);
+
+  if (Number.isFinite(revenue) && revenue > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SOURCE, "Gold", revenue, "Gameplay", "day_settlement");
+  }
+  if (Number.isFinite(expiredLoss) && expiredLoss > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SINK, "Gold", expiredLoss, "Gameplay", "expired_loss");
+  }
+  if (Number.isFinite(eventPenalty) && eventPenalty > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SINK, "Gold", eventPenalty, "Gameplay", "event_penalty");
+  }
+  if (Number.isFinite(bmBonus) && bmBonus > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SOURCE, "Gold", bmBonus, "Gameplay", "bm_bonus");
+  }
+  if (Number.isFinite(wagePaid) && wagePaid > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SINK, "Gold", wagePaid, "Wage", "daily_staff_wage");
+  }
+
+  const gameOver = data.infiniteGameOver;
+  if (gameOver?.isGameOver === true) {
+    const reason = normalizeAnalyticsToken(gameOver.primaryReason?.code, "unknown");
+    AnalyticsSystem.trackDesignEvent(`gameover:${reason}`, Number(data.day));
+  }
+}
+
+function trackRecoveryUpgradeCost(data = {}) {
+  const upgrade = data.upgrade ?? {};
+  const amount = Number(upgrade.costAmount);
+  const costType = String(upgrade.costType ?? "free").toLowerCase();
+  if (!Number.isFinite(amount) || amount <= 0 || costType === "free") return;
+
+  const currency = costType === "diamond" ? "Diamond" : costType === "gold" ? "Gold" : "";
+  if (!currency) return;
+
+  AnalyticsSystem.trackResourceEvent(
+    RESOURCE_FLOW.SINK,
+    currency,
+    amount,
+    "Upgrade",
+    normalizeAnalyticsToken(upgrade.id ?? "mental_recovery")
+  );
+}
+
+function trackExpansionConstruction(data = {}) {
+  const amount = Number(data.unlockCost);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+
+  AnalyticsSystem.trackResourceEvent(
+    RESOURCE_FLOW.SINK,
+    "Gold",
+    amount,
+    "Expansion",
+    normalizeAnalyticsToken(data.zoneId, "zone")
+  );
+}
+
+function trackExpansionCompletion(data = {}) {
+  if (data.instantComplete !== true) return;
+
+  const spentGold = Number(data.spentGold);
+  const spentDiamond = Number(data.spentDiamond);
+  const zoneId = normalizeAnalyticsToken(data.zoneId, "zone");
+
+  if (Number.isFinite(spentGold) && spentGold > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SINK, "Gold", spentGold, "Expansion", zoneId);
+  }
+  if (Number.isFinite(spentDiamond) && spentDiamond > 0) {
+    AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SINK, "Diamond", spentDiamond, "Expansion", `${zoneId}_instant`);
+  }
+}
+
+function trackUnpaidWage(data = {}) {
+  const amount = Number(data.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  AnalyticsSystem.trackResourceEvent(RESOURCE_FLOW.SINK, "Gold", amount, "Wage", "unpaid_wage");
+}
+
+function getShopResultItemId(data = {}, fallback = "purchase") {
+  return normalizeAnalyticsToken(
+    data.productId ??
+      data.product?.id ??
+      data.rewardId ??
+      data.abilityKey ??
+      data.shelfGroupId ??
+      data.shelfId ??
+      data.reason,
+    fallback
+  );
+}
+
+function bindEconomyEvents() {
+  if (economyListenersBound) return;
+  economyListenersBound = true;
+
+  EventBus.on(CURRENCY_CHANGED_EVENT, trackCurrencyChange);
+  EventBus.on(EVENTS.COST_CHANGED, trackOrderCost);
+  EventBus.on(EVENTS.RESULT_CALCULATED, trackResultEconomy);
+  EventBus.on(EVENTS.UPGRADE_SELECTED, trackRecoveryUpgradeCost);
+  EventBus.on(EXPANSION_CONSTRUCTION_STARTED, trackExpansionConstruction);
+  EventBus.on(EVENTS.EXPANSION_COMPLETED, trackExpansionCompletion);
+  EventBus.on(STAFF_UNPAID_WAGE_PAID, trackUnpaidWage);
+}
+
+function bindShopEvents() {
+  if (shopListenersBound) return;
+  shopListenersBound = true;
+
+  Object.entries(SHOP_SUCCESS_EVENTS).forEach(([eventName, fallback]) => {
+    EventBus.on(eventName, (data = {}) => {
+      AnalyticsSystem.trackDesignEvent(`shop:purchase:complete:${getShopResultItemId(data, fallback)}`);
+    });
+  });
+
+  SHOP_FAILURE_EVENTS.forEach((eventName) => {
+    EventBus.on(eventName, (data = {}) => {
+      const reason = normalizeAnalyticsToken(data.reason, "unknown");
+      AnalyticsSystem.trackDesignEvent(`shop:purchase:fail:${reason}`);
+    });
+  });
+}
+
+function sanitizeErrorMessage(value) {
+  return String(value ?? "Unknown error")
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[?&](?:key|secret|token|receipt|email)=[^&\s]+/gi, "")
+    .slice(0, ANALYTICS_ERROR_MESSAGE_LIMIT);
+}
+
+function bindGlobalErrorEvents() {
+  if (errorListenersBound || typeof window === "undefined") return;
+  errorListenersBound = true;
+
+  window.addEventListener("error", (event) => {
+    const source = String(event?.filename ?? "");
+    if (/gameanalytics/i.test(source)) return;
+
+    const location = source ? `${source.split("/").pop()}:${event?.lineno ?? 0}` : "runtime";
+    AnalyticsSystem.trackErrorEvent("Error", `${event?.message ?? "Window error"} @ ${location}`);
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event?.reason;
+    const message = reason?.message ?? reason ?? "Unhandled promise rejection";
+    if (/gameanalytics/i.test(String(message))) return;
+    AnalyticsSystem.trackErrorEvent("Error", `UnhandledPromise: ${message}`);
+  });
+}
 
 function getNormalizedDay(value) {
   const day = Math.floor(Number(value));
@@ -379,6 +681,9 @@ function registerSdkReadyListener() {
 export const AnalyticsSystem = {
   init() {
     bindGameProgressionEvents();
+    bindEconomyEvents();
+    bindShopEvents();
+    bindGlobalErrorEvents();
 
     if (this.getConsent() === "granted") {
       this.initialize();
@@ -471,6 +776,8 @@ export const AnalyticsSystem = {
 
     pendingDesignEvents.length = 0;
     pendingProgressionEvents.length = 0;
+    pendingResourceEvents.length = 0;
+    pendingErrorEvents.length = 0;
 
     if (initializationRequested) {
       callGameAnalytics("setEnabledEventSubmission", false);
@@ -531,6 +838,55 @@ export const AnalyticsSystem = {
     };
 
     pendingProgressionEvents.push(event);
+    scheduleAnalyticsFlush();
+    return true;
+  },
+
+  trackResourceEvent(flow, currency, amount, itemType, itemId) {
+    if (this.getConsent() !== "granted" || !initializationRequested) {
+      return false;
+    }
+
+    const safeFlow = flow === RESOURCE_FLOW.SOURCE || flow === RESOURCE_FLOW.SINK ? flow : null;
+    const safeCurrency = String(currency ?? "").trim();
+    const safeAmount = Number(amount);
+    const safeItemType = String(itemType ?? "").trim();
+    const safeItemId = normalizeAnalyticsToken(itemId, "unknown");
+
+    if (
+      !safeFlow ||
+      !ANALYTICS_CONFIG.resourceCurrencies.includes(safeCurrency) ||
+      !Number.isFinite(safeAmount) ||
+      safeAmount <= 0 ||
+      !ANALYTICS_CONFIG.resourceItemTypes.includes(safeItemType) ||
+      !safeItemId
+    ) {
+      return false;
+    }
+
+    pendingResourceEvents.push({
+      flow: safeFlow,
+      currency: safeCurrency,
+      amount: safeAmount,
+      itemType: safeItemType,
+      itemId: safeItemId
+    });
+    scheduleAnalyticsFlush();
+    return true;
+  },
+
+  trackErrorEvent(severity, message) {
+    if (this.getConsent() !== "granted" || !initializationRequested) {
+      return false;
+    }
+
+    const allowed = new Set(["Debug", "Info", "Warning", "Error", "Critical"]);
+    const safeSeverity = allowed.has(String(severity)) ? String(severity) : "Error";
+    const safeMessage = sanitizeErrorMessage(message);
+
+    if (!safeMessage) return false;
+
+    pendingErrorEvents.push({ severity: safeSeverity, message: safeMessage });
     scheduleAnalyticsFlush();
     return true;
   }

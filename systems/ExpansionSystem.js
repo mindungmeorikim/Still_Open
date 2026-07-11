@@ -234,6 +234,7 @@ export const ExpansionSystem = {
       effects: this.getCurrentExpansionEffects(),
       expansionState: this.getExpansionState(),
       instantComplete: options.instantComplete === true,
+      spentGold: options.spentGold ?? 0,
       spentDiamond: options.spentDiamond ?? 0,
       animation: {
         type: "expansion_unlock_puff",
