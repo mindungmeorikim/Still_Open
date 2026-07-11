@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260712-v13-trait-badge-removed";
+const CACHE_NAME = "still-open-release-20260712-v14-event-copy-wait-gauge";
 
 const APP_SHELL = [
   "./",

@@ -32568,33 +32568,62 @@ body.is-analytics-consent-active {
 /* =========================================================
    2026-07-12 CUSTOMER FLOW / NUISANCE UX FINAL OVERRIDES
    ========================================================= */
-.customer-wait-urgency {
-  display: grid;
-  gap: 3px;
-  min-width: 92px;
-  margin-top: 5px;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1.1;
+.customer-dialogue-box--checkout {
+  position: absolute;
+  box-sizing: border-box;
+  width: clamp(188px, 23vw, 230px);
+  max-width: min(230px, calc(100vw - 20px));
+  min-height: 62px;
+  max-height: 82px;
+  padding: 18px 20px 16px 18px;
+  overflow: hidden !important;
 }
 
-.customer-wait-urgency-label {
+.customer-dialogue-box--checkout .customer-wanted-image {
+  flex: 0 0 auto;
+}
+
+.customer-dialogue-box--checkout .customer-wanted-text {
+  flex: 1 1 auto;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  max-height: 2.45em;
+  overflow: hidden !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+}
+
+.customer-wait-urgency {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  z-index: 2;
   display: block;
-  text-align: center;
+  width: 50px;
+  max-width: calc(100% - 40px);
+  height: 6px;
+  margin: 0;
+  pointer-events: none;
 }
 
 .customer-wait-urgency-track {
   display: block;
   width: 100%;
-  height: 5px;
+  height: 100%;
   overflow: hidden;
+  box-sizing: border-box;
   border: 1px solid rgba(51, 37, 25, 0.68);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.88);
 }
 
 .customer-wait-urgency-fill {
   display: block;
+  width: 100%;
   height: 100%;
   border-radius: inherit;
   background: #63bd70;
@@ -33035,4 +33064,24 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight
    ========================================================= */
 .customer-trait-badge {
   display: none !important;
+}
+
+
+/* 2026-07-12 checkout bubble compact wait gauge / internal event copy removal */
+@media (max-height: 600px) and (orientation: landscape) {
+  .customer-dialogue-box--checkout {
+    width: clamp(174px, 22vw, 214px);
+    max-width: min(214px, calc(100vw - 16px));
+    min-height: 56px;
+    max-height: 74px;
+    padding: 16px 17px 14px 15px;
+  }
+
+  .customer-wait-urgency {
+    top: 7px;
+    right: 17px;
+    width: 44px;
+    height: 5px;
+    max-width: calc(100% - 34px);
+  }
 }

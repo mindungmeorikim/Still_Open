@@ -5330,7 +5330,6 @@ renderDebugCollisionBoxes() {
     if (options.context === "checkout" && Number.isFinite(options.patienceRatio)) {
       const patienceRatio = Math.max(0, Math.min(1, Number(options.patienceRatio)));
       const urgency = document.createElement("span");
-      const urgencyLabel = document.createElement("span");
       const urgencyTrack = document.createElement("span");
       const urgencyFill = document.createElement("span");
 
@@ -5340,18 +5339,12 @@ renderDebugCollisionBoxes() {
         : patienceRatio <= 0.5
           ? "warning"
           : "normal";
-      urgencyLabel.className = "customer-wait-urgency-label";
-      urgencyLabel.textContent = patienceRatio <= 0.25
-        ? "곧 떠나요!"
-        : patienceRatio <= 0.5
-          ? "기다리는 중"
-          : "계산 대기";
+      urgency.setAttribute("aria-label", "손님 계산 대기 시간");
       urgencyTrack.className = "customer-wait-urgency-track";
       urgencyFill.className = "customer-wait-urgency-fill";
       urgencyFill.style.width = `${Math.round(patienceRatio * 100)}%`;
 
       urgencyTrack.appendChild(urgencyFill);
-      urgency.appendChild(urgencyLabel);
       urgency.appendChild(urgencyTrack);
       bubble.appendChild(urgency);
     }
@@ -14991,45 +14984,6 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }).join(", ");
   },
 
-  formatCustomerEventApplicationResult(result = null) {
-    if (!result) {
-      return "실제 반영: 만족도/멘탈";
-    }
-
-    if (result.reason === "duplicate_choice_effect") {
-      return "실제 반영: 이미 처리된 선택";
-    }
-
-    const appliedParts = [];
-
-    if (Number(result.appliedRevenue) > 0) {
-      appliedParts.push(`매출 +${Number(result.appliedRevenue).toLocaleString("ko-KR")}원`);
-    }
-
-    if (Number(result.appliedPenalty) > 0) {
-      appliedParts.push(`손실/비용 -${Number(result.appliedPenalty).toLocaleString("ko-KR")}원`);
-    }
-
-    if (result.inventoryResult?.success === true) {
-      const appliedChanges = Array.isArray(result.inventoryResult.appliedChanges)
-        ? result.inventoryResult.appliedChanges
-        : [];
-
-      if (appliedChanges.length > 0) {
-        appliedParts.push(`재고 ${this.formatCustomerEventInventoryChanges(appliedChanges)}`);
-      }
-    }
-
-    if (result.inventoryResult?.success === false) {
-      appliedParts.push("재고 부족으로 매출/재고 반영 차단");
-    }
-
-    if (appliedParts.length === 0) {
-      appliedParts.push("만족도/멘탈");
-    }
-
-    return `실제 반영: ${appliedParts.join(" / ")}`;
-  },
 
   createCustomerEventResultNode(choice = {}) {
     const wrapper = document.createElement("div");
@@ -15037,8 +14991,6 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const customerReaction = document.createElement("p");
     const playerThought = document.createElement("p");
     const changesList = document.createElement("ul");
-    const specialEffect = document.createElement("p");
-    const applicationResult = document.createElement("p");
     const effects = choice.effects ?? {};
     const revenue = Number(effects.revenue) || 0;
     const cost = Number(effects.cost) || 0;
@@ -15099,14 +15051,6 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       )
     );
 
-    specialEffect.className = "customer-event-result-special";
-    specialEffect.textContent = `특수 효과: ${choice.specialEffect || "없음"}`;
-
-    applicationResult.className = "customer-event-result-application";
-    applicationResult.textContent = this.formatCustomerEventApplicationResult(
-      choice.effectApplicationResult
-    );
-
     wrapper.appendChild(title);
     wrapper.appendChild(customerReaction);
 
@@ -15115,8 +15059,6 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     }
 
     wrapper.appendChild(changesList);
-    wrapper.appendChild(specialEffect);
-    wrapper.appendChild(applicationResult);
 
     return wrapper;
   },
