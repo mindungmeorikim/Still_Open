@@ -32530,3 +32530,37 @@ body.is-analytics-consent-active {
     padding: 6px 10px !important;
   }
 }
+
+
+/* ===========================================================================
+   [v8.11.3] 상단 HUD 주기적 풀표시/축약표시 왕복 방지
+   - GAME_STATE_CHANGED가 반복될 때 전체 숫자로 되돌린 뒤 다시 축약하던 1프레임 왕복을 제거한다.
+   - 상태바 측정 중 padding/font-size transition이 재생되지 않게 고정한다.
+   - Day 카드와 상태바의 표시/그리드 위치를 고정해 BlueStacks에서 좌우로 튀지 않게 한다.
+   =========================================================================== */
+#status-panel > p,
+#status-panel > #diamond-info,
+#status-panel > #stock-info,
+#status-panel > #sanitation-info {
+  transition: none !important;
+}
+
+#status-panel.is-layout-measuring > p,
+#status-panel.is-layout-measuring > #diamond-info,
+#status-panel.is-layout-measuring > #stock-info,
+#status-panel.is-layout-measuring > #sanitation-info {
+  transition: none !important;
+}
+
+#day-card {
+  display: grid !important;
+  grid-column: 1 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+#status-panel {
+  grid-column: 2 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}

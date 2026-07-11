@@ -5516,12 +5516,33 @@ renderDebugCollisionBoxes() {
   },
 
   setTopStatusText(node, fullText, compactText = fullText) {
-    if (!node) return;
+    if (!node) return false;
 
-    node.dataset.fullText = String(fullText);
-    node.dataset.compactText = String(compactText);
-    node.textContent = String(fullText);
-    node.title = String(fullText);
+    const resolvedFullText = String(fullText);
+    const resolvedCompactText = String(compactText);
+    const panel = node.closest?.("#status-panel") ?? document.getElementById("status-panel");
+    const shouldUseCompactText = panel?.classList.contains("is-abbreviated") === true;
+    const nextVisibleText = shouldUseCompactText
+      ? resolvedCompactText
+      : resolvedFullText;
+    const hasChanged =
+      node.dataset.fullText !== resolvedFullText ||
+      node.dataset.compactText !== resolvedCompactText;
+
+    node.dataset.fullText = resolvedFullText;
+    node.dataset.compactText = resolvedCompactText;
+
+    if (node.textContent !== nextVisibleText) {
+      node.textContent = nextVisibleText;
+    }
+
+    node.title = resolvedFullText;
+
+    if (hasChanged) {
+      this.topStatusLayoutDirty = true;
+    }
+
+    return hasChanged;
   },
 
   getTopStatusNodes() {
@@ -5551,32 +5572,64 @@ renderDebugCollisionBoxes() {
 
     if (!panel || nodes.length === 0) return;
 
+    panel.classList.add("is-layout-measuring");
     panel.classList.remove("is-compact", "is-condensed", "is-abbreviated");
     nodes.forEach((node) => {
-      node.textContent = node.dataset.fullText || node.textContent || "";
+      const fullText = node.dataset.fullText || node.textContent || "";
+
+      if (node.textContent !== fullText) {
+        node.textContent = fullText;
+      }
     });
+
+    let resolvedMode = "";
 
     // 1단계: 기본 간격과 글자 크기
-    if (!this.isTopStatusOverflowing(panel, nodes)) return;
+    if (this.isTopStatusOverflowing(panel, nodes)) {
+      // 2단계: 간격과 글자 크기를 아주 조금 축소
+      panel.classList.add("is-compact");
+      resolvedMode = "compact";
 
-    // 2단계: 간격과 글자 크기를 아주 조금 축소
-    panel.classList.add("is-compact");
-    if (!this.isTopStatusOverflowing(panel, nodes)) return;
+      if (this.isTopStatusOverflowing(panel, nodes)) {
+        // 3단계: 한 번 더 최소 폭으로 압축
+        panel.classList.add("is-condensed");
+        resolvedMode = "condensed";
 
-    // 3단계: 한 번 더 최소 폭으로 압축
-    panel.classList.add("is-condensed");
-    if (!this.isTopStatusOverflowing(panel, nodes)) return;
+        if (this.isTopStatusOverflowing(panel, nodes)) {
+          // 마지막 단계: 긴 숫자만 축약해 표시하고 전체 값은 title로 유지
+          panel.classList.add("is-abbreviated");
+          resolvedMode = "abbreviated";
+          nodes.forEach((node) => {
+            const compactText =
+              node.dataset.compactText ||
+              node.dataset.fullText ||
+              node.textContent ||
+              "";
 
-    // 마지막 단계: 긴 숫자만 축약해 표시하고 전체 값은 title로 유지
-    panel.classList.add("is-abbreviated");
-    nodes.forEach((node) => {
-      node.textContent = node.dataset.compactText || node.dataset.fullText || node.textContent || "";
-    });
+            if (node.textContent !== compactText) {
+              node.textContent = compactText;
+            }
+          });
+        }
+      }
+    }
+
+    panel.dataset.adaptiveMode = resolvedMode;
+    panel.classList.remove("is-layout-measuring");
+    this.topStatusLayoutDirty = false;
   },
 
-  scheduleTopStatusAdaptiveLayout() {
+  scheduleTopStatusAdaptiveLayout(force = false) {
+    if (force) {
+      this.topStatusLayoutDirty = true;
+    }
+
+    if (!this.topStatusLayoutDirty) {
+      return;
+    }
+
     if (this.topStatusLayoutFrameId) {
-      cancelAnimationFrame(this.topStatusLayoutFrameId);
+      return;
     }
 
     this.topStatusLayoutFrameId = requestAnimationFrame(() => {
@@ -5604,12 +5657,12 @@ renderDebugCollisionBoxes() {
         }
 
         this.topStatusObservedWidth = observedWidth;
-        this.scheduleTopStatusAdaptiveLayout();
+        this.scheduleTopStatusAdaptiveLayout(true);
       });
       this.topStatusResizeObserver.observe(panel);
     } else {
       window.addEventListener("resize", () => {
-        this.scheduleTopStatusAdaptiveLayout();
+        this.scheduleTopStatusAdaptiveLayout(true);
       });
     }
   },

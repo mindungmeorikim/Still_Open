@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260711-v6-analytics-nonblocking";
+const CACHE_NAME = "still-open-release-20260711-v5-hud-stable";
 
 const APP_SHELL = [
   "./",
