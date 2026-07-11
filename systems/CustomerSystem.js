@@ -1991,6 +1991,8 @@ export const CustomerSystem = {
     const measuredCustomer = this.recordCustomerWaitMetric(customer);
     const leavingCustomer = {
       ...measuredCustomer,
+      activeCheckoutId: null,
+      checkoutStartedAt: null,
       status: CUSTOMER_STATUS.LEAVING,
       currentZone: shouldShowDepartureBubble
         ? CUSTOMER_ZONES.DOOR
@@ -2205,19 +2207,31 @@ export const CustomerSystem = {
   getCheckoutCustomerForCompletion(data = {}) {
     if (data.customerId) {
       const customer = this.getCustomerById(data.customerId);
+      const checkoutId = String(data.checkoutId ?? "").trim();
 
-      if (customer && this.isCheckoutCandidate(customer)) {
+      if (
+        customer &&
+        customer.status === CUSTOMER_STATUS.CHECKOUT &&
+        this.isCheckoutCandidate(customer) &&
+        (!checkoutId || customer.activeCheckoutId === checkoutId)
+      ) {
         return customer;
       }
 
       console.warn(
-        `[CustomerSystem] Checkout customer not found or unavailable: ${data.customerId}`
+        `[CustomerSystem] Checkout customer not found or transaction mismatch: ${data.customerId}`
       );
 
       return null;
     }
 
-    return this.getNextCheckoutCustomer();
+    // checkoutId/customerId가 없는 구형 외부 이벤트만 제한적으로 지원한다.
+    return this.customers.find((customer) => {
+      return (
+        customer.status === CUSTOMER_STATUS.CHECKOUT &&
+        this.isCheckoutCandidate(customer)
+      );
+    }) ?? null;
   },
 
   closeCustomerFlow() {
@@ -2499,23 +2513,39 @@ export const CustomerSystem = {
     return null;
   },
 
-  markCustomerAsCheckout(customerId) {
+  markCustomerAsCheckout(customerId, checkoutId = null) {
     const customer = this.getCustomerById(customerId);
+    const normalizedCheckoutId = String(checkoutId ?? "").trim();
 
-    if (!this.isCheckoutCandidate(customer)) {
+    // 계산 시작 잠금은 실제 계산대 waiting 손님에게만 허용한다.
+    if (!this.isCheckoutReadyCustomer(customer) || !normalizedCheckoutId) {
       return null;
     }
 
-    const checkoutCustomer = this.transitionCustomerStatus(
-      customer,
-      CUSTOMER_STATUS.CHECKOUT
-    );
+    const checkoutCustomer = {
+      ...this.transitionCustomerStatus(customer, CUSTOMER_STATUS.CHECKOUT),
+      activeCheckoutId: normalizedCheckoutId,
+      checkoutStartedAt: Date.now()
+    };
 
     this.replaceCustomer(checkoutCustomer);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
     return this.createCustomerPayload(checkoutCustomer);
+  },
+
+  isCheckoutTransactionActive(customerId, checkoutId) {
+    const customer = this.getCustomerById(customerId);
+    const normalizedCheckoutId = String(checkoutId ?? "").trim();
+
+    return Boolean(
+      customer &&
+      normalizedCheckoutId &&
+      customer.status === CUSTOMER_STATUS.CHECKOUT &&
+      customer.activeCheckoutId === normalizedCheckoutId &&
+      this.isCheckoutCandidate(customer)
+    );
   },
 
   handleStockShortageForCustomer(customerId, reason = "stock_shortage") {

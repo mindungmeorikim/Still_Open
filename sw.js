@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260712-v14-event-copy-wait-gauge";
+const CACHE_NAME = "still-open-release-20260712-v15-checkout-lock";
 
 const APP_SHELL = [
   "./",

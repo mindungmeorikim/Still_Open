@@ -2458,6 +2458,19 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
       return null;
     }
 
+    // 계산을 시작한 순간 손님을 checkout 상태로 잠근다.
+    // 이후 3초 계산 연출 중에는 대기 시간이 줄지 않으며,
+    // 같은 손님이 중복 계산 대상으로 다시 선택되지 않는다.
+    const lockedCustomer = CustomerSystem.markCustomerAsCheckout?.(
+      checkoutPayload.customerId,
+      checkoutPayload.checkoutId
+    );
+
+    if (!lockedCustomer) {
+      this.showActionMessage("손님 상태가 바뀌어 계산을 시작하지 못했습니다.");
+      return null;
+    }
+
     if (this.shouldDelayCheckout(checkoutPayload, options)) {
       this.scheduleDelayedCheckout(checkoutPayload, options);
       return checkoutPayload;
@@ -2610,6 +2623,23 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
   },
 
   completeCheckout(checkoutPayload = {}, options = {}) {
+    // 지연 계산 콜백이 실행될 때에도 같은 손님과 같은 계산 건이
+    // 여전히 유효한지 재검증한다. 이미 떠난 손님/취소된 계산은
+    // 매출·재고 이벤트를 절대 발생시키지 않는다.
+    const isActiveCheckout = CustomerSystem.isCheckoutTransactionActive?.(
+      checkoutPayload.customerId,
+      checkoutPayload.checkoutId
+    );
+
+    if (isActiveCheckout !== true) {
+      this.showActionMessage("손님이 계산 대기 상태가 아니어서 판매를 취소했습니다.");
+      console.warn("[PlayerActionSystem] 유효하지 않은 계산 완료 콜백을 차단했습니다.", {
+        customerId: checkoutPayload.customerId,
+        checkoutId: checkoutPayload.checkoutId
+      });
+      return null;
+    }
+
     if (!this.validateCheckoutStockBeforeComplete(checkoutPayload, options)) {
       return null;
     }
@@ -2623,6 +2653,8 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
     if (options.actorType === "staff") {
       this.emitStaffAutoCheckoutResult(true, options, null, checkoutPayload);
     }
+
+    return checkoutPayload;
   },
 
   validateCheckoutStockBeforeComplete(checkoutPayload = {}, options = {}) {
