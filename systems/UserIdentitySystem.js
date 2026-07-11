@@ -29,6 +29,7 @@ const NEW_GAME_STATE_RESET = "NEW_GAME_STATE_RESET";
 const INSTALL_ID_KEY = "still_open_install_user_id_v1";
 const FIRST_LOGIN_REWARD_BASE_ID = "first_login_diamond_30";
 const FIRST_LOGIN_REWARD_CLAIM_KEY_PREFIX = "still_open_first_login_reward_claimed_v1";
+const FIRST_LOGIN_REWARD_GRANTED_KEY_PREFIX = "still_open_first_login_reward_granted_v1";
 const FIRST_LOGIN_REWARD_SOURCE = "first_login_reward";
 const FIRST_LOGIN_REWARD_AMOUNT = 30;
 
@@ -189,11 +190,24 @@ export const UserIdentitySystem = {
     return `${FIRST_LOGIN_REWARD_CLAIM_KEY_PREFIX}:${createStableHash(this.getUserId())}`;
   },
 
+  getFirstLoginRewardGrantedKey() {
+    return `${FIRST_LOGIN_REWARD_GRANTED_KEY_PREFIX}:${createStableHash(this.getUserId())}`;
+  },
+
   hasClaimedFirstLoginReward() {
     return safeStorageGet(this.getFirstLoginRewardClaimKey()) === "claimed";
   },
 
+  hasGrantedFirstLoginReward() {
+    return safeStorageGet(this.getFirstLoginRewardGrantedKey()) === "granted";
+  },
+
+  markFirstLoginRewardGranted() {
+    return safeStorageSet(this.getFirstLoginRewardGrantedKey(), "granted");
+  },
+
   markFirstLoginRewardClaimed() {
+    this.markFirstLoginRewardGranted();
     return safeStorageSet(this.getFirstLoginRewardClaimKey(), "claimed");
   },
 
@@ -227,10 +241,19 @@ export const UserIdentitySystem = {
     });
 
     if (existingReward) {
+      this.markFirstLoginRewardGranted();
       return {
         success: true,
         reason: "already_pending",
         reward: existingReward
+      };
+    }
+
+    if (this.hasGrantedFirstLoginReward()) {
+      return {
+        success: false,
+        reason: "already_granted",
+        rewardId
       };
     }
 
@@ -250,6 +273,7 @@ export const UserIdentitySystem = {
     });
 
     if (result.success) {
+      this.markFirstLoginRewardGranted();
       EventBus.emit(USER_IDENTITY_EVENTS.FIRST_LOGIN_REWARD_GRANTED, {
         trigger,
         rewardId,

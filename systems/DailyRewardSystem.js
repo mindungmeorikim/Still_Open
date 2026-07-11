@@ -24,6 +24,7 @@ import { EconomySystem } from "./EconomySystem.js";
 
 const ATTENDANCE_STORAGE_KEY = "today_normal_open_daily_reward_v1";
 const BM_WALLET_STORAGE_KEY = "today_normal_open_bm_wallet_v1";
+const ACCOUNT_BM_WALLET_VERSION = 2;
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 const DEFAULT_ATTENDANCE_STATE = Object.freeze({
@@ -243,7 +244,14 @@ export const DailyRewardSystem = {
   },
 
   writeWallet(wallet) {
-    this.writeJson(BM_WALLET_STORAGE_KEY, wallet);
+    const normalizedWallet = {
+      ...DEFAULT_BM_WALLET,
+      ...wallet,
+      accountWalletVersion: ACCOUNT_BM_WALLET_VERSION,
+      walletUpdatedAt: Date.now()
+    };
+
+    this.writeJson(BM_WALLET_STORAGE_KEY, normalizedWallet);
   },
 
   resetForNewGame(wallet = DEFAULT_BM_WALLET) {

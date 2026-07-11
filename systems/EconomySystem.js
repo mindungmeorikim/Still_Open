@@ -32,6 +32,9 @@ const CURRENCY_TYPES = Object.freeze({
   DIAMOND: "diamond"
 });
 
+const ACCOUNT_BM_WALLET_STORAGE_KEY = "today_normal_open_bm_wallet_v1";
+const ACCOUNT_BM_WALLET_VERSION = 2;
+
 export const EconomySystem = {
   processedCheckoutKeys: new Set(),
   activeDay: null,
@@ -140,6 +143,8 @@ export const EconomySystem = {
         bm.paidWallet = bm.paidWallet && typeof bm.paidWallet === "object" ? bm.paidWallet : {};
         bm.paidWallet.diamond = this.toNonNegativeInteger(bm.paidWallet.diamond) + normalizedAmount;
       }
+
+      this.persistAccountDiamondWallet(bm.diamond);
     }
 
     const balances = this.getCurrencyBalances();
@@ -210,6 +215,35 @@ export const EconomySystem = {
     GameState.bmWallet.diamonds = GameState.bm.diamond;
 
     return GameState.bm;
+  },
+
+  persistAccountDiamondWallet(diamondAmount = 0) {
+    try {
+      if (!window?.localStorage) return false;
+
+      let storedWallet = {};
+      const rawWallet = window.localStorage.getItem(ACCOUNT_BM_WALLET_STORAGE_KEY);
+
+      if (rawWallet) {
+        const parsedWallet = JSON.parse(rawWallet);
+        if (parsedWallet && typeof parsedWallet === "object") {
+          storedWallet = parsedWallet;
+        }
+      }
+
+      const nextWallet = {
+        ...storedWallet,
+        diamonds: this.toNonNegativeInteger(diamondAmount),
+        accountWalletVersion: ACCOUNT_BM_WALLET_VERSION,
+        diamondUpdatedAt: Date.now()
+      };
+
+      window.localStorage.setItem(ACCOUNT_BM_WALLET_STORAGE_KEY, JSON.stringify(nextWallet));
+      return true;
+    } catch (error) {
+      console.warn("[EconomySystem] 계정 다이아 지갑 저장 실패", error);
+      return false;
+    }
   },
 
   normalizeCurrencyType(type) {

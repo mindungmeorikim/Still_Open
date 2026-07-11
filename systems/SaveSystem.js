@@ -24,6 +24,8 @@ import { RewardInboxSystem, REWARD_INBOX_EVENTS } from "./RewardInboxSystem.js";
 
 const SAVE_KEY = "today_normal_open_save_v1";
 const SETTINGS_KEY = "today_normal_open_settings_v1";
+const ACCOUNT_BM_WALLET_STORAGE_KEY = "today_normal_open_bm_wallet_v1";
+const ACCOUNT_BM_WALLET_VERSION = 2;
 const SAVE_VERSION = "v7.6.1";
 const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
 const NEW_GAME_STATE_RESET = "NEW_GAME_STATE_RESET";
@@ -279,14 +281,25 @@ export const SaveSystem = {
   },
 
   resetNewGameState() {
-    const paidCarryover = this.createPaidBMCarryoverSnapshot(GameState.bm);
-    const accountWalletCarryover = this.createAccountBMWalletCarryoverSnapshot(GameState.bm);
+    const persistedSaveData = this.readSaveData();
+    const persistedBM = persistedSaveData?.gameState?.bm ?? {};
+    const paidCarryover = this.createPaidBMCarryoverSnapshot(GameState.bm, persistedBM);
+    const accountWalletCarryover = this.createAccountBMWalletCarryoverSnapshot(GameState.bm, persistedBM);
+    const currentInboxSnapshot = this.normalizeRewardInboxSnapshot(RewardInboxSystem.getState());
+    const savedInboxSnapshot = this.normalizeRewardInboxSnapshot(
+      persistedSaveData?.gameState?.rewardInbox ?? this.createDefaultRewardInboxSnapshot()
+    );
+    const rewardInboxCarryover = this.hasRewardInboxProgress(currentInboxSnapshot)
+      ? currentInboxSnapshot
+      : savedInboxSnapshot;
+
     this.clearSaveData();
     this.isResettingNewGame = true;
 
     this.applyGameStateSnapshot(this.createDefaultGameStateSnapshot());
     this.applyPaidBMCarryover(paidCarryover);
     this.applyAccountBMWalletCarryover(accountWalletCarryover);
+    RewardInboxSystem.writeState(rewardInboxCarryover, { emit: false });
     DailyRewardSystem.resetForNewGame(GameState.bmWallet);
     this.applyInventorySnapshot({ lots: [], lotSequence: 0, initializedProductIds: [] });
     this.applyExpansionSnapshot({ unlockedZoneIds: ["zone_basic"], constructionZoneId: null });
@@ -1159,27 +1172,82 @@ export const SaveSystem = {
     };
   },
 
-  createPaidBMCarryoverSnapshot(source = {}) {
+  createPaidBMCarryoverSnapshot(source = {}, persistedSource = {}) {
     const paidWallet = source?.paidWallet && typeof source.paidWallet === "object"
       ? source.paidWallet
       : {};
+    const persistedPaidWallet = persistedSource?.paidWallet && typeof persistedSource.paidWallet === "object"
+      ? persistedSource.paidWallet
+      : {};
 
     return {
-      diamond: this.toNonNegativeInteger(paidWallet.diamond),
-      adSkipTickets: this.toNonNegativeInteger(paidWallet.adSkipTickets),
-      peakTimeCoupons: this.toNonNegativeInteger(paidWallet.peakTimeCoupons),
-      coffeeTickets: this.toNonNegativeInteger(paidWallet.coffeeTickets),
-      purchasedDiamondProductIds: this.createUniqueStringArray(source?.purchasedDiamondProductIds)
+      diamond: Math.max(
+        this.toNonNegativeInteger(paidWallet.diamond),
+        this.toNonNegativeInteger(persistedPaidWallet.diamond)
+      ),
+      adSkipTickets: Math.max(
+        this.toNonNegativeInteger(paidWallet.adSkipTickets),
+        this.toNonNegativeInteger(persistedPaidWallet.adSkipTickets)
+      ),
+      peakTimeCoupons: Math.max(
+        this.toNonNegativeInteger(paidWallet.peakTimeCoupons),
+        this.toNonNegativeInteger(persistedPaidWallet.peakTimeCoupons)
+      ),
+      coffeeTickets: Math.max(
+        this.toNonNegativeInteger(paidWallet.coffeeTickets),
+        this.toNonNegativeInteger(persistedPaidWallet.coffeeTickets)
+      ),
+      purchasedDiamondProductIds: this.createUniqueStringArray([
+        ...(source?.purchasedDiamondProductIds ?? []),
+        ...(persistedSource?.purchasedDiamondProductIds ?? [])
+      ])
     };
   },
 
-  createAccountBMWalletCarryoverSnapshot(source = {}) {
+  createAccountBMWalletCarryoverSnapshot(source = {}, persistedSource = {}) {
+    const storedWallet = DailyRewardSystem.readWallet();
+    const storedWalletRecord = this.readAccountBMWalletStorageRecord();
+    const hasCanonicalDiamondWallet = this.toNonNegativeInteger(
+      storedWalletRecord.accountWalletVersion
+    ) >= ACCOUNT_BM_WALLET_VERSION;
+    const storedDiamond = this.toNonNegativeInteger(storedWalletRecord.diamonds);
+
     return {
-      diamond: this.toNonNegativeInteger(source?.diamond),
-      adSkipTickets: this.toNonNegativeInteger(source?.adSkipTickets),
-      peakTimeCoupons: this.toNonNegativeInteger(source?.peakTimeCoupons),
-      coffeeTickets: this.toNonNegativeInteger(source?.coffeeTickets)
+      diamond: hasCanonicalDiamondWallet
+        ? storedDiamond
+        : Math.max(
+            this.toNonNegativeInteger(source?.diamond),
+            this.toNonNegativeInteger(persistedSource?.diamond),
+            this.toNonNegativeInteger(storedWallet.diamonds)
+          ),
+      adSkipTickets: Math.max(
+        this.toNonNegativeInteger(source?.adSkipTickets),
+        this.toNonNegativeInteger(persistedSource?.adSkipTickets),
+        this.toNonNegativeInteger(storedWallet.adSkipTickets)
+      ),
+      peakTimeCoupons: Math.max(
+        this.toNonNegativeInteger(source?.peakTimeCoupons),
+        this.toNonNegativeInteger(persistedSource?.peakTimeCoupons),
+        this.toNonNegativeInteger(storedWallet.peakTimeCoupons)
+      ),
+      coffeeTickets: Math.max(
+        this.toNonNegativeInteger(source?.coffeeTickets),
+        this.toNonNegativeInteger(persistedSource?.coffeeTickets),
+        this.toNonNegativeInteger(storedWallet.coffeeTickets)
+      )
     };
+  },
+
+  readAccountBMWalletStorageRecord() {
+    if (!this.canUseLocalStorage()) return {};
+
+    try {
+      const rawWallet = window.localStorage.getItem(ACCOUNT_BM_WALLET_STORAGE_KEY);
+      const parsedWallet = rawWallet ? JSON.parse(rawWallet) : {};
+      return parsedWallet && typeof parsedWallet === "object" ? parsedWallet : {};
+    } catch (_error) {
+      return {};
+    }
   },
 
   applyAccountBMWalletCarryover(carryover = {}) {
@@ -1204,7 +1272,8 @@ export const SaveSystem = {
       this.toNonNegativeInteger(carryover.coffeeTickets)
     );
 
-    this.syncBMWalletFromBMSnapshot(GameState.bm);
+    const syncedWallet = this.syncBMWalletFromBMSnapshot(GameState.bm);
+    DailyRewardSystem.writeWallet(syncedWallet);
   },
 
   applyPaidBMCarryover(carryover = {}) {
@@ -1212,10 +1281,8 @@ export const SaveSystem = {
       GameState.bm = this.createDefaultBMSnapshot();
     }
 
-    GameState.bm.diamond = this.toNonNegativeInteger(GameState.bm.diamond) + this.toNonNegativeInteger(carryover.diamond);
-    GameState.bm.adSkipTickets = this.toNonNegativeInteger(GameState.bm.adSkipTickets) + this.toNonNegativeInteger(carryover.adSkipTickets);
-    GameState.bm.peakTimeCoupons = this.toNonNegativeInteger(GameState.bm.peakTimeCoupons) + this.toNonNegativeInteger(carryover.peakTimeCoupons);
-    GameState.bm.coffeeTickets = this.toNonNegativeInteger(GameState.bm.coffeeTickets) + this.toNonNegativeInteger(carryover.coffeeTickets);
+    // paidWallet은 결제 유입 추적용 메타데이터입니다.
+    // 이미 사용한 유료 다이아를 새 게임에서 다시 총 잔액에 더하지 않습니다.
     GameState.bm.purchasedDiamondProductIds = this.createUniqueStringArray(carryover.purchasedDiamondProductIds);
     GameState.bm.paidWallet = {
       diamond: this.toNonNegativeInteger(carryover.diamond),
