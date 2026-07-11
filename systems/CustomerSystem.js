@@ -74,7 +74,7 @@ const CUSTOMER_TRAITS = Object.freeze({
   [CUSTOMER_TRAIT_IDS.QUICK]: Object.freeze({
     id: CUSTOMER_TRAIT_IDS.QUICK,
     label: "급한 손님",
-    icon: "⏱️",
+    icon: "급",
     weight: 24,
     patienceMultiplier: 0.78,
     fastCheckoutSeconds: 4,
@@ -83,7 +83,7 @@ const CUSTOMER_TRAITS = Object.freeze({
   [CUSTOMER_TRAIT_IDS.BULK]: Object.freeze({
     id: CUSTOMER_TRAIT_IDS.BULK,
     label: "대량 구매",
-    icon: "🛒",
+    icon: "대",
     weight: 20,
     minQuantity: 2,
     maxQuantity: 3
@@ -91,14 +91,14 @@ const CUSTOMER_TRAITS = Object.freeze({
   [CUSTOMER_TRAIT_IDS.CLEAN]: Object.freeze({
     id: CUSTOMER_TRAIT_IDS.CLEAN,
     label: "청결 중시",
-    icon: "✨",
+    icon: "청",
     weight: 18,
     sanitationThreshold: 60
   }),
   [CUSTOMER_TRAIT_IDS.VALUE]: Object.freeze({
     id: CUSTOMER_TRAIT_IDS.VALUE,
     label: "추천 상품 선호",
-    icon: "💰",
+    icon: "추",
     weight: 22,
     recommendedWeightMultiplier: 1.75
   })
@@ -1166,7 +1166,13 @@ export const CustomerSystem = {
       return null;
     }
 
-    const profileIds = getNuisanceProfileIds();
+    const dayProfileIds = RandomEventSystem.getNuisanceProfileIdsForDay(
+      GameState.day,
+      customerType.id
+    );
+    const profileIds = dayProfileIds.length > 0
+      ? dayProfileIds
+      : getNuisanceProfileIds();
 
     if (profileIds.length === 0) {
       return null;
@@ -2724,6 +2730,12 @@ export const CustomerSystem = {
 
   getRandomEventTargetCustomer() {
     const candidates = this.getWaitingCustomers().filter((customer) => {
+      // 전용 진상 손님은 위의 보장 이벤트 경로에서만 처리한다.
+      // 안전 대기 2초 전에 일반 랜덤 이벤트가 선점해 다른 선택지가 붙는 것을 방지한다.
+      if (this.needsNuisanceEventBeforeCheckout(customer)) {
+        return false;
+      }
+
       return this.getAvailableEventsForCustomer(customer).length > 0;
     });
 

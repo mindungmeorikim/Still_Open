@@ -20,6 +20,7 @@ import {
   getCustomerEventDetail
 } from "../data/EventData.js";
 import { InventorySystem } from "./InventorySystem.js";
+import { getNuisanceProfileIdForAssetVariantId } from "../data/AssetData.js";
 
 const EVENT_TYPE_RATE_BY_DAY = Object.freeze({
   1: Object.freeze({ positive: 45, neutral: 30, negative: 25 }),
@@ -360,6 +361,64 @@ export const RandomEventSystem = {
     );
   },
 
+  getCustomerNuisanceProfileId(customer = {}) {
+    const explicitProfileId = String(customer?.nuisanceProfileId ?? "").trim();
+
+    if (explicitProfileId) {
+      return explicitProfileId;
+    }
+
+    return (
+      getNuisanceProfileIdForAssetVariantId(
+        customer?.nuisanceAssetVariantId ??
+          customer?.assetVariantId ??
+          customer?.variantId ??
+          null
+      ) ?? null
+    );
+  },
+
+  getNuisanceProfileIdsForDay(day = this.getCurrentDay(), customerTypeId = "difficult") {
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const profiledEvents = CUSTOMER_EVENT_DETAILS.filter((eventDetail) => {
+      return (
+        this.isNuisanceEventDetail(eventDetail) &&
+        Boolean(eventDetail.nuisanceProfileId) &&
+        Array.isArray(eventDetail.choices) &&
+        eventDetail.choices.length > 0 &&
+        Array.isArray(eventDetail.allowedTypeIds) &&
+        eventDetail.allowedTypeIds.includes(customerTypeId)
+      );
+    });
+    const unlockedEvents = profiledEvents.filter((eventDetail) => {
+      return Number(eventDetail.unlockDay) <= safeDay;
+    });
+    let sourceEvents = unlockedEvents;
+
+    // Day 1처럼 아직 해금된 진상 이벤트가 없으면 가장 가까운 다음 해금 단계의
+    // 초반용 프로필만 사용한다. 이 덕분에 첫날부터 후반 잼민이/만취 에셋이
+    // 뽑힌 뒤 다른 사람의 선택지가 붙는 현상을 막는다.
+    if (sourceEvents.length === 0 && profiledEvents.length > 0) {
+      const nextUnlockDay = Math.min(
+        ...profiledEvents
+          .map((eventDetail) => Number(eventDetail.unlockDay) || Number.POSITIVE_INFINITY)
+          .filter((unlockDay) => unlockDay > safeDay)
+      );
+
+      sourceEvents = profiledEvents.filter((eventDetail) => {
+        return Number(eventDetail.unlockDay) === nextUnlockDay;
+      });
+    }
+
+    return Array.from(
+      new Set(
+        sourceEvents
+          .map((eventDetail) => String(eventDetail.nuisanceProfileId ?? "").trim())
+          .filter(Boolean)
+      )
+    );
+  },
+
   dedupeEventDetails(eventDetails = []) {
     const seenIds = new Set();
     const deduped = [];
@@ -384,16 +443,11 @@ export const RandomEventSystem = {
     this.resetDailyStateIfNeeded(day);
 
     // 진상 보장 이벤트는 일반 랜덤 이벤트의 1회 roll/canRoll 제한과 분리한다.
-    // 이미 일반 이벤트 판정을 시도한 손님이어도, 진상 계산대 도착 전용 모달은 100% 보장되어야 한다.
-    const unlockedNuisanceEvents = this.getAvailableEventsForCustomer(
-      customer,
-      day,
-      CUSTOMER_EVENT_TYPES.NEGATIVE
-    ).filter((eventDetail) => {
-      return this.isNuisanceEventDetail(eventDetail);
-    });
-
-    const fallbackNuisanceEvents = CUSTOMER_EVENT_DETAILS.filter((eventDetail) => {
+    // 에셋/프로필이 이미 정해진 진상 손님은 반드시 같은 nuisanceProfileId의
+    // 사건과 선택지만 받는다. 프로필이 다르면 타입이 difficult여도 후보에서 제외한다.
+    const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+    const customerProfileId = this.getCustomerNuisanceProfileId(customer);
+    const compatibleEvents = CUSTOMER_EVENT_DETAILS.filter((eventDetail) => {
       return (
         Array.isArray(eventDetail.allowedTypeIds) &&
         eventDetail.allowedTypeIds.includes(customer.typeId) &&
@@ -403,15 +457,47 @@ export const RandomEventSystem = {
       );
     });
 
-    const candidates = this.dedupeEventDetails([
-      ...unlockedNuisanceEvents,
-      ...fallbackNuisanceEvents
-    ]);
-    const candidatesWithoutLast = candidates.filter((eventDetail) => {
+    let candidates = [];
+
+    if (customerProfileId) {
+      const exactProfileEvents = compatibleEvents.filter((eventDetail) => {
+        return eventDetail.nuisanceProfileId === customerProfileId;
+      });
+      const unlockedExactEvents = exactProfileEvents.filter((eventDetail) => {
+        return Number(eventDetail.unlockDay) <= safeDay;
+      });
+
+      // 정상 진행에서는 현재 Day에 해금된 동일 프로필 사건만 사용한다.
+      // Day 1 보장 진상처럼 다음 Day용 프로필을 미리 체험시키는 경우에만
+      // 동일 프로필의 가장 이른 사건을 fallback으로 허용한다.
+      if (unlockedExactEvents.length > 0) {
+        candidates = unlockedExactEvents;
+      } else if (exactProfileEvents.length > 0) {
+        const earliestUnlockDay = Math.min(
+          ...exactProfileEvents.map((eventDetail) => Number(eventDetail.unlockDay) || 1)
+        );
+        candidates = exactProfileEvents.filter((eventDetail) => {
+          return Number(eventDetail.unlockDay) === earliestUnlockDay;
+        });
+      }
+    } else {
+      const unlockedCompatibleEvents = compatibleEvents.filter((eventDetail) => {
+        return Number(eventDetail.unlockDay) <= safeDay;
+      });
+
+      candidates = unlockedCompatibleEvents.length > 0
+        ? unlockedCompatibleEvents
+        : compatibleEvents;
+    }
+
+    const dedupedCandidates = this.dedupeEventDetails(candidates);
+    const candidatesWithoutLast = dedupedCandidates.filter((eventDetail) => {
       return eventDetail.id !== this.lastEventId;
     });
 
-    return candidatesWithoutLast.length > 0 ? candidatesWithoutLast : candidates;
+    return candidatesWithoutLast.length > 0
+      ? candidatesWithoutLast
+      : dedupedCandidates;
   },
 
   pickGuaranteedNuisanceEventForCustomer(customer, day = this.getCurrentDay()) {
@@ -421,8 +507,24 @@ export const RandomEventSystem = {
   },
 
   getFilteredEventsByType(customer, eventType, day = this.getCurrentDay()) {
+    const customerProfileId = this.getCustomerNuisanceProfileId(customer);
+
     return this.getAvailableEventsForCustomer(customer, day, eventType).filter((eventDetail) => {
-      return eventDetail.id !== this.lastEventId;
+      if (eventDetail.id === this.lastEventId) {
+        return false;
+      }
+
+      // 이미 전용 진상 에셋/프로필을 가진 손님에게 다른 인물의 진상 사건이
+      // 랜덤 경로로 붙지 않도록 동일 프로필만 허용한다.
+      if (
+        customerProfileId &&
+        this.isNuisanceEventDetail(eventDetail) &&
+        eventDetail.nuisanceProfileId !== customerProfileId
+      ) {
+        return false;
+      }
+
+      return true;
     });
   },
 

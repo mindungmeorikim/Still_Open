@@ -32985,3 +32985,44 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight
   box-sizing: border-box !important;
   overflow: hidden !important;
 }
+
+
+/* =========================================================
+   v11.1 — 손님 성향 배지 가독성 및 진상 프로필 표시 보정
+   - customer-npc의 흰 글자색 상속으로 아이콘이 사라지던 문제 수정
+   - 이모지 폰트 의존 없이 한글 1글자 배지로 표시
+   ========================================================= */
+.customer-trait-badge {
+  color: #2d241c !important;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 950 !important;
+  text-shadow: none !important;
+  border: 1px solid rgba(45, 36, 28, 0.28) !important;
+}
+
+.customer-trait-badge[data-trait-id="quick"] {
+  background: #ffe1d8 !important;
+  color: #a43d24 !important;
+}
+
+.customer-trait-badge[data-trait-id="bulk"] {
+  background: #dceeff !important;
+  color: #235f96 !important;
+}
+
+.customer-trait-badge[data-trait-id="clean"] {
+  background: #def5e4 !important;
+  color: #277044 !important;
+}
+
+.customer-trait-badge[data-trait-id="value"] {
+  background: #fff0b8 !important;
+  color: #775200 !important;
+}
+
+@media (max-aspect-ratio: 16 / 9), (max-height: 760px) {
+  .customer-trait-badge {
+    font-size: 11px !important;
+  }
+}
