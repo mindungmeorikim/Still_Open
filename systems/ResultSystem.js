@@ -21,8 +21,10 @@ import { GameState } from "../core/GameState.js";
 import { EventBus } from "../core/EventBus.js";
 import { EVENTS, GAME_PHASE, GAME_CONFIG } from "../core/Constants.js";
 import { UIManager } from "../ui/UIManager.js";
-import { getUnlockedProducts } from "../data/ProductData.js";
+import { getUnlockedProducts, getProductById } from "../data/ProductData.js";
 import { InventorySystem } from "./InventorySystem.js";
+import { BMSystem } from "./BMSystem.js";
+import { getDayScenario } from "../data/DayScenarioData.js";
 
 const ENABLE_MVP_TEST_SETTLEMENT_DATA = false;
 
@@ -109,10 +111,91 @@ export const ResultSystem = {
 
     this.processedCheckoutKeys.add(checkoutKey);
     GameState.todayStats.checkoutSuccessCount += 1;
+    this.recordProductPerformance(data);
 
     EventBus.emit(EVENTS.GAME_STATE_CHANGED, GameState);
 
     return true;
+  },
+
+  recordProductPerformance(data = {}) {
+    const productId = String(data.productId ?? data.wantedProductId ?? "").trim();
+
+    if (!productId) return;
+
+    const stats = GameState.todayStats;
+    const quantity = Math.max(1, Math.floor(Number(data.quantity) || 1));
+    const amount = Math.max(0, Number(data.amount) || 0);
+
+    stats.productSalesById = stats.productSalesById && typeof stats.productSalesById === "object"
+      ? stats.productSalesById
+      : {};
+    stats.productRevenueById = stats.productRevenueById && typeof stats.productRevenueById === "object"
+      ? stats.productRevenueById
+      : {};
+    stats.productSalesById[productId] = Math.max(0, Number(stats.productSalesById[productId]) || 0) + quantity;
+    stats.productRevenueById[productId] = Math.max(0, Number(stats.productRevenueById[productId]) || 0) + amount;
+
+    const scenario = GameState.dayScenario?.day === GameState.day
+      ? GameState.dayScenario
+      : getDayScenario(GameState.day);
+    const recommendedIds = new Set(scenario.recommendedProductIds ?? []);
+
+    if (recommendedIds.has(productId)) {
+      stats.popularProductSoldQuantity = Math.max(0, Number(stats.popularProductSoldQuantity) || 0) + quantity;
+    }
+  },
+
+  createResultHighlights(stats = {}, staffResult = {}) {
+    const highlights = [];
+    const productSales = stats.productSalesById && typeof stats.productSalesById === "object"
+      ? stats.productSalesById
+      : {};
+    const productRevenue = stats.productRevenueById && typeof stats.productRevenueById === "object"
+      ? stats.productRevenueById
+      : {};
+    const topProductEntry = Object.keys(productSales)
+      .map((productId) => ({
+        productId,
+        quantity: Math.max(0, Number(productSales[productId]) || 0),
+        revenue: Math.max(0, Number(productRevenue[productId]) || 0)
+      }))
+      .sort((a, b) => b.revenue - a.revenue || b.quantity - a.quantity)[0];
+
+    if (topProductEntry?.quantity > 0) {
+      const product = getProductById(topProductEntry.productId);
+      const name = product ? BMSystem.getProductDisplayName(product) : topProductEntry.productId;
+      highlights.push(`최고 매출 상품: ${name} · ${topProductEntry.quantity.toLocaleString("ko-KR")}개`);
+    }
+
+    const popularSold = Math.max(0, Number(stats.popularProductSoldQuantity) || 0);
+    const popularLost = Math.max(0, Number(stats.popularProductLostCustomers) || 0);
+
+    if (popularSold > 0 || popularLost > 0) {
+      highlights.push(`추천 상품 판매 ${popularSold.toLocaleString("ko-KR")}개 · 품절 이탈 ${popularLost.toLocaleString("ko-KR")}명`);
+    }
+
+    if (stats.shiftGoalCompleted === true) {
+      highlights.push(`영업 중 목표 달성 · 보너스 ₩${Math.max(0, Number(stats.shiftGoalRewardGold) || 0).toLocaleString("ko-KR")}`);
+    } else {
+      const staffTotalAssist = Math.max(
+        0,
+        Number(staffResult.totalAssistCount) ||
+          Number(staffResult.warehouseHelpCount || 0) +
+          Number(staffResult.shelfHelpCount || 0) +
+          Number(staffResult.cleaningHelpCount || 0)
+      );
+
+      if (staffTotalAssist > 0) {
+        highlights.push(`알바가 오늘 ${staffTotalAssist.toLocaleString("ko-KR")}번 매장 운영을 도왔어요`);
+      } else if (Number(stats.storeIncidentResolvedCount) > 0) {
+        highlights.push(`매장 돌발 상황 ${Number(stats.storeIncidentResolvedCount).toLocaleString("ko-KR")}건을 해결했어요`);
+      } else if (Number(stats.positiveGuestCount) > 0) {
+        highlights.push(`칭찬 손님 ${Number(stats.positiveGuestCount).toLocaleString("ko-KR")}명이 응원하고 갔어요`);
+      }
+    }
+
+    return highlights.slice(0, 3);
   },
 
   bindCustomerEvents() {
@@ -297,6 +380,7 @@ export const ResultSystem = {
           mentalSuccess
         });
     const nextStepText = this.createNextStepText(success, infiniteGameOver);
+    const resultHighlights = this.createResultHighlights(stats, staffResult);
 
     const resultData = {
       day: GameState.day,
@@ -335,6 +419,19 @@ export const ResultSystem = {
         unpaidWage: staffWageSettlement.unpaidAmount,
         totalUnpaidWage: staffWageSettlement.totalUnpaidWage,
         wagePaymentStatus: staffWageSettlement.status
+      },
+      resultHighlights,
+      popularProductPerformance: {
+        requestedQuantity: Math.max(0, Number(stats.popularProductRequestedCount) || 0),
+        soldQuantity: Math.max(0, Number(stats.popularProductSoldQuantity) || 0),
+        lostCustomers: Math.max(0, Number(stats.popularProductLostCustomers) || 0)
+      },
+      storePlayFeatures: {
+        incidentStartedCount: Math.max(0, Number(stats.storeIncidentStartedCount) || 0),
+        incidentResolvedCount: Math.max(0, Number(stats.storeIncidentResolvedCount) || 0),
+        incidentFailedCount: Math.max(0, Number(stats.storeIncidentFailedCount) || 0),
+        shiftGoalCompleted: stats.shiftGoalCompleted === true,
+        shiftGoalRewardGold: Math.max(0, Number(stats.shiftGoalRewardGold) || 0)
       },
       customerFlowMetrics: {
         averageWaitSeconds: Number(stats.customerWaitSampleCount) > 0

@@ -35,6 +35,10 @@ import { CURRENCY_EVENTS } from "../systems/EconomySystem.js";
 import { BMSystem, BM_EVENTS } from "../systems/BMSystem.js";
 import { DailyRewardSystem } from "../systems/DailyRewardSystem.js";
 import { DailyMissionSystem, DAILY_MISSION_EVENTS } from "../systems/DailyMissionSystem.js";
+import {
+  StorePlayFeatureSystem,
+  STORE_PLAY_FEATURE_EVENTS
+} from "../systems/StorePlayFeatureSystem.js";
 import { RewardCodeSystem, REWARD_CODE_EVENTS } from "../systems/RewardCodeSystem.js";
 import { RewardInboxSystem } from "../systems/RewardInboxSystem.js";
 import { RewardInboxUI } from "./RewardInboxUI.js";
@@ -50,6 +54,7 @@ const SHELF_INTERACTION_FEEDBACK_DISTANCE_CAP = Object.freeze({
 });
 const PLAYER_DIALOGUE_REQUESTED = "PLAYER_DIALOGUE_REQUESTED";
 const PLAYER_POSITION_CHANGED = "PLAYER_POSITION_CHANGED";
+const CUSTOMER_DEMAND_PHASE_CHANGED = "CUSTOMER_DEMAND_PHASE_CHANGED";
 const ORDER_CONFIRMATION_FAILED = "ORDER_CONFIRMATION_FAILED";
 const SHELF_STOCK_CHANGED = "SHELF_STOCK_CHANGED";
 const WAREHOUSE_INVENTORY_OPENED = "WAREHOUSE_INVENTORY_OPENED";
@@ -273,6 +278,8 @@ export const UIManager = {
   staffAssistState: { ...DEFAULT_STAFF_ASSIST_STATE },
   staffEntryVisualLockDay: null,
   sanitationState: { ...DEFAULT_SANITATION_STATE },
+  storePlayFeatureState: null,
+  adaptiveTextFitFrameId: null,
   notificationTimerId: null,
   isWorldCameraBound: false,
   sparkleTimeoutIds: {},
@@ -318,6 +325,7 @@ export const UIManager = {
     this.bindExpansionEvents();
     this.bindBMEvents();
     this.bindSanitationEvents();
+    this.bindStorePlayFeatureEvents();
     this.bindEndingEvents();
     this.bindOrderEvents();
     this.bindStaffEvents();
@@ -3531,6 +3539,7 @@ export const UIManager = {
 
     body.innerHTML = this.createBMDailyMissionPanelMarkup(DailyMissionSystem.getState());
     this.bindBMDailyMissionButtons();
+    this.scheduleAdaptiveTextFit(modal);
   },
 
   configureTopSettingsMenu() {
@@ -4218,6 +4227,11 @@ renderDebugCollisionBoxes() {
     });
 
     EventBus.on(EVENTS.CUSTOMER_LEFT, (data = {}) => {
+      if (data.reason === "low_sanitation_clean_customer") {
+        this.showMessage("청결을 중요하게 생각하는 손님이 위생 상태를 보고 돌아갔습니다.");
+        return;
+      }
+
       if (data.reason !== "wanted_product_out_of_stock") {
         return;
       }
@@ -4650,6 +4664,55 @@ renderDebugCollisionBoxes() {
     });
   },
 
+  bindStorePlayFeatureEvents() {
+    EventBus.on(STORE_PLAY_FEATURE_EVENTS.STATE_CHANGED, (data = {}) => {
+      this.storePlayFeatureState = data.storePlayFeatureState ?? StorePlayFeatureSystem.getState();
+      this.renderStoreIncidentIndicator();
+
+      if (this.isDailyMissionModalVisible()) {
+        this.renderDailyMissionModal();
+      }
+    });
+
+    EventBus.on(STORE_PLAY_FEATURE_EVENTS.MESSAGE_REQUESTED, (data = {}) => {
+      this.showMessage(data.message ?? "매장 상황을 확인해주세요.", {
+        duration: data.duration
+      });
+    });
+
+    [
+      STORE_PLAY_FEATURE_EVENTS.INCIDENT_STARTED,
+      STORE_PLAY_FEATURE_EVENTS.INCIDENT_UPDATED,
+      STORE_PLAY_FEATURE_EVENTS.INCIDENT_RESOLVED,
+      STORE_PLAY_FEATURE_EVENTS.INCIDENT_FAILED
+    ].forEach((eventName) => {
+      EventBus.on(eventName, () => {
+        this.storePlayFeatureState = StorePlayFeatureSystem.getState();
+        this.renderStoreIncidentIndicator();
+      });
+    });
+
+    EventBus.on(STORE_PLAY_FEATURE_EVENTS.SHIFT_GOAL_CHANGED, () => {
+      if (this.isDailyMissionModalVisible()) {
+        this.renderDailyMissionModal();
+      }
+    });
+
+    EventBus.on(CUSTOMER_DEMAND_PHASE_CHANGED, (data = {}) => {
+      if (data.isInitial === true) return;
+
+      const phaseMessages = {
+        midday: "점심 수요가 시작됐어요. 도시락과 음료를 찾는 손님이 늘어납니다.",
+        late: "야식 수요가 시작됐어요. 컵면과 간식, 온장 상품 수요가 늘어납니다."
+      };
+      const message = phaseMessages[data.phaseId];
+
+      if (message) {
+        this.showMessage(message, { duration: 3600 });
+      }
+    });
+  },
+
   bindEndingEvents() {
     EventBus.on(EVENTS.ENDING_ACHIEVED, (data) => {
       this.showEndingModal(data);
@@ -4760,6 +4823,7 @@ renderDebugCollisionBoxes() {
     });
 
     this.updateWorldDepthOrdering();
+    this.scheduleAdaptiveTextFit(customerLayer);
   },
 
   applyCustomerTargetPosition(customerNode, customer, index = 0) {
@@ -5085,7 +5149,29 @@ renderDebugCollisionBoxes() {
 
     this.syncCustomerSprite(customerNode, customer, assetPath, displayText);
     this.syncCustomerLabel(customerNode, displayText, Boolean(assetPath));
+    this.syncCustomerTraitBadge(customerNode, customer);
     this.syncCustomerBubbleLayer(customerNode, customer);
+  },
+
+  syncCustomerTraitBadge(customerNode, customer = {}) {
+    let badge = customerNode.querySelector(":scope > .customer-trait-badge");
+    const icon = String(customer.traitIcon ?? "").trim();
+
+    if (!icon) {
+      badge?.remove();
+      return;
+    }
+
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.className = "customer-trait-badge";
+      badge.setAttribute("aria-hidden", "true");
+      customerNode.appendChild(badge);
+    }
+
+    badge.textContent = icon;
+    badge.title = customer.traitLabel ?? "손님 성향";
+    badge.dataset.traitId = customer.traitId ?? "";
   },
 
   syncCustomerSprite(customerNode, customer, assetPath, displayText) {
@@ -5223,6 +5309,7 @@ renderDebugCollisionBoxes() {
         productName,
         productImagePath: customer.carriedProductImagePath,
         context: "checkout",
+        quantity: Math.max(1, Math.floor(Number(customer.carriedQuantity) || Number(customer.wantedQuantity) || 1)),
         patienceRatio: Number(customer.patienceRatio),
         waitingElapsedTime: Number(customer.waitingElapsedTime) || 0
       }
@@ -5342,6 +5429,13 @@ renderDebugCollisionBoxes() {
         "계산할게요."
       ]
     };
+    const quantity = Math.max(1, Math.floor(Number(options.quantity) || Number(customer.carriedQuantity) || Number(customer.wantedQuantity) || 1));
+
+    if (context === "checkout" && quantity > 1) {
+      const productName = String(options.productName ?? customer.carriedProductName ?? customer.wantedProductName ?? "상품");
+      return `${productName} ${quantity.toLocaleString("ko-KR")}개 계산해주세요!`;
+    }
+
     const candidates = checkoutDialogues[typeId] ?? checkoutDialogues.normal;
     const seed = String(customer.customerId ?? customer.id ?? typeId).split("").reduce((sum, char) => {
       return sum + char.charCodeAt(0);
@@ -5782,6 +5876,7 @@ renderDebugCollisionBoxes() {
     this.renderStoreObjectVisuals();
     this.renderWarehouseBox();
     this.renderCleaningZone();
+    this.renderStoreIncidentIndicator();
     this.renderSanitationHud();
     this.renderPlayer();
     this.prepareUiImageButtons();
@@ -5905,6 +6000,100 @@ renderDebugCollisionBoxes() {
     });
     this.renderDebugCollisionBoxes();
     this.updateWorldDepthOrdering();
+  },
+
+  renderStoreIncidentIndicator() {
+    const state = this.storePlayFeatureState ?? StorePlayFeatureSystem.getState();
+    const incident = state?.activeIncident ?? null;
+
+    document.querySelectorAll(".store-incident-warning").forEach((node) => node.remove());
+    document.querySelectorAll(".has-store-incident").forEach((node) => {
+      node.classList.remove("has-store-incident");
+    });
+
+    if (!incident || GameState.phase !== GAME_PHASE.STORE_RUNNING) {
+      return;
+    }
+
+    let targetNode = null;
+
+    if (incident.id === "fridge_door") {
+      targetNode = [...document.querySelectorAll('[data-shelf-id="shelf_fridge"]')].find((node) => {
+        return node.hidden !== true && node.getAttribute("aria-hidden") !== "true";
+      }) ?? null;
+    } else if (incident.id === "floor_spill") {
+      targetNode = document.getElementById("cleaning-zone");
+    }
+
+    if (!targetNode) return;
+
+    const warning = document.createElement("span");
+    warning.className = `store-incident-warning store-incident-warning--${incident.id}`;
+    warning.textContent = "!";
+    warning.setAttribute("aria-hidden", "true");
+    warning.title = incident.title ?? "매장 돌발 상황";
+    targetNode.classList.add("has-store-incident");
+    targetNode.appendChild(warning);
+  },
+
+  scheduleAdaptiveTextFit(root = document) {
+    window.cancelAnimationFrame(this.adaptiveTextFitFrameId);
+    this.adaptiveTextFitFrameId = window.requestAnimationFrame(() => {
+      this.adaptiveTextFitFrameId = null;
+      this.fitStoreFeatureText(root);
+    });
+  },
+
+  fitStoreFeatureText(root = document) {
+    const scope = root?.querySelectorAll ? root : document;
+    const nodes = scope.querySelectorAll([
+      ".store-shift-goal-card strong",
+      ".store-shift-goal-card em",
+      ".result-highlight-panel li",
+      ".customer-dialogue-text",
+      "#system-message"
+    ].join(","));
+
+    nodes.forEach((node) => {
+      this.fitTextWithoutEllipsis(node, { minFontSize: 9, step: 0.5 });
+    });
+  },
+
+  fitTextWithoutEllipsis(node, options = {}) {
+    if (!node || node.hidden || node.offsetParent === null) return;
+
+    const minFontSize = Math.max(7, Number(options.minFontSize) || 9);
+    const step = Math.max(0.25, Number(options.step) || 0.5);
+    node.style.removeProperty("font-size");
+    node.style.setProperty("text-overflow", "clip", "important");
+    node.style.setProperty("white-space", "normal", "important");
+    node.style.setProperty("overflow", "visible", "important");
+    node.style.setProperty("overflow-wrap", "anywhere", "important");
+
+    let fontSize = Number.parseFloat(window.getComputedStyle(node).fontSize) || 14;
+    let guard = 0;
+    const constrainedParent = node.parentElement ?? null;
+    const isOverflowing = () => {
+      const nodeOverflow =
+        node.scrollWidth > node.clientWidth + 1 ||
+        node.scrollHeight > node.clientHeight + 1;
+      const parentOverflow = constrainedParent
+        ? constrainedParent.scrollWidth > constrainedParent.clientWidth + 1 ||
+          constrainedParent.scrollHeight > constrainedParent.clientHeight + 1
+        : false;
+
+      return nodeOverflow || parentOverflow;
+    };
+
+    while (
+      fontSize > minFontSize &&
+      isOverflowing() &&
+      guard < 30
+    ) {
+      fontSize = Math.max(minFontSize, fontSize - step);
+      node.style.setProperty("font-size", `${fontSize}px`, "important");
+      guard += 1;
+    }
   },
 
   renderWarehouseBox() {
@@ -10675,6 +10864,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     messagePanel.classList.remove("message-panel--player-textbox");
     messagePanel.classList.remove("is-hidden");
     messagePanel.classList.add("is-visible");
+    this.scheduleAdaptiveTextFit(messagePanel);
 
     const duration = Number(options.duration) || 2400;
 
@@ -11972,11 +12162,23 @@ renderShelfWarningIcons(node, shelfInstanceId) {
   createBMDailyMissionPanelMarkup(state = {}) {
     const missions = Array.isArray(state.missions) ? state.missions : [];
     const rewards = Array.isArray(state.rewards) ? state.rewards : [];
+    const shiftGoal = StorePlayFeatureSystem.getShiftGoalState();
+    const shiftGoalMarkup = shiftGoal
+      ? `
+        <article class="store-shift-goal-card ${shiftGoal.isComplete ? "is-complete" : ""}" aria-label="영업 중 목표">
+          <div class="store-shift-goal-copy">
+            <span>영업 중 목표</span>
+            <strong>${shiftGoal.title}</strong>
+          </div>
+          <em>${shiftGoal.progressText} · 보상 ₩${Number(shiftGoal.rewardGold || 0).toLocaleString("ko-KR")}</em>
+        </article>
+      `
+      : "";
 
     return `
       <section class="bm-shop-section bm-daily-mission-panel">
         <h3>오늘의 일일 미션</h3>
-        <p class="bm-shop-section-note">오늘의 미션을 완료하고 단계별 보상을 받을 수 있습니다.</p>
+        ${shiftGoalMarkup || '<p class="bm-shop-section-note">오늘의 미션을 완료하고 단계별 보상을 받을 수 있습니다.</p>'}
         <div class="bm-daily-mission-list">
           ${missions.map((mission) => `
             <article class="bm-daily-mission-card ${mission.isComplete ? "is-complete" : ""}">
@@ -14307,6 +14509,19 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const sanitationPenaltyText = resultData.sanitationPenalty?.applies
       ? ` / 만족도 ${resultData.sanitationPenalty.satisfactionPenalty}`
       : "";
+    const resultHighlights = Array.isArray(resultData.resultHighlights)
+      ? resultData.resultHighlights.slice(0, 3).filter(Boolean)
+      : [];
+    const resultHighlightsMarkup = resultHighlights.length > 0
+      ? `
+        <section class="result-highlight-panel" aria-label="오늘의 영업 하이라이트">
+          <strong>오늘의 하이라이트</strong>
+          <ul>
+            ${resultHighlights.map((highlight) => `<li>${highlight}</li>`).join("")}
+          </ul>
+        </section>
+      `
+      : "";
     const sanitationResultRow = sanitation
       ? `
         <div class="result-row result-row-sanitation ${resultData.sanitationPenalty?.applies ? "is-warning" : ""}">
@@ -14385,6 +14600,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
               `;
             }).join("")}
           </div>
+          ${resultHighlightsMarkup}
         </section>
 
         <p class="result-next-step">${nextStepText}</p>
@@ -14402,6 +14618,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     };
 
     this.resultModal.classList.remove("hidden");
+    this.scheduleAdaptiveTextFit(this.resultModal);
   },
 
   hideResultModal() {

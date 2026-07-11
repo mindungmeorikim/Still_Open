@@ -1,3 +1,37 @@
+# v10.1.2 — 플레이 요소 확장 + UI 안전 적용 (2026-07-12)
+
+- 서비스 콤보는 추가하지 않음.
+- 영업시간을 초반/점심/야식 수요 구간으로 나누고 상품 선택 가중치를 적용.
+- 손님 성향 4종 추가: 급한 손님, 대량 구매, 청결 중시, 추천 상품 선호.
+- 오늘의 추천 상품을 실제 구매 가중치·판매/품절 통계·정산 하이라이트에 연결.
+- 긍정 손님 프로필을 동네 단골/청결 칭찬/빠른 응대/대량 구매 응원으로 확장.
+- 정산 하이라이트를 최대 3줄로 제한해 기존 정산 틀 안에서 표시.
+- 가벼운 매장 돌발 상황 2종 추가: 바닥 오염, 냉장고 문 열림.
+- 영업 중 목표 1개를 기존 일일 미션 UI에 추가하고 보상 200골드 지급.
+- 신규 문구는 말줄임 없이 자동 줄바꿈·자동 글자 축소 적용.
+- 일일 미션 안내 문구 자리를 영업 중 목표 카드로 교체해 모달 높이 증가 방지.
+- 정산 오른쪽 패널을 flex 구조로 보정해 하이라이트가 잘리지 않도록 수정.
+- 토스트의 기존 2줄 강제 줄임을 신규 안내에 대해 해제하고 자동 축소 적용.
+- PWA 캐시 버전을 v11-gameplay-variety-ui-fit으로 갱신.
+
+## 변경 파일
+
+- `core/GameState.js`
+- `main.js`
+- `style.css`
+- `sw.js`
+- `systems/AnalyticsSystem.js`
+- `systems/CustomerSystem.js`
+- `systems/GameFlowSystem.js`
+- `systems/PlayerActionSystem.js`
+- `systems/ResultSystem.js`
+- `systems/SanitationSystem.js`
+- `systems/SaveSystem.js`
+- `systems/StorePlayFeatureSystem.js` 신규
+- `ui/UIManager.js`
+
+---
+
 # 변경 이력
 
 ## [v8.12.0] GameAnalytics 핵심 운영 데이터 연결

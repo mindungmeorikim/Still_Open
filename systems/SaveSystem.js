@@ -414,6 +414,7 @@ export const SaveSystem = {
       rewardClaims: this.normalizeRewardClaimsSnapshot(RewardCodeSystem.getState()),
       rewardInbox: this.normalizeRewardInboxSnapshot(RewardInboxSystem.getState()),
       sanitation: this.normalizeSanitationSnapshot(GameState.sanitation),
+      storePlayFeatures: GameState.storePlayFeatures ?? null,
       staff: GameState.staff ?? null,
       player: GameState.player ?? null,
       expansion: GameState.expansion ?? null
@@ -455,6 +456,16 @@ export const SaveSystem = {
       rewardClaims: this.createDefaultRewardClaimsSnapshot(),
       rewardInbox: this.createDefaultRewardInboxSnapshot(),
       sanitation: this.createDefaultSanitationSnapshot(),
+      storePlayFeatures: {
+        day: 1,
+        demandPhaseId: "opening",
+        demandPhaseLabel: "영업 초반",
+        shiftGoal: null,
+        activeIncident: null,
+        incidentHistory: [],
+        incidentTriggerChecked: false,
+        incidentTriggerElapsedSeconds: 100
+      },
       staff: null,
       player: {
         x: 610,
@@ -627,7 +638,18 @@ export const SaveSystem = {
       nuisanceTimeoutCount: 0,
       nuisanceResponseTimeTotalMs: 0,
       nuisanceResponseCount: 0,
-      positiveGuestCount: 0
+      positiveGuestCount: 0,
+      popularProductRequestedCount: 0,
+      popularProductSoldQuantity: 0,
+      popularProductLostCustomers: 0,
+      customerTraitCounts: {},
+      productSalesById: {},
+      productRevenueById: {},
+      storeIncidentStartedCount: 0,
+      storeIncidentResolvedCount: 0,
+      storeIncidentFailedCount: 0,
+      shiftGoalCompleted: false,
+      shiftGoalRewardGold: 0
     };
   },
 
@@ -1024,6 +1046,9 @@ export const SaveSystem = {
     );
     GameState.sanitation = this.normalizeSanitationSnapshot(
       nextState.sanitation ?? defaultSnapshot.sanitation
+    );
+    GameState.storePlayFeatures = this.deepClone(
+      nextState.storePlayFeatures ?? defaultSnapshot.storePlayFeatures
     );
     GameState.expansion = this.deepClone(nextState.expansion ?? defaultSnapshot.expansion);
     GameState.player = this.normalizePlayerSnapshot(

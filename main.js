@@ -30,6 +30,7 @@ import { AudioSystem } from "./systems/AudioSystem.js";
 import { PauseSystem } from "./systems/PauseSystem.js";
 import { ModalFlowGuardSystem } from "./systems/ModalFlowGuardSystem.js";
 import { AnalyticsSystem } from "./systems/AnalyticsSystem.js";
+import { StorePlayFeatureSystem } from "./systems/StorePlayFeatureSystem.js";
 import {
   UserIdentitySystem,
   USER_IDENTITY_EVENTS
@@ -324,6 +325,7 @@ function initGame() {
   AudioSystem.init();
   PauseSystem.init();
   ModalFlowGuardSystem.init();
+  StorePlayFeatureSystem.init();
   UserIdentitySystem.init();
   AnalyticsSystem.init();
   MobileUI.init();

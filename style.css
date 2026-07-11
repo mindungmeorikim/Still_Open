@@ -32715,3 +32715,273 @@ body.is-analytics-consent-active {
     height: 6px;
   }
 }
+
+/* =========================================================
+   v10.1 — gameplay variety / no-truncation final overrides
+   기존 UI 틀 유지: 새 요소는 자동 줄바꿈 및 글자 자동 축소 대상
+   ========================================================= */
+
+.customer-trait-badge {
+  position: absolute;
+  left: 50%;
+  top: -14px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.24);
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.customer-dialogue-text,
+.customer-wanted-text {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+  text-align: center !important;
+  line-height: 1.2 !important;
+}
+
+.store-shift-goal-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  margin: 6px 0 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(88, 74, 44, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 249, 224, 0.9);
+  box-sizing: border-box;
+}
+
+.store-shift-goal-card.is-complete {
+  background: rgba(231, 250, 232, 0.94);
+}
+
+.store-shift-goal-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+}
+
+.store-shift-goal-copy span {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.store-shift-goal-copy strong,
+.store-shift-goal-card em {
+  min-width: 0;
+  margin: 0;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+  line-height: 1.15;
+}
+
+.store-shift-goal-copy strong {
+  font-size: 12px;
+  text-align: left;
+}
+
+.store-shift-goal-card em {
+  max-width: 148px;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  text-align: right;
+}
+
+.result-highlight-panel {
+  width: 100%;
+  margin-top: 7px;
+  padding: 7px 9px;
+  border: 1px solid rgba(76, 64, 43, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 250, 235, 0.84);
+  box-sizing: border-box;
+}
+
+.result-highlight-panel > strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.result-highlight-panel ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.result-highlight-panel li {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+  text-align: center;
+}
+
+.store-incident-warning {
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  z-index: 35;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: #fff4d6;
+  border: 2px solid #d35b32;
+  color: #9e2f18;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+  pointer-events: none;
+  animation: store-incident-warning-pulse 0.9s ease-in-out infinite alternate;
+}
+
+.has-store-incident {
+  overflow: visible !important;
+}
+
+@keyframes store-incident-warning-pulse {
+  from { transform: translateX(-50%) scale(0.92); }
+  to { transform: translateX(-50%) scale(1.08); }
+}
+
+@media (max-aspect-ratio: 16 / 9), (max-height: 760px) {
+  .store-shift-goal-card {
+    min-height: 34px;
+    margin: 4px 0 6px;
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .store-shift-goal-copy span,
+  .store-shift-goal-card em {
+    font-size: 9px;
+  }
+
+  .store-shift-goal-copy strong {
+    font-size: 11px;
+  }
+
+  .result-highlight-panel {
+    margin-top: 5px;
+    padding: 5px 7px;
+  }
+
+  .result-highlight-panel > strong,
+  .result-highlight-panel li {
+    font-size: 9px;
+  }
+
+  .customer-trait-badge {
+    top: -11px;
+    width: 21px;
+    height: 21px;
+    font-size: 12px;
+  }
+}
+
+
+/* v10.1.1 — 정산/미션 신규 정보가 기존 프레임 밖으로 밀리지 않도록 하는 최종 안전 보정 */
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 5px !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel .result-check-list {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+}
+
+body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight-panel {
+  flex: 0 0 auto !important;
+  max-height: 70px !important;
+  overflow: visible !important;
+}
+
+.daily-mission-modal-body .store-shift-goal-card {
+  flex: 0 0 auto !important;
+  min-height: 34px !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-right-panel {
+    display: flex !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight-panel {
+    max-height: none !important;
+  }
+
+  .daily-mission-modal-body .store-shift-goal-card {
+    grid-template-columns: minmax(0, 1fr) minmax(88px, auto) !important;
+  }
+}
+
+
+/* v10.1.2 — 신규 토스트 문구도 말줄임 없이 자동 축소 대상으로 통일 */
+#message-panel #system-message,
+#message-panel p#system-message {
+  display: block !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+  text-align: center !important;
+  line-height: 1.14 !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: initial !important;
+}
+
+#message-panel {
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}

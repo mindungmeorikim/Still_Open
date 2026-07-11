@@ -1,23 +1,28 @@
-오늘도 정상영업 — 손님 흐름/진상 UX/알바 가치/첫 로그인 보상 최종 패치 v3
-적용 기준: 260711 SDK PROD 연결.zip
+Still Open gameplay variety + UI safe patch v4
+Baseline: Still_Open_customer_flow_nuisance_reward_final_v3
 
-[변경 파일]
-CHANGELOG.md
-PATCH_GUIDE_DAY_FLOW_UX.md
-TEST_REPORT_DAY_FLOW_UX.md
-core/GameState.js
-main.js
-style.css
-sw.js
-systems/AnalyticsSystem.js
-systems/CustomerSystem.js
-systems/GameFlowSystem.js
-systems/ModalFlowGuardSystem.js
-systems/PauseSystem.js
-systems/RandomEventSystem.js
-systems/ResultSystem.js
-systems/SanitationSystem.js
-systems/SaveSystem.js
-systems/StaffAssistSystem.js
-systems/UserIdentitySystem.js
-ui/UIManager.js
+OVERWRITE / ADD:
+- core/GameState.js
+- main.js
+- style.css
+- sw.js
+- systems/AnalyticsSystem.js
+- systems/CustomerSystem.js
+- systems/GameFlowSystem.js
+- systems/PlayerActionSystem.js
+- systems/ResultSystem.js
+- systems/SanitationSystem.js
+- systems/SaveSystem.js
+- systems/StorePlayFeatureSystem.js (NEW)
+- ui/UIManager.js
+- CHANGELOG.md
+
+REFERENCE DOCUMENTS:
+- PATCH_GUIDE_GAMEPLAY_VARIETY_UI_SAFE.md
+- TEST_REPORT_GAMEPLAY_VARIETY_UI_SAFE.md
+
+NOT INCLUDED:
+- Service combo
+- Large new modals
+- HUD layout changes
+- World coordinates / collision box changes

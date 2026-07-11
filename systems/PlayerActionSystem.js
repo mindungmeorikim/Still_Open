@@ -49,6 +49,8 @@ const WAREHOUSE_INVENTORY_ACTION = "warehouse_inventory";
 const SANITATION_CLEANING_STARTED = "SANITATION_CLEANING_STARTED";
 const SANITATION_CLEANING_COMPLETED = "SANITATION_CLEANING_COMPLETED";
 const SANITATION_CLEANING_FAILED = "SANITATION_CLEANING_FAILED";
+const STORE_PLAY_FEATURE_STATE_CHANGED = "STORE_PLAY_FEATURE_STATE_CHANGED";
+const STORE_INCIDENT_RESOLVE_REQUESTED = "STORE_INCIDENT_RESOLVE_REQUESTED";
 const NUISANCE_CHECKOUT_DELAY_MS = 5000;
 const PLAYER_CHECKOUT_DELAY_MS = 3000;
 const VALID_CARRYING_BOX_TYPES = new Set([
@@ -81,6 +83,7 @@ export const PlayerActionSystem = {
   lastPointerActionTimeStamp: 0,
   pauseAwareActionTimerIds: new Set(),
   shelfStocks: {},
+  activeStoreIncident: null,
 
   shelf: {
     shelfId: PRODUCT_SHELF_IDS.BASIC,
@@ -172,6 +175,10 @@ export const PlayerActionSystem = {
     this.bindDeliveryBoxEvents();
     this.bindSanitationEvents();
     this.bindShelfStockEvents();
+
+    EventBus.on(STORE_PLAY_FEATURE_STATE_CHANGED, (data = {}) => {
+      this.activeStoreIncident = data.storePlayFeatureState?.activeIncident ?? null;
+    });
 
     EventBus.on(TUTORIAL_PRACTICE_RESET_REQUESTED, () => {
       this.resetTutorialPracticeActions();
@@ -506,6 +513,11 @@ export const PlayerActionSystem = {
       return;
     }
 
+    if (target.type === "store_incident") {
+      this.resolveStoreIncident(target);
+      return;
+    }
+
     if (target.type === "shelf") {
       this.handleShelfRestockAction({
         shelfId: target.shelfId,
@@ -587,6 +599,10 @@ export const PlayerActionSystem = {
     if (!GameState.player) return;
 
     const requestedShelf = this.getShelfSlot(options.shelfInstanceId ?? options.shelfId);
+
+    if (this.tryResolveStoreIncidentFromShelf(requestedShelf)) {
+      return;
+    }
 
     if (!this.isNearShelf(requestedShelf)) {
       this.showActionMessage("진열대에 더 가까이 가야 합니다.");
@@ -1028,6 +1044,12 @@ export const PlayerActionSystem = {
       return counterTarget;
     }
 
+    const incidentTarget = this.getStoreIncidentInteractionTarget();
+
+    if (incidentTarget) {
+      return incidentTarget;
+    }
+
     const shelfTargets = this.getNearbyShelfTargets()
       .sort((first, second) => this.sortRestockTargets(first, second));
 
@@ -1051,6 +1073,64 @@ export const PlayerActionSystem = {
     }
 
     return shelfTargets[0] ?? null;
+  },
+
+  getStoreIncidentInteractionTarget() {
+    const incident = this.activeStoreIncident;
+
+    if (!incident || incident.id !== "fridge_door") {
+      return null;
+    }
+
+    const fridgeShelf = this.getShelfSlots().find((shelf) => {
+      return shelf.shelfId === PRODUCT_SHELF_IDS.FRIDGE;
+    }) ?? this.shelves[PRODUCT_SHELF_IDS.FRIDGE];
+
+    if (!fridgeShelf || !this.isNearShelf(fridgeShelf)) {
+      return null;
+    }
+
+    const interactionInfo = this.getShelfInteractionInfo(fridgeShelf);
+
+    return {
+      type: "store_incident",
+      incidentId: incident.id,
+      targetType: "fridge",
+      shelfId: PRODUCT_SHELF_IDS.FRIDGE,
+      shelfInstanceId: fridgeShelf.instanceId ?? null,
+      distance: interactionInfo.distance ?? 0
+    };
+  },
+
+  resolveStoreIncident(target = {}) {
+    EventBus.emit(STORE_INCIDENT_RESOLVE_REQUESTED, {
+      day: GameState.day,
+      incidentId: target.incidentId ?? this.activeStoreIncident?.id ?? null,
+      targetType: target.targetType ?? "fridge",
+      shelfId: target.shelfId ?? PRODUCT_SHELF_IDS.FRIDGE,
+      source: "player_action_system"
+    });
+  },
+
+  tryResolveStoreIncidentFromShelf(shelf = null) {
+    const incident = this.activeStoreIncident;
+
+    if (!incident || incident.id !== "fridge_door" || shelf?.shelfId !== PRODUCT_SHELF_IDS.FRIDGE) {
+      return false;
+    }
+
+    if (!this.isNearShelf(shelf)) {
+      this.showActionMessage("냉장고에 더 가까이 가야 문을 닫을 수 있습니다.");
+      return true;
+    }
+
+    this.resolveStoreIncident({
+      incidentId: incident.id,
+      targetType: "fridge",
+      shelfId: shelf.shelfId,
+      shelfInstanceId: shelf.instanceId ?? null
+    });
+    return true;
   },
 
   getCounterInteractionTarget() {
@@ -2598,7 +2678,10 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
       actorType: "player",
       checkoutIdPrefix: "checkout",
       successMessage: (checkoutPayload) => {
-        return `계산해드릴게요. ${checkoutPayload.productName} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`;
+        const quantityText = Number(checkoutPayload.quantity) > 1
+          ? ` ${Number(checkoutPayload.quantity).toLocaleString("ko-KR")}개`
+          : "";
+        return `계산해드릴게요. ${checkoutPayload.productName}${quantityText} 계산 완료 (+${checkoutPayload.amount.toLocaleString("ko-KR")}원)`;
       }
     });
   },
@@ -2620,7 +2703,7 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
 
     const wantedProductId = customer.wantedProductId;
     const carriedProductId = customer.carriedProductId ?? null;
-    const quantity = 1;
+    const quantity = Math.max(1, Math.floor(Number(customer.carriedQuantity) || Number(customer.wantedQuantity) || 1));
 
     if (
       customer.status !== "waiting" ||
@@ -2712,6 +2795,9 @@ completeShelfRestock(restockTarget = this.activeRestockTarget) {
       customerId: customer.customerId,
       customerTypeId: customer.customerTypeId ?? null,
       customerTypeName: customer.customerTypeName ?? "",
+      traitId: customer.traitId ?? null,
+      traitLabel: customer.traitLabel ?? null,
+      positiveGuestProfileId: customer.positiveGuestProfileId ?? null,
       isNuisance: customer.isNuisance === true,
       nuisanceProfileId: customer.nuisanceProfileId ?? null,
       nuisanceEventResolved: customer.nuisanceEventResolved === true,

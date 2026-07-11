@@ -62,6 +62,79 @@ const CUSTOMER_EVENT_SAFE_WAIT_SECONDS = 2;
 const POST_MODAL_GRACE_MS = 1000;
 const POSITIVE_GUEST_TIP_GOLD = 300;
 const POSITIVE_GUEST_SATISFACTION = 1;
+const CUSTOMER_FLOW_TICK = "CUSTOMER_FLOW_TICK";
+const CUSTOMER_DEMAND_PHASE_CHANGED = "CUSTOMER_DEMAND_PHASE_CHANGED";
+const CUSTOMER_TRAIT_IDS = Object.freeze({
+  QUICK: "quick",
+  BULK: "bulk",
+  CLEAN: "clean",
+  VALUE: "value"
+});
+const CUSTOMER_TRAITS = Object.freeze({
+  [CUSTOMER_TRAIT_IDS.QUICK]: Object.freeze({
+    id: CUSTOMER_TRAIT_IDS.QUICK,
+    label: "급한 손님",
+    icon: "⏱️",
+    weight: 24,
+    patienceMultiplier: 0.78,
+    fastCheckoutSeconds: 4,
+    fastCheckoutTipGold: 150
+  }),
+  [CUSTOMER_TRAIT_IDS.BULK]: Object.freeze({
+    id: CUSTOMER_TRAIT_IDS.BULK,
+    label: "대량 구매",
+    icon: "🛒",
+    weight: 20,
+    minQuantity: 2,
+    maxQuantity: 3
+  }),
+  [CUSTOMER_TRAIT_IDS.CLEAN]: Object.freeze({
+    id: CUSTOMER_TRAIT_IDS.CLEAN,
+    label: "청결 중시",
+    icon: "✨",
+    weight: 18,
+    sanitationThreshold: 60
+  }),
+  [CUSTOMER_TRAIT_IDS.VALUE]: Object.freeze({
+    id: CUSTOMER_TRAIT_IDS.VALUE,
+    label: "추천 상품 선호",
+    icon: "💰",
+    weight: 22,
+    recommendedWeightMultiplier: 1.75
+  })
+});
+const DEMAND_PHASES = Object.freeze([
+  Object.freeze({
+    id: "opening",
+    label: "출근·등교 수요",
+    startSeconds: 0,
+    productIds: Object.freeze(["coffee", "iced_americano", "triangle_kimbap", "egg_sandwich", "tuna_mayo_sandwich", "banana_milk", "water"]),
+    categories: Object.freeze(["drink", "fresh_food"]),
+    weightMultiplier: 1.55
+  }),
+  Object.freeze({
+    id: "midday",
+    label: "점심 수요",
+    startSeconds: 60,
+    productIds: Object.freeze(["lunch_box", "pork_cutlet_lunchbox", "spicy_pork_lunchbox", "cheese_kimchi_rice", "cola", "orange_juice", "healthy_salad"]),
+    categories: Object.freeze(["ready_meal", "drink"]),
+    weightMultiplier: 1.6
+  }),
+  Object.freeze({
+    id: "late",
+    label: "야식 수요",
+    startSeconds: 120,
+    productIds: Object.freeze(["ramen", "udon", "sausage_hotbar", "microwave_hotbar", "tteokbokki", "roasted_sweet_potato", "hoppang", "potato_chips", "chocolate_bar"]),
+    categories: Object.freeze(["instant_food", "snack"]),
+    weightMultiplier: 1.65
+  })
+]);
+const POSITIVE_GUEST_PROFILES = Object.freeze([
+  Object.freeze({ id: "neighbor", label: "동네 단골", dialogue: "동네에 편의점이 생겨서 좋아요. 자주 올게요!", tipGold: 300, satisfaction: 1 }),
+  Object.freeze({ id: "clean_praise", label: "청결 칭찬", dialogue: "매장이 깔끔하네요. 기분 좋게 쇼핑했어요!", tipGold: 250, satisfaction: 1, requiresSanitation: 80 }),
+  Object.freeze({ id: "quick_support", label: "빠른 응대 칭찬", dialogue: "바쁜데도 빠르게 챙겨주시네요!", tipGold: 200, satisfaction: 1, requiresFastCheckout: true }),
+  Object.freeze({ id: "bulk_support", label: "대량 구매 응원", dialogue: "필요한 걸 한 번에 살 수 있어서 좋네요!", tipGold: 350, satisfaction: 1, requiresBulkPurchase: true })
+]);
 const STORY_BASE_SPAWN_RATE_BY_DAY = Object.freeze({
   1: 1,
   2: 1.15,
@@ -170,6 +243,7 @@ export const CustomerSystem = {
   guaranteedNuisanceSpawnIndex: null,
   guaranteedPositiveGuestSpawnIndex: null,
   positiveGuestCount: 0,
+  currentDemandPhaseId: "opening",
   inventoryByProductId: {},
   pendingPickupQuantitiesByProductId: {},
 
@@ -215,7 +289,9 @@ export const CustomerSystem = {
       ? this.pickGuaranteedPositiveGuestIndex()
       : null;
     this.positiveGuestCount = 0;
+    this.currentDemandPhaseId = this.getDemandPhaseForElapsed(0).id;
     this.ensureFlowStats();
+    this.emitDemandPhaseChanged(this.getDemandPhaseForElapsed(0), true);
 
     const initialCustomerDelayMs = this.getInitialCustomerDelayMs();
 
@@ -247,6 +323,7 @@ export const CustomerSystem = {
     this.guaranteedNuisanceSpawnIndex = null;
     this.guaranteedPositiveGuestSpawnIndex = null;
     this.positiveGuestCount = 0;
+    this.currentDemandPhaseId = "opening";
     this.pendingPickupQuantitiesByProductId = {};
     this.isCustomerFlowPaused = false;
     this.isWaitTimePaused = false;
@@ -688,7 +765,19 @@ export const CustomerSystem = {
       nuisanceTimeoutCount: Math.max(0, Math.floor(Number(stats.nuisanceTimeoutCount) || 0)),
       nuisanceResponseTimeTotalMs: Math.max(0, Number(stats.nuisanceResponseTimeTotalMs) || 0),
       nuisanceResponseCount: Math.max(0, Math.floor(Number(stats.nuisanceResponseCount) || 0)),
-      positiveGuestCount: Math.max(0, Math.floor(Number(stats.positiveGuestCount) || 0))
+      positiveGuestCount: Math.max(0, Math.floor(Number(stats.positiveGuestCount) || 0)),
+      popularProductRequestedCount: Math.max(0, Math.floor(Number(stats.popularProductRequestedCount) || 0)),
+      popularProductSoldQuantity: Math.max(0, Math.floor(Number(stats.popularProductSoldQuantity) || 0)),
+      popularProductLostCustomers: Math.max(0, Math.floor(Number(stats.popularProductLostCustomers) || 0)),
+      customerTraitCounts: stats.customerTraitCounts && typeof stats.customerTraitCounts === "object"
+        ? { ...stats.customerTraitCounts }
+        : {},
+      productSalesById: stats.productSalesById && typeof stats.productSalesById === "object"
+        ? { ...stats.productSalesById }
+        : {},
+      productRevenueById: stats.productRevenueById && typeof stats.productRevenueById === "object"
+        ? { ...stats.productRevenueById }
+        : {}
     };
   },
 
@@ -764,9 +853,162 @@ export const CustomerSystem = {
     return Math.floor(lower + Math.random() * (upper - lower + 1));
   },
 
+  getDemandPhaseForElapsed(elapsedSeconds = this.flowElapsedSeconds) {
+    const safeElapsed = Math.max(0, Number(elapsedSeconds) || 0);
+    let phase = DEMAND_PHASES[0];
+
+    DEMAND_PHASES.forEach((candidate) => {
+      if (safeElapsed >= candidate.startSeconds) {
+        phase = candidate;
+      }
+    });
+
+    return phase;
+  },
+
+  updateDemandPhase() {
+    const nextPhase = this.getDemandPhaseForElapsed();
+
+    if (nextPhase.id === this.currentDemandPhaseId) {
+      return nextPhase;
+    }
+
+    this.currentDemandPhaseId = nextPhase.id;
+    this.emitDemandPhaseChanged(nextPhase, false);
+    return nextPhase;
+  },
+
+  emitDemandPhaseChanged(phase = this.getDemandPhaseForElapsed(), isInitial = false) {
+    EventBus.emit(CUSTOMER_DEMAND_PHASE_CHANGED, {
+      day: GameState.day,
+      phaseId: phase.id,
+      label: phase.label,
+      elapsedSeconds: this.flowElapsedSeconds,
+      isInitial
+    });
+  },
+
+  pickCustomerTrait(customerType = {}, spawnOrdinal = 1) {
+    if (customerType.id === "difficult") {
+      return null;
+    }
+
+    const traits = Object.values(CUSTOMER_TRAITS).map((trait) => {
+      let weight = Math.max(0, Number(trait.weight) || 0);
+
+      if (customerType.id === "hurried" && trait.id === CUSTOMER_TRAIT_IDS.QUICK) {
+        weight *= 1.6;
+      }
+
+      if (customerType.id === "student" && trait.id === CUSTOMER_TRAIT_IDS.VALUE) {
+        weight *= 1.35;
+      }
+
+      if (GameState.day === 1 && trait.id === CUSTOMER_TRAIT_IDS.BULK) {
+        weight *= 0.55;
+      }
+
+      return { trait, weight };
+    });
+    const noTraitWeight = GameState.day === 1 ? 70 : 45;
+    const totalWeight = noTraitWeight + traits.reduce((sum, entry) => sum + entry.weight, 0);
+    let target = Math.random() * totalWeight;
+
+    if (target < noTraitWeight) {
+      return null;
+    }
+
+    target -= noTraitWeight;
+
+    for (const entry of traits) {
+      target -= entry.weight;
+
+      if (target <= 0) {
+        return entry.trait;
+      }
+    }
+
+    return traits[(Math.max(1, Number(spawnOrdinal) || 1) - 1) % traits.length]?.trait ?? null;
+  },
+
+  getCustomerWantedQuantity(trait = null) {
+    if (trait?.id !== CUSTOMER_TRAIT_IDS.BULK) {
+      return 1;
+    }
+
+    return this.randomIntegerBetween(trait.minQuantity ?? 2, trait.maxQuantity ?? 3);
+  },
+
+  getWeightedWantedProduct(candidates = [], customerType = {}, trait = null) {
+    const scenario = this.getCurrentDayScenario();
+    const recommendedIds = new Set(scenario.recommendedProductIds ?? []);
+    const preferredIds = new Set(customerType.preferredProductIds ?? []);
+    const demandPhase = this.getDemandPhaseForElapsed();
+    const weighted = candidates.map((requestProduct) => {
+      const sellableProducts = getProductsByCustomerRequestId(requestProduct.id)
+        .filter((product) => this.canCustomerChooseProduct(product));
+      const representative = sellableProducts[0] ?? getProductById(requestProduct.id) ?? null;
+      let weight = 1;
+
+      if (preferredIds.has(requestProduct.id)) {
+        weight *= 1.45;
+      }
+
+      if (recommendedIds.has(requestProduct.id)) {
+        weight *= 1.85;
+
+        if (trait?.id === CUSTOMER_TRAIT_IDS.VALUE) {
+          weight *= trait.recommendedWeightMultiplier ?? 1.75;
+        }
+      }
+
+      if (demandPhase.productIds.includes(requestProduct.id)) {
+        weight *= demandPhase.weightMultiplier;
+      } else if (representative && demandPhase.categories.includes(representative.category)) {
+        weight *= 1.25;
+      }
+
+      return { requestProduct, weight: Math.max(0.05, weight) };
+    });
+    const totalWeight = weighted.reduce((sum, entry) => sum + entry.weight, 0);
+    let target = Math.random() * totalWeight;
+
+    for (const entry of weighted) {
+      target -= entry.weight;
+
+      if (target <= 0) {
+        return entry.requestProduct;
+      }
+    }
+
+    return weighted[weighted.length - 1]?.requestProduct ?? candidates[0] ?? CUSTOMER_WANTED_PRODUCTS[0];
+  },
+
+  pickPositiveGuestProfile(trait = null, wantedQuantity = 1) {
+    const rawSanitationValue = Number(GameState.sanitation?.value);
+    const sanitationValue = Math.max(
+      0,
+      Math.min(100, Number.isFinite(rawSanitationValue) ? rawSanitationValue : 100)
+    );
+    const eligible = POSITIVE_GUEST_PROFILES.filter((profile) => {
+      if (profile.requiresSanitation && sanitationValue < profile.requiresSanitation) return false;
+      if (profile.requiresBulkPurchase && wantedQuantity < 2) return false;
+      if (profile.requiresFastCheckout && trait?.id !== CUSTOMER_TRAIT_IDS.QUICK) return false;
+      return true;
+    });
+
+    if (eligible.length === 0) {
+      return POSITIVE_GUEST_PROFILES[0];
+    }
+
+    return eligible[this.customerIdCounter % eligible.length];
+  },
+
   createCustomer(spawnOrdinal = this.spawnedCustomerCount + 1) {
     const customerType = this.pickCustomerType(spawnOrdinal);
-    const wantedProduct = this.decideWantedProduct(customerType);
+    const customerTrait = this.pickCustomerTrait(customerType, spawnOrdinal);
+    const wantedProduct = this.decideWantedProduct(customerType, customerTrait);
+    const wantedQuantity = this.getCustomerWantedQuantity(customerTrait);
     const wantedShelfInstance = this.getShelfInstanceForRequest(wantedProduct.id);
     const wantedShelfId = wantedShelfInstance?.shelfId ?? this.getShelfIdForRequest(wantedProduct.id);
     const routeState = this.getRouteStateByStatus(CUSTOMER_STATUS.ENTERING);
@@ -792,14 +1034,30 @@ export const CustomerSystem = {
       spawnOrdinal,
       customerType
     );
-    const entryDialogueText = isPositiveGuest
-      ? this.pickPositiveGuestDialogue(this.customerIdCounter)
-      : this.pickCustomerEntryDialogue(customerType, this.customerIdCounter);
+    const positiveGuestProfile = isPositiveGuest
+      ? this.pickPositiveGuestProfile(customerTrait, wantedQuantity)
+      : null;
+    const entryDialogueText = positiveGuestProfile?.dialogue
+      ?? (isPositiveGuest
+        ? this.pickPositiveGuestDialogue(this.customerIdCounter)
+        : this.pickCustomerEntryDialogue(customerType, this.customerIdCounter));
 
     if (isPositiveGuest) {
       this.positiveGuestCount += 1;
       this.ensureFlowStats();
       GameState.todayStats.positiveGuestCount += 1;
+    }
+
+    this.ensureFlowStats();
+    const recommendedIds = new Set(this.getCurrentDayScenario().recommendedProductIds ?? []);
+
+    if (recommendedIds.has(wantedProduct.id)) {
+      GameState.todayStats.popularProductRequestedCount += wantedQuantity;
+    }
+
+    if (customerTrait?.id) {
+      GameState.todayStats.customerTraitCounts[customerTrait.id] =
+        Math.max(0, Number(GameState.todayStats.customerTraitCounts[customerTrait.id]) || 0) + 1;
     }
 
     return {
@@ -817,12 +1075,24 @@ export const CustomerSystem = {
       nuisanceEventResolved: false,
       nuisanceCheckoutDelayMs: 0,
       isPositiveGuest,
+      positiveGuestProfileId: positiveGuestProfile?.id ?? null,
+      positiveGuestProfileLabel: positiveGuestProfile?.label ?? null,
+      positiveGuestRequiresFastCheckout: positiveGuestProfile?.requiresFastCheckout === true,
       positiveGuestBonusApplied: false,
-      positiveGuestTipGold: isPositiveGuest ? POSITIVE_GUEST_TIP_GOLD : 0,
-      positiveGuestSatisfaction: isPositiveGuest ? POSITIVE_GUEST_SATISFACTION : 0,
+      positiveGuestTipGold: isPositiveGuest ? Number(positiveGuestProfile?.tipGold ?? POSITIVE_GUEST_TIP_GOLD) : 0,
+      positiveGuestSatisfaction: isPositiveGuest ? Number(positiveGuestProfile?.satisfaction ?? POSITIVE_GUEST_SATISFACTION) : 0,
 
-      patience: customerType.patience,
-      initialPatience: customerType.patience,
+      traitId: customerTrait?.id ?? null,
+      traitLabel: customerTrait?.label ?? null,
+      traitIcon: customerTrait?.icon ?? null,
+      fastCheckoutSeconds: Number(customerTrait?.fastCheckoutSeconds) || 0,
+      fastCheckoutTipGold: Number(customerTrait?.fastCheckoutTipGold) || 0,
+      wantedQuantity,
+      carriedQuantity: 0,
+      cleanlinessConcerned: customerTrait?.id === CUSTOMER_TRAIT_IDS.CLEAN && Number(GameState.sanitation?.value ?? 100) < Number(customerTrait.sanitationThreshold ?? 60),
+
+      patience: Math.max(8, Math.round(customerType.patience * (Number(customerTrait?.patienceMultiplier) || 1))),
+      initialPatience: Math.max(8, Math.round(customerType.patience * (Number(customerTrait?.patienceMultiplier) || 1))),
       spendBias: customerType.spendBias,
       eventChance: this.getCustomerEventChance(customerType),
 
@@ -843,7 +1113,7 @@ export const CustomerSystem = {
 
       enteringTime: this.getDefaultEnteringTime(),
       shoppingTime: this.getShoppingTimeByCustomerType(customerType),
-      waitTime: customerType.patience,
+      waitTime: Math.max(8, Math.round(customerType.patience * (Number(customerTrait?.patienceMultiplier) || 1))),
       waitingElapsedTime: 0,
       queueOrder: null,
       mood: "neutral",
@@ -987,27 +1257,13 @@ export const CustomerSystem = {
     return safeWeightedTypes[safeWeightedTypes.length - 1].type;
   },
 
-  decideWantedProduct(customerType) {
-    const preferredProductIds = customerType.preferredProductIds ?? [];
+  decideWantedProduct(customerType, customerTrait = null) {
     const availableWantedProducts = this.getAvailableWantedProducts();
+    const safeCandidates = availableWantedProducts.length > 0
+      ? availableWantedProducts
+      : CUSTOMER_WANTED_PRODUCTS;
 
-    const candidateProducts =
-      preferredProductIds.length > 0
-        ? availableWantedProducts.filter((product) => {
-            return preferredProductIds.includes(product.id);
-          })
-        : availableWantedProducts;
-
-    const safeCandidates =
-      candidateProducts.length > 0
-        ? candidateProducts
-        : availableWantedProducts.length > 0
-          ? availableWantedProducts
-          : CUSTOMER_WANTED_PRODUCTS;
-
-    const randomIndex = Math.floor(Math.random() * safeCandidates.length);
-
-    return safeCandidates[randomIndex];
+    return this.getWeightedWantedProduct(safeCandidates, customerType, customerTrait);
   },
 
   getCurrentDayScenario() {
@@ -1152,6 +1408,13 @@ export const CustomerSystem = {
     let changed = false;
 
     this.flowElapsedSeconds += safeAmount;
+    const demandPhase = this.updateDemandPhase();
+    EventBus.emit(CUSTOMER_FLOW_TICK, {
+      day: GameState.day,
+      elapsedSeconds: this.flowElapsedSeconds,
+      amount: safeAmount,
+      demandPhaseId: demandPhase.id
+    });
     this.updateRushState();
     this.updateOutOfStockMetric(safeAmount);
     this.pendingPickupQuantitiesByProductId = {};
@@ -1183,7 +1446,6 @@ export const CustomerSystem = {
 
       if (
         customer.status === CUSTOMER_STATUS.LEAVING &&
-        customer.leaveReason === "wanted_product_out_of_stock" &&
         Number(customer.leavingRenderTime) > 0
       ) {
         changed = true;
@@ -1415,11 +1677,39 @@ export const CustomerSystem = {
     const nextShoppingTime = Math.max(0, currentShoppingTime - safeAmount);
 
     if (nextShoppingTime <= 0) {
-      const carriedProduct = this.findStockedProductForRequest(
+      const rawSanitationValue = Number(GameState.sanitation?.value);
+      const sanitationValue = Math.max(
+        0,
+        Math.min(100, Number.isFinite(rawSanitationValue) ? rawSanitationValue : 100)
+      );
+
+      if (
+        customer.traitId === CUSTOMER_TRAIT_IDS.CLEAN &&
+        sanitationValue < Number(CUSTOMER_TRAITS[CUSTOMER_TRAIT_IDS.CLEAN].sanitationThreshold || 60)
+      ) {
+        return this.markCustomerAsLeaving({
+          ...customer,
+          shoppingTime: 0,
+          cleanlinessConcerned: true
+        }, "low_sanitation_clean_customer");
+      }
+
+      const requestedQuantity = Math.max(1, Math.floor(Number(customer.wantedQuantity) || 1));
+      let carriedQuantity = requestedQuantity;
+      let carriedProduct = this.findStockedProductForRequest(
         customer.wantedProductId,
-        1,
+        carriedQuantity,
         customer.id
       );
+
+      if (!carriedProduct && carriedQuantity > 1) {
+        carriedQuantity = 1;
+        carriedProduct = this.findStockedProductForRequest(
+          customer.wantedProductId,
+          carriedQuantity,
+          customer.id
+        );
+      }
 
       if (!carriedProduct) {
         return this.markCustomerAsLeaving({
@@ -1428,9 +1718,9 @@ export const CustomerSystem = {
         }, "wanted_product_out_of_stock");
       }
 
-      this.reservePickupQuantity(carriedProduct.id, 1);
+      this.reservePickupQuantity(carriedProduct.id, carriedQuantity);
 
-      this.consumeShelfStockForProduct(carriedProduct.id, 1, {
+      this.consumeShelfStockForProduct(carriedProduct.id, carriedQuantity, {
         customerId: customer.id,
         shelfInstanceId: carriedProduct.shelfInstanceId ?? customer.targetShelfInstanceId ?? null
       });
@@ -1442,6 +1732,7 @@ export const CustomerSystem = {
         carriedProductName: BMSystem.getProductDisplayName(carriedProduct),
         carriedProductImagePath: carriedProduct.imagePath,
         carriedShelfId: carriedProduct.shelfId ?? customer.wantedShelfId ?? null,
+        carriedQuantity,
         targetShelfInstanceId: carriedProduct.shelfInstanceId ?? customer.targetShelfInstanceId ?? null,
         targetX: null,
         targetY: null
@@ -1637,7 +1928,7 @@ export const CustomerSystem = {
         return total;
       }
 
-      return total + 1;
+      return total + Math.max(1, Math.floor(Number(customer.carriedQuantity) || 1));
     }, 0);
   },
 
@@ -1686,24 +1977,39 @@ export const CustomerSystem = {
 
     const isWantedProductOutOfStock =
       reason === "wanted_product_out_of_stock";
+    const isLowSanitationCleanCustomer =
+      reason === "low_sanitation_clean_customer";
+    const shouldShowDepartureBubble =
+      isWantedProductOutOfStock || isLowSanitationCleanCustomer;
 
     const measuredCustomer = this.recordCustomerWaitMetric(customer);
     const leavingCustomer = {
       ...measuredCustomer,
       status: CUSTOMER_STATUS.LEAVING,
-      currentZone: isWantedProductOutOfStock
+      currentZone: shouldShowDepartureBubble
         ? CUSTOMER_ZONES.DOOR
         : CUSTOMER_ZONES.EXIT,
       targetZone: CUSTOMER_ZONES.EXIT,
       leaveReason: reason,
-      ...(isWantedProductOutOfStock
+      ...(shouldShowDepartureBubble
         ? {
             leavingRenderTime: 2,
-            bubbleText: "앗, 찾던 상품이 없네… 다음에 올게요."
+            bubbleText: isLowSanitationCleanCustomer
+              ? "매장이 조금 지저분하네요. 다음에 다시 올게요."
+              : "앗, 찾던 상품이 없네… 다음에 올게요."
           }
         : {}),
       hasReportedLeft: true
     };
+
+    if (isWantedProductOutOfStock) {
+      const recommendedIds = new Set(this.getCurrentDayScenario().recommendedProductIds ?? []);
+
+      if (recommendedIds.has(leavingCustomer.wantedProductId)) {
+        this.ensureFlowStats();
+        GameState.todayStats.popularProductLostCustomers += 1;
+      }
+    }
 
     EventBus.emit(EVENTS.CUSTOMER_LEFT, {
       ...this.createCustomerPayload(leavingCustomer),
@@ -1733,9 +2039,13 @@ export const CustomerSystem = {
     this.enrichCheckoutPayload(data, customer);
 
     const measuredCustomer = this.recordCustomerWaitMetric(customer);
+    const qualifiesForPositiveProfile =
+      measuredCustomer.positiveGuestRequiresFastCheckout !== true ||
+      Number(measuredCustomer.waitingElapsedTime) <= Math.max(1, Number(measuredCustomer.fastCheckoutSeconds) || 4);
     const shouldGrantPositiveBonus =
       measuredCustomer.isPositiveGuest === true &&
-      measuredCustomer.positiveGuestBonusApplied !== true;
+      measuredCustomer.positiveGuestBonusApplied !== true &&
+      qualifiesForPositiveProfile;
     const checkedOutCustomer = {
       ...measuredCustomer,
       status: CUSTOMER_STATUS.LEAVING,
@@ -1781,6 +2091,29 @@ export const CustomerSystem = {
       });
     }
 
+    const fastCheckoutTipGold =
+      checkedOutCustomer.traitId === CUSTOMER_TRAIT_IDS.QUICK &&
+      Number(checkedOutCustomer.waitingElapsedTime) <= Math.max(1, Number(checkedOutCustomer.fastCheckoutSeconds) || 4)
+        ? Math.max(0, Number(checkedOutCustomer.fastCheckoutTipGold) || 0)
+        : 0;
+
+    if (fastCheckoutTipGold > 0) {
+      EventBus.emit(EVENTS.REVENUE_CHANGED, {
+        day: GameState.day,
+        amount: fastCheckoutTipGold,
+        source: "quick_customer_tip",
+        customerId: checkedOutCustomer.id
+      });
+      EventBus.emit(POSITIVE_CUSTOMER_BONUS_GRANTED, {
+        day: GameState.day,
+        customerId: checkedOutCustomer.id,
+        customerTypeId: checkedOutCustomer.typeId,
+        tipGold: fastCheckoutTipGold,
+        satisfaction: 0,
+        message: `빠른 계산에 고마워하며 팁 ₩${fastCheckoutTipGold.toLocaleString("ko-KR")}을 남겼어요!`
+      });
+    }
+
     EventBus.emit(EVENTS.CUSTOMER_SATISFIED, {
       ...this.createCustomerPayload(checkedOutCustomer),
       checkoutId: data.checkoutId ?? null,
@@ -1817,7 +2150,10 @@ export const CustomerSystem = {
       return data;
     }
 
-    const quantity = Math.max(1, Math.floor(Number(data.quantity) || 1));
+    const quantity = Math.max(
+      1,
+      Math.floor(Number(data.quantity) || Number(customer.carriedQuantity) || Number(customer.wantedQuantity) || 1)
+    );
     const carriedProduct =
       getProductById(customer.carriedProductId) ??
       this.findStockedProductForRequest(
@@ -1932,6 +2268,13 @@ export const CustomerSystem = {
       customerTypeId: customer.typeId,
       customerTypeName: customer.typeName,
       entryDialogueText: customer.entryDialogueText ?? null,
+      traitId: customer.traitId ?? null,
+      traitLabel: customer.traitLabel ?? null,
+      traitIcon: customer.traitIcon ?? null,
+      wantedQuantity: Math.max(1, Math.floor(Number(customer.wantedQuantity) || 1)),
+      carriedQuantity: Math.max(0, Math.floor(Number(customer.carriedQuantity) || 0)),
+      positiveGuestProfileId: customer.positiveGuestProfileId ?? null,
+      positiveGuestProfileLabel: customer.positiveGuestProfileLabel ?? null,
 
       wantedProductId: customer.wantedProductId,
       wantedProductName: customer.wantedProductName,
@@ -1983,6 +2326,13 @@ export const CustomerSystem = {
       typeId: customer.typeId,
       typeName: customer.typeName,
       entryDialogueText: customer.entryDialogueText ?? null,
+      traitId: customer.traitId ?? null,
+      traitLabel: customer.traitLabel ?? null,
+      traitIcon: customer.traitIcon ?? null,
+      wantedQuantity: Math.max(1, Math.floor(Number(customer.wantedQuantity) || 1)),
+      carriedQuantity: Math.max(0, Math.floor(Number(customer.carriedQuantity) || 0)),
+      positiveGuestProfileId: customer.positiveGuestProfileId ?? null,
+      positiveGuestProfileLabel: customer.positiveGuestProfileLabel ?? null,
       wantedProductId: customer.wantedProductId,
       wantedProductName: customer.wantedProductName,
       carriedProductId: customer.carriedProductId ?? null,
@@ -2038,7 +2388,6 @@ export const CustomerSystem = {
       .filter((customer) => {
         const shouldRenderLeavingCustomer =
           customer.status === CUSTOMER_STATUS.LEAVING &&
-          customer.leaveReason === "wanted_product_out_of_stock" &&
           Number(customer.leavingRenderTime) > 0;
 
         return (

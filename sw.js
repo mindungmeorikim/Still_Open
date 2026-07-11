@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260712-v10-customer-ux-reward";
+const CACHE_NAME = "still-open-release-20260712-v11-gameplay-variety-ui-fit";
 
 const APP_SHELL = [
   "./",
@@ -10,6 +10,8 @@ const APP_SHELL = [
   "./config/analytics.config.js",
   "./systems/AnalyticsSystem.js",
   "./systems/CustomerSystem.js",
+  "./systems/PlayerActionSystem.js",
+  "./systems/StorePlayFeatureSystem.js",
   "./systems/GameFlowSystem.js",
   "./systems/PauseSystem.js",
   "./systems/RandomEventSystem.js",

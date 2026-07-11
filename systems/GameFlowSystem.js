@@ -924,7 +924,18 @@ export const GameFlowSystem = {
       nuisanceTimeoutCount: 0,
       nuisanceResponseTimeTotalMs: 0,
       nuisanceResponseCount: 0,
-      positiveGuestCount: 0
+      positiveGuestCount: 0,
+      popularProductRequestedCount: 0,
+      popularProductSoldQuantity: 0,
+      popularProductLostCustomers: 0,
+      customerTraitCounts: {},
+      productSalesById: {},
+      productRevenueById: {},
+      storeIncidentStartedCount: 0,
+      storeIncidentResolvedCount: 0,
+      storeIncidentFailedCount: 0,
+      shiftGoalCompleted: false,
+      shiftGoalRewardGold: 0
     };
   },
 

@@ -48,7 +48,29 @@ export const GameState = {
     nuisanceTimeoutCount: 0,
     nuisanceResponseTimeTotalMs: 0,
     nuisanceResponseCount: 0,
-    positiveGuestCount: 0
+    positiveGuestCount: 0,
+    popularProductRequestedCount: 0,
+    popularProductSoldQuantity: 0,
+    popularProductLostCustomers: 0,
+    customerTraitCounts: {},
+    productSalesById: {},
+    productRevenueById: {},
+    storeIncidentStartedCount: 0,
+    storeIncidentResolvedCount: 0,
+    storeIncidentFailedCount: 0,
+    shiftGoalCompleted: false,
+    shiftGoalRewardGold: 0
+  },
+
+  storePlayFeatures: {
+    day: 1,
+    demandPhaseId: "opening",
+    demandPhaseLabel: "영업 초반",
+    shiftGoal: null,
+    activeIncident: null,
+    incidentHistory: [],
+    incidentTriggerChecked: false,
+    incidentTriggerElapsedSeconds: 100
   },
 
   upgrades: [],

@@ -28,6 +28,7 @@ export const SANITATION_EVENTS = Object.freeze({
 });
 
 const SAVE_GAME_LOADED = "SAVE_GAME_LOADED";
+const STORE_INCIDENT_SANITATION_PENALTY_REQUESTED = "STORE_INCIDENT_SANITATION_PENALTY_REQUESTED";
 const DEFAULT_SANITATION = 100;
 const CLEANING_RECOVERY = 25;
 const CUSTOMER_MESS_PENALTY = 5;
@@ -68,6 +69,21 @@ export const SanitationSystem = {
     this.bindCustomerEvents();
     this.bindCleaningRequests();
     this.bindSaveEvents();
+    EventBus.on(STORE_INCIDENT_SANITATION_PENALTY_REQUESTED, (data = {}) => {
+      const amount = Math.max(0, Number(data.amount) || 0);
+
+      if (amount <= 0) return;
+
+      const result = this.decreaseSanitation(
+        amount,
+        data.reason ?? "store_incident"
+      );
+
+      EventBus.emit(SANITATION_EVENTS.MESSAGE_REQUESTED, {
+        message: `매장 돌발 상황으로 위생이 ${Math.abs(Number(result.amount) || amount)} 감소했습니다.`,
+        duration: 3000
+      });
+    });
     this.emitChanged("init");
   },
 

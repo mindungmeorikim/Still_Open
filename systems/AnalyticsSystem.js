@@ -37,6 +37,11 @@ const CUSTOMER_EVENT_OPENED = "CUSTOMER_EVENT_OPENED";
 const CUSTOMER_EVENT_CHOICE_SELECTED = "CUSTOMER_EVENT_CHOICE_SELECTED";
 const CUSTOMER_EVENT_RESPONSE_TIMEOUT = "CUSTOMER_EVENT_RESPONSE_TIMEOUT";
 const STAFF_ASSIST_TASK_COMPLETED = "STAFF_ASSIST_TASK_COMPLETED";
+const CUSTOMER_DEMAND_PHASE_CHANGED = "CUSTOMER_DEMAND_PHASE_CHANGED";
+const STORE_SHIFT_GOAL_COMPLETED = "STORE_SHIFT_GOAL_COMPLETED";
+const STORE_INCIDENT_STARTED = "STORE_INCIDENT_STARTED";
+const STORE_INCIDENT_RESOLVED = "STORE_INCIDENT_RESOLVED";
+const STORE_INCIDENT_FAILED = "STORE_INCIDENT_FAILED";
 const ANALYTICS_ERROR_MESSAGE_LIMIT = 500;
 
 const SHOP_SUCCESS_EVENTS = Object.freeze({
@@ -716,6 +721,12 @@ function trackCustomerFlowMetrics(data = {}) {
     ["ux:nuisance:timeout_count", Number(metrics.nuisanceTimeoutCount)],
     ["ux:nuisance:avg_response_ms", Number(metrics.averageNuisanceResponseMs)],
     ["ux:positive_guest:count", Number(metrics.positiveGuestCount)],
+    ["ux:popular_product:sold_quantity", Number(data.popularProductPerformance?.soldQuantity)],
+    ["ux:popular_product:lost_customers", Number(data.popularProductPerformance?.lostCustomers)],
+    ["ux:store_incident:started", Number(data.storePlayFeatures?.incidentStartedCount)],
+    ["ux:store_incident:resolved", Number(data.storePlayFeatures?.incidentResolvedCount)],
+    ["ux:store_incident:failed", Number(data.storePlayFeatures?.incidentFailedCount)],
+    ["ux:shift_goal:reward_gold", Number(data.storePlayFeatures?.shiftGoalRewardGold)],
     ["ux:staff:warehouse_help", Number(staff.warehouseHelpCount)],
     ["ux:staff:shelf_help", Number(staff.shelfHelpCount)],
     ["ux:staff:cleaning_help", Number(staff.cleaningHelpCount)]
@@ -737,6 +748,53 @@ function bindGameplayUxEvents() {
   EventBus.on(EVENTS.CUSTOMER_LEFT, (data = {}) => {
     AnalyticsSystem.trackDesignEvent(
       `customer:left:${normalizeAnalyticsToken(data.reason, "unknown")}`
+    );
+  });
+
+  EventBus.on(EVENTS.CUSTOMER_ENTERED, (data = {}) => {
+    if (data.traitId) {
+      AnalyticsSystem.trackDesignEvent(
+        `customer:trait:${normalizeAnalyticsToken(data.traitId, "none")}`
+      );
+    }
+
+    if (data.positiveProfileId) {
+      AnalyticsSystem.trackDesignEvent(
+        `customer:positive_profile:${normalizeAnalyticsToken(data.positiveProfileId, "guest")}`
+      );
+    }
+  });
+
+  EventBus.on(CUSTOMER_DEMAND_PHASE_CHANGED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `demand_phase:${normalizeAnalyticsToken(data.phaseId, "unknown")}`,
+      Math.max(0, Number(data.elapsedSeconds) || 0)
+    );
+  });
+
+  EventBus.on(STORE_SHIFT_GOAL_COMPLETED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `shift_goal:completed:${normalizeAnalyticsToken(data.goal?.id ?? data.goalId, "goal")}`,
+      Number(data.rewardGold) || null
+    );
+  });
+
+  EventBus.on(STORE_INCIDENT_STARTED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `store_incident:started:${normalizeAnalyticsToken(data.incident?.id ?? data.incidentId, "incident")}`
+    );
+  });
+
+  EventBus.on(STORE_INCIDENT_RESOLVED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `store_incident:resolved:${normalizeAnalyticsToken(data.incident?.id ?? data.incidentId, "incident")}`,
+      Math.max(0, Number(data.elapsedSeconds) || 0)
+    );
+  });
+
+  EventBus.on(STORE_INCIDENT_FAILED, (data = {}) => {
+    AnalyticsSystem.trackDesignEvent(
+      `store_incident:failed:${normalizeAnalyticsToken(data.incident?.id ?? data.incidentId, "incident")}`
     );
   });
 
