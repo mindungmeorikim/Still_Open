@@ -63,6 +63,22 @@ function callGameAnalytics(command, ...args) {
   }
 }
 
+
+function getResolvedSdkUrl() {
+  const configuredUrl = String(ANALYTICS_CONFIG.sdkUrl ?? "").trim();
+
+  if (!configuredUrl) {
+    return "https://unpkg.com/gameanalytics@5.0.0/dist/GameAnalytics.min.js";
+  }
+
+  // GameAnalytics 5.0.0의 비압축 브라우저 빌드는 CryptoJS를 전역 의존성으로 참조합니다.
+  // 공식 UMD 배포본인 min.js는 CryptoJS를 함께 포함하므로 브라우저/PWA에서는 min.js를 사용합니다.
+  return configuredUrl.replace(
+    /\/GameAnalytics\.js(?=([?#]|$))/i,
+    "/GameAnalytics.min.js"
+  );
+}
+
 function loadSdk() {
   if (sdkLoadPromise) {
     return sdkLoadPromise;
@@ -81,7 +97,7 @@ function loadSdk() {
     const script = existingScript ?? document.createElement("script");
     script.id = SDK_SCRIPT_ID;
     script.async = true;
-    script.src = ANALYTICS_CONFIG.sdkUrl;
+    script.src = getResolvedSdkUrl();
     script.crossOrigin = "anonymous";
 
     script.onload = () => {
