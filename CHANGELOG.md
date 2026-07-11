@@ -20,3 +20,4 @@
 - 하이라이트가 비어도 Day 요약 3줄이 항상 표시되도록 보강
 - 긴 하이라이트 문구 자동 축소 및 넘침 방지
 - SHA256SUMS.txt 최신 상태로 재생성
+- PWA 캐시를 v17-result-highlight-card로 갱신

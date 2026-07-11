@@ -1,6 +1,42 @@
-systems/ResultSystem.js
-ui/UIManager.js
-style.css
-SHA256SUMS.txt
-PATCH_MANIFEST.txt
-CHANGELOG.md
+Still Open gameplay variety + UI safe patch v4
+Baseline: Still_Open_customer_flow_nuisance_reward_final_v3
+
+OVERWRITE / ADD:
+- core/GameState.js
+- main.js
+- style.css
+- sw.js
+- systems/AnalyticsSystem.js
+- systems/CustomerSystem.js
+- systems/GameFlowSystem.js
+- systems/PlayerActionSystem.js
+- systems/ResultSystem.js
+- systems/SanitationSystem.js
+- systems/SaveSystem.js
+- systems/StorePlayFeatureSystem.js (NEW)
+- ui/UIManager.js
+- CHANGELOG.md
+
+REFERENCE DOCUMENTS:
+- PATCH_GUIDE_GAMEPLAY_VARIETY_UI_SAFE.md
+- TEST_REPORT_GAMEPLAY_VARIETY_UI_SAFE.md
+
+NOT INCLUDED:
+- Service combo
+- Large new modals
+- HUD layout changes
+- World coordinates / collision box changes
+
+ADDITIONAL PATCH — settlement highlight restore
+OVERWRITE:
+- systems/ResultSystem.js
+- ui/UIManager.js
+- style.css
+- sw.js
+- SHA256SUMS.txt
+- CHANGELOG.md
+
+CHANGES:
+- Restore today highlight as a green result card
+- Always show up to 3 highlight lines without ellipsis
+- Regenerate SHA256 manifest
