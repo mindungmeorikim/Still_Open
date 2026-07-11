@@ -1,4 +1,4 @@
-const CACHE_NAME = "still-open-release-20260712-v17-result-highlight-card";
+const CACHE_NAME = "still-open-release-20260712-v18-compact-highlight-card";
 
 const APP_SHELL = [
   "./",

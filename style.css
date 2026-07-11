@@ -33132,3 +33132,60 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight
     font-size: 9px !important;
   }
 }
+
+
+/* v18 — 오늘의 하이라이트를 매장 위생과 동일한 체크 카드 크기로 정렬 */
+#result-modal .result-check-highlight {
+  display: grid !important;
+  align-content: start !important;
+  min-width: 0 !important;
+  min-height: 128px !important;
+  height: auto !important;
+  padding: 8px !important;
+  overflow: hidden !important;
+}
+
+#result-modal .result-check-highlight .result-check-main {
+  display: grid !important;
+  gap: 0 !important;
+  margin-bottom: 7px !important;
+}
+
+#result-modal .result-check-highlight-list {
+  display: grid !important;
+  align-content: start !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+#result-modal .result-check-highlight li {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1.18 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+}
+
+@media (max-width: 760px) {
+  #result-modal .result-check-highlight {
+    min-height: 0 !important;
+  }
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  #result-modal .result-check-highlight li {
+    font-size: 9px !important;
+    line-height: 1.14 !important;
+  }
+}

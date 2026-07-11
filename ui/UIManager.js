@@ -14494,9 +14494,7 @@ renderShelfWarningIcons(node, shelfInstanceId) {
       <div class="result-check success result-check-highlight" aria-label="오늘의 영업 하이라이트">
         <div class="result-check-main">
           <span>오늘의 하이라이트</span>
-          <strong>기록</strong>
         </div>
-        <div class="result-check-value">${resultHighlights.length.toLocaleString("ko-KR")}줄 요약</div>
         <ul class="result-check-highlight-list">
           ${resultHighlights.map((highlight) => `<li>${highlight}</li>`).join("")}
         </ul>
@@ -14579,8 +14577,8 @@ renderShelfWarningIcons(node, shelfInstanceId) {
                 </div>
               `;
             }).join("")}
+            ${resultHighlightsMarkup}
           </div>
-          ${resultHighlightsMarkup}
         </section>
 
         <p class="result-next-step">${nextStepText}</p>

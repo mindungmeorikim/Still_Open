@@ -40,3 +40,20 @@ CHANGES:
 - Restore today highlight as a green result card
 - Always show up to 3 highlight lines without ellipsis
 - Regenerate SHA256 manifest
+
+ADDITIONAL PATCH — compact settlement highlight card
+OVERWRITE:
+- systems/ResultSystem.js
+- ui/UIManager.js
+- style.css
+- sw.js
+- SHA256SUMS.txt
+- PATCH_MANIFEST.txt
+- CHANGELOG.md
+
+CHANGES:
+- Place Today Highlight inside the same result-card grid as Store Sanitation
+- Remove Record / 3-line summary helper labels
+- Use concise information-style highlight copy
+- Exclude staff activity from highlight candidates
+- Keep up to 3 lines with auto text shrinking and no ellipsis

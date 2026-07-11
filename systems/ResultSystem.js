@@ -146,7 +146,19 @@ export const ResultSystem = {
     }
   },
 
-  createResultHighlights(stats = {}, staffResult = {}) {
+  createResultHighlights(stats = {}) {
+    const totalCustomers = Math.max(0, Number(stats.totalCustomers) || 0);
+    const checkoutSuccessCount = Math.max(0, Number(stats.checkoutSuccessCount) || 0);
+    const satisfaction = Math.max(0, Number(GameState.satisfaction) || 0);
+
+    if (checkoutSuccessCount <= 0) {
+      return [
+        `오늘 방문한 손님: ${totalCustomers.toLocaleString("ko-KR")}명`,
+        "내일 첫 판매 노리기!",
+        `현재 만족도: ${satisfaction.toLocaleString("ko-KR")}점`
+      ];
+    }
+
     const highlights = [];
     const productSales = stats.productSalesById && typeof stats.productSalesById === "object"
       ? stats.productSalesById
@@ -165,51 +177,47 @@ export const ResultSystem = {
     if (topProductEntry?.quantity > 0) {
       const product = getProductById(topProductEntry.productId);
       const name = product ? BMSystem.getProductDisplayName(product) : topProductEntry.productId;
-      highlights.push(`최고 매출 상품: ${name} · ${topProductEntry.quantity.toLocaleString("ko-KR")}개`);
+      highlights.push(`최고 매출 상품: ${name} ${topProductEntry.quantity.toLocaleString("ko-KR")}개`);
     }
 
     const popularSold = Math.max(0, Number(stats.popularProductSoldQuantity) || 0);
     const popularLost = Math.max(0, Number(stats.popularProductLostCustomers) || 0);
 
     if (popularSold > 0 || popularLost > 0) {
-      highlights.push(`추천 상품 판매 ${popularSold.toLocaleString("ko-KR")}개 · 품절 이탈 ${popularLost.toLocaleString("ko-KR")}명`);
+      const soldText = `판매 ${popularSold.toLocaleString("ko-KR")}개`;
+      const lostText = popularLost > 0
+        ? ` · 이탈 ${popularLost.toLocaleString("ko-KR")}명`
+        : "";
+      highlights.push(`추천 상품: ${soldText}${lostText}`);
     }
 
     if (stats.shiftGoalCompleted === true) {
-      highlights.push(`영업 중 목표 달성 · 보너스 ₩${Math.max(0, Number(stats.shiftGoalRewardGold) || 0).toLocaleString("ko-KR")}`);
-    } else {
-      const staffTotalAssist = Math.max(
-        0,
-        Number(staffResult.totalAssistCount) ||
-          Number(staffResult.warehouseHelpCount || 0) +
-          Number(staffResult.shelfHelpCount || 0) +
-          Number(staffResult.cleaningHelpCount || 0)
-      );
-
-      if (staffTotalAssist > 0) {
-        highlights.push(`알바가 오늘 ${staffTotalAssist.toLocaleString("ko-KR")}번 매장 운영을 도왔어요`);
-      } else if (Number(stats.storeIncidentResolvedCount) > 0) {
-        highlights.push(`매장 돌발 상황 ${Number(stats.storeIncidentResolvedCount).toLocaleString("ko-KR")}건을 해결했어요`);
-      } else if (Number(stats.positiveGuestCount) > 0) {
-        highlights.push(`칭찬 손님 ${Number(stats.positiveGuestCount).toLocaleString("ko-KR")}명이 응원하고 갔어요`);
-      }
+      highlights.push(`영업 목표 달성: +₩${Math.max(0, Number(stats.shiftGoalRewardGold) || 0).toLocaleString("ko-KR")}`);
     }
 
-    if (highlights.length === 0) {
-      const totalCustomers = Math.max(0, Number(stats.totalCustomers) || 0);
-      const checkoutSuccessCount = Math.max(0, Number(stats.checkoutSuccessCount) || 0);
-      const satisfaction = Math.max(0, Number(GameState.satisfaction) || 0);
+    const resolvedIncidentCount = Math.max(0, Number(stats.storeIncidentResolvedCount) || 0);
 
-      highlights.push(`오늘 손님 ${totalCustomers.toLocaleString("ko-KR")}명이 매장을 방문했어요`);
-
-      if (checkoutSuccessCount > 0) {
-        highlights.push(`계산 성공 ${checkoutSuccessCount.toLocaleString("ko-KR")}건으로 영업 흐름을 익혔어요`);
-      } else {
-        highlights.push("아직 계산 성공이 없어 내일 첫 판매를 노려보세요");
-      }
-
-      highlights.push(`현재 만족도 ${satisfaction.toLocaleString("ko-KR")}점으로 손님 반응을 유지했어요`);
+    if (resolvedIncidentCount > 0) {
+      highlights.push(`돌발 상황 해결: ${resolvedIncidentCount.toLocaleString("ko-KR")}건`);
     }
+
+    const positiveGuestCount = Math.max(0, Number(stats.positiveGuestCount) || 0);
+
+    if (positiveGuestCount > 0) {
+      highlights.push(`칭찬 손님 방문: ${positiveGuestCount.toLocaleString("ko-KR")}명`);
+    }
+
+    const fallbackHighlights = [
+      `계산 성공: ${checkoutSuccessCount.toLocaleString("ko-KR")}건`,
+      `오늘 방문한 손님: ${totalCustomers.toLocaleString("ko-KR")}명`,
+      `현재 만족도: ${satisfaction.toLocaleString("ko-KR")}점`
+    ];
+
+    fallbackHighlights.forEach((highlight) => {
+      if (highlights.length < 3) {
+        highlights.push(highlight);
+      }
+    });
 
     return highlights.slice(0, 3);
   },
