@@ -195,6 +195,22 @@ export const ResultSystem = {
       }
     }
 
+    if (highlights.length === 0) {
+      const totalCustomers = Math.max(0, Number(stats.totalCustomers) || 0);
+      const checkoutSuccessCount = Math.max(0, Number(stats.checkoutSuccessCount) || 0);
+      const satisfaction = Math.max(0, Number(GameState.satisfaction) || 0);
+
+      highlights.push(`오늘 손님 ${totalCustomers.toLocaleString("ko-KR")}명이 매장을 방문했어요`);
+
+      if (checkoutSuccessCount > 0) {
+        highlights.push(`계산 성공 ${checkoutSuccessCount.toLocaleString("ko-KR")}건으로 영업 흐름을 익혔어요`);
+      } else {
+        highlights.push("아직 계산 성공이 없어 내일 첫 판매를 노려보세요");
+      }
+
+      highlights.push(`현재 만족도 ${satisfaction.toLocaleString("ko-KR")}점으로 손님 반응을 유지했어요`);
+    }
+
     return highlights.slice(0, 3);
   },
 

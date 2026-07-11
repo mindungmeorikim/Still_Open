@@ -6027,7 +6027,7 @@ renderDebugCollisionBoxes() {
     const nodes = scope.querySelectorAll([
       ".store-shift-goal-card strong",
       ".store-shift-goal-card em",
-      ".result-highlight-panel li",
+      ".result-check-highlight li",
       ".customer-dialogue-text",
       "#system-message"
     ].join(","));
@@ -14490,16 +14490,18 @@ renderShelfWarningIcons(node, shelfInstanceId) {
     const resultHighlights = Array.isArray(resultData.resultHighlights)
       ? resultData.resultHighlights.slice(0, 3).filter(Boolean)
       : [];
-    const resultHighlightsMarkup = resultHighlights.length > 0
-      ? `
-        <section class="result-highlight-panel" aria-label="오늘의 영업 하이라이트">
-          <strong>오늘의 하이라이트</strong>
-          <ul>
-            ${resultHighlights.map((highlight) => `<li>${highlight}</li>`).join("")}
-          </ul>
-        </section>
-      `
-      : "";
+    const resultHighlightsMarkup = `
+      <div class="result-check success result-check-highlight" aria-label="오늘의 영업 하이라이트">
+        <div class="result-check-main">
+          <span>오늘의 하이라이트</span>
+          <strong>기록</strong>
+        </div>
+        <div class="result-check-value">${resultHighlights.length.toLocaleString("ko-KR")}줄 요약</div>
+        <ul class="result-check-highlight-list">
+          ${resultHighlights.map((highlight) => `<li>${highlight}</li>`).join("")}
+        </ul>
+      </div>
+    `;
     const sanitationResultRow = sanitation
       ? `
         <div class="result-row result-row-sanitation ${resultData.sanitationPenalty?.applies ? "is-warning" : ""}">

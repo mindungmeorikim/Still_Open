@@ -33085,3 +33085,50 @@ body:not(.is-tutorial-active) #result-modal.modal:not(.hidden) .result-highlight
     max-width: calc(100% - 34px);
   }
 }
+
+
+/* v10.1.2 — 정산 하이라이트를 우측 체크 박스와 동일한 초록 카드로 통합 */
+#result-modal .result-check-highlight {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  min-height: 0 !important;
+}
+
+#result-modal .result-check-highlight .result-check-main {
+  align-items: flex-start !important;
+}
+
+#result-modal .result-check-highlight .result-check-value {
+  margin-bottom: 3px !important;
+}
+
+#result-modal .result-check-highlight-list {
+  display: grid !important;
+  gap: 3px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+
+#result-modal .result-check-highlight li {
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  text-align: left !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  overflow-wrap: anywhere !important;
+  word-break: keep-all !important;
+}
+
+@media (max-width: 760px), (max-height: 560px) {
+  #result-modal .result-check-highlight li {
+    font-size: 9px !important;
+  }
+}
